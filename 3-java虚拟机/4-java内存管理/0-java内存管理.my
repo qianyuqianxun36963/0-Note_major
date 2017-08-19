@@ -1,0 +1,271 @@
+<h1><strong>java内存管理&nbsp;</strong></h1>
+
+<h2><strong>运行时数据区域</strong></h2>
+
+<p>&nbsp; &nbsp; &nbsp; &nbsp;&nbsp;<a href="http://lib.csdn.net/base/java" target="_blank" title="Java 知识库">Java</a>虚拟机在执行Java的过程中会把管理的内存划分为若干个不同的数据区域。这些区域有各自的用途，以及创建和销毁的时间，有的区域随着虚拟机进程的启动而存在，而有的区域则依赖线程的启动和结束而创建和销毁。</p>
+
+<p>&nbsp; &nbsp; &nbsp;&nbsp;&nbsp;Java虚拟机包括下面几个运行时数据区域：</p>
+
+<p><img alt="JVM运行时数据区" src="http://dl.iteye.com/upload/picture/pic/115264/4991b17e-a8b4-3d0a-a316-4651bb23da5e.png" style="height:398px; width:475px" /></p>
+
+<h3>内存区域简述：</h3>
+
+<h4>堆区:（存放所有new出来的对象；）</h4>
+
+<p>1.存储的全部是对象，每个对象都包含一个与之对应的class的信息。(class的目的是得到操作指令)&nbsp;<br />
+2.jvm只有一个堆区(heap)被所有线程共享，堆中不存放基本类型和对象引用，只存放对象本身</p>
+
+<h4>栈区:（存放基本类型的变量数据和对象的应用，对象（new出来的对象）本身并不存在栈中，而是存放在堆中或者常量池中（字符串常量对象存放在常量池中））</h4>
+
+<p>1.每个线程包含一个栈区，栈中只保存基础数据类型的对象（比如int i=1中1就是基础类型的对象）和自定义对象的引用(不是对象)而真实对象都存放在堆区中&nbsp;<br />
+2.每个栈中的数据(原始类型和对象引用)都是私有的，其他栈不能访问。&nbsp;<br />
+3.栈分为3个部分：基本类型变量区、执行环境上下文、操作指令区(存放操作指令)。</p>
+
+<h4>常量池：存放基本类型常量和字符串常量。</h4>
+
+<p>&nbsp;</p>
+
+<h3><strong>线程私有</strong></h3>
+
+<h3><strong>--程序计数器(PC寄存器)</strong></h3>
+
+<p>&nbsp; &nbsp; &nbsp; &nbsp;&nbsp;程序计数器是一块较小的区域，它的作用可以看做是当前线程所执行的字节码的行号指示器。在虚拟机的模型里，字节码指示器就是通过改变程序计数器的值来指定下一条需要执行的指令。分支，循环等基础功能就是依赖程序计数器来完成的。</p>
+
+<p>&nbsp; &nbsp; &nbsp; &nbsp; <span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif">每一条JVM线程都有自己的PC寄存器。</span></span>由于java虚拟机的多线程是通过轮流切换并分配处理器执行时间来完成，<strong>一个处理器同一时间只会执行一条线程中的指令</strong>。为了线程恢复后能够恢复正确的执行位置，每条线程都需要一个独立的程序计数器，以确保线程之间互不影响。所以程序计数器是&ldquo;线程私有&rdquo;的内存。</p>
+
+<p>&nbsp; &nbsp; &nbsp; &nbsp; 如果虚拟机正在执行的是一个Java方法，则计数器指定的是字节码指令对应的地址，如果正在执行的是一个本地方法，则计数器指定问空undefined。</p>
+
+<p>&nbsp; &nbsp; &nbsp; &nbsp; 程序计数器区域是Java虚拟机中唯一没有定义OutOfMemory异常的区域。</p>
+
+<h3><strong>--Java虚拟机栈</strong></h3>
+
+<p>&nbsp; &nbsp; &nbsp; &nbsp;&nbsp;和程序计数器一样也是线程私有的，生命周期与线程相同。<strong>虚拟机栈描述的是Java方法执行的内存模型：每个方法被执行的时候都会创建一个栈帧用于存储局部变量表，操作栈，动态链接，方法出口等信息。每一个方法被调用的过程就对应一个栈帧在虚拟机栈中从入栈到出栈的过程。</strong></p>
+
+<p>&nbsp; &nbsp; &nbsp; &nbsp; 通常所说的虚拟机运行时分为栈和堆，这里的栈指的就是虚拟机栈或者说虚拟机栈中的局部变量表部分。</p>
+
+<p>&nbsp; &nbsp; &nbsp; &nbsp; 局部变量表存放了编译器可知的各种基本数据类型、对象引用和returnAddress类型（指向一条字节码指令的地址）。局部变量表所需的内存空间在编译器完成分配，当进入一个方法时这个方法需要在帧中分配多大的内存空间是完全确定的，运行期间不会改变局部变量表的大小。（64为长度的long和double会占用两个局部变量空间，其他的数据类型占用一个）</p>
+
+<p>&nbsp; &nbsp; &nbsp; &nbsp;&nbsp;Java虚拟机栈可能出现两种类型的异常：1. 线程请求的栈深度大于虚拟机允许的栈深度，将抛出StackOverflowError。2.虚拟机栈空间可以动态扩展，当动态扩展是无法申请到足够的空间时，抛出OutOfMemory异常。</p>
+
+<p>&nbsp;</p>
+
+<h3><strong>--本地方法栈</strong></h3>
+
+<p>&nbsp; &nbsp; &nbsp; &nbsp; 本地方法栈和虚拟机栈基本类似，只不过Java虚拟机栈执行的是Java代码（字节码），本地方法栈中执行的是本地方法的服务。本地方法栈中也会抛出StackOverflowError和OutOfMemory异常。</p>
+
+<h3><strong>线程共享&nbsp; &nbsp; &nbsp; &nbsp;&nbsp;</strong></h3>
+
+<h3><strong>--堆</strong></h3>
+
+<p>&nbsp; &nbsp; &nbsp; &nbsp;&nbsp;<strong>堆是Java虚拟机所管理的内存中最大的一块。堆是所有线程共享的一块区域，在虚拟机启动时创建。堆的唯一目的是存放对象实例，</strong>几乎所有的对象实例都在这里分配，不过随着JIT编译器的发展和逃逸技术的成熟，栈上分配和标量替换技术使得这种情况发生着微妙的变化，对上分配正变得不那么绝对。</p>
+
+<p><em>附：在Java编程语言和环境中，即时编译器（JIT compiler，just-in-time compiler）是一个把Java的字节码（包括需要被解释的指令的程序）转换成可以直接发送给处理器的指令的程序。当你写好一个Java程序后，源语言的语句将由Java编译器编译成字节码，而不是编译成与某个特定的处理器硬件平台对应的指令代码（比如，Intel的Pentium微处理器或IBM的System/390处理器）。字节码是可以发送给任何平台并且能在那个平台上运行的独立于平台的代码。</em></p>
+
+<p>&nbsp; &nbsp; &nbsp; &nbsp;&nbsp;Java堆是垃圾收集器管理的主要区域，所以也称为&ldquo;GC堆&rdquo;。由于现在的垃圾收集器基本上都是采用分代收集<a href="http://lib.csdn.net/base/datastructure" target="_blank" title="算法与数据结构知识库">算法</a>，所以<strong>Java堆还可细分为:新生代和老生代</strong>。在细致一点可分为Eden空间，From Survivor空间，To Survivor空间。如果从内存分配的角度看，线程共享的Java堆可划分出多个线程私有的分配缓冲区。不过无论如何划分，都与存放内容无关，无论哪个区域，都是用来存放对象实例。细分的目的是为了更好的回收内存或者更快的分配内存。</p>
+
+<p>&nbsp; &nbsp; &nbsp; &nbsp;&nbsp;Java堆可以是物理上不连续的空间，只要逻辑上连续即可，主流的虚拟机都是按照可扩展的方式来实现的。如果当前对中没有内存完成对象实例的创建，并且不能在进行内存扩展，则会抛出OutOfMemory异常。</p>
+
+<p>&nbsp;</p>
+
+<h3><strong>--方法区(堆的一个逻辑分区)</strong></h3>
+
+<p>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp;<strong>方法区也是线程共享的区域，用于<u>存储已经被虚拟机加载的类信息，常量，静态变量和即时编译器（JIT）编译后的代码等数据</u>。</strong>Java虚拟机把方法区描述为堆的一个逻辑分区，不过方法区有一个别名Non-Heap(非堆)，用于区别于Java堆区。</p>
+
+<p>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp;Java虚拟机规范对这个区域的限制也非常宽松，除了可以是物理不连续的空间外，也允许固定大小和扩展性，还可以不实现垃圾收集。<strong>相对而言，垃圾收集行为在这个区域是比较少出现的（所以常量和静态变量的定义要多注意）</strong>。方法区的内存收集还是会出现，不过这个区域的内存收集主要是针对常量池的回收和对类型的卸载。</p>
+
+<p>&nbsp; &nbsp; &nbsp; &nbsp; 一般来说方法区的内存回收比较难以令人满意。当方法区无法满足内存分配需求时将抛出OutOfMemoryError异常。</p>
+
+<p>&nbsp;</p>
+
+<h3><strong>--运行时常量池（是方法区的一部分）</strong></h3>
+
+<p>&nbsp; &nbsp; &nbsp; &nbsp;<strong>运行时常量池是方法区的一部分，Class文件中除了有类的版本，字段，方法，接口等信息以外，还有一项信息是常量池用于存储编译器生成的各种字面量和符号引用，这部分信息将在类加载后存放到方法区的运行时常量池中</strong>。Java虚拟机对类的每一部分（包括常量池）都有严格的规定，每个字节用于存储哪种数据都必须有规范上的要求，这样才能够被虚拟机认可，装载和执行。一般来说，除了保存Class文件中描述的符号引用外，还会把翻译出来的直接引用也存储在运行时常量池中。</p>
+
+<p>&nbsp; &nbsp; &nbsp; &nbsp; 运行时常量池相对于Class文件常量池的另外一个重要特征是具备动态性，Java虚拟机并不要求常量只能在编译期产生，也就是并非预置入Class文件常量池的内容才能进入方法区的运行时常量池中，运行期间也可将新的常量放入常量池中。</p>
+
+<p>&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;常量池是方法区的一部分，所以受到内存的限制，当无法申请到足够内存时会抛出OutOfMemoryError异常。</p>
+
+<p>&nbsp; &nbsp; &nbsp; &nbsp;</p>
+
+<h2><strong>对象访问</strong></h2>
+
+<p>&nbsp; &nbsp; &nbsp; &nbsp;对象访问在Java语言中无处不在，即使是最简单的访问，也会涉及到Java栈，java堆，方法区这三个最重要的内存区域之间的关联关系。如下面的代码：</p>
+
+<p>&nbsp; &nbsp; &nbsp;&nbsp;<strong>&nbsp;Object obj = new Object();</strong></p>
+
+<p><strong>&nbsp; &nbsp; &nbsp; &nbsp;假设这段代码出现在方法体中，那么&ldquo;Object obj&rdquo;部分的语义将会反映到Java栈的本地变量表中，作为一个reference类型的数据存在。而&ldquo;new Object();&rdquo;部分的语义将会反应到Java堆中，形成一块存储Object类型所有实例数据值（Instance Data）的结构化内存，根据具体类型以及虚拟机实现的对象分布的不同，这块内存的长度是不固定的。另外，在JAVA堆中还必须包含能查找到此对象内存数据的地址信息，这些类型数据则存储在方法区中。</strong></p>
+
+<p><strong>&nbsp; &nbsp; &nbsp; &nbsp;由于reference类型在Java虚拟机中之规定了指向对象的引用，并没有规定这个引用要通过哪种方式去定位，以及访问到Java堆中的对象的具体位置，因此虚拟机实现的对象访问方式会有所不同。</strong>主流的访问方式有两种：句柄访问方式和直接指针。</p>
+
+<p>&nbsp; &nbsp; &nbsp; &nbsp;1. 如果使用句柄访问方式，Java堆中将会划分出一块内存来作为句柄池，reference中存储的就是对象的地址，而句柄中包含了对象实例数据和类型数据各自的具体地址信息。</p>
+
+<p>&nbsp; &nbsp; &nbsp;<img alt="" src="http://img.blog.csdn.net/20141116180521750?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQvT3lhbmdZdWp1bg==/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70/gravity/Center" /></p>
+
+<p>&nbsp; &nbsp; &nbsp; &nbsp;2. 如果通过直接指针方式访问，Java堆对象的布局中就必须考虑如何放置访问类型数据的相关信息，reference中直接存储的就是对象的地址。</p>
+
+<p>&nbsp; &nbsp; &nbsp; &nbsp;&nbsp;<img alt="" src="http://img.blog.csdn.net/20141116180738062?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQvT3lhbmdZdWp1bg==/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70/gravity/Center" /></p>
+
+<p>&nbsp; &nbsp; &nbsp; &nbsp; 两种方式各有优势，局并访问方式最大的好处是reference中存放的是稳定的句柄地址，在对象被移动时，只会改变句柄中的实例数据指针，而reference本身不需要被修改。而指针访问的最大优势是速度快，它节省了一次指针定位的开销，由于对象访问在Java中非常频繁，一次这类开销积少成多后也是一项非常可观的成本。</p>
+
+<p>&nbsp; &nbsp; &nbsp; &nbsp; 具体的访问方式都是有虚拟机指定的，虚拟机Sun HotSpot使用的是直接指针方式，不过从整个软件开发的范围来看，各种语言和框架使用句柄访问方式的情况十分常见。</p>
+
+<p>&nbsp;</p>
+
+<h2>java方法区</h2>
+
+<p>类型信息</p>
+
+<p>在一个jvm实例的内部，类型信息被存储在一个称为方法区的内存逻辑区中。类型信息是由类加载器在类加载时从类文件中提取出来的。类(静态)变量也存储在方法区中。</p>
+
+<p>jvm在运行应用时要大量使用存储在方法区中的类型信息。在类型信息的表示上，设计者除了要尽可能提高应用的运行效率外，还要考虑空间问题。根据不同的需求，jvm的实现者可以在时间和空间上追求一种平衡。</p>
+
+<p>因为方法区是被所有线程共享的，所以必须考虑数据的线程安全。假如两个线程都在试图找lava的类，在lava类还没有被加载的情况下，只应该有一个线程去加载，而另一个线程等待。</p>
+
+<p><strong>方法区的大小不必是固定的</strong>，jvm可以根据应用的需要动态调整。同样方法区也不必是连续的。方法区可以在堆(甚至是虚拟机自己的堆)中分配。jvm可以允许用户和程序指定方法区的初始大小，最小和最大尺寸。</p>
+
+<p>方法区同样存在垃圾收集，因为通过用户定义的类加载器可以动态扩展<a href="http://lib.csdn.net/base/java" target="_blank" title="Java 知识库">Java</a>程序，一些类也会成为垃圾。jvm可以回收一个未被引用类所占的空间，以使方法区的空间最小。</p>
+
+<p>类型信息&nbsp;<br />
+对每个加载的类型，jvm必须在方法区中存储以下类型信息：&nbsp;<br />
+一 这个类型的完整有效名&nbsp;<br />
+二 这个类型直接父类的完整有效名(除非这个类型是interface或是java.lang.Object，两种情况下都没有父类)&nbsp;<br />
+三 这个类型的修饰符(public,abstract, final的某个子集)&nbsp;<br />
+四 这个类型直接接口的全限定名的有序列表</p>
+
+<p>类型名称在java类文件和jvm中都以完整有效名出现。在java源代码中，完整有效名由类的所属包名称加一个&rdquo;.&rdquo;，再加上类名&nbsp;<br />
+组成。例如，类Object的所属包为java.lang，那它的完整名称为java.lang.Object，但在类文件里，所有的&rdquo;.&rdquo;都被&nbsp;<br />
+斜杠&ldquo;/&rdquo;代替，就成为java/lang/Object。完整有效名在方法区中的表示根据不同的实现而不同。</p>
+
+<p>除了以上的基本信息外，jvm还要为每个类型保存以下信息：&nbsp;</p>
+
+<p>1、类型的常量池( constant pool)&nbsp;<br />
+2、域(Field)信息&nbsp;<br />
+3、方法(Method)信息&nbsp;<br />
+4、除了常量外的所有静态(static)变量</p>
+
+<p>常量池&nbsp;<br />
+jvm为每个已加载的类型都维护一个常量池。常量池就是这个类型用到的常量的一个有序集合，包括实际的常量(string,&nbsp;<br />
+integer, 和floating point常量)和对类型，域和方法的符号引用。池中的数据项象数组项一样，是通过索引访问的。&nbsp;<br />
+因为常量池存储了一个类型所使用到的所有类型，域和方法的符号引用，所以它在java程序的动态链接中起了核心的作用。</p>
+
+<p>域信息&nbsp;<br />
+jvm必须在方法区中保存类型的所有域的相关信息以及域的声明顺序，&nbsp;<br />
+域的相关信息包括：&nbsp;<br />
+域名&nbsp;<br />
+域类型&nbsp;<br />
+域修饰符(public, private, protected,static,final volatile, transient的某个子集)</p>
+
+<p>方法信息&nbsp;<br />
+jvm必须保存所有方法的以下信息，同样域信息一样包括声明顺序&nbsp;<br />
+方法名&nbsp;<br />
+方法的返回类型(或 void)&nbsp;<br />
+方法参数的数量和类型(有序的)&nbsp;<br />
+方法的修饰符(public, private, protected, static, final, synchronized, native, abstract的一个子集)除了abstract和native方法外，其他方法还有保存方法的字节码(bytecodes)操作数栈和方法栈帧的局部变量区的大小&nbsp;<br />
+异常表</p>
+
+<p>类变量(&nbsp;<br />
+Class Variables&nbsp;<br />
+译者:就是类的静态变量，它只与类相关，所以称为类变量&nbsp;<br />
+)&nbsp;<br />
+类变量被类的所有实例共享，即使没有类实例时你也可以访问它。这些变量只与类相关，所以在方法区中，它们成为类数据在逻辑上的一部分。在jvm使用一个类之前，它必须在方法区中为每个non-final类变量分配空间。</p>
+
+<p>常量(被声明为final的类变量)的处理方法则不同，每个常量都会在常量池中有一个拷贝。non-final类变量被存储在声明它的&nbsp;<br />
+类信息内，而final类被存储在所有使用它的类信息内。</p>
+
+<p>对类加载器的引用&nbsp;<br />
+jvm必须知道一个类型是由启动加载器加载的还是由用户类加载器加载的。如果一个类型是由用户类加载器加载的，那么jvm会将这个类加载器的一个引用作为类型信息的一部分保存在方法区中。</p>
+
+<p>jvm在动态链接的时候需要这个信息。当解析一个类型到另一个类型的引用的时候，jvm需要保证这两个类型的类加载器是相同的。这对jvm区分名字空间的方式是至关重要的。</p>
+
+<p>对Class类的引用&nbsp;<br />
+jvm为每个加载的类型(译者：包括类和接口)都创建一个java.lang.Class的实例。而jvm必须以某种方式把Class的这个实例和存储在方法区中的类型数据联系起来。</p>
+
+<p>你可以通过Class类的一个静态方法得到这个实例的引用// A method declared in class java.lang.Class:&nbsp;<br />
+public static Class forName(String className);</p>
+
+<p>假如你调用forName(&ldquo;java.lang.Object&rdquo;)，你会得到与java.lang.Object对应的类对象。你甚至可以通过这个函数&nbsp;<br />
+得到任何包中的任何已加载的类引用，只要这个类能够被加载到当前的名字空间。如果jvm不能把类加载到当前名字空间，&nbsp;<br />
+forName就会抛出ClassNotFoundException。&nbsp;<br />
+(译者：熟悉COM的朋友一定会想到，在COM中也有一个称为 类对象(Class Object)的东东，这个类对象主要 是实现一种工厂模式，而java由于有了jvm这个中间 层，类对象可以很方便的提供更多的信息。这两种类对象 都是Singleton的)</p>
+
+<p>&nbsp;</p>
+
+<h2><strong>JVM的本地方法栈</strong></h2>
+
+<p>对于一个运行中的Java程序而言，它还可能会用到一些跟本地方法相关的数据区。当某个线程调用一个本地方法时，它就进入了一个全新的并且不再受虚拟机限制的世界。本地方法可以通过本地方法接口来访问虚拟机的运行时数据区，但不止如此，它还可以做任何它想做的事情。</p>
+
+<p>　　本地方法本质上时依赖于实现的，虚拟机实现的设计者们可以自由地决定使用怎样的机制来让Java程序调用本地方法。</p>
+
+<p>　　任何本地方法接口都会使用某种本地方法栈。当线程调用Java方法时，虚拟机会创建一个新的栈帧并压入Java栈。然而当它调用的是本地方法时，虚拟机会保持Java栈不变，不再在线程的Java栈中压入新的帧，虚拟机只是简单地动态连接并直接调用指定的本地方法。</p>
+
+<p>　　如果某个虚拟机实现的本地方法接口是使用C连接模型的话，那么它的本地方法栈就是C栈。当C程序调用一个C函数时，其栈操作都是确定的。传递给该函数的参数以某个确定的顺序压入栈，它的返回值也以确定的方式传回调用者。同样，这就是虚拟机实现中本地方法栈的行为。</p>
+
+<p>　　很可能本地方法接口需要回调Java虚拟机中的Java方法，在这种情况下，该线程会保存本地方法栈的状态并进入到另一个Java栈。</p>
+
+<p>　　下图描绘了这样一个情景，就是当一个线程调用一个本地方法时，本地方法又回调虚拟机中的另一个Java方法。</p>
+
+<p>　　这幅图展示了JAVA虚拟机内部线程运行的全景图。一个线程可能在整个生命周期中都执行Java方法，操作它的Java栈；或者它可能毫无障碍地在Java栈和本地方法栈之间跳转。　</p>
+
+<p><img alt="" src="http://images2015.cnblogs.com/blog/990532/201608/990532-20160827203431726-2050515871.png" /></p>
+
+<p>该线程首先调用了两个Java方法，而第二个Java方法又调用了一个本地方法，这样导致虚拟机使用了一个本地方法栈。假设这是一个C语言栈，其间有两个C函数，第一个C函数被第二个Java方法当做本地方法调用，而这个C函数又调用了第二个C函数。之后第二个C函数又通过本地方法接口回调了一个Java方法（第三个Java方法），最终这个Java方法又调用了一个Java方法（它成为图中的当前方法）。</p>
+
+<p>&nbsp;</p>
+
+<h2><strong>Java虚拟机栈</strong></h2>
+
+<p><a href="http://lib.csdn.net/base/java" target="_blank" title="Java 知识库">Java</a>栈空间是一块线程私有的内存空间，java堆和程序数据密切相关，那么java栈就是和线程执行密切相关。线程最基本的执行行为就是函数的调用。每次函数调用其实是通过java栈传递数据的。</p>
+
+<p><a href="http://lib.csdn.net/base/datastructure" target="_blank" title="算法与数据结构知识库">数据结构</a>中的栈的特性：先进后出，后进先出。FIFO.</p>
+
+<p>java内存中的栈跟数据结构中的特性相似也是FIFO.但是只支持进栈和出栈操作。</p>
+
+<p>java栈中保存的主要内容是栈帧。每一次函数调用都会有对应的栈帧被压进去java栈，执行完毕的时候被弹出java栈。如下图所示。</p>
+
+<p><img alt="" src="http://img.blog.csdn.net/20160402085853826?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQv/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70/gravity/Center" /></p>
+
+<p>&nbsp;</p>
+
+<p>函数1对应栈帧1，函数2对应栈帧2.函数3对应栈帧3.以此类推。</p>
+
+<p>函数1调用函数2，函数2调用函数3，函数3调用函数4，以此类推。</p>
+
+<p>函数1被调用的时候栈帧1入栈，函数2被调用的时候栈帧2入栈，以此类推。</p>
+
+<p>所以最后被调用的函数在栈顶，也是最先被弹出栈的。</p>
+
+<p>每一个栈帧保存着函数的局部变量、中间运算结果等数据。</p>
+
+<p>函数返回的时候，栈帧从java栈弹出。什么时候函数返回呢？两种情况：</p>
+
+<p>1.正常的return的时候。</p>
+
+<p>2.程序抛出异常。</p>
+
+<p>在一个栈帧内，至少包含局部变量表、操作数帧和帧数据区几部分。</p>
+
+<p>思考的问题：没一次函数调用生成栈帧，从而肯定会占用一定的栈空间。所以栈空间内存不足的时候，函数调用无法进行。当请求的栈深度大于最大栈深度的时候系统会抛出StackOverflowError异常。(内存溢出会在以后的章节深入的讲解和汇总)</p>
+
+<p>java虚拟机制定线程的最大栈空间参数为-Xss,这个参数决定了函数调用的最大深度。</p>
+
+<p>&nbsp;</p>
+
+<h2><strong>Java虚拟机栈-栈帧</strong></h2>
+
+<p><strong>&nbsp; &nbsp;&nbsp;</strong>&nbsp; 栈帧是用于支持虚拟机进行方法调用和方法执行的数据结构，他是虚拟机运行时数据区的虚拟机栈的栈元素。栈帧存储了方法的局部变量表、操作数栈、动态链接和方法的返回地址等信息。每一个方法从调用开始直至执行完成的过程，都对应的一个栈帧在虚拟机栈里入栈和出栈的过程。</p>
+
+<p><strong>&nbsp; &nbsp;</strong>&nbsp;&nbsp; 在编译程序代码的时候，栈帧中需要多大的局部变量表，多深的操作数栈都已经完全确定了，并且写入到方法表的Code属性中，因此一个栈帧需要多大的内存，不会受到程序运行期变量数据的影响。</p>
+
+<p>&nbsp; &nbsp; &nbsp;一个线程的方法调用链可能会很长，很多方法会同时处于执行状态。对于执行引擎来说，在当前活动的线程中，只有位于栈顶的栈帧才是有效的，成为当前栈帧，与这个栈帧相关联的方法成为当前方法。</p>
+
+<p>&nbsp; &nbsp; &nbsp;典型的栈帧概念模型如下图所示：</p>
+
+<p><img alt="" src="https://thumbnail0.baidupcs.com/thumbnail/d352ce46cec78470f1cb56b96be299d4?fid=2586325330-250528-162610827717971&amp;time=1500202800&amp;rt=sh&amp;sign=FDTAER-DCb740ccc5511e5e8fedcff06b081203-DDp4RGxe3jIiUMUHE9iYLTmteuk%3D&amp;expires=8h&amp;chkv=0&amp;chkbd=0&amp;chkpc=&amp;dp-logid=4564734749790564775&amp;dp-callid=0&amp;size=c710_u400&amp;quality=100&amp;vuk=-&amp;ft=video" style="height:700px; width:900px" /></p>
+
+<p>&nbsp;</p>
+
+<h3><strong>2.什么叫java的内存泄露</strong></h3>
+
+<p>在java中，内存泄漏就是存在一些被分配的对象，这些对象有下面两个特点，首先，这些对象是可达的，即在有向图中，存在通路可以与其相连（也就是说仍存在该内存对象的引用）；其次，这些对象是无用的，即程序以后不会再使用这些对象。如果对象满足这两个条件，这些对象就可以判定为Java中的内存泄漏，这些对象不会被GC所回收，然而它却占用内存。</p>
+
+<p>&nbsp;</p>

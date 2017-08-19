@@ -1,0 +1,248 @@
+<h2><strong>一、分布式协调技术</strong></h2>
+
+<p>在给大家介绍ZooKeeper之前先来给大家介绍一种技术&mdash;&mdash;分布式协调技术。那么什么是分布式协调技术？那么我来告诉大家，其实分布式协调技术 主要用来解决分布式环境当中多个进程之间的同步控制，让他们有序的去访问某种临界资源，防止造成&quot;脏数据&quot;的后果。这时，有人可能会说这个简单，写一个调 度算法就轻松解决了。说这句话的人，可能对分布式系统不是很了解，所以才会出现这种误解。如果这些进程全部是跑在一台机上的话，相对来说确实就好办了，问 题就在于他是在一个分布式的环境下，这时问题又来了，那什么是分布式呢？这个一两句话我也说不清楚，但我给大家画了一张图希望能帮助大家理解这方面的内 容，如果觉得不对尽可拍砖，来咱们看一下这张图，如图1.1所示。</p>
+
+<p>图 1.1 分布式系统图</p>
+
+<p><img alt="" src="http://images.cnitblog.com/blog/671563/201411/301534548096997.png" /></p>
+
+<p>给大家分析一下这张图，在这图中有三台机器，每台机器各跑一个应用程序。然后我们将这三台机器通过网络将其连接起来，构成一个系统来为用户提供服务，对用户来说这个系统的架构是透明的，他感觉不到我这个系统是一个什么样的架构。那么我们就可以把这种系统称作一个<strong>分布式系统</strong>。</p>
+
+<p>那我们接下来再分析一下，在这个分布式系统中如何对进程进行调度，我假设在第一台机器上挂载了一个资源，然后这三个物理分布的进程都要竞争这个资源，但我们又不希望他们同时进行访问，这时候我们就需要一个<strong>协调器</strong>，来让他们有序的来访问这个资源。这个协调器就是我们经常提到的那个<strong>锁</strong>，比如说&quot;进程-1&quot;在使用该资源的时候，会先去获得锁，&quot;进程1&quot;获得锁以后会对该资源保持<strong>独占</strong>，这样其他进程就无法访问该资源，&quot;进程1&quot;用完该资源以后就将锁释放掉，让其他进程来获得锁，那么通过这个锁机制，我们就能保证了分布式系统中多个进程能够有序的访问该临界资源。那么我们把这个分布式环境下的这个锁叫作<strong>分布式锁</strong>。这个分布式锁也就是我们<strong>分布式协调技术</strong>实现的核心内容，那么如何实现这个分布式呢，那就是我们后面要讲的内容。</p>
+
+<h2><strong>二、分布式锁的实现</strong></h2>
+
+<p>好我们知道，为了防止分布式系统中的多个进程之间相互干扰，我们需要一种分布式协调技术来对这些进程进行调度。而这个分布式协调技术的核心就是来实现这个分<strong>布式锁</strong>。那么这个锁怎么实现呢？这实现起来确实相对来说比较困难的。</p>
+
+<h3><strong>1.1 面临的问题</strong></h3>
+
+<p>在看了图1.1所示的分布式环境之后，有人可能会感觉这不是很难。无非是将原来在同一台机器上对进程调度的原语，通过网络实现在分布式环境中。是的，表面上是可以这么说。但是问题就在网络这，在分布式系统中，所有在同一台机器上的假设都不存在：因为网络是不可靠的。</p>
+
+<p>比如，在同一台机器上，你对一个服务的调用如果成功，那就是成功，如果调用失败，比如抛出异常那就是调用失败。但是在分布式环境中，由于网络的不可 靠，你对一个服务的调用失败了并不表示一定是失败的，可能是执行成功了，但是响应返回的时候失败了。还有，A和B都去调用C服务，在时间上 A还先调用一些，B后调用，那么最后的结果是不是一定A的请求就先于B到达呢？ 这些在同一台机器上的种种假设，我们都要重新思考，我们还要思考这些问题给我们的设计和编码带来了哪些影响。还有，在分布式环境中为了提升可靠性，我们往 往会部署多套服务，但是如何在多套服务中达到一致性，这在同一台机器上多个进程之间的同步相对来说比较容易办到，但在分布式环境中确实一个大难题。</p>
+
+<p>所以分布式协调远比在同一台机器上对多个进程的调度要难得多，而且如果为每一个分布式应用都开发一个独立的协调程序。一方面，协调程序的反复编写浪 费，且难以形成通用、伸缩性好的协调器。另一方面，协调程序开销比较大，会影响系统原有的性能。所以，急需一种高可靠、高可用的通用协调机制来用以协调分 布式应用。</p>
+
+<h3><strong>1.2 分布式锁的实现者</strong></h3>
+
+<p>目前，在分布式协调技术方面做得比较好的就是Google的Chubby还有Apache的ZooKeeper他们都是分布式锁的实现者。有人会问 既然有了Chubby为什么还要弄一个ZooKeeper，难道Chubby做得不够好吗？不是这样的，主要是Chbby是非开源的，Google自家 用。后来雅虎模仿Chubby开发出了ZooKeeper，也实现了类似的分布式锁的功能，并且将ZooKeeper作为一种开源的程序捐献给了 Apache，那么这样就可以使用ZooKeeper所提供锁服务。而且在分布式领域久经考验，它的可靠性，可用性都是经过理论和实践的验证的。所以我们 在构建一些分布式系统的时候，就可以以这类系统为起点来构建我们的系统，这将节省不少成本，而且bug也 将更少。</p>
+
+<p><img alt="" src="http://images.cnitblog.com/blog/671563/201411/301534551216968.png" /></p>
+
+<p><img alt="" src="http://images.cnitblog.com/blog/671563/201411/301534558566811.png" /></p>
+
+<h2><strong>三、ZooKeeper概述</strong></h2>
+
+<p>ZooKeeper是一种为分布式应用所设计的高可用、高性能且一致的开源协调服务，它提供了一项基本服务：<strong>分布式锁服务</strong>。由于ZooKeeper的开源特性，后来我们的开发者在分布式锁的基础上，摸索了出了其他的使用方法：<strong>配置维护、组服务、分布式消息队列</strong>、<strong>分布式通知/协调</strong>等。</p>
+
+<h4><strong>注意：</strong>ZooKeeper<strong>性能上的特点</strong>决定了它能够用在大型的、分布式的系统当中。从<strong>可靠性</strong>方面来说，它并不会因为一个节点的错误而崩溃。除此之外，它<strong>严格的序列访问控制</strong>意味着复杂的控制原语可以应用在客户端上。ZooKeeper在一致性、可用性、容错性的保证，也是ZooKeeper的成功之处，它获得的一切成功都与它采用的协议&mdash;&mdash;Zab协议是密不可分的，这些内容将会在后面介绍。</h4>
+
+<p>前面提到了那么多的服务，比如分布式锁、配置维护、组服务等，那它们是如何实现的呢，我相信这才是大家关心的东西。ZooKeeper在实现这些服务时，首先它设计一种新的<strong>数据结构&mdash;&mdash;Znode</strong>，然后在该数据结构的基础上定义了一些<strong>原语</strong>，也就是一些关于该数据结构的一些操作。有了这些数据结构和原语还不够，因为我们的ZooKeeper是工作在一个分布式的环境下，我们的服务是通过消息以网络的形式发送给我们的分布式应用程序，所以还需要一个<strong>通知机制</strong>&mdash;&mdash;Watcher机制。那么总结一下，ZooKeeper所提供的服务主要是通过：数据结构+原语+watcher机制，三个部分来实现的。那么我就从这三个方面，给大家介绍一下ZooKeeper。</p>
+
+<h2><strong>四、ZooKeeper数据模型</strong></h2>
+
+<h3><strong>4.1 ZooKeeper数据模型Znode</strong></h3>
+
+<p>ZooKeeper拥有一个层次的命名空间，这个和标准的文件系统非常相似，如下图3.1 所示。</p>
+
+<p>图4.1 ZooKeeper数据模型与文件系统目录树</p>
+
+<p><img alt="" src="http://images.cnitblog.com/blog/671563/201411/301534562152768.png" />&nbsp;<img alt="" src="http://images.cnitblog.com/blog/671563/201411/301534565743426.png" /></p>
+
+<p>从图中我们可以看出ZooKeeper的数据模型，在结构上和标准文件系统的非常相似，都是采用这种树形层次结构，ZooKeeper树中的每个节点被称为&mdash;Znode。和文件系统的目录树一样，ZooKeeper树中的每个节点可以拥有子节点。但也有不同之处：</p>
+
+<p><strong>(1) 引用方式</strong></p>
+
+<p>Zonde通过<strong>路径引用</strong>，如同Unix中的文件路径。路径必须是绝对的，因此他们必须由斜杠字符来<strong>开头</strong>。除此以外，他们必须是唯一的，也就是说每一个路径只有一个表示，因此这些路径不能改变。在ZooKeeper中，路径由Unicode字符串组成，并且有一些限制。字符串&quot;/zookeeper&quot;用以保存管理信息，比如关键配额信息。</p>
+
+<p><strong>(2)</strong>&nbsp;<strong>Znode结构</strong></p>
+
+<p>ZooKeeper命名空间中的Znode，兼具文件和目录两种特点。既像文件一样维护着数据、元信息、ACL、时间戳等数据结构，又像目录一样可以作为路径标识的一部分。图中的每个节点称为一个Znode。 每个Znode由3部分组成:</p>
+
+<p><strong>①</strong>&nbsp;stat：此为状态信息, 描述该Znode的版本, 权限等信息</p>
+
+<p><strong>②</strong>&nbsp;data：与该Znode关联的数据</p>
+
+<p><strong>③</strong>&nbsp;children：该Znode下的子节点</p>
+
+<p>ZooKeeper虽然可以关联一些数据，但并没有被设计为常规的数据库或者大数据存储，相反的是，它用来<strong>管理调度数据</strong>，比如分布式应用中的配置文件信息、状态信息、汇集位置等等。这些数据的共同特性就是它们都是很小的数据，通常以KB为大小单位。ZooKeeper的服务器和客户端都被设计为严格检查并限制每个Znode的数据大小至多1M，但常规使用中应该远小于此值。</p>
+
+<p><strong>(3) 数据访问</strong></p>
+
+<p>ZooKeeper中的每个节点存储的数据要被<strong>原子性的操作</strong>。也就是说读操作将获取与节点相关的所有数据，写操作也将替换掉节点的所有数据。另外，每一个节点都拥有自己的ACL(访问控制列表)，这个列表规定了用户的权限，即限定了特定用户对目标节点可以执行的操作。</p>
+
+<p><strong>(4) 节点类型</strong></p>
+
+<p>ZooKeeper中的节点有两种，分别为<strong>临时节点</strong>和<strong>永久节点</strong>。节点的类型在创建时即被确定，并且不能改变。</p>
+
+<p><strong>① 临时节点：</strong>该节点的生命周期依赖于创建它们的会话。一旦会话(Session)结束，临时节点将被自动删除，当然可以也可以手动删除。虽然每个临时的Znode都会绑定到一个客户端会话，但他们对所有的客户端还是可见的。另外，ZooKeeper的临时节点不允许拥有子节点。</p>
+
+<p><strong>② 永久节点：</strong>该节点的生命周期不依赖于会话，并且只有在客户端显示执行删除操作的时候，他们才能被删除。</p>
+
+<p><strong>(5)</strong>&nbsp;<strong>顺序节点</strong></p>
+
+<p>当创建Znode的时候，用户可以请求在ZooKeeper的路径结尾添加一个<strong>递增的计数</strong>。这个计数<strong>对于此节点的父节点来说</strong>是唯一的，它的格式为&quot;%10d&quot;(10位数字，没有数值的数位用0补充，例如&quot;0000000001&quot;)。当计数值大于2<sup>32</sup>-1时，计数器将溢出。</p>
+
+<p><strong>(6) 观察</strong></p>
+
+<p>客户端可以在节点上设置watch，我们称之为<strong>监视器</strong>。当节点状态发生改变时(Znode的增、删、改)将会触发watch所对应的操作。当watch被触发时，ZooKeeper将会向客户端发送且仅发送一条通知，因为watch只能被触发一次，这样可以减少网络流量。</p>
+
+<h3><strong>4.2 ZooKeeper中的时间</strong></h3>
+
+<p>ZooKeeper有多种记录时间的形式，其中包含以下几个主要属性：</p>
+
+<p><strong>(1) Zxid</strong></p>
+
+<p>致使ZooKeeper节点状态改变的每一个操作都将使节点接收到一个Zxid格式的时间戳，并且这个时间戳全局有序。也就是说，也就是说，每个对 节点的改变都将产生一个唯一的Zxid。如果Zxid1的值小于Zxid2的值，那么Zxid1所对应的事件发生在Zxid2所对应的事件之前。实际 上，ZooKeeper的每个节点维护者三个Zxid值，为别为：cZxid、mZxid、pZxid。</p>
+
+<p><strong>①</strong>&nbsp;<strong>cZxid</strong>： 是节点的创建时间所对应的Zxid格式时间戳。<br />
+<strong>② mZxid</strong>：是节点的修改时间所对应的Zxid格式时间戳。</p>
+
+<p>实现中Zxid是一个64为的数字，它高32位是epoch用来标识leader关系是否改变，每次一个leader被选出来，它都会有一个 新的epoch。低32位是个<strong>递增计数</strong>。&nbsp;<strong>(2) 版本号</strong></p>
+
+<p>对节点的每一个操作都将致使这个节点的版本号增加。每个节点维护着三个版本号，他们分别为：</p>
+
+<p><strong>① version</strong>：节点数据版本号<br />
+<strong>② cversion</strong>：子节点版本号<br />
+<strong>③ aversion</strong>：节点所拥有的ACL版本号</p>
+
+<h3><strong>4.3 ZooKeeper节点属性</strong></h3>
+
+<p>通过前面的介绍，我们可以了解到，一个节点自身拥有表示其状态的许多重要属性，如下图所示。</p>
+
+<p>图 4.2 Znode节点属性结构</p>
+
+<p><img alt="" src="http://images.cnitblog.com/blog/671563/201411/301534569026625.png" /></p>
+
+<h2><strong>五、ZooKeeper服务中操作</strong></h2>
+
+<p>在ZooKeeper中有9个基本操作，如下图所示：</p>
+
+<p>图 5.1 ZooKeeper类方法描述</p>
+
+<p><img alt="" src="http://images.cnitblog.com/blog/671563/201411/301534572468352.png" /></p>
+
+<p>更新ZooKeeper操作是有限制的。delete或setData必须明确要更新的Znode的版本号，我们可以调用exists找到。如果版本号不匹配，更新将会失败。</p>
+
+<p>更新ZooKeeper操作是非阻塞式的。因此客户端如果失去了一个更新(由于另一个进程在同时更新这个Znode)，他可以在不阻塞其他进程执行的情况下，选择重新尝试或进行其他操作。</p>
+
+<p>尽管ZooKeeper可以被看做是一个文件系统，但是处于便利，摒弃了一些文件系统地操作原语。因为文件非常的小并且使整体读写的，所以不需要打开、关闭或是寻地的操作。</p>
+
+<h2><strong>六、Watch触发器</strong></h2>
+
+<p><strong>(1) watch概述</strong></p>
+
+<p>ZooKeeper可以为所有的<strong>读操作</strong>设置watch，这些读操作包括：exists()、getChildren()及getData()。watch事件是<strong>一次性的触发器</strong>，当watch的对象状态发生改变时，将会触发此对象上watch所对应的事件。watch事件将被<strong>异步</strong>地发送给客户端，并且ZooKeeper为watch机制提供了有序的<strong>一致性保证</strong>。理论上，客户端接收watch事件的时间要快于其看到watch对象状态变化的时间。</p>
+
+<p><strong>(2) watch类型</strong></p>
+
+<p>ZooKeeper所管理的watch可以分为两类：</p>
+
+<p><strong>①</strong>&nbsp;数据watch(data&nbsp; watches)：<strong>getData</strong>和<strong>exists</strong>负责设置数据watch<br />
+<strong>②&nbsp;</strong>孩子watch(child watches)：<strong>getChildren</strong>负责设置孩子watch</p>
+
+<p>我们可以通过操作<strong>返回的数据</strong>来设置不同的watch：</p>
+
+<p><strong>① getData和exists：</strong>返回关于节点的数据信息<br />
+<strong>② getChildren：</strong>返回孩子列表</p>
+
+<p>因此</p>
+
+<p><strong>①&nbsp;</strong>一个成功的<strong>setData操作</strong>将触发Znode的数据watch</p>
+
+<p><strong>②</strong>&nbsp;一个成功的<strong>create操作</strong>将触发Znode的数据watch以及孩子watch</p>
+
+<p><strong>③&nbsp;</strong>一个成功的<strong>delete操作</strong>将触发Znode的数据watch以及孩子watch</p>
+
+<p><strong>(3) watch注册与处触发</strong></p>
+
+<p>图 6.1 watch设置操作及相应的触发器如图下图所示：</p>
+
+<p><img alt="" src="http://images.cnitblog.com/blog/671563/201411/301534579188980.png" /></p>
+
+<p><strong>①&nbsp;</strong>exists操作上的watch，在被监视的Znode<strong>创建</strong>、<strong>删除</strong>或<strong>数据更新</strong>时被触发。<br />
+<strong>②</strong>&nbsp;getData操作上的watch，在被监视的Znode<strong>删除</strong>或<strong>数据更新</strong>时被触发。在被创建时不能被触发，因为只有Znode一定存在，getData操作才会成功。<br />
+<strong>③</strong>&nbsp;getChildren操作上的watch，在被监视的Znode的子节点<strong>创建</strong>或<strong>删除</strong>，或是这个Znode自身被<strong>删除</strong>时被触发。可以通过查看watch事件类型来区分是Znode，还是他的子节点被删除：NodeDelete表示Znode被删除，NodeDeletedChanged表示子节点被删除。</p>
+
+<p>Watch由客户端所连接的ZooKeeper服务器在本地维护，因此watch可以非常容易地设置、管理和分派。当客户端连接到一个新的服务器 时，任何的会话事件都将可能触发watch。另外，当从服务器断开连接的时候，watch将不会被接收。但是，当一个客户端重新建立连接的时候，任何先前 注册过的watch都会被重新注册。</p>
+
+<p><strong>(4) 需要注意的几点</strong></p>
+
+<p><strong>Zookeeper的watch实际上要处理两类事件：</strong></p>
+
+<p><strong>① 连接状态事件</strong>(type=None, path=null)</p>
+
+<p>这类事件不需要注册，也不需要我们连续触发，我们只要处理就行了。</p>
+
+<p><strong>② 节点事件</strong></p>
+
+<p>节点的建立，删除，数据的修改。它是one time trigger，我们需要不停的注册触发，还可能发生事件丢失的情况。</p>
+
+<p>上面2类事件都在Watch中处理，也就是重载的<strong>process(Event event)</strong></p>
+
+<p><strong>节点事件的触发，通过函数exists，getData或getChildren来处理这类函数，有双重作用：</strong></p>
+
+<p><strong>① 注册触发事件</strong></p>
+
+<p><strong>② 函数本身的功能</strong></p>
+
+<p>函数的本身的功能又可以用异步的回调函数来实现,重载processResult()过程中处理函数本身的的功能。</p>
+
+<h2><strong>七、ZooKeeper应用举例　</strong></h2>
+
+<p>为了方便大家理解ZooKeeper，在此就给大家举个例子，看看ZooKeeper是如何实现的他的服务的，我以ZooKeeper提供的基本服务<strong>分布式锁</strong>为例。</p>
+
+<h3><strong>7.1 分布式锁应用场景</strong></h3>
+
+<p>在分布式锁服务中，有一种最典型应用场景，就是通过对集群进行<strong>Master选举</strong>，来解决分布式系统中的<strong>单点故障</strong>。什么是分布式系统中的单点故障：通常分布式系统采用主从模式，就是一个主控机连接多个处理节点。主节点负责分发任务，从节点负责处理任务，当我们的主节点发生故障时，那么整个系统就都瘫痪了，那么我们把这种故障叫作单点故障。如下图7.1和7.2所示：</p>
+
+<p><strong>图 7.1 主从模式分布式系统&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 图7.2 单点故障</strong></p>
+
+<p><img alt="" src="http://images.cnitblog.com/blog/671563/201411/301534587316566.png" style="height:314px; width:328px" />&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<img alt="" src="http://images.cnitblog.com/blog/671563/201411/301534591214279.png" style="height:289px; width:302px" /></p>
+
+<h3><strong>7.2 传统解决方案</strong></h3>
+
+<p>传统方式是采用一个备用节点，这个备用节点定期给当前主节点发送ping包，主节点收到ping包以后向备用节点发送回复Ack，当备用节点收到回复的时候就会认为当前主节点还活着，让他继续提供服务。如图7.3所示：</p>
+
+<p><strong>图 7.3 传统解决方案</strong></p>
+
+<p><img alt="" src="http://images.cnitblog.com/blog/671563/201411/301534594814937.png" style="height:249px; width:418px" /></p>
+
+<p>当主节点挂了，这时候备用节点收不到回复了，然后他就认为主节点挂了接替他成为主节点如下图7.4所示：</p>
+
+<p><strong>图 7.4传统解决方案</strong></p>
+
+<p><img alt="" src="http://images.cnitblog.com/blog/671563/201411/301534599495094.png" style="height:296px; width:496px" /></p>
+
+<p>但是这种方式就是有一个隐患，就是网络问题，来看一网络问题会造成什么后果，如下图7.5所示：</p>
+
+<p>图 7.5 网络故障</p>
+
+<p><img alt="" src="http://images.cnitblog.com/blog/671563/201411/301535005121522.png" style="height:276px; width:436px" /></p>
+
+<p>也就是说我们的主节点的并没有挂，只是在回复的时候网络发生故障，这样我们的备用节点同样收不到回复，就会认为主节点挂了，然后备用节点将他的Master实例启动起来，这样我们的分布式系统当中就有了两个主节点也就是---<strong>双Master</strong>， 出现Master以后我们的从节点就会将它所做的事一部分汇报给了主节点，一部分汇报给了从节点，这样服务就全乱了。为了防止出现这种情况，我们引入了 ZooKeeper，它虽然不能避免网络故障，但它能够保证每时每刻只有一个Master。我么来看一下ZooKeeper是如何实现的。</p>
+
+<h3><strong>7.3 ZooKeeper解决方案</strong></h3>
+
+<p><strong>(1) Master启动</strong></p>
+
+<p>在引入了Zookeeper以后我们启动了两个主节点，&quot;主节点-A&quot;和&quot;主节点-B&quot;他们启动以后，都向ZooKeeper去注册一个节点。我们 假设&quot;主节点-A&quot;锁注册地节点是&quot;master-00001&quot;，&quot;主节点-B&quot;注册的节点是&quot;master-00002&quot;，注册完以后进行选举，编号最 小的节点将在选举中获胜获得锁成为主节点，也就是我们的&quot;主节点-A&quot;将会获得锁成为主节点，然后&quot;主节点-B&quot;将被阻塞成为一个备用节点。那么，通过这 种方式就完成了对两个Master进程的调度。</p>
+
+<p>图7.6 ZooKeeper Master选举</p>
+
+<p><img alt="" src="http://images.cnitblog.com/blog/671563/201411/301535008567950.png" /></p>
+
+<p><strong>(2) Master故障</strong></p>
+
+<p>如果&quot;主节点-A&quot;挂了，这时候他所注册的节点将被自动删除，ZooKeeper会自动感知节点的变化，然后再次发出选举，这时候&quot;主节点-B&quot;将在选举中获胜，替代&quot;主节点-A&quot;成为主节点。</p>
+
+<p>图7.7 ZooKeeper Master选举</p>
+
+<p><img alt="" src="http://images.cnitblog.com/blog/671563/201411/301535012773122.png" /></p>
+
+<p><strong>(3) Master 恢复</strong></p>
+
+<p>图7.8 ZooKeeper Master选举</p>
+
+<p><img alt="" src="http://images.cnitblog.com/blog/671563/201411/301535016997293.png" /></p>
+
+<p>如果主节点恢复了，他会再次向ZooKeeper注册一个节点，这时候他注册的节点将会是&quot;master-00003&quot;，ZooKeeper会感知节点的变化再次发动选举，这时候&quot;主节点-B&quot;在选举中会再次获胜继续担任&quot;主节点&quot;，&quot;主节点-A&quot;会担任备用节点。</p>

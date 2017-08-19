@@ -1,0 +1,268 @@
+<h1>Python程序的执行原理</h1>
+
+<p>Python先把代码（.py文件）编译成字节码，交给字节码虚拟机，然后虚拟机一条一条执行字节码指令，从而完成程序的执行。</p>
+
+<h2><strong>1. 过程概述</strong></h2>
+
+<p>Python先把代码（.py文件）编译成字节码，交给字节码虚拟机，然后虚拟机一条一条执行(解释器工作:解码-运行)字节码指令，从而完成程序的执行。</p>
+
+<h2><strong>2. 字节码</strong></h2>
+
+<p>字节码在Python虚拟机程序里对应的是PyCodeObject对象。<br />
+.pyc文件是字节码在磁盘上的表现形式。</p>
+
+<h2><strong>3. pyc文件</strong></h2>
+
+<p>PyCodeObject对象的创建时机是模块加载的时候，即import。<br />
+Python test.py会对test.py进行编译成字节码并解释执行，但是不会生成test.pyc。<br />
+如果test.py加载了其他模块，如import util，Python会对util.py进行编译成字节码，生成util.pyc，然后对字节码解释执行。<br />
+如果想生成test.pyc，我们可以使用Python内置模块py_compile来编译。<br />
+加载模块时，如果同时存在.py和.pyc，Python会尝试使用.pyc，如果.pyc的编译时间早于.py的修改时间，则重新编译.py并更新.pyc。</p>
+
+<h2><strong>4. PyCodeObject</strong></h2>
+
+<p>Python代码的编译结果就是PyCodeObject对象。</p>
+
+<ol>
+	<li>typedef&nbsp;struct&nbsp;{&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;PyObject_HEAD&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;int&nbsp;co_argcount;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/*&nbsp;位置参数个数&nbsp;*/&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;int&nbsp;co_nlocals;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/*&nbsp;局部变量个数&nbsp;*/&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;int&nbsp;co_stacksize;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/*&nbsp;栈大小&nbsp;*/&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;int&nbsp;co_flags;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;PyObject&nbsp;*co_code;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/*&nbsp;字节码指令序列&nbsp;*/&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;PyObject&nbsp;*co_consts;&nbsp;&nbsp;&nbsp;&nbsp;/*&nbsp;所有常量集合&nbsp;*/&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;PyObject&nbsp;*co_names;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/*&nbsp;所有符号名称集合&nbsp;*/&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;PyObject&nbsp;*co_varnames;&nbsp;&nbsp;/*&nbsp;局部变量名称集合&nbsp;*/&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;PyObject&nbsp;*co_freevars;&nbsp;&nbsp;/*&nbsp;闭包用的的变量名集合&nbsp;*/&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;PyObject&nbsp;*co_cellvars;&nbsp;&nbsp;/*&nbsp;内部嵌套函数引用的变量名集合&nbsp;*/&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;/*&nbsp;The&nbsp;rest&nbsp;doesn&rsquo;t&nbsp;count&nbsp;for&nbsp;hash/cmp&nbsp;*/&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;PyObject&nbsp;*co_filename;&nbsp;&nbsp;/*&nbsp;代码所在文件名&nbsp;*/&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;PyObject&nbsp;*co_name;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/*&nbsp;模块名|函数名|类名&nbsp;*/&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;int&nbsp;co_firstlineno;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/*&nbsp;代码块在文件中的起始行号&nbsp;*/&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;PyObject&nbsp;*co_lnotab;&nbsp;&nbsp;&nbsp;&nbsp;/*&nbsp;字节码指令和行号的对应关系&nbsp;*/&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;void&nbsp;*co_zombieframe;&nbsp;&nbsp;&nbsp;/*&nbsp;for&nbsp;optimization&nbsp;only&nbsp;(see&nbsp;frameobject.c)&nbsp;*/&nbsp;</li>
+	<li>}&nbsp;PyCodeObject;&nbsp;</li>
+</ol>
+
+<h2><strong>5. pyc文件格式</strong></h2>
+
+<p>加载模块时，模块对应的PyCodeObject对象被写入.pyc文件，格式如下：</p>
+
+<p><img alt="" src="http://s1.51cto.com/wyfs01/M01/20/C0/wKioJlI3w9WTRYjAAADhdwIZ_0U308.jpg-wh_651x-s_2906548955.jpg" /></p>
+
+<h2><strong>6. 分析字节码</strong></h2>
+
+<h3><strong>6.1 解析PyCodeObject</strong></h3>
+
+<p>Python提供了内置函数compile可以编译Python代码和查看PyCodeObject对象，如下：</p>
+
+<p><strong>Python代码[test.py]</strong></p>
+
+<pre>
+
+&nbsp;</pre>
+
+<ol>
+	<li>s&nbsp;=&nbsp;&rdquo;hello&rdquo;&nbsp;</li>
+	<li>&nbsp;</li>
+	<li>def&nbsp;func():&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;print&nbsp;s&nbsp;</li>
+	<li>&nbsp;</li>
+	<li>func()&nbsp;</li>
+</ol>
+
+<p>在Python交互式shell里编译代码得到PyCodeObject对象:</p>
+
+<p><img alt="" src="http://s1.51cto.com/wyfs01/M00/20/C1/wKioOVI3w9XiomlhAAB13vZoJHc627.jpg-wh_600x-s_475310811.jpg" /></p>
+
+<p>dir(co)已经列出co的各个域，想查看某个域直接在终端输出即可：</p>
+
+<p><img alt="" src="http://s8.51cto.com/wyfs01/M00/20/C0/wKioJlI3w9WhJilxAAAc1Xs6Xog195.jpg" /></p>
+
+<p><strong>test.py的PyCodeObject</strong></p>
+
+<pre>
+
+&nbsp;</pre>
+
+<ol>
+	<li>co.co_argcount&nbsp;&nbsp;&nbsp;&nbsp;0&nbsp;</li>
+	<li>co.co_nlocals&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;0&nbsp;</li>
+	<li>co.co_names&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(&lsquo;s&rsquo;,&nbsp;&rsquo;func&rsquo;)&nbsp;</li>
+	<li>co.co_varnames&nbsp;&nbsp;&nbsp;&nbsp;(&lsquo;s&rsquo;,&nbsp;&rsquo;func&rsquo;)&nbsp;</li>
+	<li>co.co_consts&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(&lsquo;hello&rsquo;,&nbsp;&lt;code&nbsp;object&nbsp;func&nbsp;at&nbsp;0x2aaeeec57110,&nbsp;file&nbsp;&rdquo;test.py&rdquo;,&nbsp;line&nbsp;3&gt;,&nbsp;None)&nbsp;</li>
+	<li>co.co_code&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&rsquo;d\x00\x00Z\x00\x00d\x01\x00\x84\x00\x00Z\x01\x00e\x01\x00\x83\x00\x00\x01d\x02\x00S&rsquo;&nbsp;</li>
+</ol>
+
+<p>Python解释器会为函数也生成的字节码PyCodeObject对象，见上面的co_consts[1]</p>
+
+<p><strong>func的PyCodeObject</strong></p>
+
+<pre>
+
+&nbsp;</pre>
+
+<ol>
+	<li>func.co_argcount&nbsp;&nbsp;&nbsp;0&nbsp;</li>
+	<li>func.co_nlocals&nbsp;&nbsp;&nbsp;&nbsp;0&nbsp;</li>
+	<li>func.co_names&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(&lsquo;s&rsquo;,)&nbsp;</li>
+	<li>func.co_varnames&nbsp;&nbsp;&nbsp;()&nbsp;</li>
+	<li>func.co_consts&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(None,)&nbsp;</li>
+	<li>func.co_code&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lsquo;t\x00\x00GHd\x00\x00S&rsquo;&nbsp;</li>
+</ol>
+
+<p>co_code是指令序列，是一串二进制流，它的格式和解析方法见6.2。</p>
+
+<h3><strong>6.2 解析指令序列</strong></h3>
+
+<p><strong>指令序列co_code的格式</strong></p>
+
+<table align="center" border="1">
+	<thead>
+		<tr>
+			<th>opcode</th>
+			<th>oparg</th>
+			<th>opcode</th>
+			<th>opcode</th>
+			<th>oparg</th>
+			<th>&hellip;</th>
+		</tr>
+	</thead>
+	<tbody>
+		<tr>
+			<td>1 byte</td>
+			<td>2 bytes</td>
+			<td>1 byte</td>
+			<td>1 byte</td>
+			<td>2 bytes</td>
+			<td>&nbsp;</td>
+		</tr>
+	</tbody>
+</table>
+
+<p><strong>test.py的指令序列</strong></p>
+
+<p><img alt="" src="http://s2.51cto.com/wyfs01/M00/20/C0/wKioJlI3w9Xh_iYLAABU8BGDdEI066.jpg-wh_600x-s_2877670207.jpg" /></p>
+
+<p><strong>func函数的指令序列</strong></p>
+
+<p><img alt="" src="http://s4.51cto.com/wyfs01/M00/20/C1/wKioOVI3w9XR7OMIAAAk2l9r_FM767.jpg" /></p>
+
+<p>第一列表示以下几个指令在py文件中的行号;</p>
+
+<p>第二列是该指令在指令序列co_code里的偏移量;</p>
+
+<p>第三列是指令opcode的名称，分为有操作数和无操作数两种，opcode在指令序列中是一个字节的整数;</p>
+
+<p>第四列是操作数oparg，在指令序列中占两个字节，基本都是co_consts或者co_names的下标;</p>
+
+<p>第五列带括号的是操作数说明。</p>
+
+<h2><strong>7. 执行字节码</strong></h2>
+
+<p>Python虚拟机的原理就是模拟可执行程序再X86机器上的运行，X86的运行时栈帧如下图：</p>
+
+<p><img alt="" src="http://s8.51cto.com/wyfs01/M01/20/C1/wKioOVI3w9Wx4_TDAABhiD5DHqM396.jpg" /></p>
+
+<p>假如test.py用C语言来实现，会是下面这个样子：</p>
+
+<pre>
+
+&nbsp;</pre>
+
+<ol>
+	<li>const&nbsp;char&nbsp;*s&nbsp;=&nbsp;&ldquo;hello&rdquo;;&nbsp;</li>
+	<li>&nbsp;</li>
+	<li>void&nbsp;func()&nbsp;{&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;printf(&ldquo;%s\n&rdquo;,&nbsp;s);&nbsp;</li>
+	<li>}&nbsp;</li>
+	<li>&nbsp;</li>
+	<li>int&nbsp;main()&nbsp;{&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;func();&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;return&nbsp;0;&nbsp;</li>
+	<li>}&nbsp;</li>
+</ol>
+
+<p>Python虚拟机的原理就是模拟上述行为。当发生函数调用时，创建新的栈帧，对应Python的实现就是PyFrameObject对象。</p>
+
+<h3><strong>7.1 PyFrameObject</strong></h3>
+
+<pre>
+
+&nbsp;</pre>
+
+<ol>
+	<li>typedef&nbsp;struct&nbsp;_frame&nbsp;{&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;PyObject_VAR_HEAD&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;struct&nbsp;_frame&nbsp;*f_back;&nbsp;&nbsp;&nbsp;&nbsp;/*&nbsp;调用者的帧&nbsp;*/&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;PyCodeObject&nbsp;*f_code;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/*&nbsp;帧对应的字节码对象&nbsp;*/&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;PyObject&nbsp;*f_builtins;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/*&nbsp;内置名字空间&nbsp;*/&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;PyObject&nbsp;*f_globals;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/*&nbsp;全局名字空间&nbsp;*/&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;PyObject&nbsp;*f_locals;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/*&nbsp;本地名字空间&nbsp;*/&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;PyObject&nbsp;**f_valuestack;&nbsp;&nbsp;/*&nbsp;运行时栈底&nbsp;*/&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;PyObject&nbsp;**f_stacktop;&nbsp;&nbsp;&nbsp;&nbsp;/*&nbsp;运行时栈顶&nbsp;*/&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&hellip;&hellip;.&nbsp;</li>
+	<li>}&nbsp;</li>
+</ol>
+
+<p>那么对应Python的运行时栈就是这样子：</p>
+
+<p><img alt="" src="http://s6.51cto.com/wyfs01/M01/20/C0/wKioJlI3w9WwA7e5AABVLInf6W8238.jpg" /></p>
+
+<h3><strong>7.2 执行指令</strong></h3>
+
+<p>执行test.py的字节码时，会先创建一个栈帧，以下用f表示当前栈帧，执行过程注释如下：</p>
+
+<p><strong>test.py的符号名集合和常量集合</strong></p>
+
+<pre>
+
+&nbsp;</pre>
+
+<ol>
+	<li>co.co_names&nbsp;&nbsp;&nbsp;(&lsquo;s&rsquo;,&nbsp;&rsquo;func&rsquo;)&nbsp;</li>
+	<li>co.co_consts&nbsp;&nbsp;(&lsquo;hello&rsquo;,&nbsp;&lt;code&nbsp;object&nbsp;func&nbsp;at&nbsp;0x2aaeeec57110,&nbsp;file&nbsp;&rdquo;test.py&rdquo;,&nbsp;line&nbsp;3&gt;,&nbsp;None)&nbsp;</li>
+</ol>
+
+<p>test.py的指令序列</p>
+
+<p><img alt="" src="http://s9.51cto.com/wyfs01/M01/20/C0/wKioJlI3w9Xwo9_8AACWSRlliaw800.jpg" /></p>
+
+<p>上面的CALL_FUNCTION指令执行时，会创建新的栈帧，并执行func的字节码指令，以下用f表示当前栈帧，func的字节码执行过程如下：</p>
+
+<p><strong>func函数的符号名集合和常量集合</strong></p>
+
+<pre>
+
+&nbsp;</pre>
+
+<ol>
+	<li>func.co_names&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(&lsquo;s&rsquo;,)&nbsp;</li>
+	<li>func.co_consts&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(None,)&nbsp;</li>
+</ol>
+
+<p><strong>func函数的指令序列</strong></p>
+
+<p><img alt="" src="http://s7.51cto.com/wyfs01/M01/20/C1/wKioOVI3w9XTWIvhAABMXducswQ101.jpg" /></p>
+
+<h3><strong>7.3 查看栈帧</strong></h3>
+
+<p>如果你想查看当前栈帧，Python提供了sys._getframe()方法可以获取当前栈帧，你只需要在代码里加入代码如下：</p>
+
+<pre>
+
+&nbsp;</pre>
+
+<ol>
+	<li>def&nbsp;func():&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;import&nbsp;sys&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;frame&nbsp;=&nbsp;sys._getframe()&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;print&nbsp;frame.f_locals&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;print&nbsp;frame.f_globals&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;print&nbsp;frame.f_back.f_locals&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;#你可以打印frame的各个域&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;print&nbsp;s&nbsp;&nbsp;&nbsp;</li>
+</ol>
+
+<p>原文链接：<a href="http://tech.uc.cn/?p=1932">http://tech.uc.cn/?p=1932</a></p>

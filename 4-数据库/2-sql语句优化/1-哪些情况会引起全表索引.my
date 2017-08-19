@@ -1,0 +1,49 @@
+<h1>SQL中哪些情况会引起全表扫描</h1>
+
+<h2><strong>1、模糊查询效率很低：</strong></h2>
+
+<p>原因：like本身效率就比较低，应该尽量避免查询条件使用like；对于like &lsquo;%...%&rsquo;（全模糊）这样的条件，是无法使用索引的，全表扫描自然效率很低；另外，由于匹配算法的关系，模糊查询的字段长度越大，模糊查询效率越低。<br />
+<br />
+解决办法：首先尽量避免模糊查询，如果因为业务需要一定要使用模糊查询，则至少保证不要使用全模糊查询，对于右模糊查询，即like &lsquo;&hellip;%&rsquo;，是会使用索引的；左模糊like<br />
+<br />
+&lsquo;%...&rsquo;无法直接使用索引，但可以利用reverse + function index 的形式，变化成 like &lsquo;&hellip;%&rsquo;；全模糊是无法优化的，一定要的话考虑用搜索引擎。出于降低数据库服务器的负载考虑，尽可能地减少数据库模糊查询。</p>
+
+<h2><strong>2、查询条件中含有is null的select语句执行慢</strong></h2>
+
+<p>原因：Oracle 9i中，查询字段is null时单索引失效，引起全表扫描。<br />
+<br />
+解决方法：SQL语法中使用NULL会有很多麻烦，最好索引列都是NOT NULL的；对于is null，可以建立组合索引，nvl(字段,0),对表和索引analyse后，is null查询时可以重新启用索引查找,但是效率还不是值得肯定；is not null 时永远不会使用索引。一般数据量大的表不要用is null查询。</p>
+
+<h2>3<strong>、查询条件中使用了不等于操作符（&lt;&gt;、!=）的select语句执行慢</strong></h2>
+
+<p>原因：SQL中，不等于操作符会限制索引，引起全表扫描，即使比较的字段上有索引<br />
+<br />
+解决方法：通过把不等于操作符改成or，可以使用索引，避免全表扫描。例如，把column&lt;&gt;&rsquo;aaa&rsquo;，改成column&lt;&rsquo;aaa&rsquo; or column&gt;&rsquo;aaa&rsquo;，就可以使用索引了。</p>
+
+<h2><strong>4、or语句使用不当会引起全表扫描</strong></h2>
+
+<p>原因：where子句中比较的两个条件，一个有索引，一个没索引，使用or则会引起全表扫描。例如：where A==1 or B==2，A上有索引，B上没索引，则比较B=：2时会重新开始全表扫描。</p>
+
+<h2><strong>5、组合索引</strong></h2>
+
+<p>排序时应按照组合索引中各列的顺序进行排序，即使索引中只有一个列是要排序的，否则排序性能会比较差。</p>
+
+<p>例如：create index skip1 on emp5(job,empno，date);&nbsp;</p>
+
+<p>select job，empno from emp5 where job=&rsquo;manager&rsquo;and empno=&rsquo;10&rsquo; order by job,empno,date desc;</p>
+
+<p>实际上只是查询出符合job=&rsquo;manager&rsquo;and empno=&rsquo;10&rsquo;条件的记录并按date降序排列，但是写成order by date desc性能较差。</p>
+
+<h2><strong>6、Update 语句</strong></h2>
+
+<p>如果只更改1、2个字段，不要Update全部字段，否则频繁调用会引起明显的性能消耗，同时带来大量日志。</p>
+
+<h2>7<strong>、对于多张大数据量</strong></h2>
+
+<p><strong>（</strong>这里几百条就算大了）的表JOIN，要先分页再JOIN，否则逻辑读会很高，性能很差。</p>
+
+<h2><strong>8、select count(*) from table；</strong></h2>
+
+<p>这样不带任何条件的count会引起全表扫描，并且没有任何业务意义，是一定要杜绝的。</p>
+
+<p><strong>上面列出了通常会引起全表扫描的常用几种情况，更多的情况需要我们在工作、学习中实践、摸索，才能够深入分析SQL执行计划，找到适合自己系统的SQL数据库解决方案。</strong></p>

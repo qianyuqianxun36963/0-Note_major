@@ -1,0 +1,1494 @@
+<h1><a href="http://blog.csdn.net/u014292162/article/details/52277756">Spring中IOC配置xml实现和IOC注解实现</a></h1>
+
+<h2>1.什么是spring</h2>
+
+<p>spring 是分层的JavaSE/EE轻量级应用开源框架，已控制反转IOC和面向切面编程AOP为核心，提供了展现层SpringMVC,</p>
+
+<p>和持久层Srping JDBC以及事务管理等。</p>
+
+<p><a href="http://lib.csdn.net/base/javaee" target="_blank" title="Java EE知识库">spring</a>是一个开源框架，为了解决企业应用开发的复杂性而创建的，但现在不止应用于企业应用。<br />
+同时是一个轻量级的控制反转ioc和面向切面编程的容器框架<br />
+轻量：从大小与开销对于spring都是轻量的<br />
+通过控制反转ioc的技术达到松耦合<br />
+提供面向切面编程的丰富支持，允许通过分离应用的业务逻辑与系统服务进行内聚性的开发<br />
+包含并管理应用对象的配置和生命周期，这个意义是容器<br />
+将简单的组件配置组合成复杂的应用，这个意义是框架</p>
+
+<p>框架：框架就是定制一套规范或者规则（思想），大家在该规范或思想下进行工作，或者说<br />
+使用别人打好的舞台，你来做表演</p>
+
+<p>&nbsp;<br />
+框架于类库的区别<br />
+框架一般是封装了逻辑的，高内聚的，类库则是松散的工具集合<br />
+框架一般似乎专注于某一领域，类库则是更通用的</p>
+
+<p>&nbsp;</p>
+
+<p>spring带来了复杂的JavaEE的春天</p>
+
+<h2>2.特点</h2>
+
+<p>方便解耦，简化开发<br />
+spring提供ioc容器，可以将对象之间的依赖关系交给spring控制，避免硬编码所造成的过度程序耦合。<br />
+<br />
+<br />
+AOP编程支持<br />
+通过spring提供的aop功能，用户可以轻松的进行面向切面编程<br />
+<br />
+<br />
+声明事务的支持<br />
+用户可以通过spring来管理事务，提升开发效率<br />
+<br />
+<br />
+方便程序的测试<br />
+可以使用非容器的依赖的编程方式进行几乎所有的测试工作，在spring中，测试不再是<br />
+昂贵的操作，而是随手可做的事<br />
+方便集成各种优秀的框架<br />
+spring不排斥各种优秀的框架，相反spring可以降低各种框架的使用难度。如可以集成（struts、Hibernate）<br />
+<br />
+降低JavaEE API的使用难度<br />
+如JDBC、JavaMail、远程调用等</p>
+
+<p>spring源码设计精妙、结构清晰，研究源码可以快速提升<a href="http://lib.csdn.net/base/javase" target="_blank" title="Java SE知识库">Java</a>技术水平和开发应用水平</p>
+
+<p>&nbsp;</p>
+
+<p>&nbsp;</p>
+
+<h2>3.案例中使用的jar</h2>
+
+<p>&nbsp;</p>
+
+<p><img alt="" src="http://img.blog.csdn.net/20160822175417590?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQv/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70/gravity/Center" /></p>
+
+<p>&nbsp;</p>
+
+<h2>4.直入主题IOC</h2>
+
+<h4>4.1 小案例</h4>
+
+<p>&nbsp; &nbsp; 将对象的依赖交给配置文件来配置（配置文件的名字是可以任意的，不过一般写一个比较规范的名字）,这里使用IOC特性对类中的属性进行初始化</p>
+
+<p>&nbsp; &nbsp;使用junit来进行<a href="http://lib.csdn.net/base/softwaretest" target="_blank" title="软件测试知识库">测试</a>单元测试（注意：单元测试一些老的版本可能会存在bug,如calssNotFound...,建议下载新的junit版本）</p>
+
+<p>&nbsp; &nbsp;User.java 用户bean类</p>
+
+<ol start="1">
+	<li>package&nbsp;com.xxx.spring.ioc.bean;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>import&nbsp;java.io.Serializable;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>public&nbsp;class&nbsp;User&nbsp;implements&nbsp;Serializable&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;private&nbsp;static&nbsp;final&nbsp;long&nbsp;serialVersionUID&nbsp;=&nbsp;1L;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;private&nbsp;int&nbsp;id;&nbsp;//用户编号&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;private&nbsp;String&nbsp;name;&nbsp;//用户名&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;private&nbsp;int&nbsp;age;&nbsp;//用户年龄&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;private&nbsp;String&nbsp;gender;&nbsp;//用户性别&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;User()&nbsp;{}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;User(int&nbsp;id,&nbsp;String&nbsp;name,&nbsp;int&nbsp;age,&nbsp;String&nbsp;gender)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;super();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;this.id&nbsp;=&nbsp;id;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;this.name&nbsp;=&nbsp;name;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;this.age&nbsp;=&nbsp;age;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;this.gender&nbsp;=&nbsp;gender;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;int&nbsp;getId()&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return&nbsp;id;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;void&nbsp;setId(int&nbsp;id)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;this.id&nbsp;=&nbsp;id;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;String&nbsp;getName()&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return&nbsp;name;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;void&nbsp;setName(String&nbsp;name)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;this.name&nbsp;=&nbsp;name;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;int&nbsp;getAge()&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return&nbsp;age;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;void&nbsp;setAge(int&nbsp;age)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;this.age&nbsp;=&nbsp;age;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;String&nbsp;getGender()&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return&nbsp;gender;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;void&nbsp;setGender(String&nbsp;gender)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;this.gender&nbsp;=&nbsp;gender;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;@Override&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;String&nbsp;toString()&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return&nbsp;&quot;User&nbsp;[id=&quot;&nbsp;+&nbsp;id&nbsp;+&nbsp;&quot;,&nbsp;name=&quot;&nbsp;+&nbsp;name&nbsp;+&nbsp;&quot;,&nbsp;age=&quot;&nbsp;+&nbsp;age&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;+&nbsp;&quot;,&nbsp;gender=&quot;&nbsp;+&nbsp;gender&nbsp;+&nbsp;&quot;]&quot;;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>}&nbsp;&nbsp;</li>
+</ol>
+
+<p>&nbsp;</p>
+
+<p>Spring中bean的配置：</p>
+
+<p>&nbsp;</p>
+
+<p>这里说的Spring中的Bean概念，跟我们写JavaBean类不是一个概念，Spring中所有配置在xml中或使用spring来初始化的都叫Bean(dao,service,javaBean,Controller...)</p>
+
+<p><br />
+IOC控制反转，控制权的转移，应用程序本身不负责依赖对象的创建和维护，而是有外部容器的创建和维护<br />
+（就像我们需要房子，不是自己去画图纸，建房子而是去请开发商去做，或房屋中介住房）<br />
+什么被反转了呢&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;》获的对象的过程被反转了，依赖注入</p>
+
+<p>set.xml配置文件初始化User.java中的相关属性，可以使用junit对其进行单元测试</p>
+
+<ol start="1">
+	<li>&lt;?xml&nbsp;version=&quot;1.0&quot;&nbsp;encoding=&quot;UTF-8&quot;?&gt;&nbsp;&nbsp;</li>
+	<li>&lt;beans&nbsp;xmlns=&quot;http://www.springframework.org/schema/beans&quot;&nbsp;&nbsp;</li>
+	<li>xmlns:xsi=&quot;http://www.w3.org/2001/XMLSchema-instance&quot;&nbsp;&nbsp;</li>
+	<li>xsi:schemaLocation=&quot;http://www.springframework.org/schema/beans&nbsp;&nbsp;</li>
+	<li>http://www.springframework.org/schema/beans/spring-beans-3.2.xsd&quot;&gt;&nbsp;&nbsp;</li>
+	<li>&lt;!--&nbsp;name中的user可以取别名&nbsp;&nbsp;&nbsp;&nbsp;scope=&quot;prototype&quot;&nbsp;或singleton=&quot;false&quot;可以设置为非单例模式&nbsp;--&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;bean&nbsp;name=&quot;user,user2&quot;&nbsp;class=&quot;com.xxx.spring.ioc.bean.User&quot;&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;property&nbsp;name=&quot;id&quot;&nbsp;value=&quot;1&quot;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;property&nbsp;name=&quot;name&quot;&nbsp;value=&quot;tom&quot;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;property&nbsp;name=&quot;age&quot;&nbsp;value=&quot;20&quot;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;property&nbsp;name=&quot;gender&quot;&nbsp;value=&quot;male&quot;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;/bean&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&lt;/beans&gt;&nbsp;&nbsp;</li>
+</ol>
+
+<p>&nbsp;</p>
+
+<p>测试：</p>
+
+<ol start="1">
+	<li>import&nbsp;org.junit.AfterClass;&nbsp;&nbsp;</li>
+	<li>import&nbsp;org.junit.BeforeClass;&nbsp;&nbsp;</li>
+	<li>import&nbsp;org.junit.Test;&nbsp;&nbsp;</li>
+	<li>import&nbsp;org.springframework.beans.factory.BeanFactory;&nbsp;&nbsp;</li>
+	<li>import&nbsp;org.springframework.beans.factory.xml.XmlBeanFactory;&nbsp;&nbsp;</li>
+	<li>import&nbsp;org.springframework.context.ApplicationContext;&nbsp;&nbsp;</li>
+	<li>import&nbsp;org.springframework.context.support.ClassPathXmlApplicationContext;&nbsp;&nbsp;</li>
+	<li>import&nbsp;org.springframework.context.support.FileSystemXmlApplicationContext;&nbsp;&nbsp;</li>
+	<li>import&nbsp;org.springframework.core.io.ClassPathResource;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>import&nbsp;com.briup.spring.aop.bean.AwareTest;&nbsp;&nbsp;</li>
+	<li>import&nbsp;com.briup.spring.ioc.UserService;&nbsp;&nbsp;</li>
+	<li>import&nbsp;com.briup.spring.ioc.bean.Car;&nbsp;&nbsp;</li>
+	<li>import&nbsp;com.briup.spring.ioc.bean.Coll;&nbsp;&nbsp;</li>
+	<li>import&nbsp;com.briup.spring.ioc.bean.Life;&nbsp;&nbsp;</li>
+	<li>import&nbsp;com.briup.spring.ioc.bean.Student;&nbsp;&nbsp;</li>
+	<li>import&nbsp;com.briup.spring.ioc.bean.Teacher;&nbsp;&nbsp;</li>
+	<li>import&nbsp;com.briup.spring.ioc.bean.User;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>public&nbsp;class&nbsp;SpringTest&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;@BeforeClass&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;static&nbsp;void&nbsp;setUpBeforeClass()&nbsp;throws&nbsp;Exception&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;System.out.println(&quot;BeforeClass&nbsp;标注的方法&nbsp;会最先先被执行&quot;);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;@AfterClass&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;static&nbsp;void&nbsp;tearDownAfterClass()&nbsp;throws&nbsp;Exception&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;System.out.println(&quot;AfterClass&nbsp;标注的方法&nbsp;会最后执行&quot;);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;@Test&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;void&nbsp;test()&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;System.out.println(&quot;test&quot;);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//路经比较特殊&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;BeanFactory&nbsp;factory&nbsp;=&nbsp;new&nbsp;ClassPathXmlApplicationContext(&quot;com/xx/spring/chap1/ioc.xml&quot;);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;UserService&nbsp;service&nbsp;=&nbsp;(UserService)&nbsp;factory.getBean(&quot;service&quot;);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;service.getUserDao().save();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;@Test&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;void&nbsp;test2()&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;BeanFactory&nbsp;factory&nbsp;=&nbsp;new&nbsp;ClassPathXmlApplicationContext(&quot;com/xxx/spring/chap1/set.xml&quot;);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//User&nbsp;user&nbsp;=&nbsp;(User)&nbsp;factory.getBean(&quot;user&quot;);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//User&nbsp;user&nbsp;=&nbsp;(User)&nbsp;factory.getBean(&quot;user&quot;,User.class);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//User&nbsp;user&nbsp;=&nbsp;(User)&nbsp;factory.getBean(User.class);&nbsp;//只有唯一的bean的时候才使用这种方式&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//System.out.println(user);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;System.out.println(factory.getType(&quot;user&quot;));&nbsp;//获取user实例的类型&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;User&nbsp;user&nbsp;=&nbsp;(User)&nbsp;factory.getBean(&quot;user&quot;);&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;User&nbsp;user2&nbsp;=&nbsp;(User)&nbsp;factory.getBean(&quot;user&quot;);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;System.out.println(user&nbsp;==&nbsp;user2);//true&nbsp;--&nbsp;单例&nbsp;&nbsp;--这是可以控制的在配置文件中&nbsp;bean&nbsp;scope=&quot;prototype&quot;--&gt;会变成原型模式&nbsp;这时结果会是false&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;System.out.println(factory.isPrototype(&quot;user&quot;));//是否为原型&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;false&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;System.out.println(factory.isSingleton(&quot;user&quot;));//是否为单例&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;true&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;System.out.println(factory.isTypeMatch(&quot;user&quot;,&nbsp;User.class));//判断&nbsp;user实例是否为这种类型&nbsp;true&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;String[]&nbsp;str&nbsp;=&nbsp;factory.getAliases(&quot;user&quot;);&nbsp;//获取别名&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;for(int&nbsp;i=0;i&lt;str.length;i++){&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;System.out.println(str[i]);//user2&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>}&nbsp;&nbsp;</li>
+</ol>
+
+<p>&nbsp;</p>
+
+<p>&nbsp;</p>
+
+<p>使用junit测试时候，注解@BeforeClass的会先于@Test注解的方法运行，@AfterClass最后运行，junit相关的jar最好使用4.4以上的版本</p>
+
+<p>上边的案例factory.getBean(&quot;user&quot;,User.class);第一参数是set.xml文件中对应bean的name值或id值.</p>
+
+<p>&nbsp;</p>
+
+<p>&nbsp;</p>
+
+<ol start="1">
+	<li>System.out.println(user&nbsp;==&nbsp;user2);//true&nbsp;&nbsp;&nbsp;</li>
+</ol>
+
+<p>上边返回true,说明默认的是单利模式，可以通过scope改变其范围为scope=&quot;prototype&quot;变为原型模式，这样每次初始化bean对象的时候，都会返回一个新的。</p>
+
+<p>&nbsp;</p>
+
+<p>&nbsp;</p>
+
+<h4>4.2 Bean容器的初始化</h4>
+
+<p>Bean容器的初始化<br />
+两个基础包：<br />
+org.springframework.beans<br />
+org.springframework.context<br />
+BeanFactory提供配置结构和基本功能，加载并初始化Bean<br />
+ApplicationContext保存了Bean对象并在spring中被广泛使用</p>
+
+<p>&nbsp;</p>
+
+<p>集中常用的使用场景：</p>
+
+<p>常用的文件初始化方式：</p>
+
+<p>FileSystemXmlApplicationContext context = new FileSystemXmlApplicationContext(&quot;F:/workspace/appcontext.xml&quot;);<br />
+ApplicationContext ac = new ClassPathXmlApplicationContext(&quot;com/xxx/spring/chap1/coll.xml&quot;);<br />
+BeanFactory factory = new ClassPathXmlApplicationContext(&quot;com/xxxspring/chap1/ioc.xml&quot;);</p>
+
+<p>&nbsp;</p>
+
+<p>在webapp中的我们一般配置到web.xml文件中</p>
+
+<p>1.</p>
+
+<ol start="1">
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;!--&nbsp;配置contextConfigLocation指定spring将要使用的配置文件&nbsp;--&gt;&nbsp;&nbsp;</li>
+	<li>&lt;context-param&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;param-name&gt;contextConfigLocation&lt;/param-name&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;param-value&gt;classpath:action.xml,classpath:dao.xml,classpath:service.xml&lt;/param-value&gt;&nbsp;&nbsp;</li>
+	<li>&lt;/context-param&gt;&nbsp;&nbsp;</li>
+	<li>&lt;!--&nbsp;&nbsp;配置listner让spring读取配置文件--&gt;&nbsp;&nbsp;</li>
+	<li>&lt;listener&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;listener-class&gt;org.springframework.web.context.ContextLoaderListener&lt;/listener-class&gt;&nbsp;&nbsp;</li>
+	<li>&lt;/listener&gt;&nbsp;&nbsp;</li>
+</ol>
+
+<p>&nbsp;</p>
+
+<p>&nbsp;</p>
+
+<p>2.load-on-startup标签指定启动顺序，1为指在启动服务器的时候初始化容器</p>
+
+<ol start="1">
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;listener&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;listener-class&gt;org.springframework.web.context.ContextLoaderListener&lt;/listener-class&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;/listener&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>lt;servlet&gt;&nbsp;&nbsp;</li>
+	<li>&lt;servlet-name&gt;remoting&lt;/servlet-name&gt;&nbsp;&nbsp;</li>
+	<li>&lt;servlet-class&gt;org.springframework.web.servlet.DispatcherServlet&lt;/servlet-class&gt;&nbsp;&nbsp;</li>
+	<li>&lt;init-param&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;param-name&gt;contextConfigLocation&lt;/param-name&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;param-value&gt;classpath:spring-remoting-servlet.xml&lt;/param-value&gt;&nbsp;&nbsp;</li>
+	<li>&lt;/init-param&gt;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&lt;load-on-startup&gt;1&lt;/load-on-startup&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&lt;/servlet&gt;&nbsp;&nbsp;</li>
+</ol>
+
+<p>&nbsp;</p>
+
+<p>&nbsp;</p>
+
+<h4>4.3 Bean的两种注入方式</h4>
+
+<p>&nbsp;</p>
+
+<p>a.设置值注入</p>
+
+<p>b.构造注入</p>
+
+<p>&nbsp;</p>
+
+<p>设置值注入案例：</p>
+
+<p>基本类型的注入： 通过&lt;property name=&quot;属性名&quot;, value=&quot;属性值/&quot;&gt;为对应类对象初始化的值，这种方式必须在类中为对应的属性提供getxxx,setxx方法</p>
+
+<p>&nbsp;</p>
+
+<ol start="1">
+	<li>&lt;?xml&nbsp;version=&quot;1.0&quot;&nbsp;encoding=&quot;UTF-8&quot;?&gt;&nbsp;&nbsp;</li>
+	<li>&lt;beans&nbsp;xmlns=&quot;http://www.springframework.org/schema/beans&quot;&nbsp;&nbsp;</li>
+	<li>xmlns:xsi=&quot;http://www.w3.org/2001/XMLSchema-instance&quot;&nbsp;&nbsp;</li>
+	<li>xsi:schemaLocation=&quot;http://www.springframework.org/schema/beans&nbsp;&nbsp;</li>
+	<li>http://www.springframework.org/schema/beans/spring-beans-3.2.xsd&quot;&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;bean&nbsp;name=&quot;user,user2&quot;&nbsp;class=&quot;com.xxx.spring.ioc.bean.User&quot;&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;property&nbsp;name=&quot;id&quot;&nbsp;value=&quot;1&quot;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;property&nbsp;name=&quot;name&quot;&nbsp;value=&quot;tom&quot;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;property&nbsp;name=&quot;age&quot;&nbsp;value=&quot;20&quot;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;property&nbsp;name=&quot;gender&quot;&nbsp;value=&quot;male&quot;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;/bean&gt;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&lt;/beans&gt;&nbsp;&nbsp;</li>
+</ol>
+
+<p>&nbsp;</p>
+
+<p>&nbsp;</p>
+
+<p>引用类型的注入：&lt;property name=&quot;属性名&quot; ref=&quot;引用的bean&quot;&gt;&lt;/property&gt;,被引入的bean和引入处可以不在同一个xml文件中，因为所有bean都会被</p>
+
+<p>容器初始化并保存到容器中</p>
+
+<p>&nbsp;</p>
+
+<ol start="1">
+	<li>&lt;?xml&nbsp;version=&quot;1.0&quot;&nbsp;encoding=&quot;UTF-8&quot;?&gt;&nbsp;&nbsp;</li>
+	<li>&lt;beans&nbsp;xmlns=&quot;http://www.springframework.org/schema/beans&quot;&nbsp;&nbsp;</li>
+	<li>xmlns:xsi=&quot;http://www.w3.org/2001/XMLSchema-instance&quot;&nbsp;&nbsp;</li>
+	<li>xsi:schemaLocation=&quot;http://www.springframework.org/schema/beans&nbsp;&nbsp;</li>
+	<li>http://www.springframework.org/schema/beans/spring-beans-3.2.xsd&quot;&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;bean&nbsp;name=&quot;memberService&quot;&nbsp;class=&quot;com.xxx.run.service.impl.IMemberServiceImpl&quot;&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;property&nbsp;name=&quot;memberDao&quot;&nbsp;ref=&quot;memberDao&quot;&gt;&lt;/property&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;/bean&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;bean&nbsp;name=&quot;memberDao&quot;&nbsp;class=&quot;com.xxx.run.dao.impl.IMemberDaoImpl&quot;&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;/bean&gt;&nbsp;&nbsp;</li>
+	<li>&lt;/beans&gt;&nbsp;&nbsp;</li>
+</ol>
+
+<p><br />
+&nbsp;</p>
+
+<p>&nbsp;</p>
+
+<p>构造注入</p>
+
+<p>顾名思义，使用构造器对对象的初始化注入对应的值，实现方式有如下3种</p>
+
+<p>&nbsp;</p>
+
+<ol start="1">
+	<li>&lt;?xml&nbsp;version=&quot;1.0&quot;&nbsp;encoding=&quot;UTF-8&quot;?&gt;&nbsp;&nbsp;</li>
+	<li>&lt;beans&nbsp;xmlns=&quot;http://www.springframework.org/schema/beans&quot;&nbsp;&nbsp;</li>
+	<li>xmlns:xsi=&quot;http://www.w3.org/2001/XMLSchema-instance&quot;&nbsp;&nbsp;</li>
+	<li>xsi:schemaLocation=&quot;http://www.springframework.org/schema/beans&nbsp;&nbsp;</li>
+	<li>http://www.springframework.org/schema/beans/spring-beans-3.2.xsd&quot;&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;bean&nbsp;name=&quot;teacher&quot;&nbsp;class=&quot;com.xxx.spring.ioc.bean.Teacher&quot;&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;!--&nbsp;&nbsp;1.按照属性名赋值&nbsp;，调用有参数的构造器，顺序是参数顺序--&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;constructor-arg&nbsp;name=&quot;id&quot;&nbsp;value=&quot;1&quot;/&gt;&nbsp;&lt;!--&nbsp;person(int&nbsp;id,String&nbsp;name,&nbsp;String&nbsp;gender)&nbsp;--&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;constructor-arg&nbsp;name=&quot;name&quot;&nbsp;value=&quot;tom&quot;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;constructor-arg&nbsp;name=&quot;gender&quot;&nbsp;value=&quot;male&quot;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;!--&nbsp;2.index从0开始，按照属性在构造器中出现的顺序赋值&nbsp;索引值是构造器中的属性顺序&nbsp;--&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;!--&nbsp;&lt;constructor-arg&nbsp;index=&quot;0&quot;&nbsp;value=&quot;2&quot;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;constructor-arg&nbsp;index=&quot;1&quot;&nbsp;value=&quot;jack&quot;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;constructor-arg&nbsp;index=&quot;2&quot;&nbsp;value=&quot;male&quot;/&gt;&nbsp;--&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;!--&nbsp;3.按照类型进行赋值，如果出现相同的类型，按照属性在构造器中出现的顺序进行复制&nbsp;--&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;!--&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;constructor-arg&nbsp;type=&quot;int&quot;&nbsp;value=&quot;3&quot;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;constructor-arg&nbsp;type=&quot;String&quot;&nbsp;value=&quot;rose&quot;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;constructor-arg&nbsp;type=&quot;String&quot;&nbsp;value=&quot;female&quot;/&gt;&nbsp;--&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;/bean&gt;&nbsp;&nbsp;</li>
+	<li>&lt;/beans&gt;&nbsp;&nbsp;</li>
+</ol>
+
+<p><br />
+Teacher.java</p>
+
+<ol start="1">
+	<li>public&nbsp;class&nbsp;Teacher&nbsp;implements&nbsp;Serializable{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;private&nbsp;static&nbsp;final&nbsp;long&nbsp;serialVersionUID&nbsp;=&nbsp;1L;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;private&nbsp;int&nbsp;id;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;private&nbsp;String&nbsp;name;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;private&nbsp;String&nbsp;gender;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;Teacher(int&nbsp;id,&nbsp;String&nbsp;name,&nbsp;String&nbsp;gender)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;super();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;this.id&nbsp;=&nbsp;id;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;this.name&nbsp;=&nbsp;name;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;this.gender&nbsp;=&nbsp;gender;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;@Override&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;String&nbsp;toString()&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return&nbsp;&quot;Teacher&nbsp;[id=&quot;&nbsp;+&nbsp;id&nbsp;+&nbsp;&quot;,&nbsp;name=&quot;&nbsp;+&nbsp;name&nbsp;+&nbsp;&quot;,&nbsp;gender=&quot;&nbsp;+&nbsp;gender&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;+&nbsp;&quot;]&quot;;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>}&nbsp;&nbsp;</li>
+</ol>
+
+<p>测试</p>
+
+<ol start="1">
+	<li>@Test&nbsp;&nbsp;</li>
+	<li>public&nbsp;void&nbsp;test3()&nbsp;throws&nbsp;Exception&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;ApplicationContext&nbsp;ac&nbsp;=&nbsp;new&nbsp;ClassPathXmlApplicationContext(&quot;com/xxx/spring/chap1/constructor.xml&quot;);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;Teacher&nbsp;teacher&nbsp;=&nbsp;(Teacher)&nbsp;ac.getBean(&quot;teacher&quot;);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;System.out.println(teacher);//Teacher&nbsp;[id=1,&nbsp;name=tom,&nbsp;gender=male]&nbsp;&nbsp;</li>
+	<li>}&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+</ol>
+
+<p>&nbsp;</p>
+
+<h2>5.Bean</h2>
+
+<p>下边我们来了解一下Bean的：</p>
+
+<p>Bean的作用域<br />
+Bean的生命周期<br />
+Bean的自动装配<br />
+Resources和ResourceLoader</p>
+
+<p>&nbsp;</p>
+
+<h4>5.1 Bean的生命周期</h4>
+
+<p>Spring中Bean的声明周期的创建和初始化都是由Spring管理创建的，如下Life实现BeanNameAware,BeanFacotryAware,可以获取到一些对应的资源</p>
+
+<ol start="1">
+	<li>import&nbsp;org.springframework.beans.BeansException;&nbsp;&nbsp;</li>
+	<li>import&nbsp;org.springframework.beans.factory.BeanFactory;&nbsp;&nbsp;</li>
+	<li>import&nbsp;org.springframework.beans.factory.BeanFactoryAware;&nbsp;&nbsp;</li>
+	<li>import&nbsp;org.springframework.beans.factory.BeanNameAware;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>public&nbsp;class&nbsp;Life&nbsp;implements&nbsp;BeanNameAware,BeanFactoryAware{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;private&nbsp;String&nbsp;name;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;Life(){//一加载就会调到用&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;System.out.println(&quot;调用无参构造器&quot;);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;String&nbsp;getName()&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return&nbsp;name;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;void&nbsp;setName(String&nbsp;name)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;System.out.println(&quot;调用setName方法&quot;);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;this.name&nbsp;=&nbsp;name;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;void&nbsp;myInit()&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;System.out.println(&quot;调用myInit方法&quot;);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;void&nbsp;myDestory(){&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;System.out.println(&quot;调用myDestory方法&quot;);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;@Override&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;void&nbsp;setBeanFactory(BeanFactory&nbsp;arg0)&nbsp;throws&nbsp;BeansException&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;System.out.println(&quot;调用setBeanFactory方法&quot;);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;@Override&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;void&nbsp;setBeanName(String&nbsp;arg0)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;System.out.println(&quot;调用setBeanName方法&quot;);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>}&nbsp;&nbsp;</li>
+</ol>
+
+<p><br />
+life.xml文件配置</p>
+
+<p>init-method指明bean初始化需要执行的方法，</p>
+
+<p>destory-method指明bean销毁需要执行的方法</p>
+
+<ol start="1">
+	<li>&lt;?xml&nbsp;version=&quot;1.0&quot;&nbsp;encoding=&quot;UTF-8&quot;?&gt;&nbsp;&nbsp;</li>
+	<li>&lt;beans&nbsp;xmlns=&quot;http://www.springframework.org/schema/beans&quot;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;xmlns:xsi=&quot;http://www.w3.org/2001/XMLSchema-instance&quot;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;xmlns:u=&quot;http://www.springframework.org/schema/util&quot;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;xsi:schemaLocation=&quot;http://www.springframework.org/schema/beans&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;http://www.springframework.org/schema/beans/spring-beans-3.2.xsd&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;http://www.springframework.org/schema/util&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;http://www.springframework.org/schema/util/spring-util-3.2.xsd&quot;&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;!--&nbsp;调用set方法赋值后会调用myInit方法&nbsp;&nbsp;&nbsp;&nbsp;myDestory方法最后调用--&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;bean&nbsp;name=&quot;life&quot;&nbsp;class=&quot;com.xxx.spring.ioc.bean.Life&quot;&nbsp;init-method=&quot;myInit&quot;&nbsp;destroy-method=&quot;myDestory&quot;&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;property&nbsp;name=&quot;name&quot;&nbsp;value=&quot;tom&quot;&gt;&lt;/property&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;/bean&gt;&nbsp;&nbsp;</li>
+	<li>&lt;/beans&gt;&nbsp;&nbsp;</li>
+</ol>
+
+<p>测试：</p>
+
+<p>注意：在xml文件中指明destory-method需要执行的方法后，bean生命周期并不会自动去掉用myDestory方法，需要ac.detstory(),才会调用</p>
+
+<ol start="1">
+	<li>@Test&nbsp;&nbsp;</li>
+	<li>public&nbsp;void&nbsp;life(){//springBean的生命周期&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;ClassPathXmlApplicationContext&nbsp;ac&nbsp;=&nbsp;new&nbsp;ClassPathXmlApplicationContext(&quot;com/xxx/spring/chap2/life.xml&quot;);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;Life&nbsp;life&nbsp;=&nbsp;ac.getBean(&quot;life&quot;,Life.class);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;System.out.println(life);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;ac.destroy();&nbsp;&nbsp;</li>
+	<li>}&nbsp;&nbsp;</li>
+</ol>
+
+<p><br />
+结果：</p>
+
+<p>调用无参构造器<br />
+调用setName方法<br />
+调用setBeanName方法<br />
+调用setBeanFactory方法<br />
+调用myInit方法<br />
+com.briup.spring.ioc.bean.Life@4f0b5b<br />
+调用myDestory方法<br />
+AfterClass 标注的方法 会最后执行<br />
+&nbsp;</p>
+
+<h4>5.2 Bean作用域</h4>
+
+<p>介绍两个常用的</p>
+
+<p>scope=&quot;prototype&quot;原型模式，该模式下每次都会创建一个新的对象</p>
+
+<p>&lt;bean id=&quot;user&quot; class=&quot;com.briup.spring.ioc.bean.User&quot; scope=&quot;prototype&quot;&gt;&lt;/bean&gt;</p>
+
+<p>scope = &quot;singleton&quot; 单例模式，该模式下容器中只会存在一个这样的对象</p>
+
+<p>&lt;bean id=&quot;user&quot; class=&quot;com.briup.spring.ioc.bean.User&quot; scope=&quot;singleton&quot;&gt;&lt;/bean&gt;</p>
+
+<p>&nbsp;</p>
+
+<p>其他的参考：</p>
+
+<p>http://blog.csdn.net/fengruifang/article/details/6522262</p>
+
+<p>&nbsp;</p>
+
+<p>&nbsp;</p>
+
+<h4>5.3 Bean的自动装配</h4>
+
+<p>上边的Bean不管通过设置值注入，或通过构造器注入，我们都显示的声明了需要注入的值</p>
+
+<p>还有一种方式也比较常用，对应引用类型的注入我们可以通过autowire自动注入</p>
+
+<p>autowire有三种方式</p>
+
+<p>1.constructor</p>
+
+<p>如下边我们不显示声明address属性的值，autowire=&ldquo;constructor&rdquo;,即初Student中提供了</p>
+
+<p>public Student(Address address) {<br />
+this.address = address;<br />
+}</p>
+
+<p>构造器，初始化Bean的时候，会去容器中查找Address.class对象是否存在，如果存在，则注入到该bean对象中，如存在address为null</p>
+
+<ol start="1">
+	<li>&lt;?xml&nbsp;version=&quot;1.0&quot;&nbsp;encoding=&quot;UTF-8&quot;?&gt;&nbsp;&nbsp;</li>
+	<li>&lt;beans&nbsp;xmlns=&quot;http://www.springframework.org/schema/beans&quot;&nbsp;&nbsp;</li>
+	<li>xmlns:xsi=&quot;http://www.w3.org/2001/XMLSchema-instance&quot;&nbsp;&nbsp;</li>
+	<li>xsi:schemaLocation=&quot;http://www.springframework.org/schema/beans&nbsp;&nbsp;</li>
+	<li>http://www.springframework.org/schema/beans/spring-beans-3.2.xsd&quot;&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;bean&nbsp;name=&quot;student&quot;&nbsp;class=&quot;com.xxx.spring.ioc.bean.Student&quot;&nbsp;autowire=&quot;constructor&quot;&gt;&lt;!--&nbsp;byName&nbsp;byType&nbsp;&nbsp;constructor(一定要提供一个单参数的构造器)--&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;property&nbsp;name=&quot;name&quot;&nbsp;value=&quot;tom&quot;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;property&nbsp;name=&quot;age&quot;&nbsp;value=&quot;20&quot;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;!--&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;property&nbsp;name=&quot;address&quot;&nbsp;ref=&quot;address&quot;/&gt;&nbsp;--&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;/bean&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;bean&nbsp;name=&quot;address&quot;&nbsp;class=&quot;com.briup.spring.ioc.bean.Address&quot;&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;property&nbsp;name=&quot;country&quot;&nbsp;value=&quot;中国&quot;&gt;&lt;/property&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;property&nbsp;name=&quot;province&quot;&nbsp;value=&quot;江苏&quot;&gt;&lt;/property&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;property&nbsp;name=&quot;city&quot;&nbsp;value=&quot;苏州&quot;&gt;&lt;/property&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;/bean&gt;&nbsp;&nbsp;</li>
+	<li>&lt;/beans&gt;&nbsp;&nbsp;</li>
+</ol>
+
+<p>&nbsp;</p>
+
+<p>2.byName</p>
+
+<p>同理，autowire=&ldquo;byName&rdquo;,初始化bean的时候，会去容器中查找名字为address的bean注入到student对象中，Student需要提供对应的getxx,setxx</p>
+
+<p>3.byType</p>
+
+<p>autowire=&ldquo;byType&rdquo;,初始化bean的时候，会取容器中通过类型查找是否有Class为Address.class类型的对象，查找到则注入到student对象中需要提供getxx,setxx</p>
+
+<p>&nbsp;</p>
+
+<p>&nbsp;</p>
+
+<h4>5.3 Aware</h4>
+
+<p>spring中提供了许多已Aware结尾的类，这些类可以获取容器中的一些资源</p>
+
+<p>比如ApplicationContextAware，可以获取applicationCcontext中的内容</p>
+
+<p>BeanNameAware可以获取到Bean的beanName</p>
+
+<ol start="1">
+	<li>&lt;?xml&nbsp;version=&quot;1.0&quot;&nbsp;encoding=&quot;UTF-8&quot;?&gt;&nbsp;&nbsp;</li>
+	<li>&lt;beans&nbsp;xmlns=&quot;http://www.springframework.org/schema/beans&quot;&nbsp;&nbsp;</li>
+	<li>xmlns:xsi=&quot;http://www.w3.org/2001/XMLSchema-instance&quot;&nbsp;&nbsp;</li>
+	<li>xsi:schemaLocation=&quot;http://www.springframework.org/schema/beans&nbsp;&nbsp;</li>
+	<li>http://www.springframework.org/schema/beans/spring-beans-3.2.xsd&quot;&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;bean&nbsp;name=&quot;applicationAawareTest&quot;&nbsp;class=&quot;com.xxx.spring.aop.bean.AwareTest&quot;&gt;&lt;/bean&gt;&nbsp;&nbsp;</li>
+	<li>&lt;/beans&gt;&nbsp;&nbsp;</li>
+</ol>
+
+<p>&nbsp;</p>
+
+<ol start="1">
+	<li>import&nbsp;org.springframework.beans.BeansException;&nbsp;&nbsp;</li>
+	<li>import&nbsp;org.springframework.beans.factory.BeanNameAware;&nbsp;&nbsp;</li>
+	<li>import&nbsp;org.springframework.context.ApplicationContext;&nbsp;&nbsp;</li>
+	<li>import&nbsp;org.springframework.context.ApplicationContextAware;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>public&nbsp;class&nbsp;AwareTest&nbsp;implements&nbsp;ApplicationContextAware,BeanNameAware{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;@Override&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;void&nbsp;setApplicationContext(ApplicationContext&nbsp;applicationContext)&nbsp;throws&nbsp;BeansException&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;System.out.println(applicationContext.getBean(AwareTest.class));&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;@Override&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;void&nbsp;setBeanName(String&nbsp;beanName)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;System.out.println(beanName);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>}&nbsp;&nbsp;</li>
+</ol>
+
+<p><br />
+&nbsp;</p>
+
+<p>&nbsp;</p>
+
+<p>测试：</p>
+
+<ol start="1">
+	<li>@Test&nbsp;&nbsp;</li>
+	<li>public&nbsp;void&nbsp;AwareTest(){&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;ClassPathXmlApplicationContext&nbsp;ac&nbsp;=&nbsp;new&nbsp;ClassPathXmlApplicationContext(&quot;com/xxx/spring/chap1/aware.xml&quot;);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;AwareTest&nbsp;awareTest&nbsp;=&nbsp;ac.getBean(&quot;applicationAawareTest&quot;,AwareTest.class);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;System.out.println(awareTest);&nbsp;&nbsp;</li>
+	<li>}&nbsp;&nbsp;</li>
+</ol>
+
+<p><br />
+&nbsp;</p>
+
+<p><br />
+结果：</p>
+
+<p>applicationAawareTest<br />
+com.xxx.spring.aop.bean.AwareTest@1d8fe20<br />
+com.xxx.spring.aop.bean.AwareTest@1d8fe20</p>
+
+<p>&nbsp;</p>
+
+<h4>5.4 Resource统一文件资源接口</h4>
+
+<p>Resources针对文件的统一接口，用于操作本地资源或网络资源，或其他<br />
+-UrlResource:URL对应的资源，根据一个URL地址既可以构建<br />
+-ClassPathResource:获取类路径下的资源文件<br />
+-FileSystemResource：获取文件系统中的资源文件<br />
+-ServletContextResource:ServletContext封装资源，用于访问ServletContext环境下的资源<br />
+-InputStreamResource:针对输入流封装的资源<br />
+-ByteArrayResource:针对字节数组封装的资源</p>
+
+<p>&nbsp;</p>
+
+<p>&nbsp;ResourceLoader<br />
+-所用的application context 实现了ResourceLoader接口</p>
+
+<p>&nbsp;</p>
+
+<p>spring中ResourceLoader定义如下：</p>
+
+<ol start="1">
+	<li>&nbsp;public&nbsp;interface&nbsp;ResourceLoader{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Resource&nbsp;getResource(String&nbsp;location);&nbsp;&nbsp;</li>
+	<li>}&nbsp;&nbsp;</li>
+</ol>
+
+<p>&nbsp;getResource中location的写法有如下几种<br />
+prefix前缀 &nbsp;案例 &nbsp; &nbsp; 说明<br />
+classpath: &nbsp;classpath:com/briup/spring/chap2/life.xml 从classpath中加载<br />
+file： file:/data/life.xml用URL从文件系统中加载<br />
+http: http://myserver/logoo.png通过URL从网络加载<br />
+（none） &nbsp;/spring/chap2/life.xml 这种相对路径的写法依赖于ApplicationContext</p>
+
+<p>&nbsp;</p>
+
+<p>spring中的使用</p>
+
+<p>Resource template = ctx.getResource(&quot;some/resource/path/myTemplate.txt&quot;);<br />
+Resource template = ctx.getResource(&quot;classpath:some/resource/path/myTemplate.txt&quot;);<br />
+Resource template = ctx.getResource(&quot;file:some/resource/path/myTemplate.txt&quot;);</p>
+
+<p>&nbsp;</p>
+
+<p>案例：</p>
+
+<p>resources.xml</p>
+
+<ol start="1">
+	<li>&lt;?xml&nbsp;version=&quot;1.0&quot;&nbsp;encoding=&quot;UTF-8&quot;?&gt;&nbsp;&nbsp;</li>
+	<li>&lt;beans&nbsp;xmlns=&quot;http://www.springframework.org/schema/beans&quot;&nbsp;&nbsp;</li>
+	<li>xmlns:xsi=&quot;http://www.w3.org/2001/XMLSchema-instance&quot;&nbsp;&nbsp;</li>
+	<li>xsi:schemaLocation=&quot;http://www.springframework.org/schema/beans&nbsp;&nbsp;</li>
+	<li>http://www.springframework.org/schema/beans/spring-beans-3.2.xsd&quot;&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;bean&nbsp;name=&quot;resourcetest&quot;&nbsp;class=&quot;com.briup.spring.aop.bean.ResourceTest&quot;/&gt;&nbsp;&nbsp;</li>
+	<li>&lt;/beans&gt;&nbsp;&nbsp;</li>
+</ol>
+
+<p>ResourceTest.java</p>
+
+<p>由于spring中所有的applicationcontext实现了ContextLoader接口， 所以我们实现applicationContext即有了ResourceLoader的能力</p>
+
+<p>下边：classpath：在eclipse中会加载src下的config.txt文件</p>
+
+<ol start="1">
+	<li>import&nbsp;java.io.IOException;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>import&nbsp;org.springframework.beans.BeansException;&nbsp;&nbsp;</li>
+	<li>import&nbsp;org.springframework.context.ApplicationContext;&nbsp;&nbsp;</li>
+	<li>import&nbsp;org.springframework.context.ApplicationContextAware;&nbsp;&nbsp;</li>
+	<li>import&nbsp;org.springframework.core.io.Resource;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>//所有的ApplicationContext实现了ResourceLoader接口&nbsp;&nbsp;</li>
+	<li>public&nbsp;class&nbsp;ResourceTest&nbsp;implements&nbsp;ApplicationContextAware{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;private&nbsp;ApplicationContext&nbsp;ApplicationContext;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;@Override&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;void&nbsp;setApplicationContext(ApplicationContext&nbsp;applicationContext)&nbsp;throws&nbsp;BeansException&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;this.ApplicationContext&nbsp;=&nbsp;applicationContext;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;void&nbsp;resource()&nbsp;throws&nbsp;IOException{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//Resource&nbsp;resource&nbsp;=&nbsp;ApplicationContext.getResource(&quot;config.txt&quot;);//默认为classpath&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//Resource&nbsp;resource&nbsp;=&nbsp;ApplicationContext.getResource(&quot;classpath:config.txt&quot;);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//Resource&nbsp;resource&nbsp;=&nbsp;ApplicationContext.getResource(&quot;file:D:\\workspace\\xnxy_spring\\src\\config.txt&quot;);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Resource&nbsp;resource&nbsp;=&nbsp;ApplicationContext.getResource(&quot;url:http://repo.springsource.org/libs-release-local/org/springframework/spring/3.2.4.RELEASE/spring-framework-3.2.4.RELEASE-dist.zip&quot;);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;System.out.println(resource.getFilename());//获取文件名&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;System.out.println(resource.contentLength());&nbsp;//获取文件长度&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;System.out.println(resource.getInputStream());//获取输入流&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>}&nbsp;&nbsp;</li>
+</ol>
+
+<p><br />
+&nbsp;</p>
+
+<p>&nbsp;</p>
+
+<p>测试：</p>
+
+<ol start="1">
+	<li>@Test&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;void&nbsp;ResourceTest(){&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ClassPathXmlApplicationContext&nbsp;ac&nbsp;=&nbsp;new&nbsp;ClassPathXmlApplicationContext(&quot;com/briup/spring/chap1/resources.xml&quot;);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ResourceTest&nbsp;resourceTest&nbsp;=&nbsp;ac.getBean(&quot;resourcetest&quot;,ResourceTest.class);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;try&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;resourceTest.resource();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;catch&nbsp;(IOException&nbsp;e)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;e.printStackTrace();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+</ol>
+
+<p>&nbsp;</p>
+
+<h2>6.Bean容器的注解实现</h2>
+
+<p>下边我们主要了解如下使用：</p>
+
+<p><br />
+Classpath扫描与组件管理<br />
+类的自动检测与注册Bean<br />
+&lt;context:annotation-config/&gt;<br />
+@Component, @Repository, @Service, @Constroller<br />
+@Required<br />
+@Autowired<br />
+@Qualifier<br />
+@Resource</p>
+
+<p>&nbsp;</p>
+
+<h4>6.1 classpath扫描与组件管理</h4>
+
+<p>从Spring3.0开始，Spring JavaConfig项目提供了很多特性，包括使用java而不是XML定义Bean,比如<br />
+@Configuration, @Bean, @Import, @DependsOn<br />
+@Component是Spring中的一个通用注解，可以用于任何Bean,相当于注解的超类,如果不知道位于那个层，一般使用该注解<br />
+@Repository, @Service, @Controller是更具有针对性的注解<br />
+- @Repository,通常用于注解DAO,即持久层的注解<br />
+- @Service,通常用于追注解Service类，即服务层<br />
+- @Controller通常用于注解Controller，即控制层（MVC）</p>
+
+<p>&nbsp;</p>
+
+<p>&nbsp;</p>
+
+<h4>6.2 类的自动检测与注册Bean</h4>
+
+<p>我们再xml下配置如下标签，可以指定某个包路劲，扫描该包以及子包下，使用了spring注解的bean注册哦容器中,basp-package指向扫描那个包下的注解类</p>
+
+<ol start="1">
+	<li>&lt;context:component-scan&nbsp;base-package=&quot;spring.aop.bean.annotation&quot;&gt;&lt;/context:component-scan&gt;&nbsp;&nbsp;</li>
+</ol>
+
+<p>我们还可以使用如下标签，context:annotation-config，不过context:component-scan包含context:annotation-config的全部功能，通常使用前者后，不再使用后者context:component-scan一般用于基于类的注解（包括成员变量或成员方法的注解）,但是context:annotation-config只能在完成bean注册后，去处理bean类中的成员变量或成员方法的注解.</p>
+
+<p>&nbsp;</p>
+
+<p>&nbsp;</p>
+
+<p>过虑注解：</p>
+
+<p>&nbsp;&lt;!--默认情况下，spring中自动发现并被注册bean的条件是：<br />
+&nbsp; &nbsp; &nbsp;&nbsp;使用@Component, @Repository, @Service, @Constroller其中之一的注解<br />
+&nbsp; &nbsp; &nbsp;&nbsp;或者使用基于@Component的自定义注解<br />
+&nbsp; &nbsp; &nbsp;&nbsp;<br />
+&nbsp; &nbsp; &nbsp;&nbsp;可以通过过滤器修改上边的行为，如下边的例子XML配置忽略所有@Repository注解并用&ldquo;stub&rdquo;代替<br />
+&nbsp; &nbsp; &nbsp; &nbsp; --&gt;<br />
+&lt;context:component-scan&nbsp;base-package=&quot;spring.aop.bean.annotation&quot;&gt;&nbsp;&nbsp;</p>
+
+<ol start="1">
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;!--&nbsp;&nbsp;--&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;context:include-filter&nbsp;type=&quot;regex&quot;&nbsp;expression=&quot;.*Stub.*Repository&quot;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;!--&nbsp;排除@Repository注解&nbsp;--&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;context:exclude-filter&nbsp;type=&quot;annotation&quot;&nbsp;expression=&quot;org.springframework.stereotype.Repository&quot;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;/context:component-scan&gt;&nbsp;&nbsp;</li>
+</ol>
+
+<h4>6.3 使用注解管理bean</h4>
+
+<p>这里我们先使用 @Bean @Service @Repository @Componet</p>
+
+<p>扫描过程中组件自动检测，那么Bean名称是有BeanNameGenerator生成的( @Component, @Repository, @Service, @Controller<br />
+都会有个name属性用于显示设置BeanName)</p>
+
+<p>&nbsp;</p>
+
+<p>Service</p>
+
+<p>//显示设置beanName,相当于在xml配置bean的是id的值<br />
+@Service(&quot;myMoveLister&quot;)<br />
+public class simpleLlister{<br />
+//..</p>
+
+<p>}</p>
+
+<p>&nbsp;</p>
+
+<p>Dao</p>
+
+<p>//设置beanName默认使用类名，首字母小写作为beanName<br />
+@Repository<br />
+public class MovieFinderImpl implements MovieFinder{<br />
+<br />
+}</p>
+
+<h5>6.3.1 作用域scope</h5>
+
+<p>作用域的注解Scope<br />
+通常情况下自动查找的Spring组件，其Scope是singleton,其Spring2.5提供了Scope的注解 @Scope<br />
+<br />
+@Scope(&quot;prototype&quot;) &nbsp;//括号中指定Scope的范围,默认<br />
+@Repository<br />
+public class MovieFinderImpl implements MovieFinder{<br />
+<br />
+<br />
+}<br />
+<br />
+<br />
+也可以自定义scope策略，实现ScopeMetadataResolver接口并提供一无参数的构造器<br />
+<br />
+&nbsp;&lt;context:component-scan base-package=&quot;spring.aop.bean.MyScopeResolver&quot;&gt;&lt;/context:component-scan&gt;</p>
+
+<h5>6.3.2 注解的具体案例使用</h5>
+
+<p>//由于不知道其作用于DAO或Service所以使用通用注解，如果知道具体作用在那层，我们一班使用更具体注解方式如@Service,@Repository等</p>
+
+<ol start="1">
+	<li>//@Component&nbsp;--&gt;默认使用类名小写作为bean的name&nbsp;&nbsp;</li>
+	<li>@Scope(&quot;prototype&quot;)&nbsp;//括号中为Scope的范围,这里设置为原型模式&nbsp;&nbsp;</li>
+	<li>@Component(&quot;beanAnnotation&quot;)&nbsp;&nbsp;</li>
+	<li>public&nbsp;class&nbsp;BeanAnnotation&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;void&nbsp;say(String&nbsp;arg){&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;System.out.println(&quot;BeanAnnotation:&nbsp;&quot;+arg);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>}&nbsp;&nbsp;</li>
+</ol>
+
+<p>测试：</p>
+
+<ol start="1">
+	<li>@Test&nbsp;&nbsp;</li>
+	<li>public&nbsp;void&nbsp;testAnnotation(){&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;ClassPathXmlApplicationContext&nbsp;ac&nbsp;=&nbsp;new&nbsp;ClassPathXmlApplicationContext(&quot;com/xxx/spring/chap4/annotation.xml&quot;);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;//@Component没有value值的话，默认使用类名首字母小写作为bean的id，指定value以value值为准作为id&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;BeanAnnotation&nbsp;beanAnnotation1&nbsp;&nbsp;=&nbsp;ac.getBean(&quot;beanAnnotation&quot;,BeanAnnotation.class);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;BeanAnnotation&nbsp;beanAnnotation2&nbsp;&nbsp;=&nbsp;ac.getBean(&quot;beanAnnotation&quot;,BeanAnnotation.class);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;System.out.println(beanAnnotation1);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;System.out.println(beanAnnotation2);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;//结果&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;//com.xxx.spring.aop.bean.annotation.BeanAnnotation@1598d5f&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;//com.xxx.spring.aop.bean.annotation.BeanAnnotation@505fd8&nbsp;&nbsp;</li>
+	<li>}&nbsp;&nbsp;</li>
+</ol>
+
+<p>&nbsp;</p>
+
+<h5>6.3.3 一个不常用的注解@Required</h5>
+
+<p>@Required注解使用于注解bean属性的setter方法<br />
+这个注解仅仅标识，受影响的bean属性必须在配置时被填充，通过bean定义或通过自动装配一个明确的属性值</p>
+
+<p>这个注解并不是很常用，更常用的是@Autowired</p>
+
+<p>&nbsp;</p>
+
+<p>pulic class simpleMovieLister{<br />
+<br />
+private MoiveFinder movieFinder;<br />
+<br />
+@Required<br />
+public void setMovieFinder(MovieFinder movieFinder){<br />
+this.movieFinder &nbsp;= movieFinder;<br />
+}<br />
+//..<br />
+}</p>
+
+<p>&nbsp;</p>
+
+<h5>6.3.4 @Autowired</h5>
+
+<p>这个注解相当于我们之前在xml文件中配置的autowire=&quot;constructor/byName/byType&quot;,只不过我们这里使用@Autowired方式注解方式，且默认是通过类型判断，意思就是不使用byName,和construtor。通过@Autowired注解，spring会自动去容器中查找对应的类型，注入到该属性中，且bean类中，使用@Autowired注解其属性，我们可以不用提供getter,setter方法</p>
+
+<p>使用@Autowired</p>
+
+<p>@Autowried对属性进行注解的时候，我们可以省略getter,setter方法，通过对应的bean的类型，对属性值注入<br />
+@Autowried对seter方法进行注解的时候，可以注入对应的值<br />
+@Autowried对构造器进行注解的时候，可以通过类型找到对应的bean注入<br />
+@Autowried可以将 @Autowried为&rdquo;传统&ldquo;的setter方法代替 @Required<br />
+@Autowried自动注入，会去容器中按照类型查找对应的bean注入</p>
+
+<p>&nbsp;</p>
+
+<p>案例：</p>
+
+<p>setter中使用</p>
+
+<ol start="1">
+	<li>pulic&nbsp;class&nbsp;simpleMovieLister{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;private&nbsp;MoiveFinder&nbsp;movieFinder;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;@Autowried&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;void&nbsp;setMovieFinder(MovieFinder&nbsp;movieFinder){&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;this.movieFinder&nbsp;&nbsp;=&nbsp;movieFinder;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//..&nbsp;&nbsp;</li>
+	<li>}&nbsp;&nbsp;</li>
+</ol>
+
+<p>属性和构造器中使用</p>
+
+<ol start="1">
+	<li>pulic&nbsp;class&nbsp;MovieRreCommender{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;成员变量中&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;@Autowried&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;private&nbsp;MovieCatalog&nbsp;movieCatalog;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;private&nbsp;CustomerPreferenceDao&nbsp;customerPreferenceDao;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//构造器中&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;@Autowried&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;MovieRreCommender(CustomerPreferenceDao&nbsp;customerPreferenceDao){&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;this.CustomerPreferenceDao&nbsp;&nbsp;=&nbsp;CustomerPreferenceDao;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>}&nbsp;&nbsp;</li>
+</ol>
+
+<p>&nbsp;</p>
+
+<p>&nbsp;</p>
+
+<p>上边的seter方式，构造器方式，属性方式，效果都是一样的，使用其中任何一种，都可以实现注入。不过由于，@Autowired是通过类型判断是否注入到使用该注解地方，假如容器中出现两个以上的相同类型的bean实例，就会报错，这时我们就必须指定注入那个id名的bean实例，主要有两种方法解决该问题：</p>
+
+<p>@Autowired(requried=false), @Qualifie(&quot;beanName)指定@Autowired注入那个bean实例</p>
+
+<h5>6.3.5 @Autowried(requried=false)</h5>
+
+<p>默认情况下，如果因找不到合适的bean将会导致autowiring失败抛出异常，可以通过下边<br />
+这种方式避免<br />
+<br />
+pulic class simpleMovieLister{<br />
+<br />
+private MoiveFinder movieFinder;<br />
+<br />
+@Autowried(requried=false)//指明该属性不是必须的，找不到的情况下不会抛出异常<br />
+public void setMovieFinder(MovieFinder movieFinder){<br />
+this.movieFinder &nbsp;= movieFinder;<br />
+}<br />
+//..<br />
+}<br />
+提示：每一类中只能有一个构造器被标记为requried=ture建议将 @Autowired的必要属性时，使用 @Requried注解</p>
+
+<h5>6.3.6 @Qualifier--配合 @Autowired</h5>
+
+<p>如果使用 @Autowired自动装配可能存在多个相同类型的bean的时候，可以使用spring的 @Qualifier<br />
+注解缩小注解范围（或指定唯一），也可以用于指定单独的构造参数的方法参数<br />
+可以适用于注解集合类型的变量<br />
+<br />
+案例：<br />
+public&nbsp;class&nbsp;MovieRecommander{&nbsp;&nbsp;</p>
+
+<ol start="1">
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;@Autowired&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;@Qualifier(&quot;beanName&quot;)&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;private&nbsp;MovieCatalog&nbsp;movieCatalog;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;private&nbsp;CustomerPreferenceDao&nbsp;customerPreferenceDao;&nbsp;&nbsp;</li>
+	<li>&lt;span&nbsp;style=&quot;white-space:pre&quot;&gt;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/span&gt;//@Qualifier也可以实现参数的注入&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;void&nbsp;prepare(@Qualifier(&quot;beanName&quot;)CustomerPreferenceDao&nbsp;customerPreferenceDao){&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;this.customerPreferenceDao&nbsp;=&nbsp;customerPreferenceDao;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>}&nbsp;&nbsp;</li>
+</ol>
+
+<p><br />
+上边的案例：假设MovieCatalog在容器中存在多个相同的类型的情况下，可以结合使用 @Qualifier(&quot;beanName&quot;)<br />
+指定一个bean的id注入到该属性中，可以在方法的参数中使用</p>
+
+<h5>6.3.7 @Autowired注解可以方便的注解那些众所周知的解析依赖性接口</h5>
+
+<p>&nbsp;</p>
+
+<p>比如说：BeanFacotry,ApplicationContext,Environment,ResourceLoader,ApplicaiontEventPublisher, MessageSource等</p>
+
+<ol start="1">
+	<li>pulic&nbsp;class&nbsp;simpleMovieLister{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;@Autowired&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;private&nbsp;AplicationContext&nbsp;context;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;simpleMovieLister(){}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>}&nbsp;&nbsp;</li>
+</ol>
+
+<p><br />
+上边的案例使用autowired注解ApplicationContext，这样我们就可以活ApplicatioinContext容器总的bean对象</p>
+
+<p>&nbsp;</p>
+
+<h5>6.3.8 @Autowired将容器中相关类型的bean注入到一个集合或数组中</h5>
+
+<p>使用@Autowired注解，可以将容器中的bean实例注入到集合或数组中，如果是注入到数组中通过配合@Order(&quot;排序值&quot;)，可以实现对数组或list的排序，也只能对数组或list排序，其他的如Map是不需要排序的。</p>
+
+<p>&nbsp;</p>
+
+<p>案例：接口BeanInfterface</p>
+
+<ol start="1">
+	<li>public&nbsp;interface&nbsp;BeanInterface&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>}&nbsp;&nbsp;</li>
+</ol>
+
+<p>实现类1：</p>
+
+<ol start="1">
+	<li>@Order(1)&nbsp;&nbsp;</li>
+	<li>@Component&nbsp;&nbsp;</li>
+	<li>public&nbsp;class&nbsp;BeanImplOne&nbsp;implements&nbsp;BeanInterface&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>}&nbsp;&nbsp;</li>
+</ol>
+
+<p>实现类2：</p>
+
+<ol start="1">
+	<li>@Order(2)&nbsp;&nbsp;//Order排序注解只对list,或数组集合有效括号里边是排序顺序&nbsp;&nbsp;</li>
+	<li>@Component&nbsp;&nbsp;</li>
+	<li>public&nbsp;class&nbsp;BeanImplTwo&nbsp;implements&nbsp;BeanInterface&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>}&nbsp;&nbsp;</li>
+</ol>
+
+<p>调用类：</p>
+
+<ol start="1">
+	<li>import&nbsp;java.util.List;&nbsp;&nbsp;</li>
+	<li>import&nbsp;java.util.Map;&nbsp;&nbsp;</li>
+	<li>import&nbsp;java.util.Map.Entry;&nbsp;&nbsp;</li>
+	<li>import&nbsp;java.util.Set;&nbsp;&nbsp;</li>
+	<li>import&nbsp;org.springframework.beans.factory.annotation.Autowired;&nbsp;&nbsp;</li>
+	<li>import&nbsp;org.springframework.stereotype.Component;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>@Component&nbsp;&nbsp;</li>
+	<li>public&nbsp;class&nbsp;BeanInvoker&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;@Autowired&nbsp;//该注解会将所有的BeanInterface类型的bean注入到该list中&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;//如果bean有&nbsp;@Order注解可以实现排序&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;private&nbsp;List&lt;BeanInterface&gt;&nbsp;list;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;//该注解会将所有的BeanInterface类型的bean注入到该map中，key值为bean的名字&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;//是String类型，map类型无排序可言&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;@Autowired&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;private&nbsp;Map&lt;String,&nbsp;BeanInterface&gt;&nbsp;map;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;void&nbsp;print(){&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if(list&nbsp;!=&nbsp;null&nbsp;&amp;&amp;&nbsp;0&nbsp;!=&nbsp;list.size()){&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;System.out.println(&quot;list...&quot;);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;for(BeanInterface&nbsp;beanInterface:list){&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;System.out.println(beanInterface.getClass().getName());&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if(map&nbsp;!=&nbsp;null&nbsp;&amp;&amp;&nbsp;0&nbsp;!=&nbsp;map.size()){&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;System.out.println(&quot;map...&quot;);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Set&lt;Entry&lt;String,&nbsp;BeanInterface&gt;&gt;&nbsp;entrySet&nbsp;=&nbsp;map.entrySet();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;for(Entry&lt;String,&nbsp;BeanInterface&gt;&nbsp;entry:&nbsp;entrySet){&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;System.out.println(entry.getKey()+&quot;--&quot;+entry.getValue().getClass().getName());&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>}&nbsp;&nbsp;</li>
+</ol>
+
+<p>测试类：</p>
+
+<ol start="1">
+	<li>@Test&nbsp;&nbsp;</li>
+	<li>public&nbsp;void&nbsp;testAutowired2(){&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ClassPathXmlApplicationContext&nbsp;ac&nbsp;=&nbsp;new&nbsp;ClassPathXmlApplicationContext(&quot;com/xxx/spring/chap4/annotation.xml&quot;);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;BeanInvoker&nbsp;beanInvoker&nbsp;=&nbsp;(BeanInvoker)&nbsp;ac.getBean(&quot;beanInvoker&quot;);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;beanInvoker.print();&nbsp;&nbsp;</li>
+	<li>}&nbsp;&nbsp;</li>
+</ol>
+
+<p><br />
+结果：list...<br />
+com.xxx.spring.aop.bean.annotation.BeanImplOne<br />
+com.xxx.spring.aop.bean.annotation.BeanImplTwo<br />
+map...<br />
+beanImplOne--com.xxx.spring.aop.bean.annotation.BeanImplOne<br />
+beanImplTwo--com.xxx.spring.aop.bean.annotation.BeanImplTwo</p>
+
+<h4>6.4 @Bean注解的使用</h4>
+
+<p>@Bean是基于容器的注解，我们可以在使用@Compent注解的地方配合@Bean使用，不过@Bean注解一般不于@Compent注解使用，我们一般使用</p>
+
+<p>@Bean注解配合@Configuration注解使用，相当于我们再xml配置文件中定义了&lt;bean&gt;&lt;/bean&gt;</p>
+
+<p>&nbsp;</p>
+
+<p>使用：</p>
+
+<ol start="1">
+	<li>@Configuration&nbsp;&nbsp;&nbsp;//相当于配置文件&nbsp;&nbsp;</li>
+	<li>public&nbsp;class&nbsp;Appconfig{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;@Bean(&quot;myservice&quot;)//假如bean的name属性没有指定名字的话，注入的是id为方法名的bean，一般我们指定name属性不容易出错&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;Myservice&nbsp;myservice(){&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return&nbsp;new&nbsp;MyServiceImpl();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;/*&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;对比基于XML文件中的配置效果类似&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;bean&nbsp;id=&quot;myservice&quot;&nbsp;class=&quot;com.xxx.service.MyserviceImpl&quot;&gt;&lt;/bean&gt;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;*/&nbsp;&nbsp;</li>
+	<li>}&nbsp;&nbsp;</li>
+</ol>
+
+<p><br />
+@Bean中的其他他几个属性</p>
+
+<p>&nbsp;</p>
+
+<p>之前我们再配置文件中使用过如下的配置，指定bean的初始化调时会执行的方法，和销毁会执行的方法</p>
+
+<ol start="1">
+	<li>&lt;bean&nbsp;name=&quot;life&quot;&nbsp;class=&quot;com.briup.spring.ioc.bean.Life&quot;&nbsp;init-method=&quot;myInit&quot;&nbsp;destroy-method=&quot;myDestory&quot;&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;property&nbsp;name=&quot;name&quot;&nbsp;value=&quot;tom&quot;&gt;&lt;/property&gt;&nbsp;&nbsp;</li>
+	<li>&lt;/bean&gt;&nbsp;&nbsp;</li>
+</ol>
+
+<p><br />
+我们使@Bean配置也可以实现上边这种效果<strong>[java]</strong>&nbsp;<a href="http://blog.csdn.net/u014292162/article/details/52277756#" onclick="dp.sh.Toolbar.Command('ViewSource',this);return false;" title="view plain">view plain</a>&nbsp;<a href="http://blog.csdn.net/u014292162/article/details/52277756#" onclick="dp.sh.Toolbar.Command('CopyToClipboard',this);return false;" title="copy">copy</a></p>
+
+<ol start="1">
+	<li>public&nbsp;class&nbsp;Foo{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;void&nbsp;init(){&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>public&nbsp;class&nbsp;Bar{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;void&nbsp;cleanup(){&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>}&nbsp;&nbsp;</li>
+</ol>
+
+<p>&nbsp;</p>
+
+<ol start="1">
+	<li>@Configuration&nbsp;&nbsp;&nbsp;</li>
+	<li>public&nbsp;class&nbsp;Appconfig{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;@Bean(name=&quot;life&quot;)&nbsp;&nbsp;//定义bean的name&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;Life&nbsp;life(){&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return&nbsp;new&nbsp;Life();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;@Bean(initMethod=&quot;init&quot;)&nbsp;//在初始化Foo的时候，会调用Foo.java中的init方法&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;Foo&nbsp;foo(){&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return&nbsp;new&nbsp;Foo();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;@Bean(destoryMethod=&ldquo;cleanup&rdquo;)&nbsp;//在销毁Bar的时候会调用Bar.java中的cleanup中的方法&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;Bar&nbsp;bar(){&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return&nbsp;new&nbsp;Bar();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>}&nbsp;&nbsp;</li>
+</ol>
+
+<p>&nbsp;</p>
+
+<h4>6.5 使用注解模拟连接数据库</h4>
+
+<p>db.properties内容如下：</p>
+
+<p>jdbc.driver=oracle.jdbc.driver.OracleDriver<br />
+jdbc.url=jdbc:oracle:thin:@localhost:1521:XE<br />
+jdbc.username=caojx<br />
+jdbc.password=caojx</p>
+
+<p>&nbsp;</p>
+
+<p>config.xml配置如下</p>
+
+<ol start="1">
+	<li>&lt;?xml&nbsp;version=&quot;1.0&quot;&nbsp;encoding=&quot;UTF-8&quot;?&gt;&nbsp;&nbsp;</li>
+	<li>&lt;beans&nbsp;xmlns=&quot;http://www.springframework.org/schema/beans&quot;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;xmlns:context=&quot;http://www.springframework.org/schema/context&quot;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;xmlns:xsi=&quot;http://www.w3.org/2001/XMLSchema-instance&quot;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;xsi:schemaLocation=&quot;http://www.springframework.org/schema/beans&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;http://www.springframework.org/schema/beans/spring-beans-3.0.xsd&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;http://www.springframework.org/schema/context&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;http://www.springframework.org/schema/context/spring-context.xsd&quot;&nbsp;&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;!--&nbsp;加载db.properties文件&nbsp;--&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;context:property-placeholder&nbsp;location=&quot;classpath:db.properties&quot;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;!--context:component-scan包含context:annotation-config的全部功能，通常使用前者后，不再使用后者&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;context:component-scan&nbsp;base-package=&quot;com.briup.spring.aop.bean.annotation&quot;&gt;&lt;/context:component-scan&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&lt;/beans&gt;&nbsp;&nbsp;</li>
+</ol>
+
+<p>使用如下类，打印出配置文件中db.properties中的信息</p>
+
+<ol start="1">
+	<li>public&nbsp;class&nbsp;MyDriverManager&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;MyDriverManager(String&nbsp;url,&nbsp;String&nbsp;userName,&nbsp;String&nbsp;password){&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;System.out.println(&quot;url&nbsp;:&quot;+url);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;System.out.println(&quot;userName&nbsp;:&quot;+userName);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;System.out.println(&quot;password&nbsp;:&quot;+password);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>}&nbsp;&nbsp;</li>
+</ol>
+
+<p>&nbsp;</p>
+
+<p>读取配置文件中的信息</p>
+
+<ol start="1">
+	<li>@Configuration&nbsp;&nbsp;</li>
+	<li>@ImportResource(&quot;classpath:com/xxx/spring/chap4/config.xml&quot;)&nbsp;&nbsp;//指定配置文件的路径&nbsp;&nbsp;</li>
+	<li>public&nbsp;class&nbsp;MyConnection&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;@Value(&quot;${jdbc.url}&quot;)&nbsp;&nbsp;//基本类型的变量使用@Value注解(括号里边是注入的值)&nbsp;&nbsp;，这是使用${是读取配db.properties中的值}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;private&nbsp;String&nbsp;url;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;@Value(&quot;${jdbc.username}&quot;)&nbsp;&nbsp;//如果db.properties中写法为username默认取的是当前操作系统用户的名称，可以在db.properties定义username的时候使用jdbc.username&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;private&nbsp;String&nbsp;userName;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;@Value(&quot;${jdbc.password}&quot;)&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;private&nbsp;String&nbsp;password;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;@Bean(name=&quot;myDriverManager&quot;)&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;MyDriverManager&nbsp;MyDriverManager(){&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return&nbsp;new&nbsp;MyDriverManager(url,userName,password);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>}&nbsp;&nbsp;</li>
+</ol>
+
+<p>&nbsp;</p>
+
+<p>测试：<br />
+ClassPathXmlApplicationContext ac = new ClassPathXmlApplicationContext(&quot;com/xxx/spring/chap4/annotation.xml&quot;);<br />
+System.out.println(ac.getBean(&quot;myDriverManager&quot;));<br />
+结果：<br />
+url :jdbc:oracle:thin:@localhost:1521:XE<br />
+userName :caojx<br />
+password :caojx<br />
+com.briup.spring.aop.bean.annotation.MyDriverManager@152b54b<br />
+&nbsp;</p>
+
+<p>同时：@Bean注解也可以配置@Scope使用</p>
+
+<ol start="1">
+	<li>@Bean(name=&quot;myDriverManager&quot;)&nbsp;&nbsp;</li>
+	<li>@Scope(&quot;prototype&quot;)&nbsp;&nbsp;</li>
+	<li>public&nbsp;MyDriverManager&nbsp;MyDriverManager(){&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;return&nbsp;new&nbsp;MyDriverManager(url,userName,password);&nbsp;&nbsp;</li>
+	<li>}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>@Bean(name=&quot;myDriverManager&quot;)&nbsp;&nbsp;</li>
+	<li>@Scope(&quot;singleton&quot;)&nbsp;&nbsp;</li>
+	<li>public&nbsp;MyDriverManager&nbsp;MyDriverManager(){&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;return&nbsp;new&nbsp;MyDriverManager(url,userName,password);&nbsp;&nbsp;</li>
+	<li>}&nbsp;&nbsp;</li>
+</ol>
+
+<p>&nbsp;</p>
+
+<p>提示：spring配置<a href="http://lib.csdn.net/base/mysql" target="_blank" title="MySQL知识库">数据库</a>连接，或事务管理这一块，将会专门使用一篇来说明。</p>
+
+<h4>6.6 Spring对JSR的注解支持</h4>
+
+<p>JSR常见的注解有如下</p>
+
+<p>@Resource等效于@Autowired与@Inject<br />
+@PostConstrct &nbsp;初始化回掉<br />
+@PreDetory &nbsp; 销毁回调用<br />
+@Inject 等效于 @Autowired<br />
+@Named 与 @Compenet等效</p>
+
+<h5>6.6.1 @Resource</h5>
+
+<p>@Resource的作用相当于@Autowired，只不过@Autowired按byType自动注入，<br />
+而@Resource默认按 byName自动注入罢了。<br />
+@Resource有两个属性是比较重要的，分是name和type，<br />
+Spring将@Resource注解的name属性解析为bean的名字，而type属性则解析为bean的类型。<br />
+所以如果使用name属性，则使用byName的自动注入策略，而使用type属性时则使用byType自动注入策略。如果既不指定name也不指定type属性，这时将通过反射机制使用byName自动注入策略。<br />
+　　@Resource装配顺序<br />
+　　1. 如果同时指定了name和type，则从Spring上下文中找到唯一匹配的bean进行装配，找不到则抛出异常<br />
+　　2. 如果指定了name，则从上下文中查找名称（id）匹配的bean进行装配，找不到则抛出异常<br />
+　　3. 如果指定了type，则从上下文中找到类型匹配的唯一bean进行装配，找不到或者找到多个，都会抛出异常<br />
+　　4. 如果既没有指定name，又没有指定type，则自动按照byName方式进行装配；如果没有匹配，则回退为一个原始类型进行匹配，如果匹配则自动装配；&nbsp;<br />
+&nbsp; &nbsp;&nbsp; &nbsp; 5. 如果 @Resource用于方法中，默认使用方法名作为beanName,指定名字则使用名字</p>
+
+<p>&nbsp;</p>
+
+<p>案例:</p>
+
+<p>DAO</p>
+
+<ol start="1">
+	<li>import&nbsp;org.springframework.stereotype.Repository;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>@Repository&nbsp;&nbsp;</li>
+	<li>public&nbsp;class&nbsp;JsrDAO&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;void&nbsp;save(){&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;System.out.println(&quot;JsrDao&nbsp;invoker&quot;);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>}&nbsp;&nbsp;</li>
+</ol>
+
+<p>&nbsp;</p>
+
+<p>Service</p>
+
+<ol start="1">
+	<li>import&nbsp;javax.annotation.PostConstruct;&nbsp;&nbsp;</li>
+	<li>import&nbsp;javax.annotation.PreDestroy;&nbsp;&nbsp;</li>
+	<li>import&nbsp;javax.annotation.Resource;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>import&nbsp;org.springframework.stereotype.Service;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>import&nbsp;com.briup.spring.aop.bean.annotation.dao.JsrDAO;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>@Service&nbsp;&nbsp;</li>
+	<li>public&nbsp;class&nbsp;JsrService&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;@Resource&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;private&nbsp;JsrDAO&nbsp;jsrDAO;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;@Resource&nbsp;&nbsp;//作用与上边一样,二选一都可以&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;void&nbsp;setJsrDAO(JsrDAO&nbsp;jsrDAO){&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;this.jsrDAO&nbsp;=&nbsp;jsrDAO;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;void&nbsp;save(){&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;jsrDAO.save();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;@PostConstruct&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;void&nbsp;init(){&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;System.out.println(&quot;jsr&nbsp;Service&nbsp;init&quot;);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;@PreDestroy&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;void&nbsp;destory(){&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;System.out.println(&quot;jsr&nbsp;Service&nbsp;destory&quot;);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>}&nbsp;&nbsp;</li>
+</ol>
+
+<p><br />
+提示：</p>
+
+<p>&nbsp;</p>
+
+<p>@Resource的处理是由ApplicationContext中的CommonAnnotationBeanPostProecssor发现并处理的<br />
+CommonAnnotationBeanPostProecssor不仅支持 @Resource注解，还支持 @PostConstruct初始回调<br />
+和 @PreDestory销毁回调，前提是CommonAnnotationBeanPostProecssor是在ApplicationContext中注册的<br />
+&nbsp;</p>
+
+<p>测试结果：</p>
+
+<p>@Test<br />
+public void testJsr(){<br />
+ClassPathXmlApplicationContext ac = new ClassPathXmlApplicationContext(&quot;com/briup/spring/chap4/annotation.xml&quot;);<br />
+System.out.println(ac.getBean(&quot;jsrService&quot;));<br />
+ac.destroy();<br />
+}</p>
+
+<p>结果：</p>
+
+<p>jsr Service init<br />
+com.briup.spring.aop.bean.annotation.service.JsrService@7dc4cb<br />
+jsr Service destory</p>
+
+<p>&nbsp;</p>
+
+<p>@Resource是一个比比较常用的JSR注解，对于JSR中的其他注解，这里不进行详细的介绍。</p>

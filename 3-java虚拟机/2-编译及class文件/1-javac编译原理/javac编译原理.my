@@ -1,0 +1,221 @@
+<p><a href="http://www.cnblogs.com/java-zhao/p/5194064.html" id="cb_post_title_url">第二章 Javac编译原理</a></p>
+
+<p>注：本文主要记录自《深入分析java web技术内幕》&quot;第四章 javac编译原理&quot;</p>
+
+<p><strong>1、javac作用</strong></p>
+
+<ul>
+	<li>将*.java源代码文件转化为*.class文件</li>
+</ul>
+
+<p>&nbsp;</p>
+
+<p><strong>2、编译流程</strong></p>
+
+<p><img alt="" src="http://images2015.cnblogs.com/blog/866881/201602/866881-20160216214708767-653617912.jpg" style="height:201px; width:423px" /></p>
+
+<p>流程：</p>
+
+<ul>
+	<li>词法分析器：将源码转换为Token流
+	<ul>
+		<li>将源代码划分成一个个Token（Token包含的元素类型看3.2）</li>
+	</ul>
+	</li>
+	<li>语法分析器：将Token流转化为语法树
+	<ul>
+		<li>将上述的一个个Token组成一句句话（或者说成一句句代码块），检查这一句句话是不是符合Java语言规范</li>
+	</ul>
+	</li>
+	<li>语义分析器：将语法树转化为注解语法树
+	<ul>
+		<li>将复杂的语法转化成简单的语法（eg.注解、foreach转化为for循环）并做一些检查，添加一些代码</li>
+	</ul>
+	</li>
+	<li>代码生成器：将注解语法树转化为字节码</li>
+</ul>
+
+<p>&nbsp;</p>
+
+<p><strong>3、词法分析</strong></p>
+
+<p><strong>3.1、作用</strong></p>
+
+<ul>
+	<li>将源码转换为Token流。</li>
+</ul>
+
+<p><strong>3.2、流程</strong></p>
+
+<p>一个字节一个字节的读取源代码，形成规范化的Token流。规范化的Token包含：</p>
+
+<ul>
+	<li>java关键词：package、import、public、class、int等</li>
+	<li>自定义单词：包名、类名、变量名、方法名</li>
+	<li>符号：=、;、+、-、*、/、%、{、}等</li>
+</ul>
+
+<p><strong>3.3、示例</strong></p>
+
+<p>代码：</p>
+
+<p><img alt="" id="code_img_closed_ae124fd1-0f92-4adc-aee9-c2909dc887e8" src="http://images.cnblogs.com/OutliningIndicators/ContractedBlock.gif" />&nbsp;View Code</p>
+
+<p>以上代码转化为的Token流：</p>
+
+<p><img alt="" src="http://images2015.cnblogs.com/blog/866881/201602/866881-20160216221009251-84132412.jpg" style="height:334px; width:455px" /></p>
+
+<p>说明：完成以上示例的是<strong>JavacParser</strong>的parseCompilationUnit()方法，源代码见文章开头的书籍。</p>
+
+<p>注意：上边的token流符合java语言规范。</p>
+
+<p><strong>3.4、疑问</strong></p>
+
+<ul>
+	<li>怎样判断package是java关键词还是自定义变量？
+	<ul>
+		<li>JavacParser会根据java语言规范来控制什么顺序、什么地方出现什么Token（这个查看parseCompilationUnit()源码就知道了），所以package在文件的最开头出现，我们会知道是一个Token.PACKAGE类型，而非自定义的Token.IDENTIFIER类型。</li>
+		<li>一条实践：在编写程序的时候，不要用java关键词来定义变量名、类名、包名、方法名，而是采取一定有意义的单词来定义，当然，你再eclipse中编写代码的时候，如果使用了java关键词来定义变量，eclipse会提醒你这是一个错误的定义。</li>
+	</ul>
+	</li>
+	<li>怎样确定package是一个Token，而packa不是？
+	<ul>
+		<li>我的理解是，主要看空格和符号（符号见3.2），对于package是一个单词，中间没有空格也没有符号，所以是一个Token</li>
+		<li>一条实践：在编写代码时，例如：int a = b + c;//a与=中间有一个空格、=与b之间有一个空格、b与+之间有一个空格、+与c之间有一个空格，当然，这里没有空格也行，因为每一个变量之间正好都是由符号来隔开的，但是之前看了一个视频说，如果上边这句话没有这些空格的话，可能编译不通过，所以我们最好还是加上空格，当然加上空格后显得整个代码也清晰。</li>
+	</ul>
+	</li>
+</ul>
+
+<p>&nbsp;</p>
+
+<p><strong>4、语法分析</strong></p>
+
+<p><strong>4.1、作用</strong></p>
+
+<ul>
+	<li>将进行词法分析后形成的Token流中的一个个Token组成一句句话，检查这一句句话是不是符合Java语言规范。</li>
+</ul>
+
+<p><strong>4.2、语法分析三部分：</strong></p>
+
+<ul>
+	<li>package</li>
+	<li>import</li>
+	<li>类（包含class、interface、enum），一下提到的类泛指这三类，并不单单是指class</li>
+</ul>
+
+<p><strong>4.3、示例</strong></p>
+
+<p>代码：</p>
+
+<p><img alt="" id="code_img_closed_d5561900-ffcc-4972-b10c-8e92a9bdf287" src="http://images.cnblogs.com/OutliningIndicators/ContractedBlock.gif" />&nbsp;View Code</p>
+
+<p>最终语法树：</p>
+
+<p><img alt="" src="http://images2015.cnblogs.com/blog/866881/201602/866881-20160217112103441-566975624.jpg" style="height:423px; width:596px" /></p>
+
+<p>说明：</p>
+
+<ul>
+	<li>每一个包package下的所有类都会放在一个JCCompilationUnit节点下，在该节点下包含：package语法树（作为pid）、各个类的语法树</li>
+	<li>每一个从JCClassDecl发出的分支都是一个完整的代码块，上述是四个分支，对应我们代码中的两行属性操作语句和两个方法块代码块，这样其实就完成了语法分析器的作用：将一个个Token单词组成了一句句话（或者说成一句句代码块）</li>
+	<li>在上述的语法树部分，对于属性操作部分是完整的，但是对于两个方法块，省略了一些语法节点，例如：方法修饰符public、方法返回类型、方法参数。</li>
+</ul>
+
+<p>疑问：</p>
+
+<p>import节点的语法树与package的相似，但是import语法树放在了哪一个地方？</p>
+
+<p>&nbsp;</p>
+
+<p><strong>5、语义分析</strong></p>
+
+<p><strong>5.1、作用</strong></p>
+
+<ul>
+	<li>将语法树转化为注解语法树</li>
+</ul>
+
+<p><strong>5.2、步骤</strong></p>
+
+<ul>
+	<li>添加默认的无参构造器（在没有指定任何有参构造器的情况下）</li>
+	<li>处理注解</li>
+	<li>标注：检查语义合法性、进行逻辑判断
+	<ul>
+		<li>检查语法树中的变量类型是否匹配（eg.String s = 1 + 2;//这样&quot;=&quot;两端的类型就不匹配）</li>
+		<li>检查变量、方法或者类的访问是否合法（eg.一个类无法访问另一个类的private方法）</li>
+		<li>变量在使用前是否已经声明、是否初始化</li>
+		<li>常量折叠（eg.代码中：String s = &quot;hello&quot; + &quot;world&quot;，语义分析后String s = &quot;helloworld&quot;）</li>
+		<li>推导泛型方法的参数类型</li>
+	</ul>
+	</li>
+	<li>数据流分析
+	<ul>
+		<li>变量的确定性赋值（eg.有返回值的方法必须确定有返回值）</li>
+		<li>final变量只能赋一次值，在编译的时候再赋值的话会报错</li>
+		<li>所有的检查型异常是否抛出或捕获</li>
+		<li>所有的语句都要被执行到（return后边的语句就不会被执行到，除了finally块儿）</li>
+	</ul>
+	</li>
+	<li>进一步语义分析
+	<ul>
+		<li>去掉永假代码（eg.if(false)）</li>
+		<li>变量自动转换（eg.int和Integer）</li>
+		<li>去掉语法糖（eg.foreach转化为for循环，assert转化为if，内部类解析成一个与外部类相关联的外部类）</li>
+	</ul>
+	</li>
+	<li>最后，将经过上述处理的语法树转化为最后的注解语法树</li>
+</ul>
+
+<p>&nbsp;</p>
+
+<p><strong>6、生成字节码</strong></p>
+
+<p><strong>6.1、作用</strong></p>
+
+<ul>
+	<li>将注解语法树转化成字节码，并将字节码写入*.class文件。</li>
+</ul>
+
+<p><strong>6.2、步骤</strong></p>
+
+<ul>
+	<li>将java的代码块转化为符合JVM语法的命令形式，这就是字节码</li>
+	<li>按照JVM的文件组织格式将字节码输出到*.class文件中</li>
+</ul>
+
+<p>具体的源代码与步骤查看com.sun.tools.javac.jvm.Gen类与《分布式Java应用：基础与实践》P42</p>
+
+<p><strong>6.3、class文件包含的内容</strong></p>
+
+<p>在生成的*.class文件中不只包含字节码信息，具体包含：</p>
+
+<ul>
+	<li>结构信息
+	<ul>
+		<li>class文件格式版本号</li>
+		<li>各部分的数量与大小</li>
+	</ul>
+	</li>
+	<li>元数据
+	<ul>
+		<li>类、父类、实现接口的声明信息</li>
+		<li>属性声明信息</li>
+		<li>方法声明信息</li>
+		<li>常量池</li>
+	</ul>
+	</li>
+	<li>方法信息
+	<ul>
+		<li>字节码</li>
+		<li>异常处理器表</li>
+		<li>局部变量区的大小</li>
+		<li>操作数栈的大小</li>
+		<li>操作数栈的类型记录</li>
+		<li>调试用符号信息</li>
+	</ul>
+	</li>
+</ul>
+
+<p>这里提到的局部变量区和操作数栈组成了了方法栈，可以参看<a href="http://www.cnblogs.com/java-zhao/p/5179836.html">第一章 JVM内存结构</a></p>

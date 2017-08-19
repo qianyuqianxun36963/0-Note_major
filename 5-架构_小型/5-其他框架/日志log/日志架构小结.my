@@ -1,0 +1,227 @@
+<h1>log4j logback slf4j项目配置中的简单总结</h1>
+
+<h2>一. Log4j+commons-logging&nbsp;</h2>
+
+<p> JAR包&nbsp;<br />
+commons-logging-1.1.jar&nbsp;<br />
+log4j-1.2.15.jar&nbsp;<br />
+ 配置文件&nbsp;<br />
+commons-logging.properties&nbsp;<br />
+log4j.xml&nbsp;<br />
+ commons-logging.jar包读取commons-logging.properties中指定的log,自动加载日志配置&nbsp;<br />
+在commons-logging+log4j组合中commons-logging.properties指定的日志为:&nbsp;<br />
+org.apache.commons.logging.Log=org.apache.commons.logging.impl.Log4JLogger&nbsp;<br />
+ log4j指定具体日志输出配置&nbsp;<br />
+ 如果未选用commons-logging,可以在启动项目中,主动加载log4j的配置文件&nbsp;</p>
+
+<h2>二. Logback+slf4j&nbsp;</h2>
+
+<p> JAR包&nbsp;<br />
+slf4j-api-1.5.2.jar&nbsp;<br />
+logback-classic-0.9.9.jar&nbsp;<br />
+logback-core-0.9.9.jar&nbsp;<br />
+ 配置文件&nbsp;<br />
+Logback.xml&nbsp;<br />
+ logback的加载采用编码加载&nbsp;</p>
+
+<ol start="1">
+	<li>String&nbsp;logbackCfg&nbsp;=&nbsp;&quot;/config/logback.xml&quot;;&nbsp;&nbsp;</li>
+	<li>URL&nbsp;logURL&nbsp;=&nbsp;new&nbsp;ClassPathResource(logbackCfg).getURL();&nbsp;&nbsp;</li>
+	<li>ILoggerFactory&nbsp;loggerFactory&nbsp;=&nbsp;LoggerFactory.getILoggerFactory();&nbsp;&nbsp;</li>
+	<li>LoggerContext&nbsp;loggerContext&nbsp;=&nbsp;(LoggerContext)&nbsp;loggerFactory;&nbsp;&nbsp;</li>
+	<li>loggerContext.shutdownAndReset();&nbsp;&nbsp;</li>
+	<li>JoranConfigurator&nbsp;configurator&nbsp;=&nbsp;new&nbsp;JoranConfigurator();&nbsp;&nbsp;</li>
+	<li>configurator.setContext(loggerContext);&nbsp;&nbsp;</li>
+	<li>configurator.doConfigure(logURL);&nbsp;&nbsp;</li>
+</ol>
+
+<h2>三. Slf4j+log4j&nbsp;</h2>
+
+<p> JAR包&nbsp;<br />
+slf4j-api-1.5.2.jar&nbsp;<br />
+slf4j-log4j12-1.5.2.jar&nbsp;<br />
+log4j-1.2.15.jar&nbsp;<br />
+ 配置文件&nbsp;<br />
+Logback.xml&nbsp;</p>
+
+<h2>四. Slf4j+logback+logback&nbsp;</h2>
+
+<p>注:这种情况下是项目中有log4j输出的日志以及logback数据的日志.老项目改造,log4j和logback共存的情况下.(当选用spring+slf4j+logback的时候,spring的日志输出是log4j的,这个时候采用这种配置.)&nbsp;<br />
+ JARbao&nbsp;<br />
+log4j-over-slf4j-1.5.2.jar&nbsp;<br />
+logback-classic-0.9.9.jar&nbsp;<br />
+logback-core-0.9.9.jar&nbsp;<br />
+slf4j-api-1.5.2.jar&nbsp;<br />
+ 配置文件&nbsp;<br />
+Logback.xml&nbsp;<br />
+ 配置加载&nbsp;</p>
+
+<p>Java代码&nbsp;</p>
+
+<ol start="1">
+	<li>String&nbsp;logbackCfg&nbsp;=&nbsp;&quot;/config/logback.xml&quot;;&nbsp;&nbsp;</li>
+	<li>URL&nbsp;logURL&nbsp;=&nbsp;new&nbsp;ClassPathResource(logbackCfg).getURL();&nbsp;&nbsp;</li>
+	<li>ILoggerFactory&nbsp;loggerFactory&nbsp;=&nbsp;LoggerFactory.getILoggerFactory();&nbsp;&nbsp;</li>
+	<li>LoggerContext&nbsp;loggerContext&nbsp;=&nbsp;(LoggerContext)&nbsp;loggerFactory;&nbsp;&nbsp;</li>
+	<li>loggerContext.shutdownAndReset();&nbsp;&nbsp;</li>
+	<li>JoranConfigurator&nbsp;configurator&nbsp;=&nbsp;new&nbsp;JoranConfigurator();&nbsp;&nbsp;</li>
+	<li>configurator.setContext(loggerContext);&nbsp;&nbsp;</li>
+	<li>configurator.doConfigure(logURL);&nbsp;&nbsp;</li>
+</ol>
+
+<h2>五. Log4j配置文件示例&nbsp;</h2>
+
+<ol start="1">
+	<li>&lt;?xml&nbsp;version=&quot;1.0&quot;&nbsp;encoding=&quot;UTF-8&quot;?&gt;&nbsp;&nbsp;</li>
+	<li>&lt;!DOCTYPE&nbsp;log4j:configuration&nbsp;SYSTEM&nbsp;&quot;log4j.dtd&quot;&gt;&nbsp;&nbsp;</li>
+	<li>&lt;log4j:configuration&nbsp;xmlns:log4j=&quot;http://jakarta.apache.org/log4j/&quot;&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;!--&nbsp;控制台输出--&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;appender&nbsp;name=&quot;CONSOLE&quot;&nbsp;class=&quot;org.apache.log4j.ConsoleAppender&quot;&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;param&nbsp;name=&quot;Target&quot;&nbsp;value=&quot;System.out&quot;&nbsp;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;param&nbsp;name=&quot;Threshold&quot;&nbsp;value=&quot;INFO&quot;&nbsp;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;layout&nbsp;class=&quot;org.apache.log4j.PatternLayout&quot;&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;param&nbsp;name=&quot;ConversionPattern&quot;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;value=&quot;%d{yyyy-MM-dd&nbsp;HH:mm:ss&nbsp;sss}[%-p][%-c][line:%-L]&nbsp;\r\n&nbsp;&nbsp;%m%n&quot;&nbsp;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/layout&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&lt;!&mdash;&nbsp;以下是过滤一些不需要输出的log信息&nbsp;--&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;filter&nbsp;class=&quot;org.apache.log4j.varia.StringMatchFilter&quot;&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;param&nbsp;name=&quot;StringToMatch&quot;&nbsp;value=&quot;new&nbsp;a&nbsp;seq&nbsp;no&nbsp;spend&quot;&nbsp;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;param&nbsp;name=&quot;AcceptOnMatch&quot;&nbsp;value=&quot;false&quot;&nbsp;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/filter&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;filter&nbsp;class=&quot;org.apache.log4j.varia.StringMatchFilter&quot;&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;param&nbsp;name=&quot;StringToMatch&quot;&nbsp;value=&quot;new&nbsp;hi[type=&quot;&nbsp;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;param&nbsp;name=&quot;AcceptOnMatch&quot;&nbsp;value=&quot;false&quot;&nbsp;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/filter&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;filter&nbsp;class=&quot;org.apache.log4j.varia.StringMatchFilter&quot;&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;param&nbsp;name=&quot;StringToMatch&quot;&nbsp;value=&quot;FileTransfer.execCommand()&quot;&nbsp;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;param&nbsp;name=&quot;AcceptOnMatch&quot;&nbsp;value=&quot;false&quot;&nbsp;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/filter&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;/appender&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;!--文件输出&nbsp;按照文件大小滚动文件--&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;appender&nbsp;name=&quot;xxxx_file&quot;&nbsp;class=&quot;org.apache.log4j.RollingFileAppender&quot;&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;param&nbsp;name=&quot;Append&quot;&nbsp;value=&quot;true&quot;&nbsp;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;param&nbsp;name=&quot;Threshold&quot;&nbsp;value=&quot;INFO&quot;&nbsp;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;param&nbsp;name=&quot;File&quot;&nbsp;value=&quot;xxxx.log&quot;&nbsp;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;param&nbsp;name=&quot;MaxFileSize&quot;&nbsp;value=&quot;100MB&quot;&nbsp;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;param&nbsp;name=&quot;MaxBackupIndex&quot;&nbsp;value=&quot;15&quot;&nbsp;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;layout&nbsp;class=&quot;org.apache.log4j.PatternLayout&quot;&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;param&nbsp;name=&quot;ConversionPattern&quot;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;value=&quot;%d{yyyy-MM-dd&nbsp;HH:mm:ss&nbsp;sss}[%-p][%-c][line:%-L]&nbsp;\r\n&nbsp;&nbsp;%m%n&quot;&nbsp;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/layout&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;filter&nbsp;class=&quot;org.apache.log4j.varia.StringMatchFilter&quot;&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;param&nbsp;name=&quot;StringToMatch&quot;&nbsp;value=&quot;new&nbsp;a&nbsp;seq&nbsp;no&nbsp;spend&quot;&nbsp;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;param&nbsp;name=&quot;AcceptOnMatch&quot;&nbsp;value=&quot;false&quot;&nbsp;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/filter&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;filter&nbsp;class=&quot;org.apache.log4j.varia.StringMatchFilter&quot;&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;param&nbsp;name=&quot;StringToMatch&quot;&nbsp;value=&quot;new&nbsp;hi[type=&quot;&nbsp;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;param&nbsp;name=&quot;AcceptOnMatch&quot;&nbsp;value=&quot;false&quot;&nbsp;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/filter&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;filter&nbsp;class=&quot;org.apache.log4j.varia.StringMatchFilter&quot;&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;param&nbsp;name=&quot;StringToMatch&quot;&nbsp;value=&quot;FileTransfer.execCommand()&quot;&nbsp;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;param&nbsp;name=&quot;AcceptOnMatch&quot;&nbsp;value=&quot;false&quot;&nbsp;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/filter&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;/appender&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;!--&nbsp;错误输出&nbsp;过滤出错误日志信息--&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;appender&nbsp;name=&quot;xxxx_error&quot;&nbsp;class=&quot;org.apache.log4j.RollingFileAppender&quot;&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;param&nbsp;name=&quot;Append&quot;&nbsp;value=&quot;true&quot;&nbsp;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;param&nbsp;name=&quot;Threshold&quot;&nbsp;value=&quot;ERROR&quot;&nbsp;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;param&nbsp;name=&quot;File&quot;&nbsp;value=&quot;xxxx-error.log&quot;&nbsp;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;param&nbsp;name=&quot;MaxFileSize&quot;&nbsp;value=&quot;100MB&quot;&nbsp;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;param&nbsp;name=&quot;MaxBackupIndex&quot;&nbsp;value=&quot;4&quot;&nbsp;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;layout&nbsp;class=&quot;org.apache.log4j.PatternLayout&quot;&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;param&nbsp;name=&quot;ConversionPattern&quot;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;value=&quot;%d{yyyy-MM-dd&nbsp;HH:mm:ss&nbsp;sss}[%-p][%-c][line:%-L]&nbsp;\r\n&nbsp;&nbsp;%m%n&quot;&nbsp;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/layout&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;/appender&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&lt;!--&nbsp;根loggr&nbsp;--&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;root&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;appender-ref&nbsp;ref=&quot;CONSOLE&quot;&nbsp;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;appender-ref&nbsp;ref=&quot;xxxx_file&quot;&nbsp;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;appender-ref&nbsp;ref=&quot;xxxx_file_error&quot;&nbsp;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;/root&gt;&nbsp;&nbsp;</li>
+	<li>&lt;/log4j:configuration&gt;&nbsp;&nbsp;</li>
+</ol>
+
+<h2>六. Logback配置文件示例&nbsp;</h2>
+
+<ol start="1">
+	<li>&lt;?xml&nbsp;version=&quot;1.0&quot;&nbsp;encoding=&quot;UTF-8&quot;&nbsp;?&gt;&nbsp;&nbsp;</li>
+	<li>&lt;!DOCTYPE&nbsp;configuration&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&lt;configuration&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;jmxConfigurator&nbsp;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;!--&nbsp;控制台输出日志&nbsp;--&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;appender&nbsp;name=&quot;STDOUT&quot;&nbsp;class=&quot;ch.qos.logback.core.ConsoleAppender&quot;&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;layout&nbsp;class=&quot;ch.qos.logback.classic.PatternLayout&quot;&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;pattern&gt;%d{yyyy-MM-dd&nbsp;HH:mm:ss.SSS}&nbsp;[%thread]&nbsp;%-5level&nbsp;%logger{36}&nbsp;-&nbsp;%msg%n&lt;/pattern&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/layout&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;/appender&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;!--&nbsp;文件输出日志&nbsp;(文件大小策略进行文件输出，超过指定大小对文件备份)--&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;appender&nbsp;name=&quot;FILE&quot;&nbsp;class=&quot;ch.qos.logback.core.rolling.RollingFileAppender&quot;&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;File&gt;xxxx.log&lt;/File&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;rollingPolicy&nbsp;class=&quot;ch.qos.logback.core.rolling.FixedWindowRollingPolicy&quot;&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;FileNamePattern&gt;xxxx.log.%i.bak&lt;/FileNamePattern&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;MinIndex&gt;1&lt;/MinIndex&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;MaxIndex&gt;12&lt;/MaxIndex&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/rollingPolicy&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;triggeringPolicy&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;class=&quot;ch.qos.logback.core.rolling.SizeBasedTriggeringPolicy&quot;&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;MaxFileSize&gt;100MB&lt;/MaxFileSize&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/triggeringPolicy&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;layout&nbsp;class=&quot;ch.qos.logback.classic.PatternLayout&quot;&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;Pattern&gt;%d{yyyy-MM-dd&nbsp;HH:mm:ss.SSS}&nbsp;[%thread]&nbsp;%-5level&nbsp;%logger{36}&nbsp;-&nbsp;%msg%n&lt;/Pattern&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/layout&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;/appender&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;appender&nbsp;name=&quot;FILE-ERROR&quot;&nbsp;class=&quot;ch.qos.logback.core.rolling.RollingFileAppender&quot;&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;filter&nbsp;class=&quot;ch.qos.logback.classic.filter.LevelFilter&quot;&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;level&gt;ERROR&lt;/level&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;OnMismatch&gt;DENY&lt;/OnMismatch&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;OnMatch&gt;ACCEPT&lt;/OnMatch&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/filter&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;File&gt;xxxx-err.log&lt;/File&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;rollingPolicy&nbsp;class=&quot;ch.qos.logback.core.rolling.FixedWindowRollingPolicy&quot;&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;FileNamePattern&gt;xxxx-err.log.%i.bak&lt;/FileNamePattern&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;MinIndex&gt;1&lt;/MinIndex&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;MaxIndex&gt;3&lt;/MaxIndex&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/rollingPolicy&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;triggeringPolicy&nbsp;class=&quot;ch.qos.logback.core.rolling.SizeBasedTriggeringPolicy&quot;&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;MaxFileSize&gt;100MB&lt;/MaxFileSize&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/triggeringPolicy&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;layout&nbsp;class=&quot;ch.qos.logback.classic.PatternLayout&quot;&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;Pattern&gt;%d{yyyy-MM-dd&nbsp;HH:mm:ss.SSS}&nbsp;[%thread]&nbsp;%-5level&nbsp;%logger{36}&nbsp;-&nbsp;%msg%n&lt;/Pattern&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/layout&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;/appender&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&lt;!--这里指定logger&nbsp;name&nbsp;是为jmx设置日志级别做铺垫&nbsp;--&gt;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;logger&nbsp;name=&quot;com.xxx.xxx&quot;&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;level&nbsp;value=&quot;INFO&quot;&nbsp;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;appender-ref&nbsp;ref=&quot;STDOUT&quot;&nbsp;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;appender-ref&nbsp;ref=&quot;FILE&quot;&nbsp;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;appender-ref&nbsp;ref=&quot;FILE-ERROR&quot;&nbsp;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;/logger&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&lt;/configuration&gt;&nbsp;&nbsp;</li>
+</ol>
+
+<h2>七. 相关简单说明&nbsp;</h2>
+
+<p> Log4j&nbsp;<br />
+Log4j是Apache的一个开放源代码项目，通过使用Log4j，我们可以控制日志信息输送的目的地是控制台、文件、GUI组件、甚至是套接口服务 器、NT的事件记录器、UNIX Syslog守护进程等；用户也可以控制每一条日志的输出格式；通过定义每一条日志信息的级别，用户能够更加细致地控制日志的生成过程。这些可以通过一个 配置文件来灵活地进行配置，而不需要修改程序代码&nbsp;<br />
+<br />
+ Slf4j&nbsp;<br />
+简单日记门面(Facade)SLF4J是为各种loging APIs提供一个简单统一的接口，从而使得最终用户能够在部署的时候配置自己希望的loging APIs实现。 Logging API实现既可以选择直接实现SLF4J接的loging APIs如： NLOG4J、SimpleLogger。也可以通过SLF4J提供的API实现来开发相应的适配器如Log4jLoggerAdapter、JDK14LoggerAdapter。&nbsp;<br />
+<br />
+ Logback&nbsp;<br />
+Logback是由log4j创始人设计的又一个开源日记组件。logback当前分成三个模块：logback-core,logback- classic和logback-access。logback-core是其它两个模块的基础模块。logback-classic是log4j的一个 改良版本。此外logback-classic完整实现SLF4J API使你可以很方便地更换成其它日记系统如log4j或JDK14 Logging。logback-access访问模块与Servlet容器集成提供通过Http来访问日记的功能。&nbsp;</p>

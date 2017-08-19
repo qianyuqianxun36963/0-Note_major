@@ -1,0 +1,111 @@
+Ajax调用后台方法的几种写法（二） Ajax.dll
+
+使用插件Ajax.dll或者AjaxPro.dll。咱使用了Ajax.dll，需先去网上下载Ajax.dll，然后引用到项目中，并在Web.Config中配置如下：
+在system.web的节点下加上这句，
+[csharp] view plaincopy
+<httpHandlers>  
+      <add verb="POST,GET" path="ajax/*.ashx" type="Ajax.PageHandlerFactory, Ajax" />  
+    </httpHandlers>  
+
+页面代码：
+[html] view plaincopy
+   <div id="Div_1"> </div>   
+<asp:Button ID="btnOK" runat="server" Text="OK" OnClientClick="return CallTest();" />  
+<br/><asp:Label ID="lblEmpNo" runat="server"></asp:Label>  
+
+JS代码：
+[javascript] view plaincopy
+<script>  
+//这个方法用户接受并处理服务器端返回的结果。   
+       function getGroups_callback(response) {  
+           var dt = response.value; //这个值就是最终传回来的值，想怎么用就怎么用，反正回前台了。  
+           document.getElementById("Div_1").innerHTML = dt;  
+       }  
+  
+       function CallTest() {  
+           var EmpName = document.getElementById('txtClientId').value;  
+           WebFormAjax.Test(EmpName, getGroups_callback);  
+           return false;  
+       }   
+   </script>  
+
+C#后台代码：
+[csharp] view plaincopy
+ protected void Page_Load(object sender, EventArgs e)  
+        {  
+            Ajax.Utility.RegisterTypeForAjax(typeof(WebFormAjax));      //typeof的参数是该页面所在的类名  
+              
+        }  
+[Ajax.AjaxMethod]  //必须加上这个标签  
+        public string Test(string EmpName)  
+        {  
+            Thread.Sleep(3000);  
+            if (lblEmpNo != null)   //前台调用还是无法访问服务器控件Label，该控件为null，遗憾，也就是说明无法在后台给前台的服务器控件赋值  
+            {  
+                lblEmpNo.Text = EmpName + "123";  
+            }  
+            return EmpName + "abc";  
+        }  
+
+局限性：使用Ajax.dll在调用后台方面确实方便许多，但是无法再后台给前台的服务器控件赋值，只能在后台方法中返回值到前台，在前台通过JS赋值给控件。
+
+其实本人的目的是想试验一个这样的功能，前台的按钮在后台事件中能给其他服务器控件赋值，特别是GridView绑定数据这种，但是由于数据量多，这个过程会比较慢，又想在前台加一个等待的遮罩提示，直到数据完全绑定到GridView上，遮罩层才消失。这就必须用Ajax。
+很显然，上面的这种方式无法满足我，因为它无法再后台绑定GridView。但是它可以返回一个DataTable，然后在前台用JS取出DataTable的值，一行一行绑定到GridView上，这个复杂啊，郁闷啊，若再来个分页的，就更麻烦了。
+
+这是从网上看来的一个例子，说明刚才的这种情况。此处用的是AjaxPro.dll，它与Ajax.dll区别不大。
+Html代码：
+[html] view plaincopy
+<%@ Page Language="C#" AutoEventWireup="true" CodeFile="ajaxpro-no-refresh-update-gridview.aspx.cs" Inherits="ajaxpro_no_refresh_update_gridview" %>  
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">  
+<html xmlns="http://www.w3.org/1999/xhtml">  
+<head>  
+    <meta http-equiv="content-type" content="text/html;charset=utf-8" />  
+    <title>ajaxpro无刷新更新gridview数据</title>  
+</head>  
+<body>  
+<script type="text/javascript">  
+    function reload() {  
+        ajaxpro_no_refresh_update_gridview.GridViewSource(callback);  
+    }  
+    function callback(r) {  
+        var rows = r.value.Rows, tb = document.getElementById('gv1'),tr,td;  
+        while (tb.rows.length > 1) tb.deleteRow(1); //删除除了页头的行，此处保留了表头  
+        for (var i = 0; i < rows.length; i++) {  
+            tr = tb.insertRow(tb.rows.length);  
+            td = tr.insertCell(0); td.innerHTML = rows[i].Id;  
+            td = tr.insertCell(1); td.innerHTML = rows[i].rndNum;     //一个格子一个格子的赋值，多么悲催啊，况且它还没有分页行，这个例子就暂且参考吧。  
+        }  
+    }  
+</script> <table id="tb1"></table>  
+<form id="form1" runat="server"><input type="button" value="马上更新" onclick="reload()"/>  
+<asp:GridView runat="server" ID="gv1"></asp:GridView>  
+</form><!--一定不能缺少runat为server的表单，要不然ajaxpro不会自动生成对应的脚本和导入相关的框架代码-->  
+</body>  
+</html>  
+
+C# 后台代码：
+[csharp] view plaincopy
+using System;  
+using System.Data;  
+public partial class ajaxpro_no_refresh_update_gridview : System.Web.UI.Page  
+{  
+    protected void Page_Load(object sender, EventArgs e)  
+    {  
+        AjaxPro.Utility.RegisterTypeForAjax(typeof(ajaxpro_no_refresh_update_gridview));  
+        gv1.DataSource = CreateDataSouce(); gv1.DataBind();   //正是因为第一次Load就绑定了GridView，才有了它的表头。若此处从未绑定，上面的JS就无从找表头了  
+    }  
+    private DataTable CreateDataSouce()  
+    {//创建数据源  
+        DataTable dt = new DataTable();  
+        dt.Columns.Add("Id");  
+        dt.Columns.Add("rndNum");  
+        Random r = new Random();  
+        for (int i = 0; i < 20; i++) dt.Rows.Add(i, r.Next(1, 1000));  
+        return dt;  
+    }  
+    [AjaxPro.AjaxMethod]  
+    public DataTable GridViewSource()  
+    {  
+        return CreateDataSouce();   //返回了DataTable去前台  
+    }  
+}  

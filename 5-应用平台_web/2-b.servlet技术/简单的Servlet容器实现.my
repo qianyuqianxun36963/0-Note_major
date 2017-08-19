@@ -1,0 +1,94 @@
+<h1>一个简单的Servlet容器实现</h1>
+
+<p>程序执行步骤：</p>
+
+<ol>
+	<li>创建一个ServerSocket对象；</li>
+	<li>调用ServerSocket对象的accept方法，等待连接，连接成功会返回一个Socket对象，否则一直阻塞等待；</li>
+	<li>从Socket对象中获取InputStream和OutputStream字节流，这两个流分别对应request请求和response响应；</li>
+	<li>处理请求：读取InputStream字节流信息，转成字符串形式，并解析，这里的解析比较简单，仅仅获取uri(统一资源标识符)信息;</li>
+	<li>处理响应（分两种类型，静态资源请求响应或servlet请求响应）：如果是静态资源请求，则根据解析出来的uri信息，从WEB_ROOT目录中寻找请求的资源资源文件, 读取资源文件，并将其写入到OutputStream字节流中；如果是Servlet请求，则首先生成一个URLClassLoader类加载器，加载请求的servlet类，创建servlet对象，执行service方法（往OutputStream写入响应的数据）；</li>
+	<li>关闭Socket对象；</li>
+	<li>转到步骤2，继续等待连接请求；</li>
+</ol>
+
+<p>实现代码：<a href="http://www.cnblogs.com/chenpi/p/5603072.html">具体实现</a></p>
+
+<p>&nbsp;</p>
+
+<h1>探秘Tomcat&mdash;&mdash;一个简易的Servlet容器</h1>
+
+<p>即便再简陋的服务器也是服务器，今天就来循着书本的第二章来看看如何实现一个servlet容器。</p>
+
+<p>背景知识</p>
+
+<p>　　既然说到servlet容器这个名词，我们首先要了解它到底是什么。</p>
+
+<p><strong>servlet</strong></p>
+
+<p>　　相比你或多或少有所了解。servlet是用java编写的服务器端程序，主要功能在于交互式地浏览和修改数据，生成动态Web内容。狭义的Servlet是指Java语言实现的一个接口，广义的Servlet是指任何实现了这个Servlet接口的类，一般情况下，人们将Servlet理解为后者。</p>
+
+<p><strong>容器</strong></p>
+
+<p>　　容器的概念很大，在这里可以理解为能够管理对象（servlet）的生命周期，对象与对象之间的依赖关系。</p>
+
+<p>　　基于对以上两个概念的解释，那么对于serelvet容器的概念也就不再那么陌生了。</p>
+
+<p><strong>servlet容器</strong></p>
+
+<p>　　就是创建、管理servlet规范中相关对象、生命周期的应用程序。</p>
+
+<p>&nbsp;</p>
+
+<p><strong>Servlet接口</strong></p>
+
+<p>　　servlet是一种编程规范，要实现servlet编程需要用到javax.servlet和javax.servlet.http。所有的servlet程序都需要实现或继承自实现了javax.servlet.servlet接口。</p>
+
+<p>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</p>
+
+<p><strong>Servlet接口的方法</strong></p>
+
+<ul>
+	<li>init（）：servlet容器的初始化方法，该方法只会被调用一次；</li>
+	<li>service（）：不同于init只会触发一次，service在客户端请求后就会被调用。同时需要传入参数servletRequest和servletResponse。从字面意思就能知道，servletRequest携带了客户端发送的HTTP请求的信息，而servletResponse则用于封装servlet的响应信息。</li>
+	<li>destroy（）：当servlet实例调用完毕要被移除时，destroy方法将被调用。</li>
+	<li>getServletConfig（）：该方法用于取得&lt;servlet&gt; &lt;init-param&gt;配置的参数</li>
+	<li>getServletInfo（）：该方法提供有关servlet的信息，如作者、版本、版权。</li>
+</ul>
+
+<p>&nbsp;</p>
+
+<p><strong>servlet容器的职责</strong></p>
+
+<ul>
+	<li>第一次调用servlet时，需要载入serlvet类并调用init方法；</li>
+	<li>针对客户端的request请求，创建一个servletRequest对象和一个servletResponse对象；</li>
+	<li>传参servletRequest和servletResponse，调用service方法；</li>
+	<li>当关闭servlet类时，调用destroy方法。</li>
+	<li>&nbsp;</li>
+</ul>
+
+<p>简陋的servlet容器</p>
+
+<p>　　之所以说是简陋的servlet容器，因为这里并没有实现servlet所有的方法，该容器只能支持很简单的servlet，也没有init方法和destroy方法。主要实现功能如下：</p>
+
+<ul>
+	<li>等待HTTP请求；</li>
+	<li>创建serlvetRequest和servletResponse对象；</li>
+	<li>能够分别处理静态资源和servlet，当客户端请求静态资源时，则调用StaticResourceProcessor对象的process方法；当请求为serlvet则载入请求的servlet类并调用service方法。</li>
+</ul>
+
+<p>&nbsp;</p>
+
+<p>主要包括6个类</p>
+
+<ul>
+	<li>HttpServer1：程序的入口，负责创建Request和Response对象，并根据HTTP请求类型将其转给相应的处理器处理；</li>
+	<li>Request：用于封装客户端HTTP请求信息；</li>
+	<li>Response：用于封装服务器响应信息；</li>
+	<li>StaticResourceProcessor：静态资源处理器；</li>
+	<li>ServletProcessor1：servlet处理器；</li>
+	<li>Constants：用于定义一些常量，如WEB_ROOT</li>
+</ul>
+
+<p>实现代码：<a href="http://www.cnblogs.com/bigdataZJ/p/TomcatSourceZJ3.html">具体实现</a></p>

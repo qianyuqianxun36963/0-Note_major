@@ -1,0 +1,531 @@
+<h1>斜堆(一)之 C语言的实现</h1>
+
+<h3><strong>概要</strong></h3>
+
+<p>本章介绍斜堆。和以往一样，本文会先对斜堆的理论知识进行简单介绍，然后给出C语言的实现。后续再分别给出C++和Java版本的实现；实现的语言虽不同，但是原理如出一辙，选择其中之一进行了解即可。若文章有错误或不足的地方，请不吝指出！</p>
+
+<p><strong>目录</strong><br />
+1.&nbsp;<a href="http://www.cnblogs.com/skywang12345/p/3638493.html#a1">斜堆的介绍</a><br />
+2.&nbsp;<a href="http://www.cnblogs.com/skywang12345/p/3638493.html#a2">斜堆的基本操作</a><br />
+3.&nbsp;<a href="http://www.cnblogs.com/skywang12345/p/3638493.html#a3">斜堆的C实现(完整源码)</a><br />
+4.&nbsp;<a href="http://www.cnblogs.com/skywang12345/p/3638493.html#a4">斜堆的C测试程序</a></p>
+
+<p>转载请注明出处：<a href="http://www.cnblogs.com/skywang12345/p/3638493.html">http://www.cnblogs.com/skywang12345/p/3638493.html</a></p>
+
+<hr />
+<p><strong>更多内容：</strong><a href="http://www.cnblogs.com/skywang12345/p/3603935.html">数据结构与算法系列 目录</a></p>
+
+<p>&nbsp;</p>
+
+<h3><strong><a name="a1"></a>斜堆的介绍</strong></h3>
+
+<p>斜堆(Skew heap)也叫自适应堆(self-adjusting heap)，它是左倾堆的一个变种。和左倾堆一样，它通常也用于实现优先队列。它的合并操作的时间复杂度也是O(lg n)。</p>
+
+<p>相比于<a href="http://www.cnblogs.com/skywang12345/p/3638327.html">左倾堆</a>，斜堆的节点没有&quot;零距离&quot;这个属性。除此之外，它们斜堆的合并操作也不同。斜堆的合并操作算法如下：<br />
+(01) 如果一个空斜堆与一个非空斜堆合并，返回非空斜堆。<br />
+(02) 如果两个斜堆都非空，那么比较两个根节点，取较小堆的根节点为新的根节点。将&quot;较小堆的根节点的右孩子&quot;和&quot;较大堆&quot;进行合并。<br />
+(03) 合并后，交换新堆根节点的左孩子和右孩子。<br />
+&nbsp; &nbsp; &nbsp; &nbsp; 第(03)步是斜堆和左倾堆的合并操作差别的关键所在，如果是左倾堆，则合并后要比较左右孩子的零距离大小，若右孩子的零距离 &gt; 左孩子的零距离，则交换左右孩子；最后，在设置根的零距离。</p>
+
+<p>&nbsp;</p>
+
+<h3><strong><a name="a2"></a>斜堆的基本操作</strong></h3>
+
+<p><strong>1. 头文件</strong></p>
+
+<p><a href="javascript:void(0);" onclick="copyCnblogsCode(this)" title="复制代码"><img alt="复制代码" src="http://common.cnblogs.com/images/copycode.gif" /></a></p>
+
+<pre>
+#ifndef _SKEW_HEAP_H_
+#define _SKEW_HEAP_H_
+
+typedef int Type;
+
+typedef struct _SkewNode{
+    Type   key;                // 关键字(键值)
+    struct _SkewNode *left;    // 左孩子
+    struct _SkewNode *right;   // 右孩子
+}SkewNode, *SkewHeap;
+
+// 前序遍历&quot;斜堆&quot;
+void preorder_skewheap(SkewHeap heap);
+// 中序遍历&quot;斜堆&quot;
+void inorder_skewheap(SkewHeap heap);
+// 后序遍历&quot;斜堆&quot;
+void postorder_skewheap(SkewHeap heap);
+
+// 获取最小值(保存到pval中)，成功返回0，失败返回-1。
+int skewheap_minimum(SkewHeap heap, int *pval);
+// 合并&quot;斜堆x&quot;和&quot;斜堆y&quot;，并返回合并后的新树
+SkewNode* merge_skewheap(SkewHeap x, SkewHeap y);
+// 将结点插入到斜堆中，并返回根节点
+SkewNode* insert_skewheap(SkewHeap heap, Type key);
+// 删除结点(key为节点的值)，并返回根节点
+SkewNode* delete_skewheap(SkewHeap heap);
+
+// 销毁斜堆
+void destroy_skewheap(SkewHeap heap);
+
+// 打印斜堆
+void print_skewheap(SkewHeap heap);
+
+#endif</pre>
+
+<p><a href="javascript:void(0);" onclick="copyCnblogsCode(this)" title="复制代码"><img alt="复制代码" src="http://common.cnblogs.com/images/copycode.gif" /></a></p>
+
+<p>SkewNode是斜堆对应的节点类。</p>
+
+<p>&nbsp;</p>
+
+<p><strong>2. 合并</strong></p>
+
+<p><a href="javascript:void(0);" onclick="copyCnblogsCode(this)" title="复制代码"><img alt="复制代码" src="http://common.cnblogs.com/images/copycode.gif" /></a></p>
+
+<pre>
+/* 
+ * 合并&quot;斜堆x&quot;和&quot;斜堆y&quot;
+ *
+ * 返回值：
+ *     合并得到的树的根节点
+ */
+SkewNode* merge_skewheap(SkewHeap x, SkewHeap y)
+{
+    if(x == NULL)
+        return y;
+    if(y == NULL)
+        return x;
+
+    // 合并x和y时，将x作为合并后的树的根；
+    // 这里的操作是保证: x的key &lt; y的key
+    if(x-&gt;key &gt; y-&gt;key)
+        swap_skewheap_node(x, y);
+
+    // 将x的右孩子和y合并，
+    // 合并后直接交换x的左右孩子，而不需要像左倾堆一样考虑它们的npl。
+    SkewNode *tmp = merge_skewheap(x-&gt;right, y);
+    x-&gt;right = x-&gt;left;
+    x-&gt;left  = tmp;
+
+    return x;
+}</pre>
+
+<p><a href="javascript:void(0);" onclick="copyCnblogsCode(this)" title="复制代码"><img alt="复制代码" src="http://common.cnblogs.com/images/copycode.gif" /></a></p>
+
+<p>merge_skewheap(x, y)的作用是合并x和y这两个斜堆，并返回得到的新堆。merge_skewheap(x, y)是递归实现的。</p>
+
+<p>&nbsp;</p>
+
+<p><strong>3. 添加</strong></p>
+
+<p><a href="javascript:void(0);" onclick="copyCnblogsCode(this)" title="复制代码"><img alt="复制代码" src="http://common.cnblogs.com/images/copycode.gif" /></a></p>
+
+<pre>
+/* 
+ * 新建结点(key)，并将其插入到斜堆中
+ *
+ * 参数说明：
+ *     heap 斜堆的根结点
+ *     key 插入结点的键值
+ * 返回值：
+ *     根节点
+ */
+SkewNode* insert_skewheap(SkewHeap heap, Type key)
+{
+    SkewNode *node;    // 新建结点
+
+    // 如果新建结点失败，则返回。
+    if ((node = (SkewNode *)malloc(sizeof(SkewNode))) == NULL)
+        return heap;
+    node-&gt;key = key;
+    node-&gt;left = node-&gt;right = NULL;
+
+    return merge_skewheap(heap, node);
+}</pre>
+
+<p><a href="javascript:void(0);" onclick="copyCnblogsCode(this)" title="复制代码"><img alt="复制代码" src="http://common.cnblogs.com/images/copycode.gif" /></a></p>
+
+<p>insert_skewheap(heap, key)的作用是新建键值为key的结点，并将其插入到斜堆中，并返回堆的根节点。</p>
+
+<p>&nbsp;</p>
+
+<p><strong>4. 删除</strong></p>
+
+<p><a href="javascript:void(0);" onclick="copyCnblogsCode(this)" title="复制代码"><img alt="复制代码" src="http://common.cnblogs.com/images/copycode.gif" /></a></p>
+
+<pre>
+/* 
+ * 取出根节点
+ *
+ * 返回值：
+ *     取出根节点后的新树的根节点
+ */
+SkewNode* delete_skewheap(SkewHeap heap)
+{
+    SkewNode *l = heap-&gt;left;
+    SkewNode *r = heap-&gt;right;
+
+    // 删除根节点
+    free(heap);
+
+    return merge_skewheap(l, r); // 返回左右子树合并后的新树
+}</pre>
+
+<p><a href="javascript:void(0);" onclick="copyCnblogsCode(this)" title="复制代码"><img alt="复制代码" src="http://common.cnblogs.com/images/copycode.gif" /></a></p>
+
+<p>delete_skewheap(heap)的作用是删除斜堆的最小节点，并返回删除节点后的斜堆根节点。</p>
+
+<p>&nbsp;</p>
+
+<p><strong>注意</strong>：关于斜堆的&quot;前序遍历&quot;、&quot;中序遍历&quot;、&quot;后序遍历&quot;、&quot;打印&quot;、&quot;销毁&quot;等接口就不再单独介绍了。后文的源码中有给出它们的实现代码，Please RTFSC(Read The Fucking Source Code)！</p>
+
+<p>&nbsp;</p>
+
+<h3><strong><a name="a3"></a>斜堆的C实现(完整源码)</strong></h3>
+
+<p>斜堆的头文件(skewheap.h)</p>
+
+<p><img alt="" id="code_img_opened_46d78b51-13df-495c-a30c-fef5319b9bb1" src="http://images.cnblogs.com/OutliningIndicators/ExpandedBlockStart.gif" /></p>
+
+<p><a href="javascript:void(0);" onclick="copyCnblogsCode(this)" title="复制代码"><img alt="复制代码" src="http://common.cnblogs.com/images/copycode.gif" /></a></p>
+
+<pre>
+ 1 #ifndef _SKEW_HEAP_H_
+ 2 #define _SKEW_HEAP_H_
+ 3 
+ 4 typedef int Type;
+ 5 
+ 6 typedef struct _SkewNode{
+ 7     Type   key;                    // 关键字(键值)
+ 8     struct _SkewNode *left;    // 左孩子
+ 9     struct _SkewNode *right;    // 右孩子
+10 }SkewNode, *SkewHeap;
+11 
+12 // 前序遍历&quot;斜堆&quot;
+13 void preorder_skewheap(SkewHeap heap);
+14 // 中序遍历&quot;斜堆&quot;
+15 void inorder_skewheap(SkewHeap heap);
+16 // 后序遍历&quot;斜堆&quot;
+17 void postorder_skewheap(SkewHeap heap);
+18 
+19 // 获取最小值(保存到pval中)，成功返回0，失败返回-1。
+20 int skewheap_minimum(SkewHeap heap, int *pval);
+21 // 合并&quot;斜堆x&quot;和&quot;斜堆y&quot;，并返回合并后的新树
+22 SkewNode* merge_skewheap(SkewHeap x, SkewHeap y);
+23 // 将结点插入到斜堆中，并返回根节点
+24 SkewNode* insert_skewheap(SkewHeap heap, Type key);
+25 // 删除结点(key为节点的值)，并返回根节点
+26 SkewNode* delete_skewheap(SkewHeap heap);
+27 
+28 // 销毁斜堆
+29 void destroy_skewheap(SkewHeap heap);
+30 
+31 // 打印斜堆
+32 void print_skewheap(SkewHeap heap);
+33 
+34 #endif</pre>
+
+<p><a href="javascript:void(0);" onclick="copyCnblogsCode(this)" title="复制代码"><img alt="复制代码" src="http://common.cnblogs.com/images/copycode.gif" /></a></p>
+
+<p>斜堆的实现文件(skewheap.c)</p>
+
+<p><img alt="" id="code_img_opened_0d5b103d-b8d1-46dd-8f53-ac2dc9372f3f" src="http://images.cnblogs.com/OutliningIndicators/ExpandedBlockStart.gif" /></p>
+
+<p><a href="javascript:void(0);" onclick="copyCnblogsCode(this)" title="复制代码"><img alt="复制代码" src="http://common.cnblogs.com/images/copycode.gif" /></a></p>
+
+<pre>
+  1 /**
+  2  * C语言实现的斜堆
+  3  *
+  4  * @author skywang
+  5  * @date 2014/03/31
+  6  */
+  7 
+  8 #include &lt;stdio.h&gt;
+  9 #include &lt;stdlib.h&gt;
+ 10 #include &quot;skewheap.h&quot;
+ 11 
+ 12 /*
+ 13  * 前序遍历&quot;斜堆&quot;
+ 14  */
+ 15 void preorder_skewheap(SkewHeap heap)
+ 16 {
+ 17     if(heap != NULL)
+ 18     {
+ 19         printf(&quot;%d &quot;, heap-&gt;key);
+ 20         preorder_skewheap(heap-&gt;left);
+ 21         preorder_skewheap(heap-&gt;right);
+ 22     }
+ 23 }
+ 24 
+ 25 /*
+ 26  * 中序遍历&quot;斜堆&quot;
+ 27  */
+ 28 void inorder_skewheap(SkewHeap heap)
+ 29 {
+ 30     if(heap != NULL)
+ 31     {
+ 32         inorder_skewheap(heap-&gt;left);
+ 33         printf(&quot;%d &quot;, heap-&gt;key);
+ 34         inorder_skewheap(heap-&gt;right);
+ 35     }
+ 36 }
+ 37 
+ 38 /*
+ 39  * 后序遍历&quot;斜堆&quot;
+ 40  */
+ 41 void postorder_skewheap(SkewHeap heap)
+ 42 {
+ 43     if(heap != NULL)
+ 44     {
+ 45         postorder_skewheap(heap-&gt;left);
+ 46         postorder_skewheap(heap-&gt;right);
+ 47         printf(&quot;%d &quot;, heap-&gt;key);
+ 48     }
+ 49 }
+ 50 
+ 51 /*
+ 52  * 交换两个节点的内容
+ 53  */
+ 54 static void swap_skewheap_node(SkewNode *x, SkewNode *y)
+ 55 {
+ 56     SkewNode tmp = *x;
+ 57     *x = *y;
+ 58     *y = tmp;
+ 59 }
+ 60 
+ 61 /* 
+ 62  * 获取最小值
+ 63  *
+ 64  * 返回值：
+ 65  *    成功返回0，失败返回-1
+ 66  */
+ 67 int skewheap_minimum(SkewHeap heap, int *pval)
+ 68 {
+ 69     if (heap == NULL)
+ 70         return -1;
+ 71 
+ 72     *pval = heap-&gt;key;
+ 73 
+ 74     return 0;
+ 75 }
+ 76  
+ 77 /* 
+ 78  * 合并&quot;斜堆x&quot;和&quot;斜堆y&quot;
+ 79  *
+ 80  * 返回值：
+ 81  *     合并得到的树的根节点
+ 82  */
+ 83 SkewNode* merge_skewheap(SkewHeap x, SkewHeap y)
+ 84 {
+ 85     if(x == NULL)
+ 86         return y;
+ 87     if(y == NULL)
+ 88         return x;
+ 89 
+ 90     // 合并x和y时，将x作为合并后的树的根；
+ 91     // 这里的操作是保证: x的key &lt; y的key
+ 92     if(x-&gt;key &gt; y-&gt;key)
+ 93         swap_skewheap_node(x, y);
+ 94 
+ 95     // 将x的右孩子和y合并，
+ 96     // 合并后直接交换x的左右孩子，而不需要像左倾堆一样考虑它们的npl。
+ 97     SkewNode *tmp = merge_skewheap(x-&gt;right, y);
+ 98     x-&gt;right = x-&gt;left;
+ 99     x-&gt;left  = tmp;
+100 
+101     return x;
+102 }
+103 
+104 /* 
+105  * 新建结点(key)，并将其插入到斜堆中
+106  *
+107  * 参数说明：
+108  *     heap 斜堆的根结点
+109  *     key 插入结点的键值
+110  * 返回值：
+111  *     根节点
+112  */
+113 SkewNode* insert_skewheap(SkewHeap heap, Type key)
+114 {
+115     SkewNode *node;    // 新建结点
+116 
+117     // 如果新建结点失败，则返回。
+118     if ((node = (SkewNode *)malloc(sizeof(SkewNode))) == NULL)
+119         return heap;
+120     node-&gt;key = key;
+121     node-&gt;left = node-&gt;right = NULL;
+122 
+123     return merge_skewheap(heap, node);
+124 }
+125 
+126 /* 
+127  * 取出根节点
+128  *
+129  * 返回值：
+130  *     取出根节点后的新树的根节点
+131  */
+132 SkewNode* delete_skewheap(SkewHeap heap)
+133 {
+134     SkewNode *l = heap-&gt;left;
+135     SkewNode *r = heap-&gt;right;
+136 
+137     // 删除根节点
+138     free(heap);
+139 
+140     return merge_skewheap(l, r); // 返回左右子树合并后的新树
+141 }
+142 
+143 /*
+144  * 销毁斜堆
+145  */
+146 void destroy_skewheap(SkewHeap heap)
+147 {
+148     if (heap==NULL)
+149         return ;
+150 
+151     if (heap-&gt;left != NULL)
+152         destroy_skewheap(heap-&gt;left);
+153     if (heap-&gt;right != NULL)
+154         destroy_skewheap(heap-&gt;right);
+155 
+156     free(heap);
+157 }
+158 
+159 /*
+160  * 打印&quot;斜堆&quot;
+161  *
+162  * heap       -- 斜堆的节点
+163  * key        -- 节点的键值 
+164  * direction  --  0，表示该节点是根节点;
+165  *               -1，表示该节点是它的父结点的左孩子;
+166  *                1，表示该节点是它的父结点的右孩子。
+167  */
+168 static void skewheap_print(SkewHeap heap, Type key, int direction)
+169 {
+170     if(heap != NULL)
+171     {
+172         if(direction==0)    // heap是根节点
+173             printf(&quot;%2d is root\n&quot;, heap-&gt;key);
+174         else                // heap是分支节点
+175             printf(&quot;%2d is %2d&#39;s %6s child\n&quot;, heap-&gt;key, key, direction==1?&quot;right&quot; : &quot;left&quot;);
+176 
+177         skewheap_print(heap-&gt;left, heap-&gt;key, -1);
+178         skewheap_print(heap-&gt;right,heap-&gt;key,  1);
+179     }
+180 }
+181 
+182 void print_skewheap(SkewHeap heap)
+183 {
+184     if (heap != NULL)
+185         skewheap_print(heap, heap-&gt;key,  0);
+186 }</pre>
+
+<p><a href="javascript:void(0);" onclick="copyCnblogsCode(this)" title="复制代码"><img alt="复制代码" src="http://common.cnblogs.com/images/copycode.gif" /></a></p>
+
+<p>斜堆的测试程序(skewheap_test.c)</p>
+
+<p><img alt="" id="code_img_opened_ea0bb90b-b014-48fb-be50-d17bf43b191c" src="http://images.cnblogs.com/OutliningIndicators/ExpandedBlockStart.gif" /></p>
+
+<p><a href="javascript:void(0);" onclick="copyCnblogsCode(this)" title="复制代码"><img alt="复制代码" src="http://common.cnblogs.com/images/copycode.gif" /></a></p>
+
+<pre>
+ 1 /**
+ 2  * C语言实现的斜堆
+ 3  *
+ 4  * @author skywang
+ 5  * @date 2014/03/31
+ 6  */
+ 7 
+ 8 #include &lt;stdio.h&gt;
+ 9 #include &quot;skewheap.h&quot;
+10 
+11 #define LENGTH(a) ( (sizeof(a)) / (sizeof(a[0])) )
+12 
+13 void main()
+14 {
+15     int i;
+16     int a[]= {10,40,24,30,36,20,12,16};
+17     int b[]= {17,13,11,15,19,21,23};
+18     int alen=LENGTH(a);
+19     int blen=LENGTH(b);
+20     SkewHeap ha,hb;
+21 
+22     ha=hb=NULL;
+23 
+24     printf(&quot;== 斜堆(ha)中依次添加: &quot;);
+25     for(i=0; i&lt;alen; i++)
+26     {
+27         printf(&quot;%d &quot;, a[i]);
+28         ha = insert_skewheap(ha, a[i]);
+29     }
+30     printf(&quot;\n== 斜堆(ha)的详细信息: \n&quot;);
+31     print_skewheap(ha);
+32 
+33 
+34     printf(&quot;\n== 斜堆(hb)中依次添加: &quot;);
+35     for(i=0; i&lt;blen; i++)
+36     {
+37         printf(&quot;%d &quot;, b[i]);
+38         hb = insert_skewheap(hb, b[i]);
+39     }
+40     printf(&quot;\n== 斜堆(hb)的详细信息: \n&quot;);
+41     print_skewheap(hb);
+42 
+43     // 将&quot;斜堆hb&quot;合并到&quot;斜堆ha&quot;中。
+44     ha = merge_skewheap(ha, hb);
+45     printf(&quot;\n== 合并ha和hb后的详细信息: \n&quot;);
+46     print_skewheap(ha);
+47 
+48 
+49     // 销毁斜堆
+50     destroy_skewheap(ha);
+51 }</pre>
+
+<p><a href="javascript:void(0);" onclick="copyCnblogsCode(this)" title="复制代码"><img alt="复制代码" src="http://common.cnblogs.com/images/copycode.gif" /></a></p>
+
+<p>&nbsp;</p>
+
+<h3><strong><a name="a4"></a>斜堆的C测试程序</strong></h3>
+
+<p>斜堆的测试程序已经包含在它的实现文件(skewheap_test.c)中了，这里仅给出它的运行结果：</p>
+
+<p><a href="javascript:void(0);" onclick="copyCnblogsCode(this)" title="复制代码"><img alt="复制代码" src="http://common.cnblogs.com/images/copycode.gif" /></a></p>
+
+<pre>
+== 斜堆(ha)中依次添加: 10 40 24 30 36 20 12 16 
+== 斜堆(ha)的详细信息: 
+10 is root
+16 is 10&#39;s   left child
+20 is 16&#39;s   left child
+30 is 20&#39;s   left child
+40 is 30&#39;s   left child
+12 is 10&#39;s  right child
+24 is 12&#39;s   left child
+36 is 24&#39;s   left child
+
+== 斜堆(hb)中依次添加: 17 13 11 15 19 21 23 
+== 斜堆(hb)的详细信息: 
+11 is root
+13 is 11&#39;s   left child
+17 is 13&#39;s   left child
+23 is 17&#39;s   left child
+19 is 13&#39;s  right child
+15 is 11&#39;s  right child
+21 is 15&#39;s   left child
+
+== 合并ha和hb后的详细信息: 
+10 is root
+11 is 10&#39;s   left child
+12 is 11&#39;s   left child
+15 is 12&#39;s   left child
+21 is 15&#39;s   left child
+24 is 12&#39;s  right child
+36 is 24&#39;s   left child
+13 is 11&#39;s  right child
+17 is 13&#39;s   left child
+23 is 17&#39;s   left child
+19 is 13&#39;s  right child
+16 is 10&#39;s  right child
+20 is 16&#39;s   left child
+30 is 20&#39;s   left child
+40 is 30&#39;s   left child</pre>

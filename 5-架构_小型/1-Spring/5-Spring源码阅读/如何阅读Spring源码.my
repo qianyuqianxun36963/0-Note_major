@@ -1,0 +1,166 @@
+<h1><a href="http://www.cnblogs.com/xing901022/p/4178963.html" id="cb_post_title_url">Spring源码解析&mdash;&mdash;如何阅读源码</a></h1>
+
+<blockquote>
+<p>　　最近没什么实质性的工作，正好有点时间，就想学学别人的代码。也看过一点源码，算是有了点阅读的经验，于是下定决心看下spring这种大型的项目的源码，学学它的设计思想。</p>
+
+<p>　　手码不易，转载请注明：<a href="http://www.cnblogs.com/xing901022/" target="_blank">xingoo</a></p>
+
+<p>　　<strong>这篇博文你可以了解到：</strong></p>
+
+<p>　　1 Spring jar包以及源码使用</p>
+
+<p>　　2 简单的spring运行示例</p>
+
+<p>　　3 利用断点调试程序，如何快速的阅读程序【快捷键等的使用】</p>
+</blockquote>
+
+<p>　　这次阅读的源码比较老了，是3.0.5版本的，由于正好手头有这个版本的源码，而且平时基本上也是用的这个版本Spring，因此后文的分析也都是针对这个版本。</p>
+
+<p>　　下面贡献一下<a href="http://download.csdn.net/detail/xingoo_/8287805" target="_blank">Jar包以及源码</a>，由于百度云上传的压缩包总是解压失败，就放在csdn上面了。</p>
+
+<h2>如何使用jar包以及源码的source包</h2>
+
+<p>　　首先，在工程右键，属性中，添加必要的jar包。</p>
+
+<p><img alt="" src="http://images.cnitblog.com/blog/449064/201412/222033469219538.png" style="height:444px; width:765px" /></p>
+
+<p>　　选中必要的jar包，上面给出的源码jar包中，导入spring3.0.5中的所有jar包。</p>
+
+<p>　　其中lib内的是spring的jar包，用到哪个导入哪个，不知道的话，全部导入就行了。</p>
+
+<p>　　外面的几个jar包，用于日志以及mysql的驱动。commons-logging jar包是必须的，其他的随意吧。</p>
+
+<p>　　不确定的话，lib外面的这几个jar包以及lib里面的都导入就行了。</p>
+
+<p><img alt="" src="http://images.cnitblog.com/blog/449064/201412/222036574373969.png" /></p>
+
+<p>　　导入jar包后，点开jar包，选中source attachment进行编辑，链接到源码的jar包。</p>
+
+<p><img alt="" src="http://images.cnitblog.com/blog/449064/201412/222037265932462.png" style="height:500px; width:719px" /></p>
+
+<p>　　选择相应的source源码包</p>
+
+<p><img alt="" src="http://images.cnitblog.com/blog/449064/201412/222038437024405.png" /></p>
+
+<p>　　全部导入后，如下</p>
+
+<p><img alt="" src="http://images.cnitblog.com/blog/449064/201412/222039113432927.png" /></p>
+
+<p>&nbsp;</p>
+
+<h2>spring样例</h2>
+
+<p>　　首先是一个必要的POJO类，用于注入属性的值。</p>
+
+<p><a href="javascript:void(0);" onclick="copyCnblogsCode(this)" title="复制代码"><img alt="复制代码" src="http://common.cnblogs.com/images/copycode.gif" /></a></p>
+
+<pre>
+ 1 package com.test.bean;
+ 2 
+ 3 public class Person {
+ 4     
+ 5     private String name;
+ 6     private int age;
+ 7     
+ 8     public String getName() {
+ 9         return name;
+10     }
+11     public void setName(String name) {
+12         this.name = name;
+13     }
+14     public int getAge() {
+15         return age;
+16     }
+17     public void setAge(int age) {
+18         this.age = age;
+19     }
+20     public void info(){
+21         System.out.println(&quot;name:&quot;+getName()+&quot; age:&quot;+getAge());
+22     }
+23 }</pre>
+
+<p><a href="javascript:void(0);" onclick="copyCnblogsCode(this)" title="复制代码"><img alt="复制代码" src="http://common.cnblogs.com/images/copycode.gif" /></a></p>
+
+<p>　　主函数，用于读取资源文件，获取bean，调用info方法</p>
+
+<p><a href="javascript:void(0);" onclick="copyCnblogsCode(this)" title="复制代码"><img alt="复制代码" src="http://common.cnblogs.com/images/copycode.gif" /></a></p>
+
+<pre>
+ 1 package test.spring;
+ 2 
+ 3 import org.springframework.context.ApplicationContext;
+ 4 import org.springframework.context.support.ClassPathXmlApplicationContext;
+ 5 
+ 6 import com.test.bean.Person;
+ 7 
+ 8 public class Test {
+ 9     public static void main(String[] args){
+10         ApplicationContext ctx = new ClassPathXmlApplicationContext(&quot;bean.xml&quot;);//读取bean.xml中的内容
+11         Person p = ctx.getBean(&quot;person&quot;,Person.class);//创建bean的引用对象
+12         p.info();
+13     }
+14 }</pre>
+
+<p><a href="javascript:void(0);" onclick="copyCnblogsCode(this)" title="复制代码"><img alt="复制代码" src="http://common.cnblogs.com/images/copycode.gif" /></a></p>
+
+<p>　　bean.xml用于配置bean的资源文件</p>
+
+<p><a href="javascript:void(0);" onclick="copyCnblogsCode(this)" title="复制代码"><img alt="复制代码" src="http://common.cnblogs.com/images/copycode.gif" /></a></p>
+
+<pre>
+ 1 &lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot;?&gt;
+ 2 &lt;beans xmlns:xsi=&quot;http://www.w3.org/2001/XMLSchema-instance&quot;
+ 3     xmlns=&quot;http://www.springframework.org/schema/beans&quot;
+ 4     xsi:schemaLocation=&quot;http://www.springframework.org/schema/beans
+ 5     http://www.springframework.org/schema/beans/spring-beans-3.0.xsd&quot;&gt;
+ 6     &lt;bean id=&quot;person&quot; class=&quot;com.test.bean.Person&quot;&gt;
+ 7         &lt;property name=&quot;name&quot; value=&quot;xingoo&quot;/&gt;
+ 8         &lt;property name=&quot;age&quot; value=&quot;12&quot;/&gt;
+ 9     &lt;/bean&gt;
+10 &lt;/beans&gt;</pre>
+
+<p><a href="javascript:void(0);" onclick="copyCnblogsCode(this)" title="复制代码"><img alt="复制代码" src="http://common.cnblogs.com/images/copycode.gif" /></a></p>
+
+<p>　　运行结果</p>
+
+<p><img alt="" src="http://images.cnitblog.com/blog/449064/201412/222047255627573.png" style="height:153px; width:693px" /></p>
+
+<p>&nbsp;</p>
+
+<h2>阅读源码</h2>
+
+<p>　　首先，有了前面的jar包以及源码包，你就可以通过这个简单的程序，进行但不的调试，阅读源码。</p>
+
+<p><img alt="" src="http://images.cnitblog.com/blog/449064/201412/222049528584707.png" style="height:501px; width:762px" /></p>
+
+<p>　　简单的说下调试的快捷键：</p>
+
+<p>　　1&nbsp;<strong>F5</strong>：下一步，可以进入下一个函数栈</p>
+
+<p>　　2&nbsp;<strong>F6</strong>：当前函数的下一步，不会进入其他的函数。</p>
+
+<p>　　3&nbsp;<strong>F8</strong>：下一个断点。</p>
+
+<p>　　4 也可以通过选中一个变量或者表达式，按<strong>ctrl+shift+i</strong>&nbsp;来查看内容。或者<strong>添加监视</strong>的方式，查看。</p>
+
+<p>　　5 可以通过快捷键<strong>F2</strong>,来查看一个函数方法的javadoc，即说明</p>
+
+<p>　　6 快捷键<strong>F3</strong>或者<strong>ctrl+鼠标点击</strong>，进入一个函数</p>
+
+<p>　　7&nbsp;<strong>ctrl+shift+G</strong>&nbsp;查看当前方法都有谁在使用</p>
+
+<p>　　8&nbsp;<strong>F4</strong>查看类的继承关系，可以向上显示出类继承的父类以及接口。</p>
+
+<p>　　<strong>有了调试的方法，接下来，就是如何阅读源码了！</strong></p>
+
+<p>　　1 参考书籍，推荐《Spring技术内幕》</p>
+
+<p>　　这本书，基本上很详细的讲述了，spring的实现方式，以及类之间的复杂关系。可以帮助你快速的理清复杂的类之间的关系。</p>
+
+<p>　　2 使用StarUML画类图</p>
+
+<p>　　比如你好不容易理清了一个部分的关系，很快就会忘记其中的关系，那么可以通过这个工具，简单的画出其中的复杂关系。</p>
+
+<p>　　这样，下一次看的时候也会清楚一些，这是我今天刚画好的ClassPathXmlApplicationContext的类图关系：</p>
+
+<p>　　</p>

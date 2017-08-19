@@ -1,0 +1,68 @@
+Ajax调用后台方法的几种写法（一）
+
+第一种如下：Js部分：
+[javascript] view plaincopy
+<script language="javascript" type="text/javascript" src="JScripts/jquery-1.8.3.js"></script>  
+   <script language="javascript" type="text/javascript" src="JScripts/jquery-ui-1.9.2.custom.min.js"></script>  
+   <link type="text/css" rel="Stylesheet" href="Css/jquery-ui-1.9.2.custom.min.css" />  
+   <script language="javascript" type="text/javascript">  
+       var loadingDialog = $('<div id="dialog" title="" width="100%"><p class="center"><img src="Images/loading.gif"/></p><br/><p class="center">Please wait for a little while.</p></div>');  
+       function bsl_showLoadingDialog(title) {  
+           loadingDialog.dialog({  
+               modal: true,  
+               title: title,  
+               width: 400,  
+               height: 300,  
+               closeOnEscape: false,  
+               resizable: false  
+           });  
+           loadingDialog.parent().find('.ui-dialog-titlebar-close').hide();  
+       }  
+  
+       $(function () {  
+           $("#btnOK").click(function () {  
+  
+               $.ajax({  
+                   type: "POST",  
+                   async:true,  
+                   url: "WebForm1.aspx/TestAjax",    //必须是后台的静态方法  
+                   contentType: "application/json; charset=utf-8",  
+                   dataType: "json",  
+                   //  data: "name=John&location=Boston",  
+                   data:"",  
+                   beforeSend: function () {  
+                       bsl_showLoadingDialog("请稍等");  
+                   },  
+                   success: function (msg) {  
+                       $(loadingDialog).dialog("close");  
+                       alert("Data Saved: " + msg.d);  
+                   },  
+                   error: function (err) {  
+                       $(loadingDialog).dialog("close");  
+                       alert(err);  
+                   }  
+               });  
+               //禁用按钮的提交   
+               return false;  
+           });  
+       });  
+   </script>  
+页面部分：
+[html] view plaincopy
+<asp:Button ID="btnOK" runat="server" Text="验证用户"  />   
+后台方法：
+[csharp] view plaincopy
+[WebMethod]//从前台调用必须是static方法，且必须加WebMethod  
+      public static string TestAjax()  
+      {  
+        //  lblName.Text = "Hello, Async";  
+          WebForm1 webForm = new WebForm1();  
+          if (webForm.lblName != null)   //此处的lblName(Label)为null值，这个方法放在WebForm1的类中  
+          {  
+              webForm.lblName.Text = "Hello,Async";  
+          }  
+         Thread.Sleep(3000);  
+          return "true";  
+      }  
+
+局限性：后台的方法必须是静态的，导致就无法使用页面中其他的控件，无法给其他控件赋值。

@@ -1,0 +1,302 @@
+<h1><a href="http://blog.csdn.net/aiwoziji13/article/details/7330333">&quot;undefined reference to&quot; 问题解决方法</a></h1>
+
+<p>&nbsp;</p>
+
+<p>&nbsp; 最近在Linux下编程发现一个诡异的现象，就是在链接一个静态库的时候总是报错，类似下面这样的错误：</p>
+
+<pre>
+
+&nbsp;</pre>
+
+<ol>
+	<li>(.text+0x13):&nbsp;undefined&nbsp;reference&nbsp;to&nbsp;`func&#39;&nbsp;</li>
+</ol>
+
+<p>&nbsp;&nbsp;&nbsp; 关于undefined reference这样的问题，大家其实经常会遇到，在此，我以详细地示例给出常见错误的各种原因以及解决方法，希望对初学者有所帮助。</p>
+
+<p><strong>1.&nbsp; 链接时缺失了相关目标文件（.o）</strong></p>
+
+<p><strong>&nbsp;&nbsp;&nbsp;&nbsp;</strong><a href="http://lib.csdn.net/base/softwaretest" target="_blank" title="软件测试知识库">测试</a>代码如下：</p>
+
+<p><a href="http://img1.51cto.com/attachment/201011/133144914.png" target="_blank"><img alt="" src="http://img1.51cto.com/attachment/201011/133144914.png" /></a>&nbsp;</p>
+
+<p>&nbsp;&nbsp;&nbsp; 然后编译。</p>
+
+<pre>
+
+&nbsp;</pre>
+
+<ol>
+	<li>gcc&nbsp;-c&nbsp;test.c &nbsp;</li>
+	<li>gcc&nbsp;&ndash;c&nbsp;main.c&nbsp;</li>
+</ol>
+
+<p>&nbsp;&nbsp;&nbsp; 得到两个 .o 文件，一个是 main.o，一个是 test.o ，然后我们链接 .o 得到可执行程序：</p>
+
+<pre>
+
+&nbsp;</pre>
+
+<ol>
+	<li>gcc&nbsp;-o&nbsp;main&nbsp;main.o&nbsp;</li>
+</ol>
+
+<p>&nbsp;&nbsp;&nbsp; 这时，你会发现，报错了：</p>
+
+<pre>
+
+&nbsp;</pre>
+
+<ol>
+	<li>main.o:&nbsp;In&nbsp;function&nbsp;`main&#39;: &nbsp;</li>
+	<li>main.c:(.text+0x7):&nbsp;undefined&nbsp;reference&nbsp;to&nbsp;`test&#39; &nbsp;</li>
+	<li>collect2:&nbsp;ld&nbsp;returned&nbsp;1&nbsp;exit&nbsp;status&nbsp;</li>
+</ol>
+
+<p>&nbsp;&nbsp;&nbsp; 这就是最典型的undefined reference错误，因为在链接时发现找不到某个函数的实现文件，本例中test.o文件中包含了test()函数的实现，所以如果按下面这种方式链接就没事了。</p>
+
+<pre>
+
+&nbsp;</pre>
+
+<ol>
+	<li>gcc&nbsp;-o&nbsp;main&nbsp;main.o&nbsp;test.o&nbsp;</li>
+</ol>
+
+<p>&nbsp;&nbsp; 【扩展】：其实上面为了让大家更加清楚底层原因，我把编译链接分开了，下面这样编译也会报undefined reference错，其实底层原因与上面是一样的。</p>
+
+<pre>
+
+&nbsp;</pre>
+
+<ol>
+	<li>gcc&nbsp;-o&nbsp;main&nbsp;main.c&nbsp;//缺少test()的实现文件&nbsp;</li>
+</ol>
+
+<p>需要改成如下形式才能成功，将test()函数的实现文件一起编译。</p>
+
+<pre>
+
+&nbsp;</pre>
+
+<ol>
+	<li>gcc&nbsp;-o&nbsp;main&nbsp;main.c&nbsp;test.c&nbsp;//ok,没问题了&nbsp;</li>
+</ol>
+
+<p><strong>2.&nbsp;&nbsp;&nbsp; 链接时缺少相关的库文件（.a/.so）</strong></p>
+
+<p>&nbsp;&nbsp;&nbsp;&nbsp;在此，只举个静态库的例子，假设源码如下。</p>
+
+<p><a href="http://img1.51cto.com/attachment/201011/133734483.png" target="_blank"><img alt="" src="http://img1.51cto.com/attachment/201011/133734483.png" /></a></p>
+
+<p>&nbsp;&nbsp;&nbsp; 先把test.c编译成静态库(.a)文件</p>
+
+<pre>
+
+&nbsp;</pre>
+
+<ol>
+	<li>gcc&nbsp;-c&nbsp;test.c &nbsp;</li>
+	<li>ar&nbsp;-rc&nbsp;test.a&nbsp;test.o&nbsp;</li>
+</ol>
+
+<p>&nbsp;&nbsp;&nbsp; 至此，我们得到了test.a文件。我们开始编译main.c</p>
+
+<pre>
+
+&nbsp;</pre>
+
+<ol>
+	<li>gcc&nbsp;-c&nbsp;main.c&nbsp;</li>
+</ol>
+
+<p>&nbsp;&nbsp;&nbsp; 这时，则生成了main.o文件，然后我们再通过如下命令进行链接希望得到可执行程序。</p>
+
+<pre>
+
+&nbsp;</pre>
+
+<ol>
+	<li>gcc&nbsp;-o&nbsp;main&nbsp;main.o&nbsp;</li>
+</ol>
+
+<p>&nbsp;&nbsp;&nbsp; 你会发现，编译器报错了：</p>
+
+<pre>
+
+&nbsp;</pre>
+
+<ol>
+	<li>/tmp/ccCPA13l.o:&nbsp;In&nbsp;function&nbsp;`main&#39;: &nbsp;</li>
+	<li>main.c:(.text+0x7):&nbsp;undefined&nbsp;reference&nbsp;to&nbsp;`test&#39; &nbsp;</li>
+	<li>collect2:&nbsp;ld&nbsp;returned&nbsp;1&nbsp;exit&nbsp;status&nbsp;</li>
+</ol>
+
+<p>&nbsp;&nbsp;&nbsp; 其根本原因也是找不到test()函数的实现文件，由于该test()函数的实现在test.a这个静态库中的，故在链接的时候需要在其后加入test.a这个库，链接命令修改为如下形式即可。</p>
+
+<pre>
+
+&nbsp;</pre>
+
+<ol>
+	<li>gcc&nbsp;-o&nbsp;main&nbsp;main.o&nbsp;./test.a&nbsp;&nbsp;//注：./&nbsp;是给出了test.a的路径&nbsp;</li>
+</ol>
+
+<p>&nbsp;&nbsp;&nbsp;&nbsp; 【扩展】：同样，为了把问题说清楚，上面我们把代码的编译链接分开了，如果希望一次性生成可执行程序，则可以对main.c和test.a执行如下命令。</p>
+
+<pre>
+
+&nbsp;</pre>
+
+<ol>
+	<li>gcc&nbsp;-o&nbsp;main&nbsp;main.c&nbsp;./test.a&nbsp;&nbsp;//同样，如果不加test.a也会报错&nbsp;</li>
+</ol>
+
+<p><strong>3.&nbsp;&nbsp;&nbsp; 链接的库文件中又使用了另一个库文件</strong></p>
+
+<p>&nbsp;&nbsp;&nbsp; 这种问题比较隐蔽，也是我最近遇到的与网上大家讨论的不同的问题，举例说明如下，首先，还是看看测试代码。</p>
+
+<p><a href="http://img1.51cto.com/attachment/201011/134157339.png" target="_blank"><img alt="" src="http://img1.51cto.com/attachment/201011/134157339.png" /></a></p>
+
+<p>&nbsp;&nbsp;&nbsp; 从上图可以看出，main.c调用了test.c的函数，test.c中又调用了fun.c的函数。<br />
+&nbsp;&nbsp;&nbsp; 首先，我们先对fun.c，test.c，main.c进行编译，生成 .o文件。</p>
+
+<pre>
+
+&nbsp;</pre>
+
+<ol>
+	<li>gcc&nbsp;-c&nbsp;func.c &nbsp;</li>
+	<li>gcc&nbsp;-c&nbsp;test.c &nbsp;</li>
+	<li>gcc&nbsp;-c&nbsp;main.c&nbsp;</li>
+</ol>
+
+<p>&nbsp;&nbsp;&nbsp; 然后，将test.c和func.c各自打包成为静态库文件。</p>
+
+<pre>
+
+&nbsp;</pre>
+
+<ol>
+	<li>ar&nbsp;&ndash;rc&nbsp;func.a&nbsp;func.o &nbsp;</li>
+	<li>ar&nbsp;&ndash;rc&nbsp;test.a&nbsp;test.o&nbsp;</li>
+</ol>
+
+<p>&nbsp;&nbsp;&nbsp; 这时，我们准备将main.o链接为可执行程序，由于我们的main.c中包含了对test()的调用，因此，应该在链接时将test.a作为我们的库文件，链接命令如下。</p>
+
+<pre>
+
+&nbsp;</pre>
+
+<ol>
+	<li>gcc&nbsp;-o&nbsp;main&nbsp;main.o&nbsp;test.a&nbsp;</li>
+</ol>
+
+<p>&nbsp;&nbsp;&nbsp; 这时，编译器仍然会报错，如下：</p>
+
+<pre>
+
+&nbsp;</pre>
+
+<ol>
+	<li>test.a(test.o):&nbsp;In&nbsp;function&nbsp;`test&#39;: &nbsp;</li>
+	<li>test.c:(.text+0x13):&nbsp;undefined&nbsp;reference&nbsp;to&nbsp;`func&#39; &nbsp;</li>
+	<li>collect2:&nbsp;ld&nbsp;returned&nbsp;1&nbsp;exit&nbsp;status&nbsp;</li>
+</ol>
+
+<p>&nbsp;&nbsp;&nbsp; 就是说，链接的时候，发现我们的test.a调用了func()函数，找不到对应的实现。由此我们发现，原来我们还需要将test.a所引用到的库文件也加进来才能成功链接，因此命令如下。</p>
+
+<pre>
+
+&nbsp;</pre>
+
+<ol>
+	<li>gcc&nbsp;-o&nbsp;main&nbsp;main.o&nbsp;test.a&nbsp;func.a&nbsp;</li>
+</ol>
+
+<p>&nbsp;&nbsp;&nbsp; ok，这样就可以成功得到最终的程序了。同样，如果我们的库或者程序中引用了第三方库（如pthread.a）则同样在链接的时候需要给出第三方库的路径和库文件，否则就会得到undefined reference的错误。</p>
+
+<p><strong>4 多个库文件链接顺序问题</strong></p>
+
+<p>&nbsp;&nbsp;&nbsp; 这种问题也非常的隐蔽，不仔细研究你可能会感到非常地莫名其妙。我们依然回到第3小节所讨论的问题中，在最后，如果我们把链接的库的顺序换一下，看看会发生什么结果？</p>
+
+<pre>
+
+&nbsp;</pre>
+
+<ol>
+	<li>gcc&nbsp;-o&nbsp;main&nbsp;main.o&nbsp;func.a&nbsp;test.a&nbsp;</li>
+</ol>
+
+<p>&nbsp;&nbsp;&nbsp; 我们会得到如下报错.</p>
+
+<pre>
+
+&nbsp;</pre>
+
+<ol>
+	<li>test.a(test.o):&nbsp;In&nbsp;function&nbsp;`test&#39;: &nbsp;</li>
+	<li>test.c:(.text+0x13):&nbsp;undefined&nbsp;reference&nbsp;to&nbsp;`func&#39; &nbsp;</li>
+	<li>collect2:&nbsp;ld&nbsp;returned&nbsp;1&nbsp;exit&nbsp;status&nbsp;</li>
+</ol>
+
+<p>&nbsp;&nbsp;&nbsp; 因此，我们需要注意，在链接命令中给出所依赖的库时，需要注意库之间的依赖顺序，依赖其他库的库一定要放到被依赖库的前面，这样才能真正避免undefined reference的错误，完成编译链接。</p>
+
+<p><strong>5. 在c++代码中链接<a href="http://lib.csdn.net/base/c" target="_blank" title="C语言知识库">C语言</a>的库</strong></p>
+
+<p>&nbsp;&nbsp; &nbsp;如果你的库文件由c代码生成的，则在c++代码中链接库中的函数时，也会碰到undefined reference的问题。下面举例说明。</p>
+
+<p>&nbsp;&nbsp; &nbsp;首先，编写c语言版库文件：&nbsp;</p>
+
+<p>&nbsp;&nbsp; &nbsp;<a href="http://img1.51cto.com/attachment/201109/150358466.png" target="_blank"><img alt="" src="http://img1.51cto.com/attachment/201109/150358466.png" /></a></p>
+
+<p>&nbsp;&nbsp; &nbsp;编译，打包为静态库：test.a</p>
+
+<pre>
+
+&nbsp;</pre>
+
+<ol>
+	<li>gcc&nbsp;-c&nbsp;test.c &nbsp;</li>
+	<li>ar&nbsp;-rc&nbsp;test.a&nbsp;test.o&nbsp;</li>
+</ol>
+
+<p>&nbsp;&nbsp;&nbsp; 至此，我们得到了test.a文件。下面我们开始编写c++文件main.cpp</p>
+
+<p>&nbsp;&nbsp; &nbsp;<a href="http://img1.51cto.com/attachment/201109/150553287.png" target="_blank"><img alt="" src="http://img1.51cto.com/attachment/201109/150553287.png" /></a></p>
+
+<p>&nbsp;&nbsp; &nbsp;然后编译main.cpp生成可执行程序：</p>
+
+<pre>
+
+&nbsp;</pre>
+
+<ol>
+	<li>g++&nbsp;-o&nbsp;main&nbsp;main.cpp&nbsp;test.a&nbsp;</li>
+</ol>
+
+<p>&nbsp;&nbsp; &nbsp;会发现报错：</p>
+
+<pre>
+
+&nbsp;</pre>
+
+<ol>
+	<li>/tmp/ccJjiCoS.o:&nbsp;In&nbsp;function&nbsp;`main&#39;:&nbsp;</li>
+	<li>main.cpp:(.text+0x7):&nbsp;undefined&nbsp;reference&nbsp;to&nbsp;`test()&#39;&nbsp;</li>
+	<li>collect2:&nbsp;ld&nbsp;returned&nbsp;1&nbsp;exit&nbsp;status&nbsp;</li>
+</ol>
+
+<p>&nbsp;&nbsp; &nbsp;原因就是main.cpp为c++代码，调用了c语言库的函数，因此链接的时候找不到，解决方法：即在main.cpp中，把与c语言库test.a相关的头文件包含添加一个extern &quot;C&quot;的声明即可。例如，修改后的main.cpp如下：</p>
+
+<p>&nbsp;&nbsp; &nbsp;<a href="http://img1.51cto.com/attachment/201109/150959476.png" target="_blank"><img alt="" src="http://img1.51cto.com/attachment/201109/150959476.png" /></a></p>
+
+<pre>
+
+&nbsp;</pre>
+
+<ol>
+	<li>g++&nbsp;-o&nbsp;main&nbsp;main.cpp&nbsp;test.a&nbsp;</li>
+</ol>
+
+<p>&nbsp;&nbsp; &nbsp;再编译会发现，问题已经成功解决。</p>

@@ -1,0 +1,145 @@
+	这个框架集合form提交、验证、上传的功能。 
+	这个框架必须和jquery完整版结合，否则使用min则无效。 
+	原理：利用js进行对form进行组装成ajax的url和data，原理还是用ajax来提交，其实这完全可以自己写，但是有这个框架可能会更简单。
+
+一、最简单例子：
+
+	第一步：引用js 
+
+		<!--这里的min是自己用js压缩工具对完整版进行的压缩
+		并不是真正的min，所以好使-->
+		<script type="text/javascript" src="js/jquery-1.7.min.js"></script>
+		<script type="text/javascript" src="js/jquery.form.js"></script>
+
+		js文件在此文件所在文件夹。
+
+	第二步：页面写form 
+
+		<form id="showDataForm"
+		action="/024pm/f_shopUser.do?method=login" method="post">
+		<input type="text" value="" name="name" maxlength="2"/>
+		<input type="password" value="" name="password" maxlength="2"/>
+		<input type="submit" value="提交"/>
+		</form>
+
+
+		<div id="output1"
+			style="width:1000px;height:200px;background-color:#eee;">
+		</div>
+
+	第三步：写js调用jquery.form.js，对form表单进行ajax提交 
+
+		$(document).ready(function() {
+		var options = {
+			target: '#output1',				// 从服务传过来的数据显示在这个div内部也就是ajax局部刷新
+			beforeSubmit: showRequest,		// ajax提交之前的处理
+			success: showResponse			// 处理之后的处理
+		};
+
+		$('#showDataForm').submit(function() {
+		$(this).ajaxSubmit(options);
+		return false;					//非常重要，如果是false，则表明是不跳转
+										//在本页上处理，也就是ajax，如果是非false，则传统的form跳转。
+		});
+		});
+
+		function showResponse(responseText, statusText, xhr, $form) {
+			alert(xhr.responseText+"=="+$form.attr("method")+'status: ' +
+			statusText + 'nnresponseText: n' + responseText);
+			//xhr：说明你可以用ajax来自己再次发出请求
+			//$form：是那个form对象，是一个jquery对象
+			//statusText：状态，成功则为success
+			//responseText，服务器返回的是字符串（当然包括html，不包括json）
+		}
+
+		function showRequest(formData, jqForm, options) {
+			//formData是数组，就是各个input的键值map数组
+			//通过这个方法来进行处理出来拼凑出来字符串。
+			//formData：拼凑出来的form字符串，比如name=hera&password，
+			//其实就是各个表单中的input的键值对，
+			//如果加上method=XXXX，那也就是相当于ajax内的data。
+			var queryString = $.param(formData);
+			alert(queryString+"======"+formData.length);
+			for (var i=0; i < formData.length; i++) 
+				{
+				alert(formData[i].value+"==============="+formData[i].name);
+				}
+
+			//jqForm，jquery form对象
+			var formElement = jqForm[0];
+			alert($(formElement).attr("method"));
+			alert($(jqForm[0].name).attr("maxlength"));
+			//非常重要，返回true则说明在提交ajax之前你验证
+			//成功，则提交ajax form
+			//如果验证不成功，则返回非true，不提交
+			return true;
+		}
+
+二、options对象内的值有哪些？
+
+	主要的有那么几个常用的属性：
+	var options = {
+	target: '#output1',
+	data:{param1:"我自己的第一个额外的参数"},
+	//这个参数是指通过ajax来给服务器提交除了form内部input的参数
+	//在后台中使用String param1=req.getParameter("param1");获取。
+	// dataType: null,
+	dataType:'json',
+	//这个参数值的是服务器返回的数据类型，默认的是null
+	//也就是服务器可以默认返回字符串，然后将这些字符串放在target内部
+	//当然还有json、xml，其中最常用的便是null和json
+	//对于json的使用，我们会稍后讲解到
+	beforeSubmit: showRequest,
+	success: successRes，
+	type：'POST'
+	//提交方式，默认是自己在form标签上指定的method
+	//如果没有指定，则使用get。
+	url：''
+	//重新提交的url，即url可以在form中配置
+	//也可以在这里配置。
+	};
+
+三、如何解析服务器传递过来的json数据
+
+	我们知道，使用jquery提供的ajax方法，如果服务器传递回来的是json数据，是可以转换为js的json对象，然后可以通过json.xxx来获取相应的值。那么这个框架呢？ 
+	1）首先options参数中指定dataType：'json' 
+	2）通过框架进行提交 
+	3）服务器接收 
+	4）服务器返回json 
+	5）页面js接收json 
+	关键是第五步，如何js接收json，是可以通过success: 指定的方法内部进行如下操作： 
+
+	var options = {
+	target: '#output1',
+	dataType:'json',
+	beforeSubmit: showRequest,
+	success: successRes
+	//注意了，successRes方法看起来并没有有参数
+	//但是为何下面的方法就能有参数了呢，是可以这么传递的。
+	function successRes(jsonData){
+	alert(jsonData.param1);
+	}
+
+四、如何通过这个框架进行简单的验证呢？
+
+	说到验证，那肯定是在beforeSubmit的方法内部进行验证的，如何验证，因为这个方法已经将jqform对象，还有formData都传给你了，你可以拿这两个参数进行获取相应的input，然后进行自己的判定，如果判定成功，则提交。
+
+	function showRequest(formData, jqForm, options) {
+	for (var i=0; i < formData.length; i++) {
+	alert(formData[i].value+"========"+formData[i].name);
+	if (!formData[i].value) {
+	//验证是否填写完整
+	alert('input有没有填写的选项');
+	//如果验证不通过，则返回false
+	return false;
+	}
+	}
+	var formElement = jqForm[0];
+	alert($(jqForm[0].name).attr("maxlength"));
+	return true;
+	}
+
+
+
+
+

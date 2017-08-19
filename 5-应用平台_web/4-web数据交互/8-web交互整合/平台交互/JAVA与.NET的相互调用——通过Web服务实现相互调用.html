@@ -1,0 +1,360 @@
+JAVA与.NET的相互调用——通过Web服务实现相互调用
+
+
+JAVA与.NET是现今世界竞争激烈的两大开发媒体，两者语言有很多相似的地方。而在很多大型的开发项目里面，往往需要使用两种语言进行集成开发。而很多的开发人员都会偏向于其中一种语言，在使用集成开发的时候对另一种语言感觉到畏惧。在这里在下向各位介绍一下，JAVA与.NET相互调用的例子。下面的介绍主要包括三方面：一是通过常用Web服务进行相互调用，二是使用TCP/IP套接字进行相互调用，三是使用Remote实现远程对象相互调用。
+
+在这章里面先为大家介绍一下最简单，最常用的Web服务相互调用方式。首先说一下Web服务的来源，Web服务是一种新的Web应用程序分支，可以执行从简单的请求到复杂商务处理等任何功能。一旦部署以后，其他Web服务应用程序可以发现并调用它部署的服务。 Web Service是一种应用程序，它可以使用标准的互联网协议，像超文件传输协议(HTTP)、简单对象访问协议(SOAP)、XML等，将功能纲领性地体现在互联网和企业内部网上，Web服务被视作是Web上的组件编程。Web服务必须提供一套标准的类型系统，用于沟通不同平台、编程语言和组件模型中的不同类型系统。
+
+XML和XSD
+
+可扩展的标记语言XML　是Web Service平台中表示数据的基本格式。除了易于建立和易于分析外，XML主要的优点在于它既与平台无关，又与厂商无关。XML是由万维网协会 (W3C)创建，W3C制定的XML SchemaXSD　定义了一套标准的数据类型，并给出了一种语言来扩展这套数据类型。 Web Service平台是用XSD来作为数据类型系统的。当你用某种语言如JAVA、C#来构造一个Web Service时，为了符合Web Service标准，所有你使用的数据类型都必须被转换为XSD类型。如想让它使用在不同平台和不同软件的不同组织间传递，还需要通过SOAP协议将它包装起来。
+
+SOAP
+
+SOAP即简单对象访问协议(Simple Object Access Protocol)，它是用于交换XML编码信息的轻量级协议。它有三个主要方面：XML-envelope为描述信息内容和如何处理内容定义了框架，将程序对象编码成为XML对象的规则，执行远程过程调用(RPC)的约定。SOAP可以运行在任何其他传输协议上。例如，你可以使用 SMTP，即因特网电子邮件协议来传递SOAP消息，这可是很有诱惑力的。在传输层之间的头是不同的，但XML有效负载保持相同。Web Service 希望实现不同的系统之间能够用“软件-软件对话”的方式相互调用，打破了软件应用、网站和各种设备之间的格格不入的状态，实现“基于Web无缝集成”的目标。
+
+WSDL
+
+Web Service描述语言WSDL　就是用机器能阅读的方式提供的一个正式描述文档而基于XML的语言，用于描述Web Service及其函数、参数和返回值。因为是基于XML的，所以WSDL既是机器可阅读的，又是人可阅读的。
+
+下面分开两个方面讲解一下如果通过Web服务实现JAVA与.NET的相互调用。
+
+
+
+
+一、使用.NET作为服务器端，JAVA作为客户端实现相互调用。
+
+在.NET系统里面，以WCF作为新一代的服务开发工具是微软的一个新卖点，我们就以WCF为例子实现服务器端，首先新建一个网站项目，在网站添加一个WCF服务PersonService。你将看到PersonService.svc、IPersonService、PersonService.cs三个文件，其中IPersonService是对向暴露一个接口，接口的功能由PersonService来实现，客户端则通过PersonalService.svc来寻获服务，并对其添加引用的。
+
+	//在PersonService.svc里，只包括一行，其中列明了该服务的实现类
+	<%@ ServiceHost Language="C#" Debug="true" Service="Service.PersonService" CodeBehind="~/App_Code/PersonService.cs"%>
+
+
+	//服务的实现
+	using System;
+	using System.Collections.Generic;
+	using System.Linq;
+	using System.Runtime.Serialization;
+	using System.ServiceModel;
+	using System.Text;
+
+	// 注意: 使用“重构”菜单上的“重命名”命令，可以同时更改代码和配置文件中的接口名“IPersonService”。
+	namespace Service
+	{
+	[ServiceContract]
+	publicinterface IPersonService
+	{
+	[OperationContract]
+	IList<Person> GetList();
+	}
+
+	publicclass PersonService : IPersonService
+	{
+	public IList<Person> GetList()
+	{
+	IList<Person> personList =new List<Person>();
+
+	Person person1 =new Person();
+	person1.ID =0;
+	person1.Age =27;
+	person1.Name ="Leslie";
+	personList.Add(person1);
+
+	Person person2 =new Person();
+	person2.ID =1;
+	person2.Age =23;
+	person2.Name ="Rose";
+	personList.Add(person2);
+
+	Person person3 =new Person();
+	person3.ID =2;
+	person3.Age =29;
+	person3.Name ="Jack";
+	personList.Add(person3);
+
+	return personList;
+	}
+	}
+	}
+
+为了使用Person能够实现远程传送，我们必须对Person进行序列化，在WCF中包括服务契约、数据契约、消息契约三部分，而数据契约正是用于对数据进行序列化处理的，如果想对WCF有进一步的了解，可以链接使用WCF实现SOA面向服务编程
+
+	using System;
+	using System.Collections.Generic;
+	using System.Linq;
+	using System.Web;
+	using System.Runtime.Serialization;
+	///<summary>
+	///Person 的摘要说明
+	///</summary>
+	namespace Service
+	{
+	[DataContract]
+	publicclass Person
+	{
+	[DataMember]
+	publicint ID
+	{
+	get;
+	set;
+	}
+	[DataMember]
+	publicstring Name
+	{
+	get;
+	set;
+	}
+	[DataMember]
+	publicint Age
+	{
+	get;
+	set;
+	}
+	}
+	}
+
+数据契约里面有多种的序列化方式，包括DataContractSerializer,NetDataContractSerializer,XmlServializer,DataContractJsonSerializer。在这里面只用使用最普遍的DataContractSerializer，而DataContractJsonSerializer是现今比较热门的方式，特别是在开发网络项目时候，多使用Json进行数据通讯。
+
+最后配置好web.config，就可以成功将WCF服务发布
+
+	<?xml version="1.0"?>
+	<configuration>
+	<system.serviceModel>
+	<behaviors>
+	<serviceBehaviors>
+	<behavior name="serviceBehavior">
+	<serviceMetadata httpGetEnabled="true"/>//注意将httpGetEnabled设置为true，使客户端能够成功捕获服务
+	<serviceDebug includeExceptionDetailInFaults="false"/>
+	</behavior>
+	</serviceBehaviors>
+	</behaviors>
+	<services>
+	<service name="Service.PersonService" behaviorConfiguration="serviceBehavior">//name属性必须与服务实现类的类名相对应
+	<endpoint address="" binding="basicHttpBinding" contract="Service.IPersonService"/>//contract必须与契约名相对应
+	<endpoint address="mex" binding="mexHttpBinding" contract="IMetadataExchange"/>//注意打开元数据，使客户能下载
+	</service>
+	</services>
+	</system.serviceModel>
+	</configuration>
+
+下面使用MyEclipse8.6进行客户端开发，首先添加对服务的引用，按Ctrl+N新建一个项目，选择Web Service->Web Service Client,单击下一步，这时候选择在Framework上选择JAX-WS，单击下一步
+
+图 1
+
+在WSDL URL上输入服务的路径，并为服务添加一个Java pagckage包myServices，点击完成，这样WCF服务便可成功加入到客户端。
+
+图 2
+
+此时为此项目添加测试类，运行进行测试
+
+	package myAssembly;
+
+	import java.util.List;
+
+	publicclass Test {
+	publicstaticvoid main(String[] args){
+	myServices.PersonService service=new myServices.PersonService(); //获取服务对象
+	myServices.IPersonService personService=service.getBasicHttpBindingIPersonService(); //通过basicHttpBinding协议绑定远程对象
+	List<myServices.Person> personList=personService.getList().getPerson();
+	for(int n=0;n<personList.size();n++){
+	System.out.println("ID:"+personList.get(n).getID()+" Name:"+personList.get(n).getName().toString()+" Age:"+personList.get(n).getAge());
+	}
+	}
+	}
+
+
+
+二、使用JAVA作为服务器端，.NET作为客户端实现相互调用。
+
+JAVA开发Web Service的工具有很多，最常用的有Axis、XFire、NetBean等，在JAVA-SE 6.0以上支持JAX-WS2.0 ，JAX-WS 2.0是JAX-RPC 1.0的更新产品。在 JAX-WS中，一个远程调用可以转换为一个基于XML的协议例如SOAP。在使用JAX-WS过程中，开发者不需要编写任何生成和处理SOAP消息的代码。JAX-WS的运行时实现会将这些API的调用转换成为对于SOAP消息。 在服务器端，用户只需要通过Java语言定义远程调用所需要实现的接口SEI (service endpoint interface)，并提供相关的实现，通过调用JAX-WS的服务发布接口就可以将其发布为WebService接口。在下面我们就以XFire建立一个Web Service。
+
+首先建立一个在一个项目上单击右键，选择MyEclipse->Add XFire Web Service Capabilities，引用了XFire工具包以后。在项目会自动建立一个WebServices文件夹，文件夹里面的service.xml就是对发布Web Service进行配置的。
+
+现在先建立好一个服务层
+
+	//建立一个Model包，里面包含一个值对象Person
+
+	package Model;
+
+	import java.io.Serializable;
+	publicclass Person implements Serializable {
+	privateint id;
+	private String name;
+	privateint age;
+
+	publicint getId(){
+	return id;
+	}
+
+	publicvoid setId(int id){
+	this.id=id;
+	}
+
+	public String getName(){
+	return name;
+	}
+
+	publicvoid setName(String name){
+	this.name=name;
+	}
+
+	publicint getAge(){
+	return age;
+	}
+
+	publicvoid setAge(int age){
+	this.age=age;
+	}
+	}
+
+
+
+	//建立一个Service包，里面包含服务接口
+
+	package Service;
+
+	import java.util.List;
+	import Model.*;
+
+	publicinterface PersonService {
+	List<Person> GetList();
+	}
+
+
+
+
+	//建立一个ServiceImpl包，实现服务
+
+	package ServiceImpl;
+
+	import Model.*;
+	import Service.*;
+	import java.util.*;
+
+	publicclass PersonServiceImpl implements PersonService{
+	public List<Person> GetList(){
+	List<Person> personList=new LinkedList<Person>();
+
+	Person person1=new Person();
+	person1.setId(0);
+	person1.setAge(23);
+	person1.setName("Leslie");
+	personList.add(person1);
+
+	Person person2=new Person();
+	person2.setId(1);
+	person2.setAge(30);
+	person2.setName("Mike");
+	personList.add(person2);
+
+	return personList;
+	}
+	}
+
+在Service.xml上面对服务进行配置
+
+	<?xml version="1.0" encoding="UTF-8"?>
+	<beans xmlns="http://xfire.codehaus.org/config/1.0">
+	<service>
+	<name>PersonService</name>
+	<namespace>http://leslie-pc:8080/PersonService</namespace>
+	<serviceClass>
+	Service.PersonService
+	</serviceClass>
+	<implementationClass>
+	ServiceImpl.PersonServiceImpl
+	</implementationClass>
+	</service>
+	</beans>
+
+其配置功能如下：
+
+service
+service 标签和它所包含的 xml 内容为发布成 Web 服务的 POJO 提供完整的描述。
+
+name
+Web 服务被发布时所采用的唯一名称。
+
+namespace
+Web 服务发布时所使用的命名空间。
+
+serviceClass
+Web 服务接口类的全名，包括包名和类名。
+
+implemetationClass
+Web 服务实现类的全名，包括包名和类名。
+
+现在可以运行程序，对服务进行测试，在测试时输入服务地址http://leslie-pc:8080/WebSite1/services/PersonService?wsdl，系统将显示wsdl代码
+
+	<?xml version="1.0" encoding="UTF-8" ?> 
+	- <wsdl:definitions targetNamespace="http://leslie-pc:8080/PersonService" xmlns:ns1="http://Model" xmlns:soapenc12="http://www.w3.org/2003/05/soap-encoding" xmlns:tns="http://leslie-pc:8080/PersonService" xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap11="http://schemas.xmlsoap.org/soap/envelope/" xmlns:wsdlsoap="http://schemas.xmlsoap.org/wsdl/soap/" xmlns:soapenc11="http://schemas.xmlsoap.org/soap/encoding/" xmlns:soap12="http://www.w3.org/2003/05/soap-envelope">
+	- <wsdl:types>
+	- <xsd:schema xmlns:xsd="http://www.w3.org/2001/XMLSchema" attributeFormDefault="qualified" elementFormDefault="qualified" targetNamespace="http://leslie-pc:8080/PersonService">
+	- <xsd:element name="GetList">
+	<xsd:complexType /> 
+	</xsd:element>
+	- <xsd:element name="GetListResponse">
+	- <xsd:complexType>
+	- <xsd:sequence>
+	<xsd:element maxOccurs="1" minOccurs="1" name="out" nillable="true" type="ns1:ArrayOfPerson"/> 
+	</xsd:sequence>
+	</xsd:complexType>
+	</xsd:element>
+	</xsd:schema>
+	- <xsd:schema xmlns:xsd="http://www.w3.org/2001/XMLSchema" attributeFormDefault="qualified" elementFormDefault="qualified" targetNamespace="http://Model">
+	- <xsd:complexType name="ArrayOfPerson">
+	- <xsd:sequence>
+	<xsd:element maxOccurs="unbounded" minOccurs="0" name="Person" nillable="true" type="ns1:Person"/> 
+	</xsd:sequence>
+	</xsd:complexType>
+	- <xsd:complexType name="Person">
+	- <xsd:sequence>
+	<xsd:element minOccurs="0" name="age" type="xsd:int"/> 
+	<xsd:element minOccurs="0" name="id" type="xsd:int"/> 
+	<xsd:element minOccurs="0" name="name" nillable="true" type="xsd:string"/> 
+	</xsd:sequence>
+	</xsd:complexType>
+	</xsd:schema>
+	</wsdl:types>
+	- <wsdl:message name="GetListRequest">
+	<wsdl:part name="parameters" element="tns:GetList"/> 
+	</wsdl:message>
+	- <wsdl:message name="GetListResponse">
+	<wsdl:part name="parameters" element="tns:GetListResponse"/> 
+	</wsdl:message>
+	- <wsdl:portType name="PersonServicePortType">
+	- <wsdl:operation name="GetList">
+	<wsdl:input name="GetListRequest" message="tns:GetListRequest"/> 
+	<wsdl:output name="GetListResponse" message="tns:GetListResponse"/> 
+	</wsdl:operation>
+	</wsdl:portType>
+	- <wsdl:binding name="PersonServiceHttpBinding" type="tns:PersonServicePortType">
+	<wsdlsoap:binding style="document" transport="http://schemas.xmlsoap.org/soap/http"/> 
+	- <wsdl:operation name="GetList">
+	<wsdlsoap:operation soapAction=""/> 
+	- <wsdl:input name="GetListRequest">
+	<wsdlsoap:body use="literal"/> 
+	</wsdl:input>
+	- <wsdl:output name="GetListResponse">
+	<wsdlsoap:body use="literal"/> 
+	</wsdl:output>
+	</wsdl:operation>
+	</wsdl:binding>
+	- <wsdl:service name="PersonService">
+	- <wsdl:port name="PersonServiceHttpPort" binding="tns:PersonServiceHttpBinding">
+	<wsdlsoap:address location="http://leslie-pc:8080/WebSite1/services/PersonService"/> 
+	</wsdl:port>
+	</wsdl:service>
+	</wsdl:definitions>
+
+服务器端测试已经成功，现在使用.NET对服务进行调用，在项目上单击右键->选择添加Web服务->在URL地址上输入服务的地址http://leslie-pc:8080/WebSite1/services/PersonService?wsdl  ，在一个页面上输入代码进行测试。
+
+	protectedvoid Page_Load(object sender, EventArgs e)
+	{
+	Service.PersonService personService =new Service.PersonService();
+	IList<Service.Person> personList = personService.GetList();
+	foreach(Service.Person person in personList)
+	{
+	Response.Write("id:"+ person.id.ToString() +" name:"+ person.name +" age:"+ person.age.ToString()+"<br/>");
+	}
+	}

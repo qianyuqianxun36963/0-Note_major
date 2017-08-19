@@ -1,0 +1,287 @@
+<h1><a href="http://blog.csdn.net/dslztx/article/details/47285601">Logback配置语法</a></h1>
+
+<h2>一、Logback配置基本概念</h2>
+
+<h3>1.1、Logback配置源的3种形式</h3>
+
+<p>分别是代码配置，XML形式的配置文件，Groovy形式的配置文件</p>
+
+<h3>1.2、Log4J中的log4j.properties文件转成logback.xml文件</h3>
+
+<p>http://logback.qos.ch/translator/</p>
+
+<h3>1.3、加载Logback配置源的过程-<strong>&lt;重点&gt;</strong></h3>
+
+<p>1)在类路径中，尝试加载logback.groovy文件<br />
+2)在类路径中，尝试加载logback-test.xml文件<br />
+3)在类路径中，尝试加载logback.xml文件<br />
+4)尝试加载一个com.qos.logback.classic.spi.Configurator实例<br />
+5)使用BasicConfigurator实例，该实例简单配置Logback</p>
+
+<p>找了一个项目示例，执行如下。在src目录下有一个logback.xml文件，成功加载了！！</p>
+
+<p>14:22:04,579 |-INFO in ch.qos.logback.classic.LoggerContext[default] - Could NOT find resource [logback.groovy]<br />
+14:22:04,579 |-INFO in ch.qos.logback.classic.LoggerContext[default] - Could NOT find resource [logback-test.xml]<br />
+14:22:04,579 |-INFO in ch.qos.logback.classic.LoggerContext[default] - Found resource [logback.xml] at [file:/D:/practice/javaWorkspace/logbackdemo/bin/logback.xml]</p>
+
+<p>下面两个调用都是可以的。</p>
+
+<p>private static final Logger logger = LoggerFactory.getLogger(CommonTest.class); //常规的方式</p>
+
+<p>private static Logger logger2 = LoggerFactory.getLogger(&quot;DAILY_LOG&quot;); //在logback.xml里面定义的appender。</p>
+
+<h3>1.4、简单配置举例</h3>
+
+<p>在1.3中提及了&quot;使用BasicConfigurator实例，该实例简单配置Logback&quot;，这个简单配置转换成等价的XML形式的配置文件，文件内容如下：</p>
+
+<ol start="1">
+	<li>&lt;configuration&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&lt;appender&nbsp;name=&quot;STDOUT&quot;&nbsp;class=&quot;ch.qos.logback.core.ConsoleAppender&quot;&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;!--&nbsp;encoders&nbsp;are&nbsp;assigned&nbsp;the&nbsp;type&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ch.qos.logback.classic.encoder.PatternLayoutEncoder&nbsp;by&nbsp;default&nbsp;--&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;encoder&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;pattern&gt;%d{HH:mm:ss.SSS}&nbsp;[%thread]&nbsp;%-5level&nbsp;%logger{36}&nbsp;-&nbsp;%msg%n&lt;/pattern&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;/encoder&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&lt;/appender&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&lt;root&nbsp;level=&quot;debug&quot;&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;appender-ref&nbsp;ref=&quot;STDOUT&quot;&nbsp;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&lt;/root&gt;&nbsp;&nbsp;</li>
+	<li>&lt;/configuration&gt;&nbsp;&nbsp;</li>
+</ol>
+
+<p>&nbsp;</p>
+
+<h3>1.5、打印Logback运行中的内部状态信息</h3>
+
+<p>默认情况下，在Logback运行过程中，如果内部碰到Warning和Error状态，那么相应的内部状态信息会被打印出来；否则，不会有任何内部状态信息被打印出来。<br />
+假如想要打印任何内部状态下的信息，可以有3种途径进行配置：<br />
+1)代码形式<br />
+显式调用&quot;StatusPrinter.print(lc)&quot;方法，具体代码如下：</p>
+
+<ol start="1">
+	<li>public&nbsp;static&nbsp;void&nbsp;main(String[]&nbsp;args)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;//&nbsp;assume&nbsp;SLF4J&nbsp;is&nbsp;bound&nbsp;to&nbsp;logback&nbsp;in&nbsp;the&nbsp;current&nbsp;environment&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;LoggerContext&nbsp;lc&nbsp;=&nbsp;(LoggerContext)&nbsp;LoggerFactory.getILoggerFactory();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;//&nbsp;print&nbsp;logback&#39;s&nbsp;internal&nbsp;status&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;StatusPrinter.print(lc);&nbsp;&nbsp;</li>
+	<li>}&nbsp;&nbsp;</li>
+</ol>
+
+<p>2)XML形式配置文件中的&lt;configuration&gt;标签的debug属性值设为true<br />
+具体内容如下：</p>
+
+<ol start="1">
+	<li>&lt;configuration&nbsp;debug=&quot;true&quot;&gt;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&lt;appender&nbsp;name=&quot;STDOUT&quot;&nbsp;class=&quot;ch.qos.logback.core.ConsoleAppender&quot;&gt;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;!--&nbsp;encoders&nbsp;are&nbsp;&nbsp;by&nbsp;default&nbsp;assigned&nbsp;the&nbsp;type&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ch.qos.logback.classic.encoder.PatternLayoutEncoder&nbsp;--&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;encoder&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;pattern&gt;%d{HH:mm:ss.SSS}&nbsp;[%thread]&nbsp;%-5level&nbsp;%logger{36}&nbsp;-&nbsp;%msg%n&lt;/pattern&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;/encoder&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&lt;/appender&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&lt;root&nbsp;level=&quot;debug&quot;&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;appender-ref&nbsp;ref=&quot;STDOUT&quot;&nbsp;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&lt;/root&gt;&nbsp;&nbsp;</li>
+	<li>&lt;/configuration&gt;&nbsp;&nbsp;</li>
+</ol>
+
+<p>3)通过&ldquo;logback.statusListenerClass&rdquo;系统变量<br />
+通过&ldquo;logback.statusListenerClass&rdquo;系统变量加载&quot;OnConsoleStatusListener&quot;这个StatusListener<br />
+具体内容如下：</p>
+
+<ol start="1">
+	<li>java&nbsp;-Dlogback.statusListenerClass=ch.qos.logback.core.status.OnConsoleStatusListener&nbsp;&nbsp;</li>
+</ol>
+
+<h2>二、XML形式配置文件语法</h2>
+
+<p>Logback中XML形式配置文件的语法非常灵活，因而不能用DTD文件或者XML模式文件来进行可使用标签的定义。<br />
+在XML形式配置文件内，总体结构是：最顶层是一个&lt;configuration&gt;标签，在&lt;configuration&gt;标签下可以有0到多个&lt;appender&gt;标签，0到多个&lt;logger&gt;标签，最多只能有1个&lt;root&gt;标签以及其他一些高级配置。</p>
+
+<p>如图1</p>
+
+<p>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; 图1</p>
+
+<p><img alt="" src="http://img.blog.csdn.net/20150814203438910?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQv/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70/gravity/Center" /></p>
+
+<p><br />
+<br />
+注意：<br />
+在XML形式的配置文件内，有些属性具有默认值，无需显式配置，但是为了更好的可读性和更精确的定义，我们还是显式配置比较好。</p>
+
+<h3>2.1、&lt;logger&gt;标签</h3>
+
+<p>配置&lt;logger&gt;标签相当于配置Logger实例，&lt;logger&gt;标签允许的属性有：<br />
+name:必需的，表示Logger实例的名称<br />
+level:可选的，表示Logger实例的Level值，可选值集合为&quot;TRACE,DEBUG,INFO,WARN,ERROR,ALL,OFF和NULL&quot;，其中NULL表示继承祖先或者父亲Logger实例的Level值</p>
+
+<p>additivity:可选的，表示是否继承祖先或者父亲Logger实例绑定的Appender，可选值集合为true,false</p>
+
+<p>&lt;logger&gt;标签允许0到多个&lt;appender-ref&gt;子标签，&lt;appender-ref&gt;子标签用来配置父&lt;logger&gt;标签表示的Logger实例所绑定的Appender，&lt;appender-ref&gt;子标签只有一个&quot;ref&quot;属性，&quot;ref&quot;属性的值为欲绑定Appender实例的名称。</p>
+
+<p>&nbsp;</p>
+
+<h3>2.2、&lt;root&gt;标签</h3>
+
+<p>配置&lt;root&gt;标签相当于配置名称为&quot;ROOT&quot;的特殊Logger实例，&lt;root&gt;标签允许的属性为level。有以下几点需要注意:<br />
+1)&lt;root&gt;标签配置的特殊Logger实例已经有名称&quot;ROOT&quot;，因而不允许name属性<br />
+2)&lt;root&gt;标签配置的特殊Logger实例处于Logger实例层次结构的最顶层，是否允许继承祖先或者父亲Logger实例的绑定的Appender对其无意义，因而不允许additivity属性<br />
+3)&lt;root&gt;标签配置的特殊Logger实例处于Logger实例层次结构的最顶层，继承祖先或者父亲Logger实例的Level值无意义，因而level属性值不能为NULL，level属性的可选值集合是&quot;TRACE,DEBUG,INFO,WARN,ERROR,ALL,OFF&quot;<br />
+&lt;root&gt;标签允许0到多个&lt;appender-ref&gt;子标签，&lt;appender-ref&gt;子标签用来配置父&lt;root&gt;标签表示的特殊Logger实例所绑定的Appender，&lt;appender-ref&gt;子标签只有一个&quot;ref&quot;属性，&quot;ref&quot;属性的值为欲绑定Appender实例的名称。</p>
+
+<h3>2.3、&lt;appender&gt;标签</h3>
+
+<p>配置&lt;appender&gt;标签相当于配置Appender实例，&lt;appender&gt;标签允许的属性有：<br />
+name:必需的，表示Appender实例的名称<br />
+class:必需的，表示Appender实例的类型<br />
+&lt;appender&gt;标签允许的子标签有：0到多个&lt;layout&gt;,0到多个&lt;encoder&gt;,0到多个&lt;filter&gt;和任意的相应于特定Appender类型的属性的标签<br />
+比如&quot;ch.qos.logback.classic.db.DBAppender&quot;类型的Appender具有<br />
+&quot;connectionSource&quot;属性，那么配置该类型的&lt;appender&gt;标签时，可以配置一个&lt;connectionSource&gt;标签，样例片段如下：</p>
+
+<ol start="1">
+	<li>&lt;appender&nbsp;name=&quot;DB&quot;&nbsp;class=&quot;ch.qos.logback.classic.db.DBAppender&quot;&gt;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;connectionSource&nbsp;class=&quot;ch.qos.logback.core.db.DriverManagerConnectionS&nbsp;&nbsp;</li>
+	<li>ource&quot;&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;driverClass&gt;com.mysql.jdbc.Driver&lt;/driverClass&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;url&gt;jdbc:mysql://127.0.0.1:3306/dslztx?useUnicode=true&amp;characterEncoding=gbk&lt;/url&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;user&gt;dsl&lt;/user&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;password&gt;dsl&lt;/password&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/connectionSource&gt;&nbsp;&nbsp;</li>
+	<li>&lt;/appender&gt;&nbsp;&nbsp;</li>
+</ol>
+
+<p>&nbsp;</p>
+
+<h4>2.3.1、&lt;layout&gt;标签</h4>
+
+<p>配置&lt;layout&gt;标签相当于配置Layout实例，&lt;layout&gt;标签允许的属性有：<br />
+class:必需的，表示Layout实例的类型。如果不显式设置，那么默认值为&quot;ch.qos.logback.classic.PatternLayout&quot;</p>
+
+<p>&lt;layout&gt;标签允许的子标签有：任意的相应于特定Layout类型的属性的标签</p>
+
+<p>Layout被用来格式化LoggingEvent实例，Layout格式化LoggingEvent实例得到一个String<br />
+常用的Layout的类型为&quot;ch.qos.logback.classic.PatternLayout&quot;，配置该类型的实例时，一般需配置它的&quot;pattern&quot;属性，样例配置片段如下：</p>
+
+<ol start="1">
+	<li>&lt;layout&nbsp;class=&quot;ch.qos.logback.classic.PatternLayout&quot;&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;pattern&gt;%d{HH:mm:ss.SSS}&nbsp;[%thread]&nbsp;%-5level&nbsp;%logger{36}&nbsp;-&nbsp;%msg%n&lt;/pattern&gt;&nbsp;&nbsp;</li>
+	<li>&lt;/layout&gt;&nbsp;&nbsp;</li>
+</ol>
+
+<p>&nbsp;</p>
+
+<h4>2.3.2、&lt;encoder&gt;标签</h4>
+
+<p>配置&lt;encoder&gt;标签相当于配置Encoder实例，&lt;encoder&gt;标签允许的属性有：<br />
+class:必需的，表示Encoder实例的类型。如果不显式设置，那么默认值为&quot;ch.qos.logback.classic.encoder.PatternLayoutEncoder&quot;<br />
+&lt;encoder&gt;标签允许的子标签有：任意的相应于特定Encoder类型的属性的标签<br />
+Encoder被用来格式化LoggingEvent实例，Encoder格式化LoggingEvent实例得到一个Byte Array。Encoder和Layout都被用来进行格式化操作，但是相比之下，Encoder拥有更多功能。<br />
+常用的Encoder的类型为&quot;ch.qos.logback.classic.encoder.PatternLayoutEncoder&quot;，配置该类型的实例时，一般需配置它的&quot;pattern&quot;属性，样例配置片段如下：</p>
+
+<ol start="1">
+	<li>&lt;encoder&nbsp;class=&quot;ch.qos.logback.classic.encoder.PatternLayoutEncoder&quot;&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;pattern&gt;%d{HH:mm:ss.SSS}&nbsp;[%thread]&nbsp;%-5level&nbsp;%logger{36}&nbsp;-&nbsp;%msg%n&lt;/pattern&gt;&nbsp;&nbsp;</li>
+	<li>&lt;/encoder&gt;&nbsp;&nbsp;</li>
+</ol>
+
+<p>备注：PatternLayoutEncoder其实继承Encoder接口，内部包含一个对PatternLayout实例的引用，而PatternLayoutEncoder中配置的pattern属性其实最终是被PatternLayout使用，因此PatternLayout和PatternLayoutEncoder中的pattern属性配置语法一致，关于pattern属性的配置语法见&quot;<a href="http://logback.qos.ch/manual/layouts.html#conversionWord" target="_blank">Conversion Word</a>&quot;</p>
+
+<p>经过实验，pattern属性值设置为如下值：&ldquo;%-5level %logger %C %M %d{MM/dd-HH:mm:ss.SSS} [%thread] - %msg%n&rdquo;比较好。</p>
+
+<p>%logger表示Logger实例的名称，开发者在类中定义Logger实例，当使用该类的全限定名称作为Logger实例的名称时，Logger实例的名称可以被用来追溯Logger实例定义所在类;否则，Logger实例的名称不可以被用来追溯Logger实例定义所在类<br />
+%M表示产生本条日志记录请求的方法所在<br />
+%C表示产生本条日志记录请求的方法所在的类</p>
+
+<h4>2.3.3、&lt;filter&gt;标签</h4>
+
+<p>配置&lt;filter&gt;标签相当于配置Filter实例，&lt;filter&gt;标签允许的属性有：<br />
+class:必需的，表示Filter实例的类型<br />
+&lt;filter&gt;标签允许的子标签有：任意的相应于特定Filter类型的属性的标签</p>
+
+<p>Filter被用来根据设置的一些条件来过滤日志记录请求</p>
+
+<p>Logback中的Filter介绍，见文章<a href="http://blog.csdn.net/dslztx/article/details/47733127" target="_blank">《Java日志框架&mdash;&mdash;Logback的Filter》</a></p>
+
+<h3>2.4、其他一些高级配置</h3>
+
+<h4>2.4.1、设置Context Name</h4>
+
+<p>有这样的一个应用场景：项目A下的Logback运行的时候将日志记录在文件a.txt中，项目B下的Logback运行的时候也将日志记录在文件a.txt中，对于a.txt文件中的某条日志记录，该如何确定是来自A还是B下的Logback?<br />
+某个项目的Logback运行的时候，会得到唯一的一个ch.qos.logback.classic.LoggerContext实例，它负责管理所有的Logger实例，它有一个name属性，可以通过XML形式配置文件中的&lt;contextName&gt;标签定义。</p>
+
+<p>现在我们可以设置项目A下的Logback的Context Name为&quot;A Context Name&quot;，B下的Logback的Context Name为&quot;B Context Name&quot;，接着设置A和B下的Logback在记录日志的时候包含Context Name这个字段（通过&quot;%contextName&quot;指示符实现），这样在最终获得的日志记录中就可以通过Context Name这个字段来判定该条日志记录是来自A还是B下的Logback。</p>
+
+<h4>2.4.2、变量定义和使用</h4>
+
+<p>1)变量的作用域<br />
+变量的作用域有：local scope,context scope,system scope，常用的作用域是local scope。<br />
+2)变量的来源<br />
+变量的来源主要有3处，分别是：Logback配置文件自身，外部文件，外部资源（外部资源跟外部文件的唯一区别是外部资源处于项目类路径下）。<br />
+i、Logback配置文件自身<br />
+Logback配置文件配置片段如下：</p>
+
+<ol start="1">
+	<li>&lt;property&nbsp;name=&quot;USER_HOME&quot;&nbsp;value=&quot;/home/dsl&quot;&nbsp;/&gt;&nbsp;&nbsp;</li>
+</ol>
+
+<p>ii、外部文件<br />
+外部文件&quot;/home/dsl/variables.properties&quot;内容如下：</p>
+
+<ol start="1">
+	<li>USER_HOME=/home/dsl&nbsp;&nbsp;</li>
+</ol>
+
+<p>Logback配置文件配置片段如下：</p>
+
+<ol start="1">
+	<li>&lt;property&nbsp;file=&quot;/home/dsl/variables.properties&quot;&nbsp;/&gt;&nbsp;&nbsp;</li>
+</ol>
+
+<p>iii、外部资源<br />
+外部资源&quot;resource.properties&quot;内容如下：</p>
+
+<ol start="1">
+	<li>USER_HOME=/home/dsl&nbsp;&nbsp;</li>
+</ol>
+
+<p>Logback配置文件配置片段如下：</p>
+
+<ol start="1">
+	<li>&lt;property&nbsp;resource=&quot;resource.properties&quot;&nbsp;/&gt;&nbsp;&nbsp;</li>
+</ol>
+
+<p>3)使用变量<br />
+使用变量采用&quot;${variableName}&quot;的形式<br />
+&nbsp;</p>
+
+<h4>2.4.3、其他</h4>
+
+<p>另外还有&ldquo;支持条件语句&rdquo;，&ldquo;从JNDI获取变量&rdquo;，&ldquo;配置文件导入&rdquo;，&ldquo;配置Context Listener&rdquo;等高级内容</p>
+
+<h2><br />
+<br />
+参考文献：</h2>
+
+<p>[1]http://logback.qos.ch/manual/architecture.html<br />
+[2]http://logback.qos.ch/manual/configuration.html<br />
+[3]http://logback.qos.ch/manual/encoders.html<br />
+[4]http://logback.qos.ch/manual/layouts.html<br />
+[5]http://logback.qos.ch/manual/filters.html</p>
+
+<p>&nbsp;</p>
+
+<h2><strong>Appender概念：</strong></h2>
+
+<h3><a href="javascript:;">&nbsp;输出目的地</a></h3>
+
+<p>2、&nbsp;<strong>输出目的地</strong>(<strong>Appender</strong>)：日志可以被写入的存储空间，常见的有控制台、文件、数据库、NT日志库、Syslog、远程文件服务器等等。</p>
+
+<h3><a href="javascript:;">&nbsp;日志存储器</a></h3>
+
+<p>使用LOG4J的心得体会 ... 对用的方法是:logger.error(Object); logger.warn(Object); logger.info(Object); logger.debug(Object); 二、&nbsp;<strong>日志存储器</strong>(<strong>APPENDER</strong>) 三、 布局（Layout） ...</p>

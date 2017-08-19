@@ -1,0 +1,367 @@
+一 JAVA语言中主要通过流来完成IO操作。
+ 
+流：计算机的输入输出之间流动的数据序列，也是类的对象。java中的流方式就像是建立在数据交换源和目的之间的一条通信路径。
+ 
+数据源：计算机中的数据源是指可以提供数据的地方，包括键盘，磁盘文件，网络接口等。
+ 
+输入流：从程序外部传向程序的流。输入流只能从中读数据。
+ 
+输出流: 从程序传到外部的流。输出流只能向其写入数据。
+ 
+所谓的输入和输出是以程序为中心的，数据流向程序即输入流，数据从程序中流出即输出流。
+ 
+二 字节流
+ 
+字节流是以字节为传输单位的数据读写形式，用于直接读取二进制数据，如图像和声音文件等。
+ 
+InputStream和OutputStream分别为面向字节的输入流类的父类和输出流类的父类。InputStream和OutputStream都是抽象类。
+ 
+FileInputStream和FileOutputStream是文件流类，他们是InputStream和OutputStream的子类。
+ 
+FileInputStream类的一般用法是：先创建一个FileInputStream对象关联到要读取的文件，然后调用read方法读取字节数据到程序中，再进行其他处理。因为read方法是按字节的读入的，所以汉字被读入时会出现乱码。
+ 
+FileOutputStream类的一般用法是：先创建一个FileOutputStream对象关联到要写入的文件，然后调用write方法将字节数据写到程序中。如果进行写操作的文件不存在，则自动创建该文件，但是如果文件所在的路径也不存在，则运行时会报错。
+ 
+例如 FileOutputStream fos = new FileOutputStream("D:\\test.txt");是不会报错的，
+ 
+      FileOutputStream fos = new FileOutputStream("D:\\tmp\\test.txt");如果之前在D盘中没有tmp这个文件夹，那么此时运行这条语句会报错。
+ 
+1 package 文件操作_BufferedInputStream;
+ 2
+ 3 import java.io.BufferedInputStream;
+ 4 import java.io.FileInputStream;
+ 5 import java.io.FileNotFoundException;
+ 6 import java.io.IOException;
+ 7
+ 8 public class BufferDemo {
+ 9     public static void main(String[] args) {
+10         try {
+11             FileInputStream fis = new FileInputStream("D:\\test.txt");
+12             BufferedInputStream bis = new BufferedInputStream(fis); //默认的输入缓冲区是2048B
+13             int ch = bis.read();
+14             while (ch != -1) {
+15                 System.out.print((char)ch);
+16                 ch = bis.read();
+17             }
+18                    
+19         } catch (FileNotFoundException e) {
+20             // TODO Auto-generated catch block
+21             e.printStackTrace();
+22         } catch (IOException e) {
+23             e.printStackTrace();
+24         }
+25     }
+26
+27 }
+ 
+
+ 
+ 
+ 
+三 字符流
+ 
+Reader 和 Writer类是所有字符流的父类。一次读取或是写入两个字节，16位，即一个Unicode字符，因此可以使用字符流直接读写汉字内容。
+ 
+BufferedReader 和 BufferedWriter类的用法示例
+ 
+1 package 文件操作_字符流_BufferedReader和BufferedWriter;
+ 2
+ 3 import java.io.BufferedReader;
+ 4 import java.io.BufferedWriter;
+ 5 import java.io.FileNotFoundException;
+ 6 import java.io.FileReader;
+ 7 import java.io.FileWriter;
+ 8 import java.io.IOException;
+ 9
+10 public class BufferedDemo {
+11     public static void main(String[] args) {
+12         try {
+13             FileReader fr = new FileReader("D:\\test.txt");
+14             BufferedReader br = new BufferedReader(fr);
+15             FileWriter fw = new FileWriter("D:\\test1.txt");
+16             BufferedWriter bw = new BufferedWriter(fw);
+17             String str = br.readLine();
+18             while (str != null) {
+19                 bw.write(str);
+20                 bw.newLine();
+21                 str = br.readLine();
+22             }
+23             br.close();
+24             bw.close();
+25         } catch (FileNotFoundException e) {
+26             // TODO Auto-generated catch block
+27             e.printStackTrace();
+28         } catch (IOException e) {
+29             e.printStackTrace();
+30         }
+31     }
+32
+33 }
+ 
+
+ 
+ 
+ 
+ 
+四 File文件类
+ 
+File aa = new File(aaName); 这里的aa可以指向文件，也可以指向文件夹
+ 
+ 
+在进行文件的操作时，若操作的对象是文件，那么在进行文件的创建，删除，复制之前，
+ 
+（1）需要判断文件是否存在，
+（2）以及File所指向的对象是一个文件还是一个文件夹(目录) 
+（3）该文件所在的文件夹是否存在，file.getParentFile().exists()
+ (4)若文件所在的文件夹不存在，需要建立其父文件夹，若未建立成功，返回false 
+       if (!file.getParentFile().mkdirs()) return false;
+ 
+在对文件夹(目录)进行操作时，
+ 
+（1）首先判断 dirName 是不是以文件分隔符 File.separator结尾，如果不是，
+ 
+     则 dirName += File.separator;
+ 
+(2)需要判断 File dir = new File(dirName) 中的dir是不是存在以及指向的是不是一个文件夹 dir.exists() dir.isDirctory();
+(3) 在对文件夹进行复制，删除等操作时，一般会用到递归，因为文件夹里面有时候会存在子文件夹。
+ 
+ 
+ 
+程序示例1 删除指定目录下的文件
+ 
+ 
+1 package 输入输出流_删除指定目录下的文件;
+ 2
+ 3 import java.io.File;
+ 4
+ 5 //delete()方法可以删除文件和文件夹，当成功删除文件或文件夹后，返回true  否则返回false
+ 6 //在使用delete()方法时，如果此路径名表示一个文件夹（目录），则此目录必须为空才能删除
+ 7 //(若要删除文件夹，需要先删除文件夹中的文件和文件夹，才能删除该文件夹)
+ 8 public class FileDemo_05 {
+ 9    
+10     public static boolean deleteFilesOrDir (String fileName) {//判断将指定文件或文件夹删除是否成功
+11         File file = new File(fileName);
+12         if (!file.exists()) {   //指定的文件或文件夹不存在，返回false
+13             System.out.println("文件删除失败，因为文件" + fileName + "不存在");
+14             return false;
+15         } else {  //指定的文件或是文件夹存在
+16             if (file.isFile()) {   //若file 是文件
+17                 return FileDemo_05.deleteFiles(fileName);
+18             } else {              //若file是文件夹
+19                 return FileDemo_05.deleteDir(fileName);
+20             }
+21         }
+22        
+23     }
+24    
+25     public static boolean deleteFiles(String fileName) { //判断删除指定文件是否成功
+26         File file = new File(fileName);
+27         if ( file.exists() && file.isFile() ) {
+28             if (file.delete()) {
+29                 System.out.println("文件" + fileName + "删除成功！");
+30                 return true;
+31             } else {
+32                 System.out.println("文件" + fileName + "删除失败！");
+33                 return false;
+34             }
+35         } else {
+36             System.out.println("文件删除失败 ： " + fileName + "文件不存在！");
+37             return false;
+38         }
+39        
+40     }
+41    
+42     public static boolean deleteDir(String dir) { //判断删除指定文件夹以及文件夹下的文件是否成功
+43          if (!dir.endsWith(File.separator)) {
+44              dir += File.separator;
+45          }
+46          File dirFile = new File(dir);
+47          if (!dirFile.exists() || !dirFile.isDirectory()) {
+48              System.out.println("文件夹删除失败！" + dir + "文件夹不存在");
+49              return false;
+50          }
+51          boolean flag = true;
+52          File[] files = dirFile.listFiles();
+53          for (int i = 0; i < files.length; i++) {
+54              if (files[i].isFile()) {            //删除文件
+55                  flag = FileDemo_05.deleteFiles(files[i].getAbsolutePath());
+56                  if (!flag) {
+57                      break;
+58                  }
+59              } else if (files[i].isDirectory()) {  //删除子文件夹，此处为递归
+60                  flag = FileDemo_05.deleteDir(files[i].getAbsolutePath());
+61                  if (!flag) {
+62                      break;
+63                  }
+64              } 
+65          }
+66          if (!flag) {
+67              System.out.println("删除文件夹失败");
+68          }
+69          if (dirFile.delete()) {
+70              System.out.println("文件夹" + dir + "删除成功！");
+71              return true;
+72          } else {
+73              return false;
+74          }
+75     }
+76    
+77    
+78
+79 }
+ 
+
+ 
+程序示例2 移动指定目录下的文件，该程序用到了 程序示例1
+ 
+  1 package 输入输出流_移动指定目录下的文件;
+  2
+  3 import java.io.File;
+  4
+  5 public class FileDemo_06 {
+  6     //英东某个指定的文件，但移动成功后不会覆盖已存在的文件
+  7     public static boolean moveA_File(String sourceFileName, String targetFileName) {
+  8         return FileDemo_06.moveA_File(sourceFileName, targetFileName, false);
+  9     }
+ 10    
+ 11     //移动某个指定的文件，但移动成功后可以根据isOverlay的值来决定是否覆盖已存在的目标文件
+ 12     public static boolean moveA_File(String sourceFileName, String targetFileName,
+ 13                                         boolean isOverlay) {
+ 14         File sourceFile = new File(sourceFileName);
+ 15         if (!sourceFile.exists()) {
+ 16             System.out.println("文件" + sourceFileName + "不存在，移动失败");
+ 17             return false;
+ 18         } else if (!sourceFile.isFile()) {
+ 19             System.out.println(sourceFileName + "不是文件，移动失败");
+ 20             return false;
+ 21         }
+ 22         File targetFile = new File(targetFileName);
+ 23         if (targetFile.exists()) {
+ 24             if (isOverlay) {
+ 25                 System.out.println("目标文件已经存在，准备删除它");
+ 26                 if (!FileDemo_05.deleteFilesOrDir(targetFileName)) {
+ 27                     System.out.println("文件移动失败，文件" + targetFileName + "删除失败");
+ 28                     return false;
+ 29                 } 
+ 30             } else {
+ 31                 System.out.println("文件移动失败，因为文件" + targetFileName + "已经存在");
+ 32                 return false;
+ 33             }
+ 34         } else {
+ 35             if (!targetFile.getParentFile().exists()) {
+ 36                 System.out.println("文件" + targetFile + "所在的目录不存在，正在创建");
+ 37                 if (!targetFile.getParentFile().mkdirs()) {
+ 38                     System.out.println("移动文件失败，因为创建文件坐在的文件夹失败");
+ 39                     return false;
+ 40                 }
+ 41             }
+ 42         }
+ 43        
+ 44         //移动源文件至目标文件
+ 45         if (sourceFile.renameTo(targetFile)) {
+ 46             System.out.println("移动源文件" + sourceFileName + "到" + targetFileName 
+ 47                     + "成功" );
+ 48             return true;
+ 49         } else {
+ 50             System.out.println("移动源文件" + sourceFileName + "到" + targetFileName 
+ 51                     + "失败" );
+ 52             return false;
+ 53         }
+ 54        
+ 55        
+ 56     }
+ 57    
+ 58     public static boolean moveDir(String sourceDirName, String targetDirName) {
+ 59         //默认为不覆盖目标文件
+ 60         return FileDemo_06.moveDir(sourceDirName, targetDirName, false);
+ 61     }
+ 62    
+ 63     //移动某个指定的目录，但移动成功后可以根据isOverlay的值来决定是否覆盖当前已存在的目标目录
+ 64     public static boolean moveDir(String sourceDirName, String targetDirName,
+ 65                                 boolean isOverlay) {
+ 66         //判断原目录是否存在
+ 67         File sourceDir = new File(sourceDirName);
+ 68         if (!sourceDir.exists()) {
+ 69             System.out.println("源目录" + sourceDirName + "不存在，移动目录失败");
+ 70             return false;
+ 71         } else if (!sourceDir.isDirectory()) {
+ 72             System.out.println("移动目录失败，" + sourceDirName + "不是目录");
+ 73             return false;
+ 74         }
+ 75         //如果目标文件名不是以文件分割符结尾，自动添加文件分隔符
+ 76         if (!targetDirName.endsWith(File.separator)) {
+ 77             targetDirName += File.separator;
+ 78         }
+ 79         File targetDir = new File(targetDirName);
+ 80         //如果目标文件夹存在
+ 81         if (targetDir.exists()) {
+ 82             if (isOverlay) {
+ 83                 //允许删除则删除已存在的目标目录
+ 84                 System.out.println("该目录已经存在，准备删除它");
+ 85                 if (!FileDemo_05.deleteFilesOrDir(targetDirName)) {
+ 86                     System.out.println("移动目录失败，因为目标目录已经存在。   删除目录" + 
+ 87                         targetDirName + "失败！"                        );
+ 88                 }
+ 89             } else {
+ 90                 System.out.println("移动目录失败:该目录" + targetDirName + "已存在！");
+ 91                 return false;
+ 92             }
+ 93         } else {
+ 94             //创建目标目录
+ 95             System.out.println("该目录不存在，正在创建");
+ 96             if (!targetDir.mkdirs()) {
+ 97                 System.out.println("移动目录失败： 创建目标目录失败");
+ 98                 return false;
+ 99             }
+100         }
+101         boolean flag = true;
+102         //移动原目录下的文件和子目录到目标目录下
+103         File[] files = sourceDir.listFiles();
+104         for (int i = 0; i < files.length; i++) {
+105             //移动子文件
+106             if (files[i].isFile()) {
+107                 flag = FileDemo_06.moveA_File(files[i].getAbsolutePath(),
+108                         targetDirName + files[i].getName(), isOverlay);
+109                 if (!flag) {
+110                     break;
+111                 }
+112             } else if (files[i].isDirectory()) { //移动子目录
+113                 flag = FileDemo_06.moveDir(files[i].getAbsolutePath(),
+114                         targetDirName + files[i].getName(), isOverlay);
+115                 if (!flag) {
+116                     break;
+117                 }
+118                
+119             }
+120         }
+121        
+122         if (!flag) {
+123             System.out.println("目录" + sourceDirName + "移动到" + targetDirName + "失败");
+124             return false;
+125         }
+126         //删除原目录
+127         if (FileDemo_05.deleteDir(sourceDirName)) {
+128             System.out.println("目录" + sourceDirName + "移动到" + targetDirName + "成功");
+129             return true;
+130         } else {
+131             System.out.println("目录" + sourceDirName + "移动到" + targetDirName + "失败");
+132             return false;
+133         }
+134     }
+135    
+136    
+137     public static void main(String[] args) {
+138         //移动文件，如果目标文件存在，则替换
+139         System.out.println("调用moveA_File方法的结果如下");
+140         String sourceFileName = "D:\\aa\\temp\\key.txt";
+141         String targetFileName = "D:\\bbb\\ddd\\";
+142         FileDemo_06.moveA_File(sourceFileName, targetFileName);
+143         //移动目录，如果目标目录存在，则不覆盖
+144         System.out.println("\n调用moveDir方法的结果如下");
+145         String sourceDir = "D:\\aa";
+146         String targetDir = "C:\\mm";
+147         FileDemo_06.moveDir(sourceDir, targetDir,false);
+148     }
+149    
+150
+151 }

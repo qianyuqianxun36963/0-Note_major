@@ -1,0 +1,300 @@
+<h1>Maven单元测试</h1>
+
+<h2>1.maven-surefire-plugin简介</h2>
+
+<p>Maven本身并不是一个单元<a href="http://lib.csdn.net/base/softwaretest" target="_blank" title="软件测试知识库">测试</a>框架，它只是在构建执行到特定生命周期阶段的时候，通过插件来执行JUnit或者TestNG的测试用例。这个插件就是maven-surefire-plugin，也可以称为测试运行器(Test Runner)，它能兼容JUnit 3、JUnit 4以及TestNG。</p>
+
+<p>在默认情况下，maven-surefire-plugin的test目标会自动执行测试源码路径（默认为src/test/<a href="http://lib.csdn.net/base/java" target="_blank" title="Java 知识库">Java</a>/）下所有符合一组命名模式的测试类。这组模式为：</p>
+
+<p>&nbsp;</p>
+
+<ul>
+	<li>**/Test*.java：任何子目录下所有命名以Test开关的Java类。</li>
+	<li>**/*Test.java：任何子目录下所有命名以Test结尾的Java类。</li>
+	<li>**/*TestCase.java：任何子目录下所有命名以TestCase结尾的Java类。</li>
+</ul>
+
+<h2>2.跳过测试</h2>
+
+<p>要想跳过测试，在命令行加入参数skipTests就可以了。如：</p>
+
+<ol start="1">
+	<li>mvn&nbsp;package&nbsp;-DskipTests&nbsp;&nbsp;</li>
+</ol>
+
+<p><br />
+也可以在pom配置中提供该属性。</p>
+
+<ol start="1">
+	<li>&lt;plugin&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;groupId&gt;org.apache.maven.plugins&lt;/groupId&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;artifactId&gt;maven-surefire-plugin&lt;/artifactId&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;version&gt;2.5&lt;/version&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;configuration&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;skipTests&gt;true&lt;/skipTests&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;/configuration&gt;&nbsp;&nbsp;</li>
+	<li>&lt;/plugin&gt;&nbsp;&nbsp;</li>
+</ol>
+
+<p>&nbsp;</p>
+
+<p>有时候可能不仅仅需要跳过测试运行，还要跳过测试代码的编译：</p>
+
+<ol start="1">
+	<li>mvn&nbsp;package&nbsp;-Dmaven.test.skip=true&nbsp;&nbsp;</li>
+</ol>
+
+<p><br />
+也可以在pom中配置maven.test.skip:</p>
+
+<ol start="1">
+	<li>&lt;plugin&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;groupId&gt;org.apache.maven.plugin&lt;/groupId&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;artifactId&gt;maven-compiler-plugin&lt;/artifactId&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;version&gt;2.1&lt;/version&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;configuration&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;skip&gt;true&lt;/skip&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;/configuration&gt;&nbsp;&nbsp;</li>
+	<li>&lt;/plugin&gt;&nbsp;&nbsp;</li>
+	<li>&lt;plugin&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;groupId&gt;org.apache.maven.plugins&lt;/groupId&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;artifactId&gt;maven-surefire-plugin&lt;/artifactId&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;version&gt;2.5&lt;/version&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;configuration&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;skip&gt;true&lt;/skip&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;/configuration&gt;&nbsp;&nbsp;</li>
+	<li>&lt;/plugin&gt;&nbsp;&nbsp;</li>
+</ol>
+
+<p>&nbsp;</p>
+
+<h2>3.动态指定要运行的测试用例</h2>
+
+<p>maven-surefire-plugin提供了一个test参数让Maven用户能够在命令行指定要运行的测试用例。如：</p>
+
+<ol start="1">
+	<li>mvn&nbsp;test&nbsp;-Dtest=RandomGeneratorTest&nbsp;&nbsp;</li>
+</ol>
+
+<p>也可以使用通配符：</p>
+
+<ol start="1">
+	<li>mvn&nbsp;test&nbsp;-Dtest=Random*Test&nbsp;&nbsp;</li>
+</ol>
+
+<p><br />
+或者也可以使用&ldquo;，&rdquo;号指定多个测试类：</p>
+
+<ol start="1">
+	<li>mvn&nbsp;test&nbsp;-Dtest=Random*Test,AccountCaptchaServiceTest&nbsp;&nbsp;</li>
+</ol>
+
+<p>如果没有指定测试类，那么会报错并导致构建失败。</p>
+
+<ol start="1">
+	<li>mvn&nbsp;test&nbsp;-Dtest&nbsp;&nbsp;</li>
+</ol>
+
+<p>这时候可以添加-DfailIfNoTests=false参数告诉maven-surefire-plugin即使没有任何测试也不要报错。</p>
+
+<ol start="1">
+	<li>mvn&nbsp;test&nbsp;-Dtest&nbsp;-DfailIfNoTests=false&nbsp;&nbsp;</li>
+</ol>
+
+<p>由此可见，命令行参数-Dtest -DfailIfNoTests=false是另外一种路过测试的方法</p>
+
+<p>&nbsp;</p>
+
+<h2>4.包含与排除测试用例</h2>
+
+<p>如果由于历史原因，测试类不符合默认的三种命名模式，可以通过pom.xml设置maven-surefire-plugin插件添加命名模式或排除一些命名模式。</p>
+
+<ol start="1">
+	<li>&lt;plugin&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;groupId&gt;org.apache.maven.plugins&lt;/groupId&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;artifactId&gt;maven-surefire-plugin&lt;/artifactId&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;version&gt;2.5&lt;/version&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;configuration&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;includes&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;include&gt;**/*Tests.java&lt;/include&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/includes&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;excludes&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;exclude&gt;**/*ServiceTest.java&lt;/exclude&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;exclude&gt;**/TempDaoTest.java&lt;/exclude&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/excludes&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;/configuration&gt;&nbsp;&nbsp;</li>
+	<li>&lt;/plugin&gt;&nbsp;&nbsp;</li>
+</ol>
+
+<p>&nbsp;</p>
+
+<h2>5.生成测试报告</h2>
+
+<h3>5.1基本测试报告</h3>
+
+<p>默认情况下，maven-surefire-plugin会在项目的target/surefire-reports目录下生成两种格式的错误报告。</p>
+
+<ul>
+	<li>简单文本格式&mdash;&mdash;内容十分简单，可以看出哪个测试项出错。</li>
+	<li>与JUnit兼容的XML格式&mdash;&mdash;XML格式已经成为了Java单元测试报告的事实标准，这个文件可以用其他的工具如IDE来查看。</li>
+</ul>
+
+<h3>5.2测试覆盖率报告</h3>
+
+<p>测试覆盖率是衡量项目代码质量的一个重要的参考指标。Cobertura是一个优秀的开源测试覆盖率统计工具（详见http://cobertura.sourceforge.net/)，Maven通过cobertura-maven-plugin与之集成，用户可以使用简单的命令为Maven项目生成测试覆盖率报告。运行下面命令生成报告：</p>
+
+<ol start="1">
+	<li>mvn&nbsp;cobertura:cobertura&nbsp;&nbsp;</li>
+</ol>
+
+<p>&nbsp;</p>
+
+<h2>6.运行TestNG测试</h2>
+
+<p>TestNG是Java社区中除了JUnit之外另一个流行的单元测试框架。TestNG在JUnit的基础上增加了很多特性，其站点是<a href="http://testng.org/" target="_blank">http://testng.org/</a>&nbsp;.添加TestNG依赖：</p>
+
+<ol start="1">
+	<li>&lt;dependency&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;groupId&gt;org.testng&lt;/groupId&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;artifactId&gt;testng&lt;/artifactId&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;version&gt;5.9&lt;/version&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;scope&gt;test&lt;/scope&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;classifier&gt;jdk15&lt;/classifier&gt;&nbsp;&nbsp;</li>
+	<li>&lt;/dependency&gt;&nbsp;&nbsp;</li>
+</ol>
+
+<p>&nbsp;</p>
+
+<p>下面是JUnit和TestNG的常用类库对应关系</p>
+
+<table align="center" border="1" cellpadding="1" cellspacing="1" style="width:600px">
+	<tbody>
+		<tr>
+			<td>JUnit类</td>
+			<td>TestNG类</td>
+			<td>作用</td>
+		</tr>
+		<tr>
+			<td>org.junit.Test</td>
+			<td>org.testng.annotations.Test</td>
+			<td>标注方法为测试方法</td>
+		</tr>
+		<tr>
+			<td>org.junit.Assert</td>
+			<td>org.testng.Assert</td>
+			<td>检查测试结果</td>
+		</tr>
+		<tr>
+			<td>org.junit.Before</td>
+			<td>org.testng.annotations.BeforeMethod</td>
+			<td>标注方法在每个测试方法之前运行</td>
+		</tr>
+		<tr>
+			<td>org.junit.After</td>
+			<td>org.testng.annotations.AfterMethod</td>
+			<td>标注方法在每个测试方法之后运行</td>
+		</tr>
+		<tr>
+			<td>org.junit.BeforeClass</td>
+			<td>org.testng.annotations.BeforeClass</td>
+			<td>标注方法在所有测试方法之前运行</td>
+		</tr>
+		<tr>
+			<td>org.junit.AfterClass</td>
+			<td>org.testng.annotations.AfterClass</td>
+			<td>标注方法在所有测试方法之后运行</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>&nbsp;</p>
+
+<p>TestNG允许用户使用一个名为testng.xml的文件来配置想要运行的测试集合。如在类路径上添加testng.xml文件，配置只运行RandomGeneratorTest</p>
+
+<ol start="1">
+	<li>&lt;?xml&nbsp;version=&quot;1.0&quot;&nbsp;encoding=&quot;UTF-8&quot;?&gt;&nbsp;&nbsp;</li>
+	<li>&lt;suite&nbsp;name=&quot;Suite1&quot;&nbsp;verbose=&quot;1&quot;&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;test&nbsp;name=&quot;Regression1&quot;&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;classes&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;class&nbsp;name=&quot;com.juvenxu.mvnbook.account.captcha.RandomGeneratorTest&quot;&nbsp;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/classes&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;/test&gt;&nbsp;&nbsp;</li>
+	<li>&lt;/suite&gt;&nbsp;&nbsp;</li>
+</ol>
+
+<p><br />
+同时再配置maven-surefire-plugin使用该testng.xml，如：</p>
+
+<ol start="1">
+	<li>&lt;plugin&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;groupId&gt;org.apache.maven.plugins&lt;/groupId&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;artifactId&gt;maven-surefire-plugin&lt;/artifactId&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;version&gt;2.5&lt;/version&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;configuration&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;suiteXmlFiles&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;suiteXmlFile&gt;testng.xml&lt;/suiteXmlFile&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/suiteXmlFiles&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;/configuration&gt;&nbsp;&nbsp;</li>
+	<li>&lt;/plugin&gt;&nbsp;&nbsp;</li>
+</ol>
+
+<p><br />
+TestNG较JUnit的一大优势在于它支持测试组的概念。如可以在方法级别声明测试组：</p>
+
+<ol start="1">
+	<li>@Test(groups={&quot;util&quot;,&quot;medium&quot;})&nbsp;&nbsp;</li>
+</ol>
+
+<p>&nbsp;</p>
+
+<p>然后可以在pom中配置运行一个或多个测试组：</p>
+
+<ol start="1">
+	<li>&lt;plugin&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;groupId&gt;org.apache.maven.plugins&lt;/groupId&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;artifactId&gt;maven-surefire-plugin&lt;/artifactId&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;version&gt;2.5&lt;/version&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;configuration&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;groups&gt;util,medium&lt;/groups&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;/configuration&gt;&nbsp;&nbsp;</li>
+	<li>&lt;/plugin&gt;&nbsp;&nbsp;</li>
+</ol>
+
+<p>&nbsp;</p>
+
+<h2>7.重用测试代码</h2>
+
+<p>当命令行运行mvn package的时候，Maven只会打包主代码及资源文件，并不会对测试代码打包。如果测试代码中有需要重用的代码，这时候就需要对测试代码打包了。</p>
+
+<p>这时候需要配置maven-jar-plugin将测试类打包，如：</p>
+
+<p>&nbsp;</p>
+
+<ol start="1">
+	<li>plugin&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;groupId&gt;org.apache.maven.plugins&lt;/groupId&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;artifactId&gt;maven-jar-plugin&lt;/artifactId&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;version&gt;2.2&lt;/version&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;executions&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;execution&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;goals&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;goal&gt;test-jar&lt;/goal&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/goals&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/execution&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;/executions&gt;&nbsp;&nbsp;</li>
+	<li>&lt;/plugin&gt;&nbsp;&nbsp;</li>
+</ol>
+
+<p>maven-jar-plugin有两个目标，分别为jar和test-jar。这两个目标都默认绑定到default生命周期的package阶段运行，只是test-jar并没有在超级POM中配置，因此需要我们另外在pom中配置。</p>
+
+<p>现在如要引用test-jar生成的测试代码包，可以如下配置：</p>
+
+<ol start="1">
+	<li>&lt;dependency&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;groupId&gt;com.juvenxu.mvnbook.account&lt;/groupId&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;artifactId&gt;account-captcha&lt;/artifactId&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;version&gt;1.0.0-SNAPSHOT&lt;/version&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;type&gt;test-jar&lt;/type&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;scope&gt;test&lt;/scope&gt;&nbsp;&nbsp;</li>
+	<li>&lt;/dependency&gt;&nbsp;&nbsp;</li>
+</ol>

@@ -1,0 +1,178 @@
+<h1>Future模式</h1>
+
+<p>&nbsp;&nbsp;&nbsp; 多线程开发可以更好的发挥多核cpu性能，常用的多线程设计模式有：Future、Master-Worker、Guard&nbsp;Susperionsion、不变、生产者-消费者 模式；jdk除了定义了若干并发的<a href="http://lib.csdn.net/base/datastructure" target="_blank" title="算法与数据结构知识库">数据结构</a>，也内置了多线程框架和各种线程池；&nbsp;&nbsp;&nbsp;&nbsp;锁（分为内部锁、重入锁、读写锁）、ThreadLocal、信号量等在并发控制中发挥着巨大的作用。这里重点介绍第一种并发&mdash;&mdash;Future模型。</p>
+
+<p><strong>一、什么是Future模型：</strong></p>
+
+<p>&nbsp;&nbsp;&nbsp;&nbsp;该模型是将异步请求和代理模式联合的模型产物。类似商品订单模型。见下图：</p>
+
+<p><img alt="" src="http://img.blog.csdn.net/20140930160301156?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQvbG1kY3N6aA==/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70/gravity/SouthEast" /></p>
+
+<p>&nbsp;&nbsp;&nbsp;&nbsp;客户端发送一个长时间的请求，服务端不需等待该数据处理完成便立即返回一个伪造的代理数据（相当于商品订单，不是商品本身），用户也无需等待，先去执行其他的若干操作后，再去调用服务器已经完成组装的真实数据。该模型充分利用了等待的时间片段。</p>
+
+<p><strong>&nbsp;二、Future模式的核心结构：</strong></p>
+
+<p>&nbsp;&nbsp;&nbsp;&nbsp;<img alt="" src="http://img.blog.csdn.net/20140930160856140?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQvbG1kY3N6aA==/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70/gravity/SouthEast" /></p>
+
+<p>Main：启动系统，调用Client发出请求；</p>
+
+<p>Client：返回Data对象，理解返回FutureData，并开启ClientThread线程装配RealData；</p>
+
+<p>Data：返回数据的接口；</p>
+
+<p>FutureData：Future数据，构造很快，但是是一个虚拟的数据，需要装配RealData；</p>
+
+<p>RealData：真实数据，构造比较慢。</p>
+
+<p><strong>三、Future模式的代码实现：</strong></p>
+
+<p>（1）Main函数：</p>
+
+<ol start="1">
+	<li>&lt;span&nbsp;style=&quot;font-size:18px;&quot;&gt;package&nbsp;tgb;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>public&nbsp;class&nbsp;Main&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;static&nbsp;void&nbsp;main(String[]&nbsp;args){&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Client&nbsp;client&nbsp;=&nbsp;new&nbsp;Client();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//理解返回一个FutureData&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Data&nbsp;data&nbsp;=&nbsp;client.request(&quot;name&quot;);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;System.out.println(&quot;请求完毕！&quot;);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;try{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//处理其他业务&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//这个过程中，真是数据RealData组装完成，重复利用等待时间&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Thread.sleep(2000);&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}catch&nbsp;(Exception&nbsp;e){&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//真实数据&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;System.out.println(&quot;数据&nbsp;=&nbsp;&quot;+&nbsp;data.getResult());&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>}&nbsp;&nbsp;</li>
+	<li>&lt;/span&gt;&nbsp;&nbsp;</li>
+</ol>
+
+<p>（2）Client的实现：</p>
+
+<ol start="1">
+	<li>&lt;span&nbsp;style=&quot;font-size:18px;&quot;&gt;package&nbsp;tgb;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>public&nbsp;class&nbsp;Client&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;Data&nbsp;request(final&nbsp;String&nbsp;queryStr){&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;final&nbsp;FutureData&nbsp;future&nbsp;=&nbsp;new&nbsp;FutureData();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//开启一个新的线程来构造真实数据&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;new&nbsp;Thread(){&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;void&nbsp;run(){&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;RealData&nbsp;realData&nbsp;=&nbsp;new&nbsp;RealData(queryStr);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;future.setRealData(realData);&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}.start();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return&nbsp;future;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>}&nbsp;&nbsp;</li>
+	<li>&lt;/span&gt;&nbsp;&nbsp;</li>
+</ol>
+
+<p><br />
+（3）Data的实现：</p>
+
+<ol start="1">
+	<li>&lt;span&nbsp;style=&quot;font-size:18px;&quot;&gt;package&nbsp;tgb;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>public&nbsp;interface&nbsp;Data&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;&nbsp;String&nbsp;getResult();&nbsp;&nbsp;</li>
+	<li>}&nbsp;&nbsp;</li>
+	<li>&lt;/span&gt;&nbsp;&nbsp;</li>
+</ol>
+
+<p><br />
+（4）FutureData：</p>
+
+<ol start="1">
+	<li>&lt;span&nbsp;style=&quot;font-size:18px;&quot;&gt;package&nbsp;tgb;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>/**&nbsp;</li>
+	<li>&nbsp;*&nbsp;是对RealData的一个包装&nbsp;</li>
+	<li>&nbsp;*&nbsp;@author&nbsp;limin&nbsp;</li>
+	<li>&nbsp;*&nbsp;</li>
+	<li>&nbsp;*/&nbsp;&nbsp;</li>
+	<li>public&nbsp;class&nbsp;FutureData&nbsp;implements&nbsp;Data&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;protected&nbsp;RealData&nbsp;realData&nbsp;=null;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;protected&nbsp;boolean&nbsp;isReady&nbsp;=&nbsp;false;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;synchronized&nbsp;void&nbsp;setRealData(RealData&nbsp;realData){&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if(isReady){&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;this.realData=realData;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;isReady=true;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;notifyAll();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;@Override&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;&nbsp;synchronized&nbsp;&nbsp;String&nbsp;getResult()&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;while(!isReady){&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;try{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;wait();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}catch&nbsp;(Exception&nbsp;e){&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return&nbsp;realData.result;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>}&nbsp;&nbsp;</li>
+	<li>&lt;/span&gt;&nbsp;&nbsp;</li>
+</ol>
+
+<p><br />
+（5）RealData实现：</p>
+
+<ol start="1">
+	<li>&lt;span&nbsp;style=&quot;font-size:18px;&quot;&gt;package&nbsp;tgb;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>public&nbsp;class&nbsp;RealData&nbsp;implements&nbsp;Data&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;protected&nbsp;&nbsp;String&nbsp;&nbsp;result;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;RealData(String&nbsp;para){&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//构造比较慢&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;StringBuffer&nbsp;sb=&nbsp;new&nbsp;StringBuffer();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;for(int&nbsp;i=0;i&lt;10;i++){&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;sb.append(para);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;try{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Thread.sleep(1000);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}catch(Exception&nbsp;e){&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;result=&nbsp;sb.toString();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;@Override&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;String&nbsp;getResult()&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return&nbsp;result;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>}&nbsp;&nbsp;</li>
+	<li>&lt;/span&gt;&nbsp;&nbsp;</li>
+</ol>
+
+<p><strong>注意：</strong></p>
+
+<p>&nbsp;&nbsp;&nbsp; FutureData是对RealData的包装，是dui真实数据的一个代理，封装了获取真实数据的等待过程。它们都实现了共同的接口，所以，针对客户端程序组是没有区别的；</p>
+
+<p>&nbsp;&nbsp;&nbsp;&nbsp;客户端在调用的方法中，单独启用一个线程来完成真实数据的组织，这对调用客户端的main函数式封闭的；</p>
+
+<p>&nbsp;&nbsp;&nbsp;&nbsp;因为咋FutureData中的notifyAll和wait函数，主程序会等待组装完成后再会继续主进程，也就是如果没有组装完成，main函数会一直等待。</p>

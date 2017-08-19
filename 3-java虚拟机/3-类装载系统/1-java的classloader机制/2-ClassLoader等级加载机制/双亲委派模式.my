@@ -1,0 +1,21 @@
+<h2>双亲委托</h2>
+
+<p><strong>双亲委托。</strong>&nbsp;<br />
+我们终于来到了这一步了。&nbsp;<br />
+一个类加载器查找class和resource时，是通过&ldquo;委托模式&rdquo;进行的，它首先判断这个class是不是已经加载成功，如果没有的话它并不是自己进行查找，而是先通过父加载器，然后递归下去，直到Bootstrap ClassLoader，如果Bootstrap classloader找到了，直接返回，如果没有找到，则一级一级返回，最后到达自身去查找这些对象。这种机制就叫做双亲委托。&nbsp;<br />
+整个流程可以如下图所示：&nbsp;<br />
+<img alt="这里写图片描述" src="http://img.blog.csdn.net/20170210192931505?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQvYnJpYmx1ZQ==/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70/gravity/SouthEast" title="" />&nbsp;<br />
+这张图是用时序图画出来的，不过画出来的结果我却自己都觉得不理想。</p>
+
+<p><strong>大家可以看到2根箭头，蓝色的代表类加载器向上委托的方向，如果当前的类加载器没有查询到这个class对象已经加载就请求父加载器（不一定是父类）进行操作，然后以此类推。直到Bootstrap ClassLoader。如果Bootstrap ClassLoader也没有加载过此class实例，那么它就会从它指定的路径中去查找，如果查找成功则返回，如果没有查找成功则交给子类加载器，也就是ExtClassLoader,这样类似操作直到终点，也就是我上图中的红色箭头示例。</strong>&nbsp;<br />
+用序列描述一下：&nbsp;<br />
+1. 一个AppClassLoader查找资源时，先看看缓存是否有，缓存有从缓存中获取，否则委托给父加载器。&nbsp;<br />
+2. 递归，重复第1部的操作。&nbsp;<br />
+3. 如果ExtClassLoader也没有加载过，则由Bootstrap ClassLoader出面，它首先查找缓存，如果没有找到的话，就去找自己的规定的路径下，也就是<code>sun.mic.boot.class</code>下面的路径。找到就返回，没有找到，让子加载器自己去找。&nbsp;<br />
+4. Bootstrap ClassLoader如果没有查找成功，则ExtClassLoader自己在<code>java.ext.dirs</code>路径中去查找，查找成功就返回，查找不成功，再向下让子加载器找。&nbsp;<br />
+5. ExtClassLoader查找不成功，AppClassLoader就自己查找，在<code>java.class.path</code>路径下查找。找到就返回。如果没有找到就让子类找，如果没有子类会怎么样？抛出各种异常。</p>
+
+<p>上面的序列，详细说明了双亲委托的加载流程。<strong>我们可以发现委托是从下向上，然后具体查找过程却是自上至下。</strong></p>
+
+<p>我说过上面用时序图画的让自己不满意，现在用框图，最原始的方法再画一次。&nbsp;<br />
+<img alt="这里写图片描述" src="http://img.blog.csdn.net/20170211135054825?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQvYnJpYmx1ZQ==/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70/gravity/SouthEast" title="" /></p>

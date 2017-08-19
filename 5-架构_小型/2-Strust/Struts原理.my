@@ -1,0 +1,241 @@
+<h1>Struts2的工作原理</h1>
+
+<p>&nbsp;</p>
+
+<p>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;<img alt="" src="http://pic002.cnblogs.com/images/2011/324906/2011082712263217.png" /></p>
+
+<p>上图来源于Struts2官方站点，是Struts 2 的整体结构。</p>
+
+<p>一个请求在Struts2框架中的处理大概分为以下几个步骤(可查看源码：<a href="https://github.com/apache/struts" target="_blank">https://github.com/apache/struts</a>):<br />
+<strong>1 客户端初始化一个指向Servlet容器（例如Tomcat）的请求</strong><br />
+<strong>2 这个请求经过一系列的过滤器（Filter）（这些过滤器中有一个叫做ActionContextCleanUp的可选过滤器，这个过滤器对于Struts2和其他框架的集成很有帮助，例如：SiteMesh Plugin）&nbsp;</strong><br />
+<strong>3 接着FilterDispatcher（现已过时）被调用，FilterDispatcher询问ActionMapper来决定这个请是否需要调用某个Action&nbsp;</strong><br />
+<strong>4 如果ActionMapper决定需要调用某个Action，FilterDispatcher把请求的处理交给ActionProxy&nbsp;</strong><br />
+<strong>5 ActionProxy通过Configuration Manager询问框架的配置文件，找到需要调用的Action类&nbsp;</strong><br />
+<strong>6 ActionProxy创建一个ActionInvocation的实例。</strong><br />
+<strong>7 ActionInvocation实例使用命名模式来调用，在调用Action的过程前后，涉及到相关拦截器（Intercepter）的调用。&nbsp;</strong><br />
+<strong>8 一旦Action执行完毕，ActionInvocation负责根据struts.xml中的配置找到对应的返回结果。返回结果通常是（但不总是，也可 能是另外的一个Action链）一个需要被表示的JSP或者FreeMarker的模版。在表示的过程中可以使用Struts2 框架中继承的标签。在这个过程中需要涉及到ActionMapper</strong></p>
+
+<p>&nbsp;</p>
+
+<p>&nbsp;一个请求在Struts2框架中的处理大概分为以下几个步骤&nbsp;</p>
+
+<p>&nbsp; &nbsp; 1、客户端初始化一个指向Servlet容器（例如Tomcat）的请求</p>
+
+<p>&nbsp; &nbsp; 2、这个请求经过一系列的过滤器（Filter）（这些过滤器中有一个叫做ActionContextCleanUp的可选过滤器，这个过滤器对于Struts2和其他框架的集成很有帮助，例如：SiteMesh Plugin）&nbsp;</p>
+
+<p>&nbsp; &nbsp; 3、接着FilterDispatcher被调用，FilterDispatcher询问ActionMapper来决定这个请是否需要调用某个Action&nbsp;</p>
+
+<p>&nbsp; &nbsp; &nbsp; &nbsp;<strong>FilterDispatcher是控制器的核心</strong>，就是mvc中c控制层的核心。下面粗略的分析下我理解的FilterDispatcher工作流程和原理：FilterDispatcher进行初始化并启用核心doFilter</p>
+
+<ol start="1">
+	<li>public&nbsp;void&nbsp;doFilter(ServletRequest&nbsp;req,&nbsp;ServletResponse&nbsp;res,&nbsp;FilterChain&nbsp;chain)&nbsp;throws&nbsp;IOException,&nbsp;ServletException&nbsp;...{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;HttpServletRequest&nbsp;request&nbsp;=&nbsp;(HttpServletRequest)&nbsp;req;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;HttpServletResponse&nbsp;response&nbsp;=&nbsp;(HttpServletResponse)&nbsp;res;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ServletContext&nbsp;servletContext&nbsp;=&nbsp;filterConfig.getServletContext();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//&nbsp;在这里处理了HttpServletRequest和HttpServletResponse。&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;DispatcherUtils&nbsp;du&nbsp;=&nbsp;DispatcherUtils.getInstance();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;du.prepare(request,&nbsp;response);//正如这个方法名字一样进行locale、encoding以及特殊request&nbsp;parameters设置&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;try&nbsp;...{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;request&nbsp;=&nbsp;du.wrapRequest(request,&nbsp;servletContext);//对request进行包装&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;catch&nbsp;(IOException&nbsp;e)&nbsp;...{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;String&nbsp;message&nbsp;=&nbsp;&quot;Could&nbsp;not&nbsp;wrap&nbsp;servlet&nbsp;request&nbsp;with&nbsp;MultipartRequestWrapper!&quot;;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;LOG.error(message,&nbsp;e);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;throw&nbsp;new&nbsp;ServletException(message,&nbsp;e);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ActionMapperIF&nbsp;mapper&nbsp;=&nbsp;ActionMapperFactory.getMapper();//得到action的mapper&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ActionMapping&nbsp;mapping&nbsp;=&nbsp;mapper.getMapping(request);//&nbsp;得到action&nbsp;的&nbsp;mapping&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if&nbsp;(mapping&nbsp;==&nbsp;null)&nbsp;...{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//&nbsp;there&nbsp;is&nbsp;no&nbsp;action&nbsp;in&nbsp;this&nbsp;request,&nbsp;should&nbsp;we&nbsp;look&nbsp;for&nbsp;a&nbsp;static&nbsp;resource?&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;String&nbsp;resourcePath&nbsp;=&nbsp;RequestUtils.getServletPath(request);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if&nbsp;(&quot;&quot;.equals(resourcePath)&nbsp;&amp;&amp;&nbsp;null&nbsp;!=&nbsp;request.getPathInfo())&nbsp;...{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;resourcePath&nbsp;=&nbsp;request.getPathInfo();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if&nbsp;(&quot;true&quot;.equals(Configuration.get(WebWorkConstants.WEBWORK_SERVE_STATIC_CONTENT))&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&amp;&amp;&nbsp;resourcePath.startsWith(&quot;/webwork&quot;))&nbsp;...{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;String&nbsp;name&nbsp;=&nbsp;resourcePath.substring(&quot;/webwork&quot;.length());&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;findStaticResource(name,&nbsp;response);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;else&nbsp;...{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//&nbsp;this&nbsp;is&nbsp;a&nbsp;normal&nbsp;request,&nbsp;let&nbsp;it&nbsp;pass&nbsp;through&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;chain.doFilter(request,&nbsp;response);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//&nbsp;WW&nbsp;did&nbsp;its&nbsp;job&nbsp;here&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Object&nbsp;o&nbsp;=&nbsp;null;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;try&nbsp;...{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//setupContainer(request);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;o&nbsp;=&nbsp;beforeActionInvocation(request,&nbsp;servletContext);&nbsp;&nbsp;</li>
+	<li>//整个框架最最核心的方法，下面分析&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;du.serviceAction(request,&nbsp;response,&nbsp;servletContext,&nbsp;mapping);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;finally&nbsp;...{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;afterActionInvocation(request,&nbsp;servletContext,&nbsp;o);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ActionContext.setContext(null);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>du.serviceAction(request,&nbsp;response,&nbsp;servletContext,&nbsp;mapping);&nbsp;&nbsp;</li>
+	<li>//这个方法询问ActionMapper是否需要调用某个Action来处理这个（request）请求，如果ActionMapper决定需要调用某个Action，FilterDispatcher把请求的处理交给ActionProxy&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;</li>
+	<li>public&nbsp;void&nbsp;serviceAction(HttpServletRequest&nbsp;request,&nbsp;HttpServletResponse&nbsp;response,&nbsp;String&nbsp;namespace,&nbsp;String&nbsp;actionName,&nbsp;Map&nbsp;requestMap,&nbsp;Map&nbsp;parameterMap,&nbsp;Map&nbsp;sessionMap,&nbsp;Map&nbsp;applicationMap)&nbsp;...{&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;HashMap&nbsp;extraContext&nbsp;=&nbsp;createContextMap(requestMap,&nbsp;parameterMap,&nbsp;sessionMap,&nbsp;applicationMap,&nbsp;request,&nbsp;response,&nbsp;getServletConfig());&nbsp;&nbsp;//实例化Map请求&nbsp;，询问ActionMapper是否需要调用某个Action来处理这个（request）请求&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;extraContext.put(SERVLET_DISPATCHER,&nbsp;this);&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;OgnlValueStack&nbsp;stack&nbsp;=&nbsp;(OgnlValueStack)&nbsp;request.getAttribute(ServletActionContext.WEBWORK_VALUESTACK_KEY);&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if&nbsp;(stack&nbsp;!=&nbsp;null)&nbsp;...{&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;extraContext.put(ActionContext.VALUE_STACK,new&nbsp;OgnlValueStack(stack));&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;try&nbsp;...{&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ActionProxy&nbsp;proxy&nbsp;=&nbsp;ActionProxyFactory.getFactory().createActionProxy(namespace,&nbsp;actionName,&nbsp;extraContext);&nbsp;&nbsp;&nbsp;</li>
+	<li>//这里actionName是通过两道getActionName解析出来的,&nbsp;FilterDispatcher把请求的处理交给ActionProxy，下面是ServletDispatcher的&nbsp;TODO:&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;request.setAttribute(ServletActionContext.WEBWORK_VALUESTACK_KEY,&nbsp;proxy.getInvocation().getStack());&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;proxy.execute();&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//通过代理模式执行ActionProxy&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if&nbsp;(stack&nbsp;!=&nbsp;null)...{&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;request.setAttribute(ServletActionContext.WEBWORK_VALUESTACK_KEY,stack);&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;catch&nbsp;(ConfigurationException&nbsp;e)&nbsp;...{&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;log.error(&quot;Could&nbsp;not&nbsp;find&nbsp;action&quot;,&nbsp;e);&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;sendError(request,&nbsp;response,&nbsp;HttpServletResponse.SC_NOT_FOUND,&nbsp;e);&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;catch&nbsp;(Exception&nbsp;e)&nbsp;...{&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;log.error(&quot;Could&nbsp;not&nbsp;execute&nbsp;action&quot;,&nbsp;e);&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;sendError(request,&nbsp;response,&nbsp;HttpServletResponse.SC_INTERNAL_SERVER_ERROR,&nbsp;e);&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;&nbsp;</li>
+	<li>}&nbsp;</li>
+</ol>
+
+<p>&nbsp; &nbsp; 4、如果ActionMapper决定需要调用某个Action，FilterDispatcher把请求的处理交给ActionProxy&nbsp;</p>
+
+<p>&nbsp; &nbsp; 5、ActionProxy通过ConfigurationManager询问框架的配置文件，找到需要调用的Action类&nbsp;,这里，我们一般是从struts.xml配置中读取。</p>
+
+<p>&nbsp; &nbsp; 6、ActionProxy创建一个ActionInvocation的实例。</p>
+
+<p>&nbsp; &nbsp; 7、ActionInvocation实例使用命名模式来调用，在调用Action的过程前后，涉及到相关拦截器（Intercepter）的调用。</p>
+
+<p>&nbsp; &nbsp; 下面我们来看看ActionInvocation是如何工作的：</p>
+
+<p>&nbsp; &nbsp; ActionInvocation是Xworks 中Action 调度的核心。而对Interceptor 的调度，也正是由ActionInvocation负责。ActionInvocation 是一个接口，而DefaultActionInvocation 则是Webwork 对ActionInvocation的默认实现。</p>
+
+<p>&nbsp; &nbsp; Interceptor的调度流程大致如下：</p>
+
+<p>&nbsp; &nbsp; 1.ActionInvocation初始化时，根据配置，加载Action相关的所有Interceptor。</p>
+
+<p>&nbsp; &nbsp; 2. 通过ActionInvocation.invoke方法调用Action实现时，执行Interceptor。</p>
+
+<p>&nbsp; &nbsp; Interceptor将很多功能从我们的Action中独立出来，大量减少了我们Action的代码，独立出来的行为具有很好的重用性。XWork、WebWork的许多功能都是有Interceptor实现，可以在配置文件中组装Action用到的Interceptor，它会按照你指定的顺序，在Action执行前后运行。</p>
+
+<p>&nbsp; &nbsp; 这里，我们简单的介绍一下Interceptor</p>
+
+<p>&nbsp; &nbsp; 在struts2中自带了很多拦截器，在struts2-core-2.1.6.jar这个包下的struts-default.xml中我们可以发现：</p>
+
+<ol start="1">
+	<li>&lt;interceptors&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;interceptor&nbsp;name=&quot;alias&quot;class=&quot;com.opensymphony.xwork2.interceptor.AliasInterceptor&quot;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;interceptor&nbsp;name=&quot;autowiring&quot;class=&quot;com.opensymphony.xwork2.spring.interceptor.ActionAutowiringInterceptor&quot;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;interceptor&nbsp;name=&quot;chain&quot;class=&quot;com.opensymphony.xwork2.interceptor.ChainingInterceptor&quot;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;interceptor&nbsp;name=&quot;conversionError&quot;class=&quot;org.apache.struts2.interceptor.StrutsConversionErrorInterceptor&quot;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;interceptor&nbsp;name=&quot;clearSession&quot;class=&quot;org.apache.struts2.interceptor.ClearSessionInterceptor&quot;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;interceptor&nbsp;name=&quot;createSession&quot;class=&quot;org.apache.struts2.interceptor.CreateSessionInterceptor&quot;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;interceptor&nbsp;name=&quot;debugging&quot;class=&quot;org.apache.struts2.interceptor.debugging.DebuggingInterceptor&quot;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;interceptor&nbsp;name=&quot;externalRef&quot;class=&quot;com.opensymphony.xwork2.interceptor.ExternalReferencesInterceptor&quot;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;interceptor&nbsp;name=&quot;execAndWait&quot;class=&quot;org.apache.struts2.interceptor.ExecuteAndWaitInterceptor&quot;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;interceptor&nbsp;name=&quot;exception&quot;class=&quot;com.opensymphony.xwork2.interceptor.ExceptionMappingInterceptor&quot;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;interceptor&nbsp;name=&quot;fileUpload&quot;class=&quot;org.apache.struts2.interceptor.FileUploadInterceptor&quot;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;interceptor&nbsp;name=&quot;i18n&quot;class=&quot;com.opensymphony.xwork2.interceptor.I18nInterceptor&quot;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;interceptor&nbsp;name=&quot;logger&quot;class=&quot;com.opensymphony.xwork2.interceptor.LoggingInterceptor&quot;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;interceptor&nbsp;name=&quot;modelDriven&quot;class=&quot;com.opensymphony.xwork2.interceptor.ModelDrivenInterceptor&quot;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;interceptor&nbsp;name=&quot;scopedModelDriven&quot;class=&quot;com.opensymphony.xwork2.interceptor.ScopedModelDrivenInterceptor&quot;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;interceptor&nbsp;name=&quot;params&quot;class=&quot;com.opensymphony.xwork2.interceptor.ParametersInterceptor&quot;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;interceptor&nbsp;name=&quot;actionMappingParams&quot;class=&quot;org.apache.struts2.interceptor.ActionMappingParametersInteceptor&quot;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;interceptor&nbsp;name=&quot;prepare&quot;class=&quot;com.opensymphony.xwork2.interceptor.PrepareInterceptor&quot;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;interceptor&nbsp;name=&quot;staticParams&quot;class=&quot;com.opensymphony.xwork2.interceptor.StaticParametersInterceptor&quot;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;interceptor&nbsp;name=&quot;scope&quot;class=&quot;org.apache.struts2.interceptor.ScopeInterceptor&quot;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;interceptor&nbsp;name=&quot;servletConfig&quot;class=&quot;org.apache.struts2.interceptor.ServletConfigInterceptor&quot;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;interceptor&nbsp;name=&quot;sessionAutowiring&quot;class=&quot;org.apache.struts2.spring.interceptor.SessionContextAutowiringInterceptor&quot;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;interceptor&nbsp;name=&quot;timer&quot;class=&quot;com.opensymphony.xwork2.interceptor.TimerInterceptor&quot;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;interceptor&nbsp;name=&quot;token&quot;class=&quot;org.apache.struts2.interceptor.TokenInterceptor&quot;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;interceptor&nbsp;name=&quot;tokenSession&quot;class=&quot;org.apache.struts2.interceptor.TokenSessionStoreInterceptor&quot;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;interceptor&nbsp;name=&quot;validation&quot;class=&quot;org.apache.struts2.interceptor.validation.AnnotationValidationInterceptor&quot;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;interceptor&nbsp;name=&quot;workflow&quot;class=&quot;com.opensymphony.xwork2.interceptor.DefaultWorkflowInterceptor&quot;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;interceptor&nbsp;name=&quot;store&quot;class=&quot;org.apache.struts2.interceptor.MessageStoreInterceptor&quot;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;interceptor&nbsp;name=&quot;checkbox&quot;class=&quot;org.apache.struts2.interceptor.CheckboxInterceptor&quot;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;interceptor&nbsp;name=&quot;profiling&quot;class=&quot;org.apache.struts2.interceptor.ProfilingActivationInterceptor&quot;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;interceptor&nbsp;name=&quot;roles&quot;class=&quot;org.apache.struts2.interceptor.RolesInterceptor&quot;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;interceptor&nbsp;name=&quot;jsonValidation&quot;class=&quot;org.apache.struts2.interceptor.validation.JSONValidationInterceptor&quot;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;interceptornameinterceptorname=&quot;annotationWorkflow&quot;class=&quot;com.opensymphony.xwork2.interceptor.annotations.AnnotationWorkflowInterceptor&quot;/&gt;&nbsp;&nbsp;</li>
+</ol>
+
+<p>&nbsp;</p>
+
+<p>&nbsp; &nbsp; 对于sturts2自带的拦截器，使用起来就相对比较方便了，我们只需要在struts.xml的action标签中加入&lt;interceptor-ref name=&quot;<em>&nbsp;logger</em>&nbsp;&quot; /&gt;并且struts.xml扩展struts-default，就可以使用，</p>
+
+<p>&nbsp; &nbsp;如果是要自定义拦截器，首先需要写一个拦截器的类：</p>
+
+<ol start="1">
+	<li>package&nbsp;ceshi;&nbsp;&nbsp;</li>
+	<li>import&nbsp;com.opensymphony.xwork2.ActionInvocation;&nbsp;&nbsp;</li>
+	<li>import&nbsp;com.opensymphony.xwork2.interceptor.AbstractInterceptor;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;</li>
+	<li>publicclassAuthorizationInterceptor&nbsp;extends&nbsp;AbstractInterceptor&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;@Override&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;Stringintercept(ActionInvocation&nbsp;ai)throws&nbsp;Exception&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;System.out.println(&quot;abc&quot;);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return&nbsp;ai.invoke();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;</li>
+	<li>}&nbsp;&nbsp;</li>
+</ol>
+
+<p>并且在struts.xml中进行配置</p>
+
+<ol start="1">
+	<li>&lt;!DOCTYPEstruts&nbsp;PUBLIC&nbsp;&nbsp;</li>
+	<li>&quot;-//Apache&nbsp;SoftwareFoundation//DTD&nbsp;Struts&nbsp;Configuration&nbsp;2.0//EN&quot;&nbsp;&nbsp;</li>
+	<li>&quot;http://struts.apache.org/dtds/struts-2.0.dtd&quot;&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;</li>
+	<li>&lt;struts&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;package&nbsp;name=&quot;test&quot;extends=&quot;struts-default&quot;&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;interceptors&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;interceptor&nbsp;name=&quot;abc&quot;class&nbsp;=&quot;ceshi.AuthorizationInterceptor&quot;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;/interceptors&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;action&nbsp;name=&quot;TestLogger&quot;class=&quot;vaannila.TestLoggerAction&quot;&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;interceptor-refnameinterceptor-refname=&quot;abc&quot;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;result&nbsp;name=&quot;success&quot;&gt;/success.jsp&lt;/result&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/action&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;/package&gt;&nbsp;&nbsp;</li>
+	<li>&lt;/struts&gt;&nbsp;&nbsp;</li>
+</ol>
+
+<p>8、一旦Action执行完毕，ActionInvocation负责根据struts.xml中的配置找到对应的返回结果。返回结果通常是（但不总是，也可能是另外的一个Action链）一个需要被表示的JSP或者FreeMarker的模版。在表示的过程中可以使用Struts2 框架中继承的标签。在这个过程中需要涉及到ActionMapper</p>
+
+<p>&nbsp;</p>
+
+<p>在上述过程中所有的对象（Action，Results，Interceptors，等）都是通过ObjectFactory来创建的。</p>
+
+<p>&nbsp;</p>
+
+<h2>Struts2和struts1的比较</h2>
+
+<p>&nbsp; &nbsp; struts2相对于struts1来说简单了很多，并且功能强大了很多，我们可以从几个方面来看：</p>
+
+<p>&nbsp; &nbsp;&nbsp;<strong>从体系结构来看：</strong>struts2大量使用拦截器来出来请求，从而允许与业务逻辑控制器 与 servlet-api分离，避免了侵入性；而struts1.x在action中明显的侵入了servlet-api.</p>
+
+<p>&nbsp;&nbsp;&nbsp;&nbsp;<strong>从线程安全分析：</strong>struts2.x是线程安全的，每一个对象产生一个实例，避免了线程安全问题；而struts1.x在action中属于单线程。</p>
+
+<p>&nbsp;&nbsp;&nbsp;&nbsp;<strong>性能方面：</strong>struts2.x<a href="http://lib.csdn.net/base/softwaretest" target="_blank" title="软件测试知识库">测试</a>可以脱离web容器，而struts1.x依赖servlet-api，测试需要依赖web容器。</p>
+
+<p>&nbsp;&nbsp;&nbsp;&nbsp;<strong>请求参数封装对比：</strong>struts2.x使用ModelDriven模式，这样我们 直接 封装model对象，无需要继承任何struts2的基类，避免了侵入性。</p>
+
+<p>&nbsp;&nbsp;&nbsp;&nbsp;<strong>标签的优势：</strong>标签库几乎可以完全替代JSTL的标签库，并且 struts2.x支持强大的ognl表达式。</p>
+
+<p>&nbsp;&nbsp;&nbsp; 当然，struts2和struts1相比，在 文件上传，数据校验 等方面也 方便了好多。在这就不详谈了。</p>
+
+<p>&nbsp;&nbsp;&nbsp;&nbsp;</p>
+
+<p>&nbsp; &nbsp; 一个比较优秀的框架可以帮着我们更高效，稳定的开发合格的产品，不过我们也不要依赖框架，我们只要理解了思想，设计模式，我们可以自己扩展功能，不然 就要 永远让别人牵着走了！</p>
+
+<p><br />
+<br />
+在上述过程中所有的对象（Action，Results，Interceptors，等）都是通过ObjectFactory来创建的。</p>

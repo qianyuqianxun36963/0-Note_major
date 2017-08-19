@@ -1,0 +1,82 @@
+<h1>powershell操作注册表：</h1>
+
+<h2>新建项：</h2>
+
+<p>New-Item -Path hkcu:\software\_DeleteMe 往注册表写内容，hkcu是 HKEY_CURRENT_USER 的缩写。</p>
+
+<p>Remove-Item -Path hkcu:\Software\_DeleteMe 删除注册表某一项。</p>
+
+<p>由于注册表项是 Windows PowerShell 驱动器上的项，因此处理它们的方式与处理文件和文件夹非常类似。一个关键差异是，基于注册表的 Windows PowerShell 驱动器上的每个项都是一个容器，就像文件系统驱动器上的文件夹一样。但是，注册表条目及其关联值是项的属性，而不是不同的项。&nbsp;</p>
+
+<h2>列出注册表项的所有子项</h2>
+
+<p>使用 Get-ChildItem 可以显示直接在注册表项中的所有项。添加可选的 Force 参数可以显示隐藏项或系统项。例如，此命令显示直接在 Windows PowerShell 驱动器 HKCU:（它对应于 HKEY_CURRENT_USER 注册表配置单元）中的项：<br />
+PS&gt; Get-ChildItem -Path hkcu:\</p>
+
+<p>Hive:Microsoft.PowerShell.Core\Registry::HKEY_CURRENT_USER</p>
+
+<p>SKC &nbsp;VC Name &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; Property<br />
+--- &nbsp;-- ---- &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; --------<br />
+2 &nbsp; 0 AppEvents &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;{}<br />
+7 &nbsp;33 Console &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;{ColorTable00, ColorTable01, ColorTab...<br />
+25 &nbsp; 1 Control Panel &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;{Opened}<br />
+0 &nbsp; 5 Environment &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;{APR_ICONV_PATH, INCLUDE, LIB, TEMP...}<br />
+1 &nbsp; 7 Identities &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; {Last Username, Last User ...<br />
+4 &nbsp; 0 Keyboard Layout &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;{}<br />
+...</p>
+
+<p>这些是在注册表编辑器 (Regedit.exe) 中 HKEY_CURRENT_USER 下可见的顶级项。</p>
+
+<p>也可以通过指定注册表提供程序的名称后跟&ldquo;::&rdquo;来指定此注册表路径。注册表提供程序的全名为 Microsoft.PowerShell.Core\Registry，但是它只需简写为 Registry 即可。下列任一命令将列出直接位于 HKCU 下的内容：<br />
+Get-ChildItem -Path Registry::HKEY_CURRENT_USER<br />
+Get-ChildItem -Path Microsoft.PowerShell.Core\Registry::HKEY_CURRENT_USER<br />
+Get-ChildItem -Path Registry::HKCU<br />
+Get-ChildItem -Path Microsoft.PowerShell.Core\Registry::HKCU<br />
+Get-ChildItem HKCU:</p>
+
+<p>这些命令仅列出直接包含的项，与使用 Cmd.exe 的 DIR 命令或 UNIX 外壳程序中的 ls 非常类似。若要显示包含的项，需要指定 Recurse 参数。若要列出 HKCU 中的所有注册表项，请使用以下命令（此操作可能需要极长的时间。）：<br />
+Get-ChildItem -Path hkcu:\ -Recurse</p>
+
+<p>Get-ChildItem 可以通过其 Path、Filter、Include 和 Exclude 参数执行复杂的筛选功能，但是这些参数通常仅基于名称。使用 Where-Objectcmdlet 可以基于项的其他属性执行复杂的筛选。以下命令查找 HKCU:\Software 中具有不超过一个子项且正好具有四个值的所有项：<br />
+Get-ChildItem -Path HKCU:\Software -Recurse | Where-Object -FilterScript {($_.SubKeyCount -le 1) -and ($_.ValueCount -eq 4) }</p>
+
+<h2>复制项</h2>
+
+<p>复制是使用 Copy-Item 进行的。以下命令将 HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion 及其所有属性复制到 HKCU:\，从而创建一个名为&ldquo;CurrentVersion&rdquo;的新项：<br />
+Copy-Item -Path &#39;HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion&#39; -Destination hkcu:</p>
+
+<p>如果在注册表编辑器中或使用 Get-ChildItem 检查此新项，您将注意到新位置中没有所包含子项的副本。为了复制容器的所有内容，需要指定 Recurse 参数。若要使前面的复制命令是递归的，请使用以下命令：<br />
+Copy-Item -Path &#39;HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion&#39; -Destination hkcu:-Recurse</p>
+
+<p>仍可以使用已经可用的其他工具执行文件系统复制。任何注册表编辑工具（包括 reg.exe、regini.exe 和 regedit.exe）和支持注册表编辑的 COM 对象（如 WScript.Shell 和 WMI 的 StdRegProv 类）都可以从 Windows PowerShell 内使用。</p>
+
+<h2>创建项</h2>
+
+<p>在注册表中创建新项比在文件系统中创建新项简单。由于所有的注册表项都是容器，因此无需指定项类型；只需提供显式路径即可，例如：<br />
+New-Item -Path hkcu:\software\_DeleteMe</p>
+
+<p>也可以使用基于提供程序的路径指定项：<br />
+New-Item -Path Registry::HKCU\_DeleteMe</p>
+
+<h2>删除项</h2>
+
+<p>在本质上，删除项对于所有提供程序都是相同的。以下命令将以无提示方式删除项：<br />
+Remove-Item -Path hkcu:\Software\_DeleteMe<br />
+Remove-Item -Path &#39;hkcu:\key with spaces in the name&#39;</p>
+
+<p>删除特定项下的所有项</p>
+
+<p>可以使用 Remove-Item 删除包含的项，但是如果该项包含任何其他内容，则会提示您确认删除。例如，如果尝试删除所创建的 HKCU:\CurrentVersion 子项，则会看到以下内容：<br />
+Remove-Item -Path hkcu:\CurrentVersion</p>
+
+<p>确认</p>
+
+<p>HKCU:\CurrentVersion\AdminDebug 中的项具有子项，并且没有指定 -recurseparameter 参数。如果继续，所有子项均将随该项删除。是否确实要继续?<br />
+[Y] 是 &nbsp;[A] 全是 &nbsp;[N] 否 &nbsp;[L] 全否 &nbsp;[S] 挂起 &nbsp;[?] 帮助<br />
+（默认值为&ldquo;Y&rdquo;）:</p>
+
+<p>若要删除包含的项而不出现提示，请指定 -Recurse 参数：<br />
+Remove-Item -Path HKCU:\CurrentVersion -Recurse</p>
+
+<p>若要删除 HKCU:\CurrentVersion 中的所有项但不删除 HKCU:\CurrentVersion 本身，则可以改用：<br />
+Remove-Item -Path HKCU:\CurrentVersion\* -Recurse</p>

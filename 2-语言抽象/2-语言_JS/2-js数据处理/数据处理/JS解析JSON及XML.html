@@ -1,0 +1,160 @@
+JS 解析 JSON 及 XML
+
+ 书写AJAX的时候，经常需要解析从服务器返回的一串字符串，这里简单介绍服务器返回字符的两种格式，及JS对它们的解析方法。
+
+一、JSON
+
+<1>直接读取加载json格式文件：
+
+    function initCityData(){
+        $.getJSON("cities.json", function(data){ 
+            mdcs.load(data);
+        }); 
+    }
+
+    citiies.json:
+        [{"area":"请选择.."},
+        {"area":"安徽"},
+        {"area":"北京"},
+        {"area":"福建"}]
+
+<2>
+    即JS对象标记（JavaScript Object Notation），是一种以JS声明对象的方式组合的一串字符串。
+    　　JS可以按以下方式定义对象：
+
+    var obj =
+    {
+        id: 2,
+        name: 'n'
+    };
+    　　　　这样就定义了对象 obj, 它有两个公共属性id和name，可以用 obj.id 的方式直接访问其属性值。
+
+    　　　　从服务器获取数据时往往不止一个对象，这就需要用到对象数组，JS中对象数组可以用 [] 来定义，如下：
+
+        var objs = [{ id: 1, name: 'n_1' }, { id: 2, name: 'n_2'}];
+        alert(objs[0].id);
+    　　　　这样就定义了对象数组 objs, 它包含两个对象，可以用索引来访问，如 objs[0] 将引用到第一个对象。
+    　　　　到这里你或许已经想到服务器返回的字符串格式是怎样的，但字符串毕竟是字符串，我们需要将其转换为可以利用JS操作的变量。
+    　　　　这就用到 eval 函数，请看下例：
+
+        var objs = eval("[{ id: 1, name: 'n_1' }, { id: 2, name: 'n_2'}]");
+        alert(objs[0].id); // return 1
+    　　　　好了，服务器端你只要以格式：[{ id: 1, name: 'n_1' }, { id: 2, name: 'n_2'}] 返回字符串，
+    　　　　在客户端就可以利用 eval() 执行返回的字符串，获得对象数组。
+    　　　　以下用AJAX做一个简单的例子。新建一个网站，在根目录下添加一个一般处理程序（GetJson.ashx），代码如下：
+
+    <%@ WebHandler Language="C#" Class="GetJson" %>
+
+    using System;
+    using System.Web;
+
+    public class GetJson : IHttpHandler {
+        
+        public void ProcessRequest (HttpContext context) {
+
+            string str = "[{id:1, name:'n_1'}, {id:2, name:'n_2'}]";
+            
+            context.Response.ContentType = "text/plain";
+            context.Response.Write(str);
+        }
+     
+        public bool IsReusable {
+            get {
+                return false;
+            }
+        }
+
+    }
+
+    在Default.aspx 文件中添加测试脚本：
+
+    复制代码
+        <script type="text/javascript">
+            function getJson() {
+                // 在IE7下测试通过，IE6下必须创建 new ActiveXObject("MSXML2.XMLHTTP.6.0")
+                var request = new XMLHttpRequest();
+
+                request.open('GET', 'GetJson.ashx');
+                request.onreadystatechange = function() {
+                    if (request.readyState == 4 && request.status == 200) {
+                        var objs = eval(request.responseText);
+                        alert(objs.length); // 2
+                        alert(objs[0].id);  // 1
+                        alert(objs[1].name);// 'n_2'
+                    }
+                }
+                request.send(null);
+            }
+        </script>
+    再添加一个测试按钮即可以看到效果：
+
+    <input type="button" value="GetJson" onclick="getJson();" />
+ 
+二、XML
+　　JS对XML的解析是基于DOM的，对HTML的DOM熟悉的话，解析XML就没什么困难了。
+　　注意：在Firefox中，解析器不会忽略空格，所以元素间的空格，FF一样会认为是一个节点。
+　　不过在我们用程序拼接XML的时候，一般不会出现节点间有空格的情况。
+
+　　在根目录下添加一个新的一般处理程序（GetXml.ashx），代码如下：
+
+    <%@ WebHandler Language="C#" Class="GetXml" %>
+
+    using System;
+    using System.Web;
+
+    public class GetXml : IHttpHandler {
+        
+        public void ProcessRequest (HttpContext context) {
+
+            System.Text.StringBuilder sb = new System.Text.StringBuilder("<?xml version='1.0' ?><Persons>");
+            string temp = "<Person><Id>{0}</Id><Name>{1}</Name></Person>";
+            sb.AppendFormat(temp, 1, "n_1");
+            sb.AppendFormat(temp, 2, "n_2");
+            sb.Append("</Persons>");
+            
+            context.Response.ContentType = "text/xml";
+            context.Response.Write(sb.ToString());
+        }
+     
+        public bool IsReusable {
+            get {
+                return false;
+            }
+        }
+
+    }
+    　　　　在Default.aspx页面添加以下脚本：
+
+    复制代码
+            function getXml() {
+                // 在IE7下测试通过，IE6下必须创建 new ActiveXObject("MSXML2.XMLHTTP.6.0")
+                var request = new XMLHttpRequest();
+
+                request.open('GET', 'GetXml.ashx');
+                request.onreadystatechange = function() {
+                    if (request.readyState == 4 && request.status == 200) {
+                        var xmlDoc = request.responseXML;
+                        var root = xmlDoc.documentElement;
+                        var elements = root.getElementsByTagName("Person");
+                        alert(elements.length); // 2
+                        // elements[0].firstChild 引用到第一个Person节点的Id节点
+                        // elements[0].firstChild.firstChild 引用到Id节点的文本节点
+                        // 因为文本节点是元素节点的第一个子节点
+                        alert(elements[0].firstChild.firstChild.nodeValue); // 1
+                        alert(elements[1].lastChild.firstChild.nodeValue);  // 'n_2'
+                    }
+                }
+                request.send(null);
+            }
+    复制代码
+    　　　　注意到代码段：var root = xmlDoc.documentElement;
+    　　　　主要是为了消除IE6和其他浏览器的兼容问题，在其他浏览器下，允许request.responseXML.getElementsByTagName("Person");
+    　　　　添加测试按钮：
+    <input type="button" value="GetXml" onclick="getXml();" />
+     
+     
+    总结：从代码上很容易看出，解析JSON相对直观，在网络中需要传输的字符串也比较少，解析过程中也不需要考虑浏览器兼容问题。
+    　　   但JSON比较适合轻量级的数据交互，XML则比JSON多了一些特性，比如命名空间，还有更多的节点类型。
+
+
+

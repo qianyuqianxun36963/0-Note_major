@@ -1,0 +1,507 @@
+<h2>一、数据源的由来</h2>
+
+<p>　　在<a href="http://lib.csdn.net/base/javase" target="_blank" title="Java SE知识库">Java</a>开发中，使用JDBC操作<a href="http://lib.csdn.net/base/mysql" target="_blank" title="MySQL知识库">数据库</a>的四个步骤如下：</p>
+
+<p>&nbsp; 　　　　①加载数据库驱动程序(Class.forName(&quot;数据库驱动类&quot;);)<br />
+&nbsp;&nbsp;　　　　②连接数据库(Connection con&nbsp; = DriverManager.getConnection();)<br />
+&nbsp;&nbsp;　　　　③操作数据库(PreparedStatement stat = con.prepareStatement(sql);stat.executeQuery();)<br />
+&nbsp;&nbsp;　　　　④关闭数据库，释放连接(con.close();)<br />
+　　也就是说，所有的用户都需要经过此四步进行操作，但是这四步之中有三步(①加载数据库驱动程序、②连接数据库、④关闭数据库，释放连接)对所有人都是一样的，而所有人只有在操作数据库上是不一样，那么这就造成了性能的损耗。<br />
+　　那么最好的做法是，准备出一个空间，此空间里专门保存着全部的数据库连接，以后用户用数据库操作的时候不用再重新加载驱动、连接数据库之类的，而直接从此空间中取走连接，关闭的时候直接把连接放回到此空间之中。<br />
+　　那么此空间就可以称为连接池（保存所有的数据库连接），但是如果要想实现此空间的话，则必须有一个问题要考虑？<br />
+&nbsp;　　&nbsp;　　1、&nbsp;如果没有任何一个用户使用连接，那么那么应该维持一定数量的连接，等待用户使用。<br />
+&nbsp;&nbsp;　　　　2、&nbsp;如果连接已经满了，则必须打开新的连接，供更多用户使用。<br />
+&nbsp;&nbsp;　　　　3、&nbsp;如果一个服务器就只能有100个连接，那么如果有第101个人过来呢？应该等待其他用户释放连接<br />
+&nbsp;&nbsp;　　　　4、&nbsp;如果一个用户等待时间太长了，则应该告诉用户，操作是失败的。<br />
+&nbsp;　　如果直接用程序实现以上功能，则会比较麻烦，所以在Tomcat 4.1.27之后，在服务器上就直接增加了数据源的配置选项，直接在服务器上配置好数据源连接池即可。在J2EE服务器上保存着一个数据库的多个连接。每一个连接通过DataSource可以找到。DataSource被绑定在了JNDI树上（为每一个DataSource提供一个名字）客户端通过名称找到在JNDI树上绑定的DataSource，再由DataSource找到一个连接。如下图所示：</p>
+
+<p>　　<img alt="" src="http://images.cnitblog.com/blog/289233/201409/031115439382500.gif" /></p>
+
+<p>　　那么在以后的操作中，除了数据库的连接方式不一样之外，其他的所有操作都一样，只是关闭的时候不是彻底地关闭数据库，而是把数据库的连接放回到连接池中去。</p>
+
+<p>　　如果要想使用数据源的配置，则必须配置虚拟目录，因为此配置是在虚拟目录之上起作用的。需要注意的是，如果要想完成以上的功能，在Tomcat服务器上一定要有各个数据库的驱动程序。</p>
+
+<h2><a name="t1"></a>二、JNDI+Tomcat配置数据源的两种方式</h2>
+
+<h3><a name="t2"></a>2.1、<strong>全局jndi配置</strong></h3>
+
+<p>　　此种配置需要在server.xml中配置数据源，具体的配置步骤如下：</p>
+
+<p>　　1、在tomcat服务器的lib目录下加入数据库连接的驱动jar包</p>
+
+<p>　　</p>
+
+<p>　　2、修改tomcat服务器的conf目录下server.xml配置文件</p>
+
+<p>　　</p>
+
+<p>　　打开server.xml配置文件，可以看到里面自带的一个全局JNDI配置，如下图所示：</p>
+
+<p>　　</p>
+
+<p>　　编辑server.xml文件，添加全局JNDI数据源配置，配置如下：</p>
+
+<p><img alt="复制代码" src="http://common.cnblogs.com/images/copycode.gif" /></p>
+
+<pre>
+ 1 &lt;!-- Global JNDI resources
+ 2        Documentation at /docs/jndi-resources-howto.html
+ 3   --&gt;
+ 4   &lt;GlobalNamingResources&gt;
+ 5     &lt;!-- Editable user database that can also be used by
+ 6          UserDatabaseRealm to authenticate users
+ 7     --&gt;
+ 8     &lt;Resource name=&quot;UserDatabase&quot; auth=&quot;Container&quot;
+ 9               type=&quot;org.apache.catalina.UserDatabase&quot;
+10               description=&quot;User database that can be updated and saved&quot;
+11               factory=&quot;org.apache.catalina.users.MemoryUserDatabaseFactory&quot;
+12               pathname=&quot;conf/tomcat-users.xml&quot; /&gt;
+13 &lt;!--
+14   |- name：表示以后要查找的名称。通过此名称可以找到DataSource，此名称任意更换，但是程序中最终要查找的就是此名称，
+15            为了不与其他的名称混淆，所以使用jdbc/oracle，现在配置的是一个jdbc的关于oracle的命名服务。
+16   |- auth：由容器进行授权及管理，指的用户名和密码是否可以在容器上生效
+17   |- type：此名称所代表的类型，现在为javax.sql.DataSource
+18   |- maxActive：表示一个数据库在此服务器上所能打开的最大连接数
+19   |- maxIdle：表示一个数据库在此服务器上维持的最小连接数
+20   |- maxWait：最大等待时间。10000毫秒
+21   |- username：数据库连接的用户名
+22   |- password：数据库连接的密码
+23   |- driverClassName：数据库连接的驱动程序
+24   |- url：数据库连接的地址
+25 --&gt;
+26 &lt;!--配置Oracle数据库的JNDI数据源--&gt;
+27 &lt;Resource 
+28         name=&quot;<strong>jdbc/oracle</strong>&quot;
+29         auth=&quot;Container&quot; 
+30         type=&quot;javax.sql.DataSource&quot;
+31         maxActive=&quot;100&quot; 
+32         maxIdle=&quot;30&quot; 
+33         maxWait=&quot;10000&quot;
+34         username=&quot;lead_oams&quot; 
+35         password=&quot;p&quot;
+36         driverClassName=&quot;oracle.jdbc.driver.OracleDriver&quot;
+37         url=&quot;jdbc:oracle:thin:@192.168.1.229:1521:lead&quot;/&gt;
+38 
+39 &lt;!--配置MySQL数据库的JNDI数据源--&gt;
+40 &lt;Resource 
+41         name=&quot;<strong>jdbc/mysql</strong>&quot;
+42         auth=&quot;Container&quot; 
+43         type=&quot;javax.sql.DataSource&quot;
+44         maxActive=&quot;100&quot; 
+45         maxIdle=&quot;30&quot; 
+46         maxWait=&quot;10000&quot;
+47         username=&quot;root&quot; 
+48         password=&quot;root&quot;
+49         driverClassName=&quot;com.mysql.jdbc.Driver&quot;
+50         url=&quot;jdbc:mysql://192.168.1.144:3306/leadtest?useUnicode=true&amp;amp;characterEncoding=utf-8&quot;/&gt;
+51 
+52 &lt;!--配置SQLServer数据库的JNDI数据源--&gt;
+53 &lt;Resource 
+54         name=&quot;<strong>jdbc/sqlserver</strong>&quot;
+55         auth=&quot;Container&quot; 
+56         type=&quot;javax.sql.DataSource&quot;
+57         maxActive=&quot;100&quot; 
+58         maxIdle=&quot;30&quot; 
+59         maxWait=&quot;10000&quot;
+60         username=&quot;sa&quot; 
+61         password=&quot;p@ssw0rd&quot;
+62         driverClassName=&quot;com.microsoft.sqlserver.jdbc.SQLServerDriver&quot;
+63         url=&quot;jdbc:sqlserver://192.168.1.51:1433;DatabaseName=demo&quot;/&gt;
+64 
+65   &lt;/GlobalNamingResources&gt;</pre>
+
+<p><img alt="复制代码" src="http://common.cnblogs.com/images/copycode.gif" /></p>
+
+<p>　　经过以上的两个步骤，全局JNDI数据源就配置好了，在上述的server.xml文件中，分别配置了<a href="http://lib.csdn.net/base/oracle" target="_blank" title="Oracle知识库">Oracle</a>、<a href="http://lib.csdn.net/base/mysql" target="_blank" title="MySQL知识库">MySQL</a>、SQLServer这三种数据库的全局JNDI数据源。</p>
+
+<h3><a name="t3"></a>2.2、<strong>全局jndi数据源测试</strong></h3>
+
+<p>　　1、创建一个JNDI<a href="http://lib.csdn.net/base/softwaretest" target="_blank" title="软件测试知识库">测试</a>项目JNDITest，在web.xml中添加JNDI配置的资源引用</p>
+
+<p>　　</p>
+
+<p>　　web.xml的配置如下：</p>
+
+<p><img alt="复制代码" src="http://common.cnblogs.com/images/copycode.gif" /></p>
+
+<pre>
+ 1 &lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot;?&gt;
+ 2 &lt;web-app version=&quot;2.5&quot; 
+ 3     xmlns=&quot;http://java.sun.com/xml/ns/javaee&quot; 
+ 4     xmlns:xsi=&quot;http://www.w3.org/2001/XMLSchema-instance&quot; 
+ 5     xsi:schemaLocation=&quot;http://java.sun.com/xml/ns/javaee 
+ 6     http://java.sun.com/xml/ns/javaee/web-app_2_5.xsd&quot;&gt;
+ 7   &lt;welcome-file-list&gt;
+ 8     &lt;welcome-file&gt;index.jsp&lt;/welcome-file&gt;
+ 9   &lt;/welcome-file-list&gt;
+10   
+11   &lt;!-- 
+12   JNDI配置的资源引用：
+13   &bull; res-ref-name：表示引用资源的名称
+14   &bull; res-type：此资源对应的类型为javax.sql.DataSource
+15   &bull; res-auth：容器授权管理
+16    --&gt;
+17    &lt;!--Oracle数据库JNDI数据源引用 --&gt;
+18   &lt;resource-ref&gt;
+19       &lt;description&gt;Oracle DB Connection&lt;/description&gt;
+20       &lt;res-ref-name&gt;<strong>oracleDataSource</strong>&lt;/res-ref-name&gt;
+21       &lt;res-type&gt;javax.sql.DataSource&lt;/res-type&gt;
+22       &lt;res-auth&gt;Container&lt;/res-auth&gt;
+23  &lt;/resource-ref&gt;
+24   
+25   &lt;!--MySQL数据库JNDI数据源引用 --&gt;
+26   &lt;resource-ref&gt;
+27       &lt;description&gt;MySQL DB Connection&lt;/description&gt;
+28       &lt;res-ref-name&gt;<strong>mysqlDataSource</strong>&lt;/res-ref-name&gt;
+29       &lt;res-type&gt;javax.sql.DataSource&lt;/res-type&gt;
+30       &lt;res-auth&gt;Container&lt;/res-auth&gt;
+31   &lt;/resource-ref&gt;
+32   
+33   &lt;!--SQLServer数据库JNDI数据源引用 --&gt;
+34   &lt;resource-ref&gt;
+35       &lt;description&gt;SQLServer DB Connection&lt;/description&gt;
+36       &lt;res-ref-name&gt;<strong>sqlserverDataSource</strong>&lt;/res-ref-name&gt;
+37       &lt;res-type&gt;javax.sql.DataSource&lt;/res-type&gt;
+38       &lt;res-auth&gt;Container&lt;/res-auth&gt;
+39   &lt;/resource-ref&gt;
+40   
+41 &lt;/web-app&gt;</pre>
+
+<p><img alt="复制代码" src="http://common.cnblogs.com/images/copycode.gif" /></p>
+
+<p>　　2、映射JNDITest项目的虚拟目录</p>
+
+<p>　　在tomcat的\conf\Catalina\localhost下（没有目录就新建）创建一个xml文件，文件名必须和项目名相同，测试JNDI数据源的web项目的项目名称是：JNDITest，所以xml文件的命名就叫JNDITest.xml，如下图所示：</p>
+
+<p>　　</p>
+
+<p>　　编辑JNDITest.xml，配置如下：</p>
+
+<p><img alt="复制代码" src="http://common.cnblogs.com/images/copycode.gif" /></p>
+
+<pre>
+ 1 &lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot;?&gt;
+ 2 &lt;!--
+ 3     jndi配置方法（tomcat）：
+ 4     将此文件放置在tomcat\conf\Catalina\localhost下（没有目录就新建）
+ 5  --&gt;
+ 6 &lt;!--映射JNDITest项目的虚拟目录--&gt;
+ 7 &lt;Context docBase=&quot;D:/MyEclipse8.5/workspace/JNDITest/WebRoot&quot; debug=&quot;0&quot; reloadable=&quot;false&quot;&gt;
+ 8     &lt;!--引用Oracle数据库的JNDI数据源--&gt;
+ 9     &lt;ResourceLink name=&quot;<strong>oracleDataSource</strong>&quot; global=&quot;<strong>jdbc/oracle</strong>&quot; type=&quot;javax.sql.DataSource&quot;/&gt;
+10     &lt;!--引用mysql数据库的JNDI数据源--&gt;
+11     &lt;ResourceLink name=&quot;<strong>mysqlDataSource</strong>&quot; global=&quot;<strong>jdbc/mysql</strong>&quot; type=&quot;javax.sql.DataSource&quot;/&gt;
+12     &lt;!--引用sqlserver数据库的JNDI数据源--&gt;
+13     &lt;ResourceLink name=&quot;<strong>sqlserverDataSource</strong>&quot; global=&quot;<strong>jdbc/sqlserver</strong>&quot; type=&quot;javax.sql.DataSource&quot;/&gt;
+14 &lt;/Context&gt;</pre>
+
+<p><img alt="复制代码" src="http://common.cnblogs.com/images/copycode.gif" /></p>
+
+<p>　　3、测试从JNDI数据源获取数据库连接</p>
+
+<p>　　配置完数据源连接池之后，就可以按照以下的步骤进行访问：</p>
+
+<p>&nbsp;　　 &bull; 初始化名称查找上下文<br />
+&nbsp;&nbsp;　　&bull; 通过JNDI名称找到DataSource<br />
+&nbsp;&nbsp;　　&bull; 通过DataSource取得一个连接<br />
+&nbsp;　　&nbsp;&bull; 操作数据库<br />
+&nbsp;&nbsp;　　&bull; 关闭数据库，关闭的时候是将连接放回到连接池之中</p>
+
+<p>　　jsp测试页面代码如下：</p>
+
+<p><img alt="复制代码" src="http://common.cnblogs.com/images/copycode.gif" /></p>
+
+<pre>
+  1 &lt;%@ page language=&quot;java&quot; import=&quot;java.util.*&quot; pageEncoding=&quot;UTF-8&quot;%&gt;
+  2 &lt;%@ page import=&quot;java.sql.*,javax.sql.*,javax.naming.*&quot; %&gt;
+  3 
+  4 &lt;!DOCTYPE HTML&gt;
+  5 &lt;html&gt;
+  6   &lt;head&gt;
+  7     &lt;title&gt;JNDI数据源测试&lt;/title&gt;
+  8   &lt;/head&gt;
+  9   
+ 10   &lt;body&gt;
+ 11         &lt;%
+ 12             Connection connOracle = null;
+ 13             try {
+ 14                 //1、初始化名称查找上下文
+ 15                 Context ctx = new InitialContext();
+ 16                 //InitialContext ctx = new InitialContext();亦可 
+ 17                 //2、通过JNDI名称找到DataSource,对名称进行定位java:comp/env是必须加的,后面跟的是DataSource名
+ 18                 /*
+ 19                 DataSource名在web.xml文件中的&lt;res-ref-name&gt;oracleDataSource&lt;/res-ref-name&gt;进行了配置
+ 20                  &lt;!--Oracle数据库JNDI数据源引用 --&gt;
+ 21                  &lt;resource-ref&gt;
+ 22                       &lt;description&gt;Oracle DB Connection&lt;/description&gt;
+ 23                       &lt;res-ref-name&gt;oracleDataSource&lt;/res-ref-name&gt;
+ 24                       &lt;res-type&gt;javax.sql.DataSource&lt;/res-type&gt;
+ 25                       &lt;res-auth&gt;Container&lt;/res-auth&gt;
+ 26                  &lt;/resource-ref&gt;
+ 27                 */
+ 28                 DataSource ds = (DataSource)ctx.lookup(&quot;java:comp/env/oracleDataSource&quot;);
+ 29                 //3、通过DataSource取得一个连接
+ 30                 connOracle = ds.getConnection();
+ 31                 out.println(&quot;Oracle Connection pool connected !!&quot;);
+ 32                 //4、操作数据库
+ 33             } catch (NamingException e) {
+ 34                 System.out.println(e.getMessage());
+ 35             } catch (SQLException e) {
+ 36                 e.printStackTrace();
+ 37             } finally {
+ 38                 //5、关闭数据库，关闭的时候是将连接放回到连接池之中
+ 39                 connOracle.close();
+ 40             }
+ 41         %&gt;
+ 42         &lt;hr/&gt;
+ 43         &lt;%
+ 44             Connection connMySQL = null;
+ 45             try {
+ 46                 //1、初始化名称查找上下文
+ 47                 Context ctx = new InitialContext();
+ 48                 //InitialContext ctx = new InitialContext();亦可 
+ 49                 //2、通过JNDI名称找到DataSource,对名称进行定位java:comp/env是必须加的,后面跟的是DataSource名
+ 50                 /*
+ 51                 DataSource名在web.xml文件中的&lt;res-ref-name&gt;mysqlDataSource&lt;/res-ref-name&gt;进行了配置
+ 52                   &lt;!--MySQL数据库JNDI数据源引用 --&gt;
+ 53                   &lt;resource-ref&gt;
+ 54                       &lt;description&gt;MySQL DB Connection&lt;/description&gt;
+ 55                       &lt;res-ref-name&gt;mysqlDataSource&lt;/res-ref-name&gt;
+ 56                       &lt;res-type&gt;javax.sql.DataSource&lt;/res-type&gt;
+ 57                       &lt;res-auth&gt;Container&lt;/res-auth&gt;
+ 58                   &lt;/resource-ref&gt;
+ 59                 */
+ 60                 DataSource ds = (DataSource)ctx.lookup(&quot;java:comp/env/mysqlDataSource&quot;);
+ 61                 //3、通过DataSource取得一个连接
+ 62                 connMySQL = ds.getConnection();
+ 63                 out.println(&quot;MySQL Connection pool connected !!&quot;);
+ 64                 //4、操作数据库
+ 65             } catch (NamingException e) {
+ 66                 System.out.println(e.getMessage());
+ 67             } catch (SQLException e) {
+ 68                 e.printStackTrace();
+ 69             } finally {
+ 70                 //5、关闭数据库，关闭的时候是将连接放回到连接池之中
+ 71                 connMySQL.close();
+ 72             }
+ 73         %&gt;
+ 74         &lt;hr/&gt;
+ 75         &lt;%
+ 76             Connection connSQLServer = null;
+ 77             try {
+ 78                 //1、初始化名称查找上下文
+ 79                 Context ctx = new InitialContext();
+ 80                 //InitialContext ctx = new InitialContext();亦可 
+ 81                 //2、通过JNDI名称找到DataSource,对名称进行定位java:comp/env是必须加的,后面的是DataSource名
+ 82                 /*
+ 83                 DataSource名在web.xml文件中的&lt;res-ref-name&gt;sqlserverDataSource&lt;/res-ref-name&gt;进行了配置
+ 84                 &lt;!--SQLServer数据库JNDI数据源引用 --&gt;
+ 85                   &lt;resource-ref&gt;
+ 86                       &lt;description&gt;SQLServer DB Connection&lt;/description&gt;
+ 87                       &lt;res-ref-name&gt;sqlserverDataSource&lt;/res-ref-name&gt;
+ 88                       &lt;res-type&gt;javax.sql.DataSource&lt;/res-type&gt;
+ 89                       &lt;res-auth&gt;Container&lt;/res-auth&gt;
+ 90                   &lt;/resource-ref&gt;
+ 91                 */
+ 92                 DataSource ds = (DataSource)ctx.lookup(&quot;java:comp/env/sqlserverDataSource&quot;);
+ 93                 //3、通过DataSource取得一个连接
+ 94                 connSQLServer = ds.getConnection();
+ 95                 out.println(&quot;SQLServer Connection pool connected !!&quot;);
+ 96                 //4、操作数据库
+ 97             } catch (NamingException e) {
+ 98                 System.out.println(e.getMessage());
+ 99             } catch (SQLException e) {
+100                 e.printStackTrace();
+101             } finally {
+102                 //5、关闭数据库，关闭的时候是将连接放回到连接池之中
+103                 connSQLServer.close();
+104             }
+105         %&gt;
+106     &lt;/body&gt;
+107 &lt;/html&gt;</pre>
+
+<p><img alt="复制代码" src="http://common.cnblogs.com/images/copycode.gif" /></p>
+
+<p>　　运行结果如下：</p>
+
+<p>　　</p>
+
+<p>　　除了可以在Jsp页面中编写java代码测试JNDI数据源连接之外，还有一种比较简单的方式就是使用JSTL标签库提供的sql标签进行测试，测试代码如下：</p>
+
+<p><img alt="复制代码" src="http://common.cnblogs.com/images/copycode.gif" /></p>
+
+<pre>
+ 1 &lt;%@ page language=&quot;java&quot; import=&quot;java.util.*&quot; pageEncoding=&quot;UTF-8&quot;%&gt;
+ 2 &lt;%--引入JSTL标签库 --%&gt;
+ 3 &lt;%@ taglib uri=&quot;http://java.sun.com/jsp/jstl/core&quot; prefix=&quot;c&quot;%&gt;
+ 4 &lt;%@ taglib uri=&quot;http://java.sun.com/jsp/jstl/sql&quot; prefix=&quot;sql&quot;%&gt;
+ 5 &lt;!DOCTYPE HTML&gt;
+ 6 &lt;html&gt;
+ 7   &lt;head&gt;
+ 8     &lt;title&gt;JNDI数据源连接测试&lt;/title&gt;
+ 9   &lt;/head&gt;
+10   
+11   &lt;body&gt;
+12           &lt;h3&gt;Oracle JNDI数据源测试&lt;/h3&gt;
+13           &lt;%--使用sql:query标签发送SQL语句去数据库查询数据，查询的结果集保存到rs变量当中，dataSource属性指明使用的数据源--%&gt;
+14         &lt;sql:query var=&quot;rs&quot; dataSource=&quot;oracleDataSource&quot;&gt;
+15             &lt;%--Oracle JNDI数据源测试 SQL--%&gt;
+16             SELECT * FROM LEAD_OAMS_DBSOURCES
+17         &lt;/sql:query&gt;
+18         &lt;%--使用c:forEach标签遍历查询结果集rs中的每一行--%&gt;
+19         &lt;c:forEach var=&quot;row&quot; items=&quot;${rs.rows}&quot;&gt;
+20             &lt;%--${row.字段名}获取字段的值--%&gt;
+21             ${row.RESOURCEID}---${row.DBSOURCE_NAME}---${row.DBSOURCE_TYPE}&lt;br/&gt;
+22         &lt;/c:forEach&gt;
+23         &lt;hr/&gt;
+24         &lt;h3&gt;MySQL JNDI数据源测试&lt;/h3&gt;
+25         &lt;%--使用sql:query标签发送SQL语句去数据库查询数据，查询的结果集保存到rs变量当中，dataSource属性指明使用的数据源--%&gt;
+26         &lt;sql:query var=&quot;rs&quot; dataSource=&quot;mysqlDataSource&quot;&gt;
+27             &lt;%--MySQL JNDI数据源测试 SQL--%&gt;
+28              select * from ld_user
+29         &lt;/sql:query&gt;
+30         &lt;%--使用c:forEach标签遍历查询结果集rs中的每一行--%&gt;
+31         &lt;c:forEach var=&quot;row&quot; items=&quot;${rs.rows}&quot;&gt;
+32             &lt;%--${row.字段名}获取字段的值--%&gt;
+33             ${row.id}---${row.username}---${row.password}&lt;br/&gt;
+34         &lt;/c:forEach&gt;
+35         &lt;hr/&gt;
+36         &lt;h3&gt;SQLServer JNDI数据源测试&lt;/h3&gt;
+37         &lt;%--使用sql:query标签发送SQL语句去数据库查询数据，查询的结果集保存到rs变量当中，dataSource属性指明使用的数据源--%&gt;
+38         &lt;sql:query var=&quot;rs&quot; dataSource=&quot;sqlserverDataSource&quot;&gt;
+39             &lt;%--SQLServer JNDI数据源测试 SQL--%&gt;
+40             select * from t_demo
+41         &lt;/sql:query&gt;
+42         &lt;%--使用c:forEach标签遍历查询结果集rs中的每一行--%&gt;
+43         &lt;c:forEach var=&quot;row&quot; items=&quot;${rs.rows}&quot;&gt;
+44             &lt;%--${row.字段名}获取字段的值--%&gt;
+45             ${row.id}---${row.time}&lt;br/&gt;
+46         &lt;/c:forEach&gt;
+47   &lt;/body&gt;
+48 &lt;/html&gt;</pre>
+
+<p><img alt="复制代码" src="http://common.cnblogs.com/images/copycode.gif" /></p>
+
+<p>　　运行结果如下：</p>
+
+<p>　　</p>
+
+<h3><a name="t4"></a>2.3、<strong>非全局jndi配置</strong></h3>
+
+<p><strong>　　</strong>非全局JNDI数据源是针对某一个Web项目配置的数据源，具体的配置步骤如下：</p>
+
+<p>&nbsp;　　1、在tomcat服务器的lib目录下加入数据库连接的驱动jar包</p>
+
+<p>　　 2、针对具体的web项目映射虚拟目录，然后在虚拟目录映射的配置文件中配置JNDI数据源</p>
+
+<p>　　还是以上面的JNDITest项目为例子进行说明</p>
+
+<p>　　在tomcat目录下的\conf\Catalina\localhost目录下创建一个JNDITest.xml文件，如下图所示：</p>
+
+<p>　　</p>
+
+<p>　　编辑JNDITest.xml文件，添加对JNDITest项目的虚拟目录的映射和JNDI数据源的配置</p>
+
+<p><img alt="复制代码" src="http://common.cnblogs.com/images/copycode.gif" /></p>
+
+<pre>
+ 1 &lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot;?&gt;
+ 2 &lt;!--
+ 3     jndi配置方法（tomcat）：
+ 4     将此文件放置在tomcat\conf\Catalina\localhost下（没有目录就新建）
+ 5  --&gt;
+ 6 
+ 7 &lt;Context docBase=&quot;D:/MyEclipse8.5/workspace/JNDITest/WebRoot&quot; debug=&quot;0&quot; reloadable=&quot;false&quot;&gt;
+ 8 &lt;!--
+ 9   |- name：表示以后要查找的名称。通过此名称可以找到DataSource，此名称任意更换，但是程序中最终要查找的就是此名称，
+10            为了不与其他的名称混淆，所以使用jdbc/oracle，现在配置的是一个jdbc的关于oracle的命名服务。
+11   |- auth：由容器进行授权及管理，指的用户名和密码是否可以在容器上生效
+12   |- type：此名称所代表的类型，现在为javax.sql.DataSource
+13   |- maxActive：表示一个数据库在此服务器上所能打开的最大连接数
+14   |- maxIdle：表示一个数据库在此服务器上维持的最小连接数
+15   |- maxWait：最大等待时间。10000毫秒
+16   |- username：数据库连接的用户名
+17   |- password：数据库连接的密码
+18   |- driverClassName：数据库连接的驱动程序
+19   |- url：数据库连接的地址
+20 --&gt;
+21 &lt;!--配置Oracle数据库的JNDI数据源--&gt;
+22 &lt;Resource 
+23         name=&quot;oracleDataSource&quot;
+24         auth=&quot;Container&quot; 
+25         type=&quot;javax.sql.DataSource&quot;
+26         maxActive=&quot;100&quot; 
+27         maxIdle=&quot;30&quot; 
+28         maxWait=&quot;10000&quot;
+29         username=&quot;lead_oams&quot; 
+30         password=&quot;p&quot;
+31         driverClassName=&quot;oracle.jdbc.driver.OracleDriver&quot;
+32         url=&quot;jdbc:oracle:thin:@192.168.1.229:1521:lead&quot;/&gt;
+33 
+34 &lt;!--配置MySQL数据库的JNDI数据源--&gt;
+35 &lt;Resource 
+36         name=&quot;mysqlDataSource&quot;
+37         auth=&quot;Container&quot; 
+38         type=&quot;javax.sql.DataSource&quot;
+39         maxActive=&quot;100&quot; 
+40         maxIdle=&quot;30&quot; 
+41         maxWait=&quot;10000&quot;
+42         username=&quot;root&quot; 
+43         password=&quot;root&quot;
+44         driverClassName=&quot;com.mysql.jdbc.Driver&quot;
+45         url=&quot;jdbc:mysql://192.168.1.144:3306/leadtest?useUnicode=true&amp;amp;characterEncoding=utf-8&quot;/&gt;
+46 
+47 &lt;!--配置SQLServer数据库的JNDI数据源--&gt;
+48 &lt;Resource 
+49         name=&quot;sqlserverDataSource&quot;
+50         auth=&quot;Container&quot; 
+51         type=&quot;javax.sql.DataSource&quot;
+52         maxActive=&quot;100&quot; 
+53         maxIdle=&quot;30&quot; 
+54         maxWait=&quot;10000&quot;
+55         username=&quot;sa&quot; 
+56         password=&quot;p@ssw0rd&quot;
+57         driverClassName=&quot;com.microsoft.sqlserver.jdbc.SQLServerDriver&quot;
+58         url=&quot;jdbc:sqlserver://192.168.1.51:1433;DatabaseName=demo&quot;/&gt;
+59 &lt;/Context&gt;</pre>
+
+<p><img alt="复制代码" src="http://common.cnblogs.com/images/copycode.gif" /></p>
+
+<p>&nbsp;　　3、在web项目的web.xml文件中引用配置好的JNDI数据源</p>
+
+<p><img alt="复制代码" src="http://common.cnblogs.com/images/copycode.gif" /></p>
+
+<pre>
+ 1  &lt;!-- 
+ 2   JNDI配置的资源引用：
+ 3   &bull; res-ref-name：表示引用资源的名称
+ 4   &bull; res-type：此资源对应的类型为javax.sql.DataSource
+ 5   &bull; res-auth：容器授权管理
+ 6    --&gt;
+ 7    &lt;!--Oracle数据库JNDI数据源引用 --&gt;
+ 8   &lt;resource-ref&gt;
+ 9       &lt;description&gt;Oracle DB Connection&lt;/description&gt;
+10       &lt;res-ref-name&gt;oracleDataSource&lt;/res-ref-name&gt;
+11       &lt;res-type&gt;javax.sql.DataSource&lt;/res-type&gt;
+12       &lt;res-auth&gt;Container&lt;/res-auth&gt;
+13  &lt;/resource-ref&gt;
+14   
+15   &lt;!--MySQL数据库JNDI数据源引用 --&gt;
+16   &lt;resource-ref&gt;
+17       &lt;description&gt;MySQL DB Connection&lt;/description&gt;
+18       &lt;res-ref-name&gt;mysqlDataSource&lt;/res-ref-name&gt;
+19       &lt;res-type&gt;javax.sql.DataSource&lt;/res-type&gt;
+20       &lt;res-auth&gt;Container&lt;/res-auth&gt;
+21   &lt;/resource-ref&gt;
+22   
+23   &lt;!--SQLServer数据库JNDI数据源引用 --&gt;
+24   &lt;resource-ref&gt;
+25       &lt;description&gt;SQLServer DB Connection&lt;/description&gt;
+26       &lt;res-ref-name&gt;sqlserverDataSource&lt;/res-ref-name&gt;
+27       &lt;res-type&gt;javax.sql.DataSource&lt;/res-type&gt;
+28       &lt;res-auth&gt;Container&lt;/res-auth&gt;
+29   &lt;/resource-ref&gt;</pre>
+
+<p><img alt="复制代码" src="http://common.cnblogs.com/images/copycode.gif" /></p>
+
+<p>　　经过以上3个步骤，针对具体web项目配置的JNDI数据源就算是配置好了。具体的测试和上述测试全局JNDI数据源的方式是一样的！</p>

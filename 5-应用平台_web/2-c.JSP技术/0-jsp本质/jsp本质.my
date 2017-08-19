@@ -1,0 +1,361 @@
+<h1>一个例子搞懂Servlet&amp;JSP</h1>
+
+<h2>一、Servlet基础</h2>
+
+<h3>1.Servlet的生命周期</h3>
+
+<p>根据日志输出，当发送HTTP请求到Servlet时，Tomcat才创建Servlet(没有配置应用自启动的那些)。首先执行的是Servlet的构造函数，<br />
+之后是init()方法，然后才是service()方法。如果没有覆写service()，那么它会根据HTTP请求是Get还是<br />
+Post来调用doGet()和doPost()方法。<br />
+这一个Servlet会一直存在，被处理各个HTTP请求的线程调用，因此Servlet要尽量含有避免synchronized<br />
+代码。最后，当Tomcat移出了Servlet时会调用destory()方法（应用被卸载或Servlet文件发生变化）。</p>
+
+<h3>2.读请求头，设置响应头</h3>
+
+<p>通过Servlet的API可以很方便的从TCP和HTTP数据包中读出很多有用的信息，底层已经帮我们解析好了。<br />
+以后有空会写一个简单的Web服务器，模拟一下J2EE容器的一些基本功能。</p>
+
+<h3>3.读URL中参数</h3>
+
+<p>这也是Web开发中最常用的方法，通过getParameter()方法可以取出URL中的参数。</p>
+
+<h3>4.重定向和转发</h3>
+
+<p>很重要的两个概念。重定向一般是返回给浏览器一个外部的URL，让它去那里请求，所以浏览器实际上<br />
+请求了两次才得到最终的内容。而转发一般是在当前Web应用内部，从一个组件转发到另一个组件（比如<br />
+从Servlet到JSP），主要用于组件间协同工作。可以通过setAttribute来传递一些数据。</p>
+
+<h2>二、JSP基础</h2>
+
+<p>JSP看似比Servlet内容多而且复杂，其实学习JSP时只要关注两件事：<br />
+&nbsp; &nbsp; &nbsp;哪些代码是编译时用的，哪些是运行时执行。<br />
+&nbsp; &nbsp; &nbsp;各种标签在编译成Servlet代码后变成了什么样。</p>
+
+<h3>1.指令</h3>
+
+<p>指令是<span class="marker">编译期</span>间执行的代码，常用的有：page、include、taglib。语法是&lt;%@page ... %&gt;。<br />
+在这个例子中通过page指令的import设置JSP引用的Java类，这样JSP编译成Servlet时才不会<br />
+有编译错误。</p>
+
+<h3>2.动作</h3>
+
+<p>动作是<span class="marker">运行期</span>执行的代码。&lt;jsp:include&gt;、&lt;jsp:forward&gt;、&lt;jsp:useBean&gt;等等。&lt;jsp:include&gt;<br />
+是动态引入其他文件，如果代码不执行到这里就不会引入，一定要与include指令区分开。<br />
+&lt;jsp:forward&gt;与Servlet中的forward方法功能相同，而&lt;jsp:useBean&gt;、&lt;jsp:property&gt;稍后在JSP<br />
+转换成的Servlet源文件中会看到它们的真身。</p>
+
+<h3>3.声明</h3>
+
+<p>声明的变量和方法最终编译成Servlet中的成员变量和方法。语法是&lt;%! ... %&gt;。这里的代码<br />
+都会生成在service()方法外，所以声明的变量是编译后Servlet的成员变量，而且可以声明方法。<br />
+这是声明与后面将要介绍的普通JSP代码的区别。</p>
+
+<h3>4.JSP表达式</h3>
+
+<p>插入一个简单的Java代码得到一个值，语法是&lt;%= ... %&gt;。</p>
+
+<h3>5.JSP代码</h3>
+
+<p>编译后会生成到service()方法中，因此在这里声明的变量是局部变量，也就不能在这里声明方法了。<br />
+语法是&lt;% ... %&gt;。</p>
+
+<h3>6.内置对象</h3>
+
+<p>out、page、session、application、config、exception、request、response、pageContext。<br />
+可以在JSP中直接使用。这些内置对象没有什么神秘的，在Servlet中都是可以获得到的，只不过<br />
+在JSP中它们都有了简短的名字，所以用起来很方便而已。</p>
+
+<h3>&nbsp;</h3>
+
+<h2>三、JSP的生命周期</h2>
+
+<p>JSP与Servlet的一个区别在于，Servlet容器必须先把JSP编译成Servlet类，然后才能运行它。<br />
+JSP的生命周期包含以下阶段。</p>
+
+<p>&bull; 解析阶段：Servlet容器解析JSP文件的代码，如果有语法错误，就会向客户端返冋错误信息。</p>
+
+<p>&bull; 翻泽阶段：Servlet容器把JSP文件翮译成Servlet源文件。</p>
+
+<p>&bull; 參编译阶段：Servlet容器编译Servlet源文件，生成Servlet类。</p>
+
+<p>&bull; 初始化阶段：加栽与JSP对应的Servlet类，创建其实例，并调用它的初始化方法。</p>
+
+<p>&bull; 运行时阶段：调用与JSP对应的Servlet实例的服务方法。</p>
+
+<p>&bull; 销毀阶段：调用与JSP对应的Servlet实例的销毁方法，然后销毁Servlet实例。&nbsp;</p>
+
+<p>在JSP的生命周期中，解析、翻译和编译是其特有的阶段，这3个阶段仅发生在以下场合：</p>
+
+<p>&bull;&nbsp;&nbsp; &nbsp;JSP文件被奔户端首次请求访问。</p>
+
+<p>&bull;&nbsp;&nbsp; &nbsp;JSP文件被更新。</p>
+
+<p>&bull;&nbsp;&nbsp; &nbsp;与JSP文件对应的Servlet类的类文件被手工删除。</p>
+
+<p>初始化、运行时和销毁阶段则是JSP和Servlet都具有的阶段。本书第4章的4.3 节（Servlet的生命周期）己经对这3个阶段的特征作了详细介绍。</p>
+
+<p>本章6.1.3节已经讲过，与JSP对应的Servlet类实现了javax.servlet.jsp.JspPage接口，而JspPage 接口则继承自 javax.servlet.Scrvlet 接口。在 JspPage 接口中定义了 jsplnit() 和jspDestroy()方法，它们的作用与Servlet接口的init()和destroy()方法相同。开发人员在编写JSP文件时，可以实现jsplnit() 和jspDestroy()方法，与JSP对应的Servlet类的jspService()方法则是由Servlet容器根据JSP源文件自动生成。</p>
+
+<p>&nbsp;</p>
+
+<h2>四、JSP查看jsp编译后的文件！</h2>
+
+<p>下面就要揭开本例中JSP神秘的面纱了，在Tomcat的work目录中我们可以找到JSP转成的Servlet源文件文件。<br />
+在myeclipse中找到源文件的方法<br />
+&nbsp;</p>
+
+<p><br />
+1.&nbsp;&nbsp; &nbsp;package org.apache.jsp; &nbsp;<br />
+2.&nbsp;&nbsp; &nbsp; &nbsp;<br />
+3.&nbsp;&nbsp; &nbsp;import javax.servlet.*; &nbsp;<br />
+4.&nbsp;&nbsp; &nbsp;import javax.servlet.http.*; &nbsp;<br />
+5.&nbsp;&nbsp; &nbsp;import javax.servlet.jsp.*; &nbsp;<br />
+6.&nbsp;&nbsp; &nbsp;import java.util.concurrent.atomic.*; &nbsp;<br />
+7.&nbsp;&nbsp; &nbsp;import com.cdai.web.j2ee.TestBean; &nbsp;<br />
+8.&nbsp;&nbsp; &nbsp; &nbsp;<br />
+9.&nbsp;&nbsp; &nbsp;public final class main_jsp extends org.apache.jasper.runtime.HttpJspBase &nbsp;<br />
+10.&nbsp;&nbsp; &nbsp; &nbsp; &nbsp;implements org.apache.jasper.runtime.JspSourceDependent { &nbsp;<br />
+11.&nbsp;&nbsp; &nbsp; &nbsp;<br />
+12.&nbsp;&nbsp; &nbsp; &nbsp;&nbsp;<br />
+13.&nbsp;&nbsp; &nbsp; &nbsp;<br />
+14.&nbsp;&nbsp; &nbsp; &nbsp; &nbsp;private AtomicInteger count = new AtomicInteger(1); &nbsp;<br />
+15.&nbsp;&nbsp; &nbsp; &nbsp; &nbsp;private ThreadLocal&lt;Integer&gt; curCountStorage = new ThreadLocal&lt;Integer&gt;(); &nbsp;<br />
+16.&nbsp;&nbsp; &nbsp; &nbsp; &nbsp; &nbsp;<br />
+17.&nbsp;&nbsp; &nbsp; &nbsp; &nbsp;private int getCount() { &nbsp;<br />
+18.&nbsp;&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;int curCount = count.getAndIncrement(); &nbsp;<br />
+19.&nbsp;&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;curCountStorage.set(curCount); &nbsp;<br />
+20.&nbsp;&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;return curCount; &nbsp;<br />
+21.&nbsp;&nbsp; &nbsp; &nbsp; &nbsp;} &nbsp;<br />
+22.&nbsp;&nbsp; &nbsp; &nbsp;<br />
+23.&nbsp;&nbsp; &nbsp; &nbsp;private static java.util.List _jspx_dependants; &nbsp;<br />
+24.&nbsp;&nbsp; &nbsp; &nbsp;<br />
+25.&nbsp;&nbsp; &nbsp; &nbsp;public Object getDependants() { &nbsp;<br />
+26.&nbsp;&nbsp; &nbsp; &nbsp; &nbsp;return _jspx_dependants; &nbsp;<br />
+27.&nbsp;&nbsp; &nbsp; &nbsp;} &nbsp;<br />
+28.&nbsp;&nbsp; &nbsp; &nbsp;<br />
+29.&nbsp;&nbsp; &nbsp; &nbsp;public void _jspService(HttpServletRequest request, HttpServletResponse response) &nbsp;<br />
+30.&nbsp;&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;throws java.io.IOException, ServletException { &nbsp;<br />
+31.&nbsp;&nbsp; &nbsp; &nbsp;<br />
+32.&nbsp;&nbsp; &nbsp; &nbsp; &nbsp;JspFactory _jspxFactory = null; &nbsp;<br />
+33.&nbsp;&nbsp; &nbsp; &nbsp; &nbsp;PageContext pageContext = null; &nbsp;<br />
+34.&nbsp;&nbsp; &nbsp; &nbsp; &nbsp;HttpSession session = null; &nbsp;<br />
+35.&nbsp;&nbsp; &nbsp; &nbsp; &nbsp;ServletContext application = null; &nbsp;<br />
+36.&nbsp;&nbsp; &nbsp; &nbsp; &nbsp;ServletConfig config = null; &nbsp;<br />
+37.&nbsp;&nbsp; &nbsp; &nbsp; &nbsp;JspWriter out = null; &nbsp;<br />
+38.&nbsp;&nbsp; &nbsp; &nbsp; &nbsp;Object page = this; &nbsp;<br />
+39.&nbsp;&nbsp; &nbsp; &nbsp; &nbsp;JspWriter _jspx_out = null; &nbsp;<br />
+40.&nbsp;&nbsp; &nbsp; &nbsp; &nbsp;PageContext _jspx_page_context = null; &nbsp;<br />
+41.&nbsp;&nbsp; &nbsp; &nbsp;<br />
+42.&nbsp;&nbsp; &nbsp; &nbsp;<br />
+43.&nbsp;&nbsp; &nbsp; &nbsp; &nbsp;try { &nbsp;<br />
+44.&nbsp;&nbsp; &nbsp; &nbsp; &nbsp; &nbsp;_jspxFactory = JspFactory.getDefaultFactory(); &nbsp;<br />
+45.&nbsp;&nbsp; &nbsp; &nbsp; &nbsp; &nbsp;response.setContentType(&quot;text/html;charset=utf-8&quot;); &nbsp;<br />
+46.&nbsp;&nbsp; &nbsp; &nbsp; &nbsp; &nbsp;pageContext = _jspxFactory.getPageContext(this, request, response, &nbsp;<br />
+47.&nbsp;&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;null, true, 8192, true); &nbsp;<br />
+48.&nbsp;&nbsp; &nbsp; &nbsp; &nbsp; &nbsp;_jspx_page_context = pageContext; &nbsp;<br />
+49.&nbsp;&nbsp; &nbsp; &nbsp; &nbsp; &nbsp;application = pageContext.getServletContext(); &nbsp;<br />
+50.&nbsp;&nbsp; &nbsp; &nbsp; &nbsp; &nbsp;config = pageContext.getServletConfig(); &nbsp;<br />
+51.&nbsp;&nbsp; &nbsp; &nbsp; &nbsp; &nbsp;session = pageContext.getSession(); &nbsp;<br />
+52.&nbsp;&nbsp; &nbsp; &nbsp; &nbsp; &nbsp;out = pageContext.getOut(); &nbsp;<br />
+53.&nbsp;&nbsp; &nbsp; &nbsp; &nbsp; &nbsp;_jspx_out = out; &nbsp;<br />
+54.&nbsp;&nbsp; &nbsp; &nbsp;<br />
+55.&nbsp;&nbsp; &nbsp; &nbsp; &nbsp; &nbsp;out.write(&quot;&lt;!-- 1.Compile instruction --&gt;\r\n&quot;); &nbsp;<br />
+56.&nbsp;&nbsp; &nbsp; &nbsp; &nbsp; &nbsp;out.write(&quot;\r\n&quot;); &nbsp;<br />
+57.&nbsp;&nbsp; &nbsp; &nbsp; &nbsp; &nbsp;out.write(&quot;\r\n&quot;); &nbsp;<br />
+58.&nbsp;&nbsp; &nbsp; &nbsp; &nbsp; &nbsp;out.write(&quot;&lt;!-- 2.Declaration: member variable and method --&gt;\r\n&quot;); &nbsp;<br />
+59.&nbsp;&nbsp; &nbsp; &nbsp; &nbsp; &nbsp;out.write(&quot;\r\n&quot;); &nbsp;<br />
+60.&nbsp;&nbsp; &nbsp; &nbsp; &nbsp; &nbsp;out.write(&quot;\r\n&quot;); &nbsp;<br />
+61.&nbsp;&nbsp; &nbsp; &nbsp; &nbsp; &nbsp;out.write(&quot;&lt;!-- 3.JSP code &amp; 4.Built-in object --&gt;\r\n&quot;); &nbsp;<br />
+62.&nbsp;&nbsp; &nbsp; &nbsp;<br />
+63.&nbsp;&nbsp; &nbsp; &nbsp; &nbsp;Object curCount = session.getAttribute(&quot;count&quot;); &nbsp;<br />
+64.&nbsp;&nbsp; &nbsp; &nbsp; &nbsp;if (curCount == null) { &nbsp;<br />
+65.&nbsp;&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;curCount = getCount(); &nbsp;<br />
+66.&nbsp;&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;session.setAttribute(&quot;count&quot;, curCount); &nbsp;<br />
+67.&nbsp;&nbsp; &nbsp; &nbsp; &nbsp;} &nbsp;<br />
+68.&nbsp;&nbsp; &nbsp; &nbsp; &nbsp; &nbsp;<br />
+69.&nbsp;&nbsp; &nbsp; &nbsp; &nbsp;out.println(request.getParameter(&quot;param1&quot;) + &quot; - &quot; + request.getAttribute(&quot;param2&quot;)); &nbsp;<br />
+70.&nbsp;&nbsp; &nbsp; &nbsp;<br />
+71.&nbsp;&nbsp; &nbsp; &nbsp; &nbsp; &nbsp;out.write(&quot;\r\n&quot;); &nbsp;<br />
+72.&nbsp;&nbsp; &nbsp; &nbsp; &nbsp; &nbsp;out.write(&quot;\r\n&quot;); &nbsp;<br />
+73.&nbsp;&nbsp; &nbsp; &nbsp; &nbsp; &nbsp;out.write(&quot;&lt;br&gt; This is main.jsp. You&#39;re the &quot;); &nbsp;<br />
+74.&nbsp;&nbsp; &nbsp; &nbsp; &nbsp; &nbsp;out.print(curCount); &nbsp;<br />
+75.&nbsp;&nbsp; &nbsp; &nbsp; &nbsp; &nbsp;out.write(&quot; visitor.\r\n&quot;); &nbsp;<br />
+76.&nbsp;&nbsp; &nbsp; &nbsp; &nbsp; &nbsp;out.write(&quot;\r\n&quot;); &nbsp;<br />
+77.&nbsp;&nbsp; &nbsp; &nbsp; &nbsp; &nbsp;out.write(&quot;&lt;!-- 5.Runtime action --&gt;\r\n&quot;); &nbsp;<br />
+78.&nbsp;&nbsp; &nbsp; &nbsp; &nbsp; &nbsp;com.cdai.web.j2ee.TestBean testBean = null; &nbsp;<br />
+79.&nbsp;&nbsp; &nbsp; &nbsp; &nbsp; &nbsp;synchronized (_jspx_page_context) { &nbsp;<br />
+80.&nbsp;&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;testBean = (com.cdai.web.j2ee.TestBean) _jspx_page_context.getAttribute(&quot;testBean&quot;, PageContext.PAGE_SCOPE); &nbsp;<br />
+81.&nbsp;&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;if (testBean == null){ &nbsp;<br />
+82.&nbsp;&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;testBean = new com.cdai.web.j2ee.TestBean(); &nbsp;<br />
+83.&nbsp;&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;_jspx_page_context.setAttribute(&quot;testBean&quot;, testBean, PageContext.PAGE_SCOPE); &nbsp;<br />
+84.&nbsp;&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;} &nbsp;<br />
+85.&nbsp;&nbsp; &nbsp; &nbsp; &nbsp; &nbsp;} &nbsp;<br />
+86.&nbsp;&nbsp; &nbsp; &nbsp; &nbsp; &nbsp;out.write(&quot;\r\n&quot;); &nbsp;<br />
+87.&nbsp;&nbsp; &nbsp; &nbsp; &nbsp; &nbsp;out.write(&quot;&lt;br&gt;Message in TestBean is: &quot;); &nbsp;<br />
+88.&nbsp;&nbsp; &nbsp; &nbsp; &nbsp; &nbsp;out.write(org.apache.jasper.runtime.JspRuntimeLibrary.toString((((com.cdai.web.j2ee.TestBean)_jspx_page_context.findAttribute(&quot;testBean&quot;)).getMessage()))); &nbsp;<br />
+89.&nbsp;&nbsp; &nbsp; &nbsp; &nbsp; &nbsp;out.write(&#39;\r&#39;); &nbsp;<br />
+90.&nbsp;&nbsp; &nbsp; &nbsp; &nbsp; &nbsp;out.write(&#39;\n&#39;); &nbsp;<br />
+91.&nbsp;&nbsp; &nbsp; &nbsp; &nbsp;} catch (Throwable t) { &nbsp;<br />
+92.&nbsp;&nbsp; &nbsp; &nbsp; &nbsp; &nbsp;if (!(t instanceof SkipPageException)){ &nbsp;<br />
+93.&nbsp;&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;out = _jspx_out; &nbsp;<br />
+94.&nbsp;&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;if (out != null &amp;&amp; out.getBufferSize() != 0) &nbsp;<br />
+95.&nbsp;&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;out.clearBuffer(); &nbsp;<br />
+96.&nbsp;&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;if (_jspx_page_context != null) _jspx_page_context.handlePageException(t); &nbsp;<br />
+97.&nbsp;&nbsp; &nbsp; &nbsp; &nbsp; &nbsp;} &nbsp;<br />
+98.&nbsp;&nbsp; &nbsp; &nbsp; &nbsp;} finally { &nbsp;<br />
+99.&nbsp;&nbsp; &nbsp; &nbsp; &nbsp; &nbsp;if (_jspxFactory != null) _jspxFactory.releasePageContext(_jspx_page_context); &nbsp;<br />
+100.&nbsp;&nbsp; &nbsp; &nbsp; &nbsp;} &nbsp;<br />
+101.&nbsp;&nbsp; &nbsp; &nbsp;} &nbsp;<br />
+102.&nbsp;&nbsp; &nbsp;} &nbsp;<br />
+怎么样？对照着JSP的源码来看，是不是毫无神秘之处。</p>
+
+<h2>五、Cookie和Session</h2>
+
+<p>在这个例子中我们使用Session，借助Cookie保存一个Session ID在浏览器端。这种Cookie也叫做会话Cookie。<br />
+在同一个Chrome进程的打开多个不同页面访问http://127.0.0.1:8080/ssh/j2ee?goto=2都能够获得Session<br />
+中保存的数据，从而达到了使无状态的HTTP看起来好像有状态一样。<br />
+&nbsp;</p>
+
+<h2><br />
+六、多线程安全</h2>
+
+<p>由于每个Servlet只有一个实例，被所有请求线程共享，所以在Servlet中要尽量避免代码同步、资源竞争，<br />
+否则服务器的响应速度会很慢。除了Servlet，还要注意一些会被共享的内置对象，比如在一个用户的所有<br />
+请求内被共享的Session对象，也是有可能发生并发问题的。有共享，就会有并发，所以在J2EE各个层的<br />
+开发中，Servlet/JSP -&gt; Service -&gt; DAO -&gt; Database都要注意并发问题。</p>
+
+<h2>Xml文件_serverlet</h2>
+
+<p>1.&nbsp;&nbsp; &nbsp;&lt;?xml version=&quot;1.0&quot; encoding=&quot;ISO-8859-1&quot;?&gt; &nbsp;<br />
+2.&nbsp;&nbsp; &nbsp; &nbsp;<br />
+3.&nbsp;&nbsp; &nbsp;&lt;web-app xmlns=&quot;http://java.sun.com/xml/ns/j2ee&quot; xmlns:xsi=&quot;http://www.w3.org/2001/XMLSchema-instance&quot; &nbsp;<br />
+4.&nbsp;&nbsp; &nbsp; &nbsp; &nbsp;xsi:schemaLocation=&quot;http://java.sun.com/xml/ns/j2ee http://java.sun.com/xml/ns/j2ee/web-app_2_4.xsd&quot; &nbsp;<br />
+5.&nbsp;&nbsp; &nbsp; &nbsp; &nbsp;version=&quot;2.4&quot;&gt; &nbsp;<br />
+6.&nbsp;&nbsp; &nbsp; &nbsp; &nbsp; &nbsp;<br />
+7.&nbsp;&nbsp; &nbsp; &nbsp; &nbsp;&lt;servlet&gt; &nbsp;<br />
+8.&nbsp;&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;&lt;servlet-name&gt;AllInOneServlet&lt;/servlet-name&gt; &nbsp;<br />
+9.&nbsp;&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;&lt;servlet-class&gt;com.cdai.web.j2ee.AllInOneServlet&lt;/servlet-class&gt; &nbsp;<br />
+10.&nbsp;&nbsp; &nbsp; &nbsp; &nbsp;&lt;/servlet&gt; &nbsp;<br />
+11.&nbsp;&nbsp; &nbsp; &nbsp;<br />
+12.&nbsp;&nbsp; &nbsp; &nbsp; &nbsp;&lt;servlet-mapping&gt; &nbsp;<br />
+13.&nbsp;&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;&lt;servlet-name&gt;AllInOneServlet&lt;/servlet-name&gt; &nbsp;<br />
+14.&nbsp;&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;&lt;url-pattern&gt;/j2ee&lt;/url-pattern&gt; &nbsp;<br />
+15.&nbsp;&nbsp; &nbsp; &nbsp; &nbsp;&lt;/servlet-mapping&gt; &nbsp;<br />
+16.&nbsp;&nbsp; &nbsp; &nbsp; &nbsp; &nbsp;<br />
+17.&nbsp;&nbsp; &nbsp; &nbsp; &nbsp;&lt;!-- Servlet mappings END --&gt; &nbsp;&nbsp;<br />
+18.&nbsp;&nbsp; &nbsp; &nbsp;<br />
+19.&nbsp;&nbsp; &nbsp;&lt;/web-app&gt; &nbsp;</p>
+
+<h2>Java文件_serverlet</h2>
+
+<p>1.&nbsp;&nbsp; &nbsp;package com.cdai.web.j2ee; &nbsp;<br />
+2.&nbsp;&nbsp; &nbsp; &nbsp;<br />
+3.&nbsp;&nbsp; &nbsp;import java.io.DataOutputStream; &nbsp;<br />
+4.&nbsp;&nbsp; &nbsp;import java.io.IOException; &nbsp;<br />
+5.&nbsp;&nbsp; &nbsp; &nbsp;<br />
+6.&nbsp;&nbsp; &nbsp;import javax.servlet.RequestDispatcher; &nbsp;<br />
+7.&nbsp;&nbsp; &nbsp;import javax.servlet.ServletException; &nbsp;<br />
+8.&nbsp;&nbsp; &nbsp;import javax.servlet.http.HttpServlet; &nbsp;<br />
+9.&nbsp;&nbsp; &nbsp;import javax.servlet.http.HttpServletRequest; &nbsp;<br />
+10.&nbsp;&nbsp; &nbsp;import javax.servlet.http.HttpServletResponse; &nbsp;<br />
+11.&nbsp;&nbsp; &nbsp; &nbsp;<br />
+12.&nbsp;&nbsp; &nbsp;@SuppressWarnings(&quot;serial&quot;) &nbsp;<br />
+13.&nbsp;&nbsp; &nbsp;public class AllInOneServlet extends HttpServlet { &nbsp;<br />
+14.&nbsp;&nbsp; &nbsp; &nbsp;<br />
+15.&nbsp;&nbsp; &nbsp; &nbsp; &nbsp;public AllInOneServlet() { &nbsp;<br />
+16.&nbsp;&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;System.out.println(&quot;Servlet constructed&quot;); &nbsp;<br />
+17.&nbsp;&nbsp; &nbsp; &nbsp; &nbsp;} &nbsp;<br />
+18.&nbsp;&nbsp; &nbsp; &nbsp;<br />
+19.&nbsp;&nbsp; &nbsp; &nbsp; &nbsp;@Override &nbsp;<br />
+20.&nbsp;&nbsp; &nbsp; &nbsp; &nbsp;public void init() { &nbsp;<br />
+21.&nbsp;&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;System.out.println(&quot;Servlet init&quot;); &nbsp;<br />
+22.&nbsp;&nbsp; &nbsp; &nbsp; &nbsp;} &nbsp;<br />
+23.&nbsp;&nbsp; &nbsp; &nbsp; &nbsp; &nbsp;<br />
+24.&nbsp;&nbsp; &nbsp; &nbsp; &nbsp;@Override &nbsp;<br />
+25.&nbsp;&nbsp; &nbsp; &nbsp; &nbsp;public void destroy() { &nbsp;<br />
+26.&nbsp;&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;System.out.println(&quot;Servlet destory&quot;); &nbsp;<br />
+27.&nbsp;&nbsp; &nbsp; &nbsp; &nbsp;} &nbsp;<br />
+28.&nbsp;&nbsp; &nbsp; &nbsp; &nbsp; &nbsp;<br />
+29.&nbsp;&nbsp; &nbsp; &nbsp; &nbsp;@Override &nbsp;<br />
+30.&nbsp;&nbsp; &nbsp; &nbsp; &nbsp;public void service(HttpServletRequest request, HttpServletResponse response) &nbsp;<br />
+31.&nbsp;&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;throws ServletException, IOException { &nbsp;<br />
+32.&nbsp;&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;<br />
+33.&nbsp;&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;System.out.println(&quot;Servlet served&quot;); &nbsp;<br />
+34.&nbsp;&nbsp; &nbsp; &nbsp;<br />
+35.&nbsp;&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;// 1.Get parameter from HTTP header &nbsp;<br />
+36.&nbsp;&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;String goWhere = request.getParameter(&quot;goto&quot;); &nbsp;<br />
+37.&nbsp;&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;<br />
+38.&nbsp;&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;if (goWhere == null || &quot;1&quot;.equals(goWhere)) { &nbsp;<br />
+39.&nbsp;&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;<br />
+40.&nbsp;&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;// 2.Set response header &nbsp;<br />
+41.&nbsp;&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;response.setContentType(&quot;text/html&quot;); &nbsp;<br />
+42.&nbsp;&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;<br />
+43.&nbsp;&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;// 3.Get useful info from TCP &amp; HTTP header &nbsp;<br />
+44.&nbsp;&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;System.out.println( &nbsp;<br />
+45.&nbsp;&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;&quot;Request from: &quot; + request.getRemoteAddr() + &quot;:&quot; + &nbsp;&nbsp;<br />
+46.&nbsp;&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;request.getRemotePort() + &quot; by method &quot; + &nbsp;&nbsp;<br />
+47.&nbsp;&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;request.getMethod()); &nbsp;<br />
+48.&nbsp;&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;<br />
+49.&nbsp;&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;// 4.Print html(out is built-in object in JSP) &nbsp;<br />
+50.&nbsp;&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;DataOutputStream out = new DataOutputStream(response.getOutputStream()); &nbsp;<br />
+51.&nbsp;&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;out.writeUTF(&quot;Hello Servlet&quot;); &nbsp;<br />
+52.&nbsp;&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;out.writeUTF(&quot;&lt;br&gt;&quot;); &nbsp;<br />
+53.&nbsp;&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;out.close(); &nbsp;<br />
+54.&nbsp;&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;} &nbsp;<br />
+55.&nbsp;&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;else if (&quot;2&quot;.equals(goWhere)) { &nbsp;<br />
+56.&nbsp;&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;RequestDispatcher dispather = request.getRequestDispatcher(&quot;/main.jsp?param1=java&quot;); &nbsp;<br />
+57.&nbsp;&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;request.setAttribute(&quot;param2&quot;, &quot;servlet&quot;); &nbsp;<br />
+58.&nbsp;&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;dispather.forward(request, response); &nbsp;<br />
+59.&nbsp;&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;} &nbsp;<br />
+60.&nbsp;&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;else if (&quot;3&quot;.equals(goWhere)) { &nbsp;<br />
+61.&nbsp;&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;response.sendRedirect(&quot;http://www.google.com?newwindow=1&amp;q=java&amp;oq=java&quot;); &nbsp;<br />
+62.&nbsp;&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;} &nbsp;<br />
+63.&nbsp;&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;<br />
+64.&nbsp;&nbsp; &nbsp; &nbsp; &nbsp;} &nbsp;<br />
+65.&nbsp;&nbsp; &nbsp; &nbsp; &nbsp; &nbsp;<br />
+66.&nbsp;&nbsp; &nbsp;} &nbsp;</p>
+
+<h2>Jsp文件</h2>
+
+<p>1.&nbsp;&nbsp; &nbsp;&lt;!-- 1.Compile instruction --&gt; &nbsp;<br />
+2.&nbsp;&nbsp; &nbsp;&lt;%@page &nbsp;&nbsp;<br />
+3.&nbsp;&nbsp; &nbsp; &nbsp; &nbsp;import=&quot;java.util.concurrent.atomic.*, com.cdai.web.j2ee.TestBean&quot; &nbsp;&nbsp;<br />
+4.&nbsp;&nbsp; &nbsp; &nbsp; &nbsp;contentType=&quot;text/html;charset=utf-8&quot; &nbsp;&nbsp;<br />
+5.&nbsp;&nbsp; &nbsp;%&gt; &nbsp;<br />
+6.&nbsp;&nbsp; &nbsp; &nbsp;<br />
+7.&nbsp;&nbsp; &nbsp;&lt;!-- 2.Declaration: member variable and method --&gt; &nbsp;<br />
+8.&nbsp;&nbsp; &nbsp;&lt;%! &nbsp;&nbsp;<br />
+9.&nbsp;&nbsp; &nbsp; &nbsp;<br />
+10.&nbsp;&nbsp; &nbsp; &nbsp; &nbsp;private AtomicInteger count = new AtomicInteger(1); &nbsp;<br />
+11.&nbsp;&nbsp; &nbsp; &nbsp; &nbsp;private ThreadLocal&lt;Integer&gt; curCountStorage = new ThreadLocal&lt;Integer&gt;(); &nbsp;<br />
+12.&nbsp;&nbsp; &nbsp; &nbsp; &nbsp; &nbsp;<br />
+13.&nbsp;&nbsp; &nbsp; &nbsp; &nbsp;private int getCount() { &nbsp;<br />
+14.&nbsp;&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;int curCount = count.getAndIncrement(); &nbsp;<br />
+15.&nbsp;&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;curCountStorage.set(curCount); &nbsp;<br />
+16.&nbsp;&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;return curCount; &nbsp;<br />
+17.&nbsp;&nbsp; &nbsp; &nbsp; &nbsp;} &nbsp;<br />
+18.&nbsp;&nbsp; &nbsp;%&gt; &nbsp;<br />
+19.&nbsp;&nbsp; &nbsp; &nbsp;<br />
+20.&nbsp;&nbsp; &nbsp;&lt;!-- 3.JSP code &amp; 4.Built-in object --&gt; &nbsp;<br />
+21.&nbsp;&nbsp; &nbsp;&lt;% &nbsp;<br />
+22.&nbsp;&nbsp; &nbsp; &nbsp; &nbsp;Object curCount = session.getAttribute(&quot;count&quot;); &nbsp;<br />
+23.&nbsp;&nbsp; &nbsp; &nbsp; &nbsp;if (curCount == null) { &nbsp;<br />
+24.&nbsp;&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;curCount = getCount(); &nbsp;<br />
+25.&nbsp;&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;session.setAttribute(&quot;count&quot;, curCount); &nbsp;<br />
+26.&nbsp;&nbsp; &nbsp; &nbsp; &nbsp;} &nbsp;<br />
+27.&nbsp;&nbsp; &nbsp; &nbsp; &nbsp; &nbsp;<br />
+28.&nbsp;&nbsp; &nbsp; &nbsp; &nbsp;out.println(request.getParameter(&quot;param1&quot;) + &quot; - &quot; + request.getAttribute(&quot;param2&quot;)); &nbsp;<br />
+29.&nbsp;&nbsp; &nbsp;%&gt; &nbsp;<br />
+30.&nbsp;&nbsp; &nbsp; &nbsp;<br />
+31.&nbsp;&nbsp; &nbsp;&lt;br&gt; This is main.jsp. You&#39;re the &lt;%=curCount%&gt; visitor. &nbsp;<br />
+32.&nbsp;&nbsp; &nbsp; &nbsp;<br />
+33.&nbsp;&nbsp; &nbsp;&lt;!-- 5.Runtime action --&gt; &nbsp;<br />
+34.&nbsp;&nbsp; &nbsp;&lt;jsp:useBean id=&quot;testBean&quot; class=&quot;com.cdai.web.j2ee.TestBean&quot; scope=&quot;page&quot;/&gt; &nbsp;<br />
+35.&nbsp;&nbsp; &nbsp;&lt;br&gt;Message in TestBean is: &lt;jsp:getProperty property=&quot;message&quot; name=&quot;testBean&quot;/&gt; &nbsp;</p>
+
+<p>这是一个很简单的例子，通过http://127.0.0.1:8080/ssh/j2ee可以访问到AllInOneServlet。通过传给它<br />
+不同的goto参数，可以控制它是：（1）自己生成一个hello servlet的响应页面（2）转发到main.jsp生成<br />
+一个统计访问量的页面（3）重定向到Google首页。通过这个例子，让我们来一起来搞懂Servlet和JSP<br />
+这两个J2EE开发中最基础的组件。</p>
+
+<h2>&nbsp;</h2>

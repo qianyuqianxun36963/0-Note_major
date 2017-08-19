@@ -1,0 +1,223 @@
+<h1><a href="http://www.cnblogs.com/CarpenterLee/p/5994681.html" id="cb_post_title_url">C语言编译过程详解</a></h1>
+
+<h1>前言</h1>
+
+<p>C语言程序从源代码到二进制行程序都经历了那些过程？本文以Linux下C语言的编译过程为例，讲解C语言程序的编译过程。</p>
+
+<p>编写hello world C程序：</p>
+
+<pre>
+<code>// hello.c
+#include &lt;stdio.h&gt;
+int main(){
+    printf(&quot;hello world!\n&quot;);
+}</code></pre>
+
+<p>编译过程只需：</p>
+
+<pre>
+<code>$ gcc hello.c # 编译
+$ ./a.out # 执行
+hello world!</code></pre>
+
+<p>这个过程如此熟悉，以至于大家觉得编译事件很简单的事。事实真的如此吗？我们来细看一下C语言的编译过程到底是怎样的。</p>
+
+<p>上述gcc命令其实依次执行了四步操作：1.预处理(Preprocessing), 2.编译(Compilation), 3.汇编(Assemble), 4.链接(Linking)。</p>
+
+<p><iframe frameborder="0" id="iframe_0.4611721832899087" scrolling="no" src="data:text/html;charset=utf8,%3Cimg%20id=%22img%22%20src=%22https://www3.ntu.edu.sg/home/ehchua/programming/cpp/images/GCC_CompilationProcess.png?_=5994681%22%20style=%22border:none;max-width:1581px%22%3E%3Cscript%3Ewindow.onload%20=%20function%20()%20%7Bvar%20img%20=%20document.getElementById('img');%20window.parent.postMessage(%7BiframeId:'iframe_0.4611721832899087',width:img.width,height:img.height%7D,%20'http://www.cnblogs.com');%7D%3C/script%3E"></iframe></p>
+
+<h1>g++/gcc</h1>
+
+<p>gcc and g++分别是GNU的c &amp;&nbsp;<a href="http://baike.baidu.com/view/1576342.htm" target="_blank">c++编译器</a></p>
+
+<p>gcc/g++在执行编译工作的时候，总共需要4步</p>
+
+<p>⒈预处理，生成.i的文件[<a href="http://baike.baidu.com/view/499651.htm" target="_blank">预处理器</a>cpp]</p>
+
+<p>⒉将预处理后的文件转换成汇编语言，生成文件.s[<a href="http://baike.baidu.com/view/487018.htm" target="_blank">编译器</a>egcs]</p>
+
+<p>⒊由汇编变为<a href="http://baike.baidu.com/view/1272000.htm" target="_blank">目标代码</a>（机器代码）生成.o的文件[<a href="http://baike.baidu.com/view/1315652.htm" target="_blank">汇编器</a>as]</p>
+
+<p>⒋连接目标代码，生成可执行程序[<a href="http://baike.baidu.com/view/1402117.htm" target="_blank">链接器</a>ld]</p>
+
+<h1>示例</h1>
+
+<p>为了下面步骤讲解的方便，我们需要一个稍微复杂一点的例子。假设我们自己定义了一个头文件<code>mymath.h</code>，实现一些自己的数学函数，并把具体实现放在<code>mymath.c</code>当中。然后写一个<code>test.c</code>程序使用这些函数。程序目录结构如下：</p>
+
+<pre>
+<code>├── test.c
+└── inc
+    ├── mymath.h
+    └── mymath.c
+</code></pre>
+
+<p>程序代码如下：</p>
+
+<pre>
+<code>// test.c
+#include &lt;stdio.h&gt;
+#include &quot;mymath.h&quot;// 自定义头文件
+int main(){
+    int a = 2;
+    int b = 3;
+    int sum = add(a, b); 
+    printf(&quot;a=%d, b=%d, a+b=%d\n&quot;, a, b, sum);
+}</code></pre>
+
+<p>头文件定义：</p>
+
+<pre>
+<code>// mymath.h
+#ifndef MYMATH_H
+#define MYMATH_H
+int add(int a, int b);
+int sum(int a, int b);
+#endif</code></pre>
+
+<p>头文件实现：</p>
+
+<pre>
+<code>// mymath.c
+int add(int a, int b){
+    return a+b;
+}
+int sub(int a, int b){
+    return a-b;
+}</code></pre>
+
+<h1>1.预处理(Preprocessing)</h1>
+
+<p><strong>预处理用于将所有的#include头文件以及宏定义替换成其真正的内容</strong>，预处理之后得到的仍然是文本文件，但文件体积会大很多。<code>gcc</code>的预处理是预处理器<code>cpp</code>来完成的，你可以通过如下命令对<code>test.c</code>进行预处理：</p>
+
+<pre>
+<code>gcc -E -I./inc test.c -o test.i</code></pre>
+
+<p>或者直接调用<code>cpp</code>命令</p>
+
+<pre>
+<code>$ cpp test.c -I./inc -o test.i</code></pre>
+
+<p>上述命令中<code>-E</code>是让编译器在预处理之后就退出，不进行后续编译过程；<code>-I</code>指定头文件目录，这里指定的是我们自定义的头文件目录；<code>-o</code>指定输出文件名。</p>
+
+<p>经过预处理之后代码体积会大很多：</p>
+
+<table>
+	<thead>
+		<tr>
+			<th>X</th>
+			<th>文件名</th>
+			<th>文件大小</th>
+			<th>代码行数</th>
+		</tr>
+	</thead>
+	<tbody>
+		<tr>
+			<td>预处理前</td>
+			<td>test.c</td>
+			<td>146B</td>
+			<td>9</td>
+		</tr>
+		<tr>
+			<td>预处理后</td>
+			<td>test.i</td>
+			<td>17691B</td>
+			<td>857</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>预处理之后的程序还是文本，可以用文本编辑器打开。</p>
+
+<h1>2.编译(Compilation)</h1>
+
+<p>这里的编译不是指程序从源文件到二进制程序的全部过程，而是指<strong>将经过预处理之后的程序转换成特定汇编代码(assembly code)的过程</strong>。编译的指定如下：</p>
+
+<pre>
+<code>$ gcc -S -I./inc test.c -o test.s</code></pre>
+
+<p>上述命令中<code>-S</code>让编译器在编译之后停止，不进行后续过程。编译过程完成后，将生成程序的汇编代码<code>test.s</code>，这也是文本文件，内容如下：</p>
+
+<pre>
+<code>// test.c汇编之后的结果test.s
+    .file   &quot;test.c&quot;
+    .section    .rodata
+.LC0:
+    .string &quot;a=%d, b=%d, a+b=%d\n&quot;
+    .text
+    .globl  main
+    .type   main, @function
+main:
+.LFB0:
+    .cfi_startproc
+    pushl   %ebp
+    .cfi_def_cfa_offset 8
+    .cfi_offset 5, -8
+    movl    %esp, %ebp
+    .cfi_def_cfa_register 5
+    andl    $-16, %esp
+    subl    $32, %esp
+    movl    $2, 20(%esp)
+    movl    $3, 24(%esp)
+    movl    24(%esp), %eax
+    movl    %eax, 4(%esp)
+    movl    20(%esp), %eax
+    movl    %eax, (%esp)
+    call    add 
+    movl    %eax, 28(%esp)
+    movl    28(%esp), %eax
+    movl    %eax, 12(%esp)
+    movl    24(%esp), %eax
+    movl    %eax, 8(%esp)
+    movl    20(%esp), %eax
+    movl    %eax, 4(%esp)
+    movl    $.LC0, (%esp)
+    call    printf
+    leave
+    .cfi_restore 5
+    .cfi_def_cfa 4, 4
+    ret 
+    .cfi_endproc
+.LFE0:
+    .size   main, .-main
+    .ident  &quot;GCC: (Ubuntu 4.8.2-19ubuntu1) 4.8.2&quot;
+    .section    .note.GNU-stack,&quot;&quot;,@progbits</code></pre>
+
+<p>请不要问我上述代码是什么意思!-_-</p>
+
+<h1>3.汇编(Assemble)</h1>
+
+<p><strong>汇编过程将上一步的汇编代码转换成机器码(machine code)</strong>，这一步产生的文件叫做<strong>目标文件</strong>，是二进制格式。<code>gcc</code>汇编过程通过<code>as</code>命令完成：</p>
+
+<pre>
+<code>$ as test.s -o test.o</code></pre>
+
+<p>等价于：</p>
+
+<pre>
+<code>gcc -c test.s -o test.o</code></pre>
+
+<p>这一步会<strong>为每一个源文件产生一个目标文件</strong>。因此<code>mymath.c</code>也需要产生一个<code>mymath.o</code>文件</p>
+
+<h1>4.链接(Linking)</h1>
+
+<p><strong>链接过程将多个目标文以及所需的库文件(.so等)链接成最终的可执行文件(executable file)</strong>。</p>
+
+<p>命令大致如下：</p>
+
+<pre>
+<code>$ ld -o test.out test.o inc/mymath.o ...libraries...</code></pre>
+
+<h1>结语</h1>
+
+<p>经过以上分析，我们发现编译过程并不像想象的那么简单，而是要经过预处理、编译、汇编、链接。尽管我们平时使用<code>gcc</code>命令的时候没有关心中间结果，但每次程序的编译都少不了这几个步骤。也不用为上述繁琐过程而烦恼，因为你仍然可以：</p>
+
+<pre>
+<code>$ gcc hello.c # 编译
+$ ./a.out # 执行</code></pre>
+
+<h1>参考文献</h1>
+
+<p>1.<a href="https://www3.ntu.edu.sg/home/ehchua/programming/cpp/gcc_make.html">https://www3.ntu.edu.sg/home/ehchua/programming/cpp/gcc_make.html</a><br />
+2.<a href="http://www.trilithium.com/johan/2005/08/linux-gate/">http://www.trilithium.com/johan/2005/08/linux-gate/</a><br />
+3.<a href="https://gcc.gnu.org/onlinedocs/gccint/Collect2.html">https://gcc.gnu.org/onlinedocs/gccint/Collect2.html</a><br />
+</p>

@@ -1,0 +1,58 @@
+<p>Servlet的监听器Listener</p>
+
+<p>&nbsp;&nbsp; &nbsp;随web应用的启动而启动，只初始化一次，随web应用的停止而销毁。<br />
+&nbsp;&nbsp; &nbsp;<br />
+&nbsp;&nbsp; &nbsp;现在来说说Servlet的监听器Listener，它是实现了javax.servlet.ServletContextListener 接口的服务器端程序，<strong>它也是随web应用的启动而启动，只初始化一次，随web应用的停止而销毁。</strong>主要作用是： 做一些初始化的内容添加工作、设置一些基本的内容、比如一些参数或者是一些固定的对象等等。下面利用监听器对数据库连接池DataSource的初始化演示它的使用：</p>
+
+<p>&nbsp;&nbsp; &nbsp;MyServletContextListener.java:</p>
+
+<p>&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;package dc.gz.listeners; &nbsp;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;import javax.servlet.ServletContext; &nbsp;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;import javax.servlet.ServletContextEvent; &nbsp;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;import javax.servlet.ServletContextListener; &nbsp;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;import org.apache.commons.dbcp.BasicDataSource; &nbsp;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp; &nbsp;&nbsp;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;/**&nbsp;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp; * Web应用监听器&nbsp;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp; */ &nbsp;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;public class MyServletContextListener implements ServletContextListener { &nbsp;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp; &nbsp;&nbsp;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp; &nbsp; &nbsp;// 应用监听器的销毁方法 &nbsp;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp; &nbsp; &nbsp;public void contextDestroyed(ServletContextEvent event) { &nbsp;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;ServletContext sc = event.getServletContext(); &nbsp;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;// 在整个web应用销毁之前调用，将所有应用空间所设置的内容清空 &nbsp;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;sc.removeAttribute(&quot;dataSource&quot;); &nbsp;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;System.out.println(&quot;销毁工作完成...&quot;); &nbsp;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp; &nbsp; &nbsp;} &nbsp;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp; &nbsp;&nbsp;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp; &nbsp; &nbsp;// 应用监听器的初始化方法 &nbsp;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp; &nbsp; &nbsp;public void contextInitialized(ServletContextEvent event) { &nbsp;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;// 通过这个事件可以获取整个应用的空间 &nbsp;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;// 在整个web应用下面启动的时候做一些初始化的内容添加工作 &nbsp;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;ServletContext sc = event.getServletContext(); &nbsp;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;// 设置一些基本的内容；比如一些参数或者是一些固定的对象 &nbsp;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;// 创建DataSource对象，连接池技术 dbcp &nbsp;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;BasicDataSource bds = new BasicDataSource(); &nbsp;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;bds.setDriverClassName(&quot;com.mysql.jdbc.Driver&quot;); &nbsp;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;bds.setUrl(&quot;jdbc:mysql://localhost:3306/hibernate&quot;); &nbsp;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;bds.setUsername(&quot;root&quot;); &nbsp;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;bds.setPassword(&quot;root&quot;); &nbsp;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;bds.setMaxActive(10);//最大连接数 &nbsp;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;bds.setMaxIdle(5);//最大管理数 &nbsp;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;//bds.setMaxWait(maxWait); 最大等待时间 &nbsp;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;// 把 DataSource 放入ServletContext空间中， &nbsp;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;// 供整个web应用的使用(获取数据库连接) &nbsp;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;sc.setAttribute(&quot;dataSource&quot;, bds); &nbsp;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;System.out.println(&quot;应用监听器初始化工作完成...&quot;); &nbsp;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;System.out.println(&quot;已经创建DataSource...&quot;); &nbsp;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp; &nbsp; &nbsp;} &nbsp;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;} &nbsp;</p>
+
+<p>&nbsp;&nbsp; &nbsp;web.xml中配置如下，很简单：</p>
+
+<p>&nbsp;&nbsp; &nbsp;&lt;!-- 配置应用监听器 &nbsp;--&gt; &nbsp;<br />
+&nbsp;&nbsp; &nbsp;&lt;listener&gt; &nbsp;<br />
+&nbsp;&nbsp; &nbsp; &nbsp; &nbsp;&lt;listener-class&gt;dc.gz.listeners.MyServletContextListener&lt;/listener-class&gt; &nbsp;<br />
+&nbsp;&nbsp; &nbsp;&lt;/listener&gt; &nbsp;</p>
+
+<p>&nbsp;&nbsp; &nbsp;这样配置好了之后，以后在web应用中就可以通过ServletContext取得BasicDataSource对象，从而获取与数据库的连接，提高性能，方便使用。</p>

@@ -1,0 +1,127 @@
+js加载css或js文件
+
+js加载css样式
+
+	方式一:使用<style>标签插入页面样式
+
+		这点采用了YUI插件中的一个方法，有效解决了各大浏览器的兼容性问题，主要是使用style.appendChild(document.createTextNode(styles));采用createTextNode将CSS代码添加到<style>标签内，看代码：
+
+		</script>
+		    function includeStyleElement(styles,styleId) {
+		        if (document.getElementById(styleId)) {
+		            return
+		        }
+		        var style = document.createElement("style");
+		        style.id = styleId;
+		        //为ie设置属性
+		        /*if (isIE()) {
+		            style.type = "text/css";
+		            style.media = "screen"
+		        }*/
+		        (document.getElementsByTagName("head")[0] || document.body).appendChild(style);
+		        if (style.styleSheet) { //for ie
+		            style.styleSheet.cssText = styles;
+		        } else {//for w3c
+		            style.appendChild(document.createTextNode(styles));
+		        }
+		    }
+
+		    var styles = "#div{background-color: #FF3300; color:#FFFFFF }";
+		    includeStyleElement(styles,"newstyle");
+		</script>
+
+	方式二：页面中引入外部样式：
+
+		在<head>中使用<link>标签引入一个外部样式文件，这个方法相对简单，而且也不存在浏览器的兼容性问题，看代码：
+
+		<script>
+		    function includeLinkStyle(url) {
+		        var link = document.createElement("link");
+		        link.rel = "stylesheet";
+		        link.type = "text/css";
+		        link.href = url;
+		        document.getElementsByTagName("head")[0].appendChild(link);
+		    }
+		    includeLinkStyle("/css/reset.cssv=20140222"
+		</script>
+
+js加载js文件
+
+　　方法一：动态加载js文件
+
+	    // 动态加载js脚本文件
+	    function loadScript(url) {
+	        var script = document.createElement("script");
+	        script.type = "text/javascript";
+	        script.src = url;
+	        document.body.appendChild(script);
+	    }
+	    // 测试
+	    loadScript("javascript/lib/cookie.js");
+
+　  方法二：动态加载js脚本
+	 　 // 动态加载js脚本
+	    function loadScriptString(code) {
+	        var script = document.createElement("script");
+	        script.type = "text/javascript";
+	        try{
+	            // firefox、safari、chrome和Opera
+	            script.appendChild(document.createTextNode(code));
+	        }catch(ex) {
+	            // IE早期的浏览器 ,需要使用script的text属性来指定javascript代码。
+	            script.text = code;
+	        }
+	        document.body.appendChild(script);
+	    }
+	    // 测试
+	    var text = "function test(){alert('test');}";
+	    loadScriptString(text);
+	    test();
+
+将加载css和js文件的方法放在一起：
+
+	方法一：加载单个文件，并需支出类型
+		function loadjscssfile(filename, filetype) {
+		    if (filetype == "js") {
+		        var fileref = document.createElement('script');
+		        fileref.setAttribute("type", "text/javascript");
+		        fileref.setAttribute("src", filename);
+		    } else if (filetype == "css") {
+		        var fileref = document.createElement('link');
+		        fileref.setAttribute("rel", "stylesheet");
+		        fileref.setAttribute("type", "text/css");
+		        fileref.setAttribute("href", filename);
+		    }
+		    if (typeof fileref != "undefined") {
+		        document.getElementsByTagName("head")[0].appendChild(fileref);
+		    }
+		}
+		 
+		loadjscssfile('http://www.sjcx.org/css/base.css', 'css');
+		loadjscssfile('http://www.sjcx.org/js/html5.js', 'js');
+
+	方法二：可以同时加载多个文件，且不需指明类型
+	
+		//how to use the function below: 
+		//$.include('file/ajaxa.js');$.include('file/ajaxa.css'); 
+		//or $.includePath = 'file/';$.include(['ajaxa.js','ajaxa.css']);(only if .js and .css files are in the same directory) 
+		$.extend({ 
+			includePath: '', 
+			include: function(file) 
+			{ 
+				var files = typeof file == "string" ? [file] : file; 
+				for (var i = 0; i < files.length; i++) 
+				{ 
+					var name = files[i].replace(/^\s|\s$/g, ""); 
+					var att = name.split('.'); 
+					var ext = att[att.length - 1].toLowerCase(); 
+					var isCSS = ext == "css"; 
+					var tag = isCSS ? "link" : "script"; 
+					var attr = isCSS ? " type='text/css' rel='stylesheet' " : " type='text/javascript' "; 
+					var link = (isCSS ? "href" : "src") + "='" + $.includePath + name + "'"; 
+					if ($(tag + "[" + link + "]").length == 0) $("head").prepend("<" + tag + attr + link + "></" + tag + ">"); 
+				} 
+			} 
+		}); 
+		$.include('../js/jquery-ui-1.8.21.custom.min.js'); 
+		$.include('../css/black-tie/jquery-ui-1.8.21.custom.css');

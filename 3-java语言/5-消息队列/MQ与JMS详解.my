@@ -1,0 +1,2342 @@
+<h1><a href="http://blog.csdn.net/keda8997110/article/details/13997859">JMS与MQ详解</a></h1>
+
+<p><strong>《一》</strong></p>
+
+<p><strong>1.ActiveMQ概述</strong></p>
+
+<p><strong>&nbsp; &nbsp;&nbsp;</strong>企业消息软件从80年代起就存在，它不只是一种应用间消息传递风格，也是一种集成风格。因此，消息传递可以满足应用间的通知和互相操作。但是开源的解决方案是到最近10年才出现的。Apache ActiveMQ就是其中一种。它使应用间能以异步，松耦合方式交流。ActiveMQ 是Apache出品，最流行的，能力强劲的开源消息总线。</p>
+
+<p>&nbsp;&zwj; &nbsp;&nbsp;ActiveMQ是Apache软件基金下的一个开源软件，它遵循JMS规范（<a href="http://lib.csdn.net/base/java" target="_blank" title="Java 知识库">Java&nbsp;</a>Message Service），是消息驱动中间件软件（MOM）。它为企业消息传递提供高可用，出色性能，可扩展，稳定和安全保障。ActiveMQ使用Apache许可协议。因此，任何人都可以使用和修改它而不必反馈任何改变。这对于商业上将ActiveMQ用在重要用途的人尤为关键。MOM的工作是在分布式的各应用之间调度事件和消息，使之到达指定的接收者。所以高可用，高性能，高可扩展性尤为关键。</p>
+
+<p><strong>2.ActiveMQ特性</strong></p>
+
+<p>&nbsp;</p>
+
+<p>&nbsp; &nbsp; ⒈支持多种语言客户端,如:<a href="http://lib.csdn.net/base/javase" target="_blank" title="Java SE知识库">Java</a>,C,C++,C#,Ruby,Perl,<a href="http://lib.csdn.net/base/python" target="_blank" title="Python知识库">Python</a>,<a href="http://lib.csdn.net/base/php" target="_blank" title="PHP知识库">PHP</a>。应用协议有 OpenWire,Stomp REST,WS Notification,XMPP,AMQP。</p>
+
+<p>&nbsp; &nbsp; ⒉ 完全支持JMS1.1和J2EE1.4规范,它们包括同步和异步消息传递，一次和只有一次的消息传递，对于预订者的持久消息等等。依附于JMS规范意味着，不论JMS消息提供者是谁，同样的基本特性（持久化，XA消息，事务)都是有效的。</p>
+
+<p>&nbsp; &nbsp; ⒊ 对<a href="http://lib.csdn.net/base/javaee" target="_blank" title="Java EE知识库">spring</a>的支持，ActiveMQ可以很容易内嵌到使用Spring的系统里面去。</p>
+
+<p>&nbsp; &nbsp; ⒋ 通过了常见J2EE服务器（如 Geronimo,JBoss 4,GlassFish,WebLogic)的<a href="http://lib.csdn.net/base/softwaretest" target="_blank" title="软件测试知识库">测试</a>，其中通过JCA 1.5 resource adaptors的配置，可以让ActiveMQ可以自动的部署到任何兼容J2EE 1.4 商业服务器上。</p>
+
+<p>&nbsp; &nbsp; ⒌ ActiveMQ提供各种连接选择，包括HTTP，HTTPS，IP多点传送，SSL，STOMP，TCP，UDP，XMPP等。大量的连接协议支持使之具有更好的灵活性。很多现有的系统使用一种特定协议并且不能改变，所以一个支持多种协议的消息平台降低了使用的门槛。虽然连接很重要，但是和其他容器集成也同样重要。</p>
+
+<p>&nbsp; &nbsp; 6.ActiveMQ提供多种持久性方案可供选择，也可以完全按自己需求定制验证和授权。例如，ActiveMQ通过KahaDB提供自己的超快速消息持久方案（ultra-fast message persistence），但也支持标准的JDBC方案。ActiveMQ可以通过配置文件提供简单的验证和授权，也提供标准的JAAS登陆模块。</p>
+
+<p>&nbsp; &nbsp; 7.ActiveMQ是为开发者设计的。它并不需要专门的管理工具，因为它提供各种易用且强大的管理特性。有很多方法去监控ActiveMQ的各个方面，可以通过JMX使用JConsole或ActiveMQ web console；可以运行ActiveMQ消息报告；可以用命令行脚本；可以通过日志。</p>
+
+<p>&nbsp; &nbsp; 8.代理器集群（Broker clustering）----为了利于扩展，多个ActiveMQ broker能够联合工作。这个方式就是network of brokers并且能支持多种拓扑结构;支持客户端-服务器，点对点。</p>
+
+<p>&nbsp; &nbsp; 9.支持Ajax, 支持与Axis的整合</p>
+
+<p>&nbsp;</p>
+
+<p><strong>3.ActiveMQ优势</strong></p>
+
+<p>&nbsp; &nbsp; 1.与OpenJMS、JbossMQ等开源jms&nbsp;provider相比，ActiveMQ有Apache的支持，持续发展的优势明显。</p>
+
+<p>&nbsp; &nbsp; 2.速度很快，JBossMQ的十倍(没有测试)</p>
+
+<p>&nbsp;</p>
+
+<p>&nbsp; &nbsp; 3.提高系统资源的利用率，主要是任务的派发不是24小时平均的，而是高峰时期任务量很多，比如1秒1000多个，有的时候很低，比如十几秒钟才来一个。应用服务通过JMS队列一个一个的取任务，做完一个再领一个，使系统资源的运用趋于平均。而JMS，比如JMS接收消息的效率是很高的，比如ActiveMQ，在赛扬（2.40GHz）机器上能够达到2000/s，消息大小为1-2k。好一些的服务器可以达到2万以上/秒。</p>
+
+<p>&nbsp;</p>
+
+<h2>4.ActiveMQ安装</h2>
+
+<p>&nbsp; &nbsp; 首先去<a href="http://activemq.apache.org/download.html" target="_blank">http://activemq.apache.org/download.html</a>&nbsp;下载最新版本<a href="http://activemq.apache.org/activemq-580-release.html" target="_blank" title="ActiveMQ 5.8.0 Release">ActiveMQ 5.8.0 Release</a>， 解压apache-activemq-5.8.0-bin.zip(或者<a href="http://www.apache.org/dyn/closer.cgi?path=/activemq/apache-activemq/5.8.0/apache-activemq-5.8.0-bin.tar.gz" target="_blank">apache-activemq-5.8.0-bin.tar.gz</a>)</p>
+
+<p>目录如下：</p>
+
+<p>&nbsp; &nbsp;+bin (windows下面的bat和unix/<a href="http://lib.csdn.net/base/linux" target="_blank" title="Linux知识库">Linux</a>下面的sh)</p>
+
+<p>&nbsp; &nbsp;+conf (activeMQ配置目录，包含最基本的activeMQ配置文件）</p>
+
+<p>&nbsp; &nbsp;+data （默认是空的）</p>
+
+<p>&nbsp; &nbsp;+docs (只有index.html）</p>
+
+<p>&nbsp; &nbsp;+example （几个例子)</p>
+
+<p>&nbsp; &nbsp;+lib (activemMQ使用到的lib)</p>
+
+<p>&nbsp; &nbsp;+webapps(后台管理页面)</p>
+
+<p>+webapps-demo(后台管理消息发送页面)</p>
+
+<p>&nbsp; &nbsp;+activemq-all-5.8.0.jar&nbsp;(java开发的jar包)</p>
+
+<p>&nbsp; &nbsp;-LICENSE.txt</p>
+
+<p>&nbsp; &nbsp;-NOTICE.txt</p>
+
+<p>&nbsp; &nbsp;-README.txt</p>
+
+<p>&nbsp; &nbsp;-user-guide.html</p>
+
+<p>你可以使用bin\activemq.bat(activemq)<strong>启动</strong>。</p>
+
+<p>启动ActiveMQ以后，登陆：<a href="http://localhost:8161/admin/" target="_blank">http://localhost:8161/admin/</a>&nbsp;默认用户/密码为admin/admin。</p>
+
+<p>注意:</p>
+
+<p>⒈ 这个仅仅是最基础的ActiveMQ的配置，很多地方都没有配置因此不要直接使用这个配置用于生存环境。</p>
+
+<p>⒉ 有的时候由于端口被占用，导致ActiveMQ错误，ActiveMQ可能需要以下端口1099(JMX),61616（默认的TransportConnector)。</p>
+
+<p>⒊ 如果没有物理网卡，或者MS的LoopBackAdpater Multicast会报一个错误</p>
+
+<p>&nbsp;</p>
+
+<p><strong>5.</strong><strong>运行附带的示例程序&nbsp;</strong></p>
+
+<p>&nbsp; &nbsp;1、Queue消息示例：&nbsp;</p>
+
+<p>&nbsp; &nbsp; &nbsp;*&nbsp;启动Queue消息消费者&nbsp;</p>
+
+<p>&nbsp; &nbsp; &nbsp; &nbsp;cd&nbsp;example&nbsp;</p>
+
+<p>&nbsp;</p>
+
+<p>&nbsp; ant&nbsp;consumer&nbsp;</p>
+
+<p>&nbsp; &nbsp; &nbsp;*&nbsp;启动Queue消息生产者&nbsp;</p>
+
+<p>&nbsp; &nbsp; &nbsp; &nbsp;cd&nbsp;example&nbsp;</p>
+
+<p>&nbsp; &nbsp; &nbsp; &nbsp;ant&nbsp;producer&nbsp;<br />
+&nbsp; &nbsp; &nbsp;简要说明：生产者（producer）发消息，消费者（consumer）接消息，发送/接收2000个消息后自动关闭&nbsp;</p>
+
+<p>&nbsp; &nbsp;2、Topic消息示例：&nbsp;</p>
+
+<p>&nbsp; &nbsp; &nbsp;*&nbsp;启动Topic消息消费者&nbsp;</p>
+
+<p>&nbsp; &nbsp; &nbsp; &nbsp;cd&nbsp;example&nbsp;</p>
+
+<p>&nbsp; &nbsp; &nbsp; &nbsp;ant&nbsp;topic-listener&nbsp;</p>
+
+<p>&nbsp; &nbsp; &nbsp;*&nbsp;启动Topic消息生产者&nbsp;</p>
+
+<p>&nbsp; &nbsp; &nbsp; &nbsp;cd&nbsp;example&nbsp;</p>
+
+<p>&nbsp; &nbsp; &nbsp; &nbsp;ant&nbsp;topic-publisher&nbsp;<br />
+&nbsp; &nbsp; &nbsp;简要说明：重复10轮，publisher每轮发送2000个消息，并等待获取listener的处理结果报告，然后进入下一轮 &nbsp; &nbsp; &nbsp;发送，最后</p>
+
+<p>统计全局发送时间。&nbsp;</p>
+
+<p>&nbsp; &nbsp;3、Queue消息和Topic消息发送之后，可以通过后台点击Queues和Topics查看发送消息具体信息。</p>
+
+<p><img alt="" src="http://img.blog.csdn.net/20130823214924921?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQvZGVuZ3dhbmNodWFu/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70/gravity/SouthEast" />&nbsp;</p>
+
+<p><strong>6.ActiveMQ类别及开发流程</strong></p>
+
+<p>&nbsp; &nbsp;<strong>1)</strong>、Point-to-Point&nbsp;(点对点)消息模式开发流程 ：<br />
+&nbsp; &nbsp; &nbsp; &nbsp;1、生产者（producer）开发流程（ProducerTool.java）：&nbsp;</p>
+
+<p>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp;1.1&nbsp;创建Connection：&nbsp;根据url，user和password创建一个jms&nbsp;Connection。&nbsp;</p>
+
+<p>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp;1.2&nbsp;创建Session：&nbsp;在connection的基础上创建一个session，同时设置是否支持事务和ACKNOWLEDGE标识。&nbsp;</p>
+
+<p>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp;1.3&nbsp;创建Destination对象：&nbsp;需指定其对应的主题（subject）名称，producer和consumer将根据subject来发送/接收对应的消息。&nbsp;</p>
+
+<p>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp;1.4&nbsp;创建MessageProducer：&nbsp;根据Destination创建MessageProducer对象，同时设置其持久模式。&nbsp;</p>
+
+<p>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp;1.5&nbsp;发送消息到队列（Queue）：&nbsp;封装TextMessage消息，使用MessageProducer的send方法将消息发送出去。&nbsp;</p>
+
+<p>&nbsp; &nbsp; &nbsp; &nbsp;2、消费者（consumer）开发流程（ConsumerTool.java）：&nbsp;</p>
+
+<p>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp;2.1&nbsp;实现MessageListener接口：&nbsp;消费者类必须实现MessageListener接口，然后在onMessage()方法中监听消息的到达并处理。&nbsp;</p>
+
+<p>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp;2.2&nbsp;创建Connection：&nbsp;根据url，user和password创建一个jms&nbsp;Connection，如果是durable模式，还需要给connection设置一个clientId。&nbsp;</p>
+
+<p>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp;2.3&nbsp;创建Session和Destination：&nbsp;与ProducerTool.java中的流程类似，不再赘述。&nbsp;</p>
+
+<p>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp;2.4 创建replyProducer【可选】：可以用来将消息处理结果发送给producer。&nbsp;</p>
+
+<p>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp;2.5&nbsp;创建MessageConsumer：&nbsp;&nbsp;根据Destination创建MessageConsumer对象。&nbsp;</p>
+
+<p>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;&nbsp;2.6&nbsp;消费message： &nbsp;在onMessage()方法中接收producer发送过来的消息进行处理，并可以通过replyProducer反馈信息给producer&nbsp;</p>
+
+<p>&nbsp;</p>
+
+<p><strong>[java]</strong>&nbsp;<a href="http://blog.csdn.net/dengwanchuan/article/details/10241345" target="_blank" title="view plain">view plain</a><a href="http://blog.csdn.net/dengwanchuan/article/details/10241345" target="_blank" title="copy">copy</a></p>
+
+<p>&nbsp;</p>
+
+<p><embed allowscriptaccess="always" bgcolor="#ffffff" height="19" pluginspage="http://www.macromedia.com/go/getflashplayer" quality="best" src="http://static.blog.csdn.net/scripts/ZeroClipboard/ZeroClipboard.swf" type="application/x-shockwave-flash" width="19" wmode="transparent"></embed></p>
+
+<ol>
+	<li>if&nbsp;(message.getJMSReplyTo()&nbsp;!=&nbsp;null)&nbsp;{&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;replyProducer.send(message.getJMSReplyTo(),&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;session.createTextMessage(&quot;Reply:&nbsp;&quot;&nbsp;+&nbsp;message.getJMSMessageID()));&nbsp;&nbsp;</li>
+</ol>
+
+<p>&nbsp;</p>
+
+<p>&nbsp;</p>
+
+<p>&nbsp; &nbsp;<strong>2)</strong>、Publisher/Subscriber(发布/订阅者)消息模式开发流程&nbsp;</p>
+
+<p>&nbsp;</p>
+
+<p>&nbsp; &nbsp; &nbsp; &nbsp;1、订阅者（Subscriber）开发流程（TopicListener.java）：&nbsp;</p>
+
+<p>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp;1.1&nbsp;实现MessageListener接口：&nbsp;在onMessage()方法中监听发布者发出的消息队列，并做相应处理。&nbsp;</p>
+
+<p>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp;1.2&nbsp;创建Connection：&nbsp;根据url，user和password创建一个jms&nbsp;Connection。&nbsp;</p>
+
+<p>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp;1.3&nbsp;创建Session：&nbsp;在connection的基础上创建一个session，同时设置是否支持事务和ACKNOWLEDGE标识。&nbsp;</p>
+
+<p>&nbsp;&nbsp;&nbsp; &nbsp; &nbsp; &nbsp;1.4&nbsp;创建Topic： &nbsp;创建2个Topic，&nbsp;topictest.messages用于接收发布者发出的消息，topictest.control 用于向发布者发送消息，实现双方的交互。&nbsp;</p>
+
+<p>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp;1.5&nbsp;创建consumer和producer对象：根据topictest.messages创建consumer，根据topictest.control创建 producer。&nbsp;</p>
+
+<p>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp;1.6&nbsp;接收处理消息：在onMessage()方法中，对收到的消息进行处理，可直接简单在本地显示消息，或者根 据消息内容不同处理对应的业务逻辑（比如：<a href="http://lib.csdn.net/base/mysql" target="_blank" title="MySQL知识库">数据库</a>更新、文件操作等等），并且可以使用producer对象将处理结果返回给发布者。&nbsp;</p>
+
+<p>&nbsp; &nbsp; &nbsp; &nbsp;2、发布者（Publisher）开发流程（TopicPublisher.java）：</p>
+
+<p>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp;2.1&nbsp;实现MessageListener接口：在onMessage()方法中接收订阅者的反馈消息。&nbsp;</p>
+
+<p>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp;2.2&nbsp;创建Connection：&nbsp;根据url，user和password创建一个jms&nbsp;Connection。&nbsp;</p>
+
+<p>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;2.3&nbsp;创建Session：&nbsp;在connection的基础上创建一个session，同时设置是否支持事务和ACKNOWLEDGE标识。&nbsp;</p>
+
+<p>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp;2.4&nbsp;创建Topic：&nbsp;创建2个Topic，topictest.messages用于向订阅者发布消息，topictest.control用于接 收订阅者反馈的消息。这2个topic与订阅者开发流程中的topic是一一对应的。&nbsp;</p>
+
+<p>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp;2.5&nbsp;创建consumer和producer对象： 根据topictest.messages创建publisher；&nbsp;根据topictest.control 创建consumer，同时监听订阅者反馈的消息。</p>
+
+<p>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp;2.6&nbsp;给所有订阅者发送消息，并接收反馈消息：&nbsp;&nbsp;示例代码中，一共重复10轮操作。&nbsp;每轮先向所有订阅者 发送2000个消息；&nbsp;然后堵塞线程，开始等待；&nbsp;最后通过onMessage()方法，接收到订阅者反馈的&ldquo;REPORT&rdquo;类信息后，才print反馈信息并解除线程堵塞，进入下一轮。&nbsp;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;注：可同时运行多个订阅者测试查看此模式效果&nbsp;</p>
+
+<p><strong>7.Eclipse代码开发</strong></p>
+
+<p>&nbsp; &nbsp;1.建立一个Web Probject 项目,将activemq-all-5.8.0.jar放在lib里面</p>
+
+<p>&nbsp;</p>
+
+<p>&nbsp; &nbsp;2.Queue（点对点）方式：生产者</p>
+
+<p><strong>[java]</strong>&nbsp;<a href="http://blog.csdn.net/dengwanchuan/article/details/10241345" target="_blank" title="view plain">view plain</a><a href="http://blog.csdn.net/dengwanchuan/article/details/10241345" target="_blank" title="copy">copy</a></p>
+
+<p>&nbsp;</p>
+
+<p><embed allowscriptaccess="always" bgcolor="#ffffff" height="19" pluginspage="http://www.macromedia.com/go/getflashplayer" quality="best" src="http://static.blog.csdn.net/scripts/ZeroClipboard/ZeroClipboard.swf" type="application/x-shockwave-flash" width="19" wmode="transparent"></embed></p>
+
+<ol>
+	<li>package&nbsp;jms;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>import&nbsp;javax.jms.Connection;&nbsp;&nbsp;</li>
+	<li>import&nbsp;javax.jms.ConnectionFactory;&nbsp;&nbsp;</li>
+	<li>import&nbsp;javax.jms.DeliveryMode;&nbsp;&nbsp;</li>
+	<li>import&nbsp;javax.jms.Destination;&nbsp;&nbsp;</li>
+	<li>import&nbsp;javax.jms.MessageProducer;&nbsp;&nbsp;</li>
+	<li>import&nbsp;javax.jms.Queue;&nbsp;&nbsp;</li>
+	<li>import&nbsp;javax.jms.Session;&nbsp;&nbsp;</li>
+	<li>import&nbsp;javax.jms.TextMessage;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>import&nbsp;org.apache.activemq.ActiveMQConnection;&nbsp;&nbsp;</li>
+	<li>import&nbsp;org.apache.activemq.ActiveMQConnectionFactory;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>//Queue（点对点）方式&nbsp;&nbsp;生存者Producer&nbsp;&nbsp;</li>
+	<li>public&nbsp;class&nbsp;QueueProducer&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;private&nbsp;static&nbsp;String&nbsp;user&nbsp;=&nbsp;ActiveMQConnection.DEFAULT_USER;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;private&nbsp;static&nbsp;String&nbsp;password&nbsp;=ActiveMQConnection.DEFAULT_PASSWORD;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;private&nbsp;static&nbsp;String&nbsp;url&nbsp;=&nbsp;&nbsp;&quot;tcp://localhost:61616&quot;;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;static&nbsp;void&nbsp;main(String[]&nbsp;args)throws&nbsp;Exception&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//&nbsp;ConnectionFactory&nbsp;：连接工厂，JMS&nbsp;用它创建连接&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ConnectionFactory&nbsp;connectionFactory&nbsp;=&nbsp;new&nbsp;ActiveMQConnectionFactory(user,password,url);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//&nbsp;Connection&nbsp;：JMS&nbsp;客户端到JMS&nbsp;Provider&nbsp;的连接&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Connection&nbsp;connection&nbsp;=&nbsp;connectionFactory.createConnection();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//&nbsp;Connection&nbsp;启动&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;connection.start();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;System.out.println(&quot;Connection&nbsp;is&nbsp;start...&quot;);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//&nbsp;Session：&nbsp;一个发送或接收消息的线程&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Session&nbsp;session&nbsp;=&nbsp;connection.createSession(Boolean.TRUE,Session.AUTO_ACKNOWLEDGE);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//&nbsp;Queue&nbsp;：消息的目的地;消息发送给谁.&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Queue&nbsp;&nbsp;destination&nbsp;=&nbsp;session.createQueue(&quot;example.A&quot;);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//&nbsp;MessageProducer：消息发送者&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;MessageProducer&nbsp;producer&nbsp;=&nbsp;session.createProducer(destination);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//&nbsp;设置不持久化，此处学习，实际根据项目决定&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;producer.setDeliveryMode(DeliveryMode.PERSISTENT);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//&nbsp;构造消息，此处写死，项目就是参数，或者方法获取&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;sendMessage(session,&nbsp;producer);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;session.commit();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;connection.close();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;System.out.println(&quot;send&nbsp;text&nbsp;ok.&quot;);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;static&nbsp;void&nbsp;sendMessage(Session&nbsp;session,&nbsp;MessageProducer&nbsp;producer)&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;throws&nbsp;Exception&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;for&nbsp;(int&nbsp;i&nbsp;=&nbsp;1;&nbsp;i&nbsp;&lt;=&nbsp;100;&nbsp;i++)&nbsp;{//有限制,达到1000就不行&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;TextMessage&nbsp;message&nbsp;=&nbsp;session.createTextMessage(&quot;ActiveMq&nbsp;发送的消息&quot;&nbsp;+&nbsp;i);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//&nbsp;发送消息到目的地方&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;System.out.println(&quot;发送消息：&quot;&nbsp;+&nbsp;&quot;ActiveMq&nbsp;发送的消息&quot;&nbsp;+&nbsp;i);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;producer.send(message);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>}&nbsp;&nbsp;</li>
+</ol>
+
+<p>&nbsp; 3.Queue（点对点）方式：消费者</p>
+
+<p>&nbsp;</p>
+
+<p><strong>[java]</strong>&nbsp;<a href="http://blog.csdn.net/dengwanchuan/article/details/10241345" target="_blank" title="view plain">view plain</a><a href="http://blog.csdn.net/dengwanchuan/article/details/10241345" target="_blank" title="copy">copy</a></p>
+
+<p>&nbsp;</p>
+
+<p><embed allowscriptaccess="always" bgcolor="#ffffff" height="19" pluginspage="http://www.macromedia.com/go/getflashplayer" quality="best" src="http://static.blog.csdn.net/scripts/ZeroClipboard/ZeroClipboard.swf" type="application/x-shockwave-flash" width="19" wmode="transparent"></embed></p>
+
+<ol>
+	<li>package&nbsp;jms;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>import&nbsp;javax.jms.Connection;&nbsp;&nbsp;</li>
+	<li>import&nbsp;javax.jms.ConnectionFactory;&nbsp;&nbsp;</li>
+	<li>import&nbsp;javax.jms.Destination;&nbsp;&nbsp;</li>
+	<li>import&nbsp;javax.jms.JMSException;&nbsp;&nbsp;</li>
+	<li>import&nbsp;javax.jms.Message;&nbsp;&nbsp;</li>
+	<li>import&nbsp;javax.jms.MessageConsumer;&nbsp;&nbsp;</li>
+	<li>import&nbsp;javax.jms.MessageListener;&nbsp;&nbsp;</li>
+	<li>import&nbsp;javax.jms.Queue;&nbsp;&nbsp;</li>
+	<li>import&nbsp;javax.jms.Session;&nbsp;&nbsp;</li>
+	<li>import&nbsp;javax.jms.TextMessage;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>import&nbsp;org.apache.activemq.ActiveMQConnection;&nbsp;&nbsp;</li>
+	<li>import&nbsp;org.apache.activemq.ActiveMQConnectionFactory;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>//Queue（点对点）方式&nbsp;&nbsp;消费这Consumer&nbsp;&nbsp;</li>
+	<li>public&nbsp;class&nbsp;QueueConsumer&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;private&nbsp;static&nbsp;String&nbsp;user&nbsp;=&nbsp;ActiveMQConnection.DEFAULT_USER;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;private&nbsp;static&nbsp;String&nbsp;password&nbsp;=ActiveMQConnection.DEFAULT_PASSWORD;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;private&nbsp;static&nbsp;String&nbsp;url&nbsp;=&nbsp;&quot;tcp://localhost:61616&quot;;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;static&nbsp;void&nbsp;main(String[]&nbsp;args)&nbsp;throws&nbsp;Exception{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//&nbsp;ConnectionFactory&nbsp;：连接工厂，JMS&nbsp;用它创建连接&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ConnectionFactory&nbsp;connectionFactory&nbsp;=&nbsp;new&nbsp;ActiveMQConnectionFactory(user,password,url);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//&nbsp;Connection&nbsp;：JMS&nbsp;客户端到JMS&nbsp;Provider&nbsp;的连接&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Connection&nbsp;connection&nbsp;=&nbsp;connectionFactory.createConnection();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;connection.start();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//&nbsp;Session：&nbsp;一个发送或接收消息的线程&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;final&nbsp;Session&nbsp;session&nbsp;=&nbsp;connection.createSession(Boolean.TRUE,&nbsp;Session.AUTO_ACKNOWLEDGE);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//&nbsp;Destination&nbsp;：消息的目的地;消息发送给谁.&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Queue&nbsp;destination=session.createQueue(&quot;example.A&quot;);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//&nbsp;消费者，消息接收者&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;MessageConsumer&nbsp;consumer&nbsp;=&nbsp;session.createConsumer(destination);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;consumer.setMessageListener(new&nbsp;MessageListener(){//有事务限制&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;@Override&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;void&nbsp;onMessage(Message&nbsp;message)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;try&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;TextMessage&nbsp;textMessage=(TextMessage)message;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;System.out.println(textMessage.getText());&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;catch&nbsp;(JMSException&nbsp;e1)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;e1.printStackTrace();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;try&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;session.commit();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;catch&nbsp;(JMSException&nbsp;e)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;e.printStackTrace();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;});&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>/*&nbsp;&nbsp;另外一种接受方式&nbsp;</li>
+	<li>&nbsp;*&nbsp;&nbsp;&nbsp;&nbsp;while&nbsp;(true)&nbsp;{&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//设置接收者接收消息的时间，为了便于测试，这里谁定为100s&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;TextMessage&nbsp;message&nbsp;=&nbsp;(TextMessage)&nbsp;consumer.receive(100000);&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if&nbsp;(null&nbsp;!=&nbsp;message)&nbsp;{&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;System.out.println(&quot;收到消息&quot;&nbsp;+&nbsp;message.getText());&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;else&nbsp;{&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;break;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}*/&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>}&nbsp;&nbsp;</li>
+</ol>
+
+<p>&nbsp;</p>
+
+<p>&nbsp;</p>
+
+<p>&nbsp;</p>
+
+<p>&nbsp;4.Topic（发布/订阅）方式：发布者</p>
+
+<p>&nbsp;</p>
+
+<p><strong>[java]</strong>&nbsp;<a href="http://blog.csdn.net/dengwanchuan/article/details/10241345" target="_blank" title="view plain">view plain</a><a href="http://blog.csdn.net/dengwanchuan/article/details/10241345" target="_blank" title="copy">copy</a></p>
+
+<p>&nbsp;</p>
+
+<p><embed allowscriptaccess="always" bgcolor="#ffffff" height="19" pluginspage="http://www.macromedia.com/go/getflashplayer" quality="best" src="http://static.blog.csdn.net/scripts/ZeroClipboard/ZeroClipboard.swf" type="application/x-shockwave-flash" width="19" wmode="transparent"></embed></p>
+
+<ol>
+	<li>package&nbsp;jms;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>import&nbsp;java.util.Date;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>import&nbsp;javax.jms.Connection;&nbsp;&nbsp;</li>
+	<li>import&nbsp;javax.jms.ConnectionFactory;&nbsp;&nbsp;</li>
+	<li>import&nbsp;javax.jms.DeliveryMode;&nbsp;&nbsp;</li>
+	<li>import&nbsp;javax.jms.JMSException;&nbsp;&nbsp;</li>
+	<li>import&nbsp;javax.jms.MapMessage;&nbsp;&nbsp;</li>
+	<li>import&nbsp;javax.jms.MessageProducer;&nbsp;&nbsp;</li>
+	<li>import&nbsp;javax.jms.Queue;&nbsp;&nbsp;</li>
+	<li>import&nbsp;javax.jms.Session;&nbsp;&nbsp;</li>
+	<li>import&nbsp;javax.jms.TextMessage;&nbsp;&nbsp;</li>
+	<li>import&nbsp;javax.jms.Topic;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>import&nbsp;org.apache.activemq.ActiveMQConnection;&nbsp;&nbsp;</li>
+	<li>import&nbsp;org.apache.activemq.ActiveMQConnectionFactory;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>//Topic（发布/订阅）方式&nbsp;&nbsp;发布者Publisher&nbsp;&nbsp;</li>
+	<li>public&nbsp;class&nbsp;TopicPublisher&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;private&nbsp;static&nbsp;String&nbsp;user&nbsp;=&nbsp;ActiveMQConnection.DEFAULT_USER;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;private&nbsp;static&nbsp;String&nbsp;password&nbsp;=ActiveMQConnection.DEFAULT_PASSWORD;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;private&nbsp;static&nbsp;String&nbsp;url&nbsp;=&nbsp;&nbsp;&quot;tcp://localhost:61616&quot;;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;static&nbsp;void&nbsp;main(String[]&nbsp;args)throws&nbsp;Exception&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//&nbsp;ConnectionFactory&nbsp;：连接工厂，JMS&nbsp;用它创建连接&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ConnectionFactory&nbsp;connectionFactory&nbsp;=&nbsp;new&nbsp;ActiveMQConnectionFactory(user,password,url);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//&nbsp;Connection&nbsp;：JMS&nbsp;客户端到JMS&nbsp;Provider&nbsp;的连接&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Connection&nbsp;connection&nbsp;=&nbsp;connectionFactory.createConnection();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//&nbsp;Connection&nbsp;启动&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;connection.start();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;System.out.println(&quot;Connection&nbsp;is&nbsp;start...&quot;);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//&nbsp;Session：&nbsp;一个发送或接收消息的线程&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Session&nbsp;session&nbsp;=&nbsp;connection.createSession(Boolean.TRUE,Session.AUTO_ACKNOWLEDGE);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//&nbsp;Topicr&nbsp;：消息的目的地;消息发送给谁.&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Topic&nbsp;&nbsp;destination&nbsp;=&nbsp;session.createTopic(&quot;example.A&quot;);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//&nbsp;MessageProducer：消息发送者&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;MessageProducer&nbsp;producer&nbsp;=&nbsp;session.createProducer(destination);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//&nbsp;设置不持久化，此处学习，实际根据项目决定&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;producer.setDeliveryMode(DeliveryMode.PERSISTENT);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//&nbsp;构造消息，此处写死，项目就是参数，或者方法获取&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;sendMessage(session,&nbsp;producer);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;session.commit();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;connection.close();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;System.out.println(&quot;send&nbsp;text&nbsp;ok.&quot;);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;static&nbsp;void&nbsp;sendMessage(Session&nbsp;session,&nbsp;MessageProducer&nbsp;producer)&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;throws&nbsp;Exception&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;for&nbsp;(int&nbsp;i&nbsp;=&nbsp;1;&nbsp;i&nbsp;&lt;=&nbsp;100;&nbsp;i++)&nbsp;{//有限制,达到1000就不行&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;TextMessage&nbsp;message&nbsp;=&nbsp;session.createTextMessage(&quot;ActiveMq&nbsp;发送的消息&quot;&nbsp;+&nbsp;i);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//&nbsp;发送消息到目的地方&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;System.out.println(&quot;发送消息：&quot;&nbsp;+&nbsp;&quot;ActiveMq&nbsp;发送的消息&quot;&nbsp;+&nbsp;i);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;producer.send(message);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>}&nbsp;&nbsp;</li>
+</ol>
+
+<p><br />
+&nbsp;</p>
+
+<p>&nbsp;</p>
+
+<p>&nbsp;</p>
+
+<p>&nbsp;</p>
+
+<p>&nbsp;5.Topic（发布/订阅）方式：订阅者</p>
+
+<p>&nbsp;</p>
+
+<p>&nbsp;</p>
+
+<p><strong>[java]</strong>&nbsp;<a href="http://blog.csdn.net/dengwanchuan/article/details/10241345" target="_blank" title="view plain">view plain</a><a href="http://blog.csdn.net/dengwanchuan/article/details/10241345" target="_blank" title="copy">copy</a></p>
+
+<p>&nbsp;</p>
+
+<p><embed allowscriptaccess="always" bgcolor="#ffffff" height="19" pluginspage="http://www.macromedia.com/go/getflashplayer" quality="best" src="http://static.blog.csdn.net/scripts/ZeroClipboard/ZeroClipboard.swf" type="application/x-shockwave-flash" width="19" wmode="transparent"></embed></p>
+
+<ol>
+	<li>package&nbsp;jms;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>import&nbsp;javax.jms.Connection;&nbsp;&nbsp;</li>
+	<li>import&nbsp;javax.jms.ConnectionFactory;&nbsp;&nbsp;</li>
+	<li>import&nbsp;javax.jms.JMSException;&nbsp;&nbsp;</li>
+	<li>import&nbsp;javax.jms.Message;&nbsp;&nbsp;</li>
+	<li>import&nbsp;javax.jms.MessageConsumer;&nbsp;&nbsp;</li>
+	<li>import&nbsp;javax.jms.MessageListener;&nbsp;&nbsp;</li>
+	<li>import&nbsp;javax.jms.Session;&nbsp;&nbsp;</li>
+	<li>import&nbsp;javax.jms.TextMessage;&nbsp;&nbsp;</li>
+	<li>import&nbsp;javax.jms.Topic;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>import&nbsp;org.apache.activemq.ActiveMQConnection;&nbsp;&nbsp;</li>
+	<li>import&nbsp;org.apache.activemq.ActiveMQConnectionFactory;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>//Topic（发布/订阅）方式&nbsp;&nbsp;订阅者TopicSubscriber&nbsp;&nbsp;</li>
+	<li>public&nbsp;class&nbsp;TopicSubscriber&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;private&nbsp;static&nbsp;String&nbsp;user&nbsp;=&nbsp;ActiveMQConnection.DEFAULT_USER;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;private&nbsp;static&nbsp;String&nbsp;password&nbsp;=ActiveMQConnection.DEFAULT_PASSWORD;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;private&nbsp;static&nbsp;String&nbsp;url&nbsp;=&nbsp;&quot;tcp://localhost:61616&quot;;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;static&nbsp;void&nbsp;main(String[]&nbsp;args)&nbsp;throws&nbsp;Exception{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//&nbsp;ConnectionFactory&nbsp;：连接工厂，JMS&nbsp;用它创建连接&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ConnectionFactory&nbsp;connectionFactory&nbsp;=&nbsp;new&nbsp;ActiveMQConnectionFactory(user,password,url);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//&nbsp;Connection&nbsp;：JMS&nbsp;客户端到JMS&nbsp;Provider&nbsp;的连接&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Connection&nbsp;connection&nbsp;=&nbsp;connectionFactory.createConnection();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;connection.start();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//&nbsp;Session：&nbsp;一个发送或接收消息的线程&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;final&nbsp;Session&nbsp;session&nbsp;=&nbsp;connection.createSession(Boolean.TRUE,&nbsp;Session.AUTO_ACKNOWLEDGE);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//&nbsp;Destination&nbsp;：消息的目的地;消息发送给谁.&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Topic&nbsp;destination=session.createTopic(&quot;example.A&quot;);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//&nbsp;消费者，消息接收者&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;MessageConsumer&nbsp;consumer&nbsp;=&nbsp;session.createConsumer(destination);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;consumer.setMessageListener(new&nbsp;MessageListener(){//有事务限制&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;@Override&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;void&nbsp;onMessage(Message&nbsp;message)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;try&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;TextMessage&nbsp;textMessage=(TextMessage)message;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;System.out.println(textMessage.getText());&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;catch&nbsp;(JMSException&nbsp;e1)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;e1.printStackTrace();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;try&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;session.commit();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;catch&nbsp;(JMSException&nbsp;e)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;e.printStackTrace();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;});&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>/*&nbsp;&nbsp;另外一种接受方式&nbsp;</li>
+	<li>&nbsp;*&nbsp;&nbsp;&nbsp;&nbsp;while&nbsp;(true)&nbsp;{&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//设置接收者接收消息的时间，为了便于测试，这里谁定为100s&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;TextMessage&nbsp;message&nbsp;=&nbsp;(TextMessage)&nbsp;consumer.receive(100000);&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if&nbsp;(null&nbsp;!=&nbsp;message)&nbsp;{&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;System.out.println(&quot;收到消息&quot;&nbsp;+&nbsp;message.getText());&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;else&nbsp;{&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;break;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}*/&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>}&nbsp;&nbsp;</li>
+</ol>
+
+<p>&nbsp;</p>
+
+<p>&nbsp;</p>
+
+<p>&nbsp;</p>
+
+<p>Queue（点对点）方式和Topic（发布/订阅）方式 的运行结果最明显的区别是：在Queue（点对点）方式中先运行生产者,再运行消费者,消费者还能接受到消息；</p>
+
+<p>而Topic（发布/订阅）方式就不同了，先运行发布者，再运行订阅者，订阅者收到的消息</p>
+
+<p>可能没有或者是不完全的。</p>
+
+<p>&nbsp;</p>
+
+<p><strong>《二》</strong></p>
+
+<p>&nbsp;</p>
+
+<p>在上一章(&nbsp;<a href="http://blog.csdn.net/dengwanchuan/article/details/10241345" target="_blank">Java中间件JMS之ActiveMQ入门</a><a href="http://blog.csdn.net/dengwanchuan/article/details/10241345" target="_blank">http://blog.csdn.net/dengwanchuan/article/details/10241345</a>)说到<a href="http://blog.csdn.net/dengwanchuan/article/details/10241345" target="_blank">ActiveMQ</a>能与spring进行整合,<a href="http://blog.csdn.net/dengwanchuan/article/details/10241345" target="_blank">ActiveMQ</a>与Spring进行整合有一定的好处,首先是可配置化,然后是能使用Spring的aop,tx等特性进行项目开发.</p>
+
+<p><strong>一.准备工作</strong></p>
+
+<p>我使用的是spring版本是4.0.0.M2，其他版本的也可以，只是配置不同，去Spring官网下载zip包，解开后将dist目录下的所有jar包（根据自己选择）拷贝到项目lib目录下并加入项目项目中的lib中，一般jms所需要的Spring的jar有:</p>
+
+<p><img alt="" src="http://img.blog.csdn.net/20130825190231203?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQvZGVuZ3dhbmNodWFu/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70/gravity/SouthEast" /></p>
+
+<p><strong>二.代码开发</strong></p>
+
+<p>1.在src目录下新建applicationContext.xml文件并输入一下内容：</p>
+
+<p><strong>[html]</strong>&nbsp;<a href="http://blog.csdn.net/dwc_fly/article/details/10306805" target="_blank" title="view plain">view plain</a><a href="http://blog.csdn.net/dwc_fly/article/details/10306805" target="_blank" title="copy">copy</a></p>
+
+<p>&nbsp;</p>
+
+<p><embed allowscriptaccess="always" bgcolor="#ffffff" height="19" pluginspage="http://www.macromedia.com/go/getflashplayer" quality="best" src="http://static.blog.csdn.net/scripts/ZeroClipboard/ZeroClipboard.swf" type="application/x-shockwave-flash" width="19" wmode="transparent"></embed></p>
+
+<ol>
+	<li>&lt;?xml&nbsp;version=&quot;1.0&quot;&nbsp;encoding=&quot;GBK&quot;?&gt;&nbsp;&nbsp;</li>
+	<li>&lt;beans&nbsp;xmlns=&quot;http://www.springframework.org/schema/beans&quot;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;xmlns:xsi=&quot;http://www.w3.org/2001/XMLSchema-instance&quot;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;xsi:schemaLocation=&quot;http://www.springframework.org/schema/beans&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;http://www.springframework.org/schema/beans/spring-beans.xsd&quot;&gt;&nbsp;&nbsp;</li>
+	<li>&lt;/beans&gt;&nbsp;&nbsp;</li>
+</ol>
+
+<p>&nbsp;</p>
+
+<p>2.引入spring,打开web.xml并将其内容修改为以下内容：</p>
+
+<p><strong>[html]</strong>&nbsp;<a href="http://blog.csdn.net/dwc_fly/article/details/10306805" target="_blank" title="view plain">view plain</a><a href="http://blog.csdn.net/dwc_fly/article/details/10306805" target="_blank" title="copy">copy</a></p>
+
+<p>&nbsp;</p>
+
+<p><embed allowscriptaccess="always" bgcolor="#ffffff" height="19" pluginspage="http://www.macromedia.com/go/getflashplayer" quality="best" src="http://static.blog.csdn.net/scripts/ZeroClipboard/ZeroClipboard.swf" type="application/x-shockwave-flash" width="19" wmode="transparent"></embed></p>
+
+<ol>
+	<li>&lt;?xml&nbsp;version=&quot;1.0&quot;&nbsp;encoding=&quot;GBK&quot;?&gt;&nbsp;&nbsp;</li>
+	<li>&lt;web-app&nbsp;version=&quot;2.5&quot;&nbsp;xmlns=&quot;http://java.sun.com/xml/ns/javaee&quot;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;xmlns:xsi=&quot;http://www.w3.org/2001/XMLSchema-instance&quot;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;xsi:schemaLocation=&quot;http://java.sun.com/xml/ns/javaee&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;http://java.sun.com/xml/ns/javaee/web-app_2_5.xsd&quot;&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;context-param&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;param-name&gt;contextConfigLocation&lt;/param-name&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;param-value&gt;classpath*:applicationContext*.xml&lt;/param-value&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;/context-param&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;servlet&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;servlet-name&gt;spring&lt;/servlet-name&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;servlet-class&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;org.springframework.web.servlet.DispatcherServlet&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/servlet-class&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;load-on-startup&gt;1&lt;/load-on-startup&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;/servlet&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;servlet-mapping&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;servlet-name&gt;spring&lt;/servlet-name&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;url-pattern&gt;/&lt;/url-pattern&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;/servlet-mapping&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;welcome-file-list&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;welcome-file&gt;index.jsp&lt;/welcome-file&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;/welcome-file-list&gt;&nbsp;&nbsp;</li>
+	<li>&lt;/web-app&gt;&nbsp;&nbsp;</li>
+</ol>
+
+<p>3.配置JMSTemplate模板</p>
+
+<p>&nbsp;</p>
+
+<p>类似于jdbcTemplate，首先要配置一个ConnectionFactory，之后要开始配置JmsTemplate模板了。最后是配置消息目标了。消息分为队列(Queue)和主题(Topic)两大类。在applicationContext.xml中加入如下内容：</p>
+
+<p>&nbsp;</p>
+
+<p><strong>[html]</strong>&nbsp;<a href="http://blog.csdn.net/dwc_fly/article/details/10306805" target="_blank" title="view plain">view plain</a><a href="http://blog.csdn.net/dwc_fly/article/details/10306805" target="_blank" title="copy">copy</a></p>
+
+<p>&nbsp;</p>
+
+<p><embed allowscriptaccess="always" bgcolor="#ffffff" height="19" pluginspage="http://www.macromedia.com/go/getflashplayer" quality="best" src="http://static.blog.csdn.net/scripts/ZeroClipboard/ZeroClipboard.swf" type="application/x-shockwave-flash" width="19" wmode="transparent"></embed></p>
+
+<ol>
+	<li>&lt;!--&nbsp;配置JMS连接工厂&nbsp;--&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;bean&nbsp;id=&quot;connectionFactory&quot;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;class=&quot;org.apache.activemq.ActiveMQConnectionFactory&quot;&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;property&nbsp;name=&quot;brokerURL&quot;&nbsp;value=&quot;tcp://localhost:61616&quot;&nbsp;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;/bean&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;!--&nbsp;发送消息的目的地（队列）&nbsp;--&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;bean&nbsp;id=&quot;queueDest&quot;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;class=&quot;org.apache.activemq.command.ActiveMQQueue&quot;&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;!--&nbsp;设置消息队列的名字&nbsp;--&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;constructor-arg&nbsp;index=&quot;0&quot;&nbsp;value=&quot;myQueue&quot;&nbsp;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;/bean&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;!--&nbsp;配置Jms模板&nbsp;&nbsp;--&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;bean&nbsp;id=&quot;jmsQueueTemplate&quot;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;class=&quot;org.springframework.jms.core.JmsTemplate&quot;&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;property&nbsp;name=&quot;connectionFactory&quot;&nbsp;ref=&quot;connectionFactory&quot;&nbsp;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;property&nbsp;name=&quot;defaultDestination&quot;&nbsp;ref=&quot;queueDest&quot;&nbsp;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;!--&lt;property&nbsp;name=&quot;receiveTimeout&quot;&nbsp;value=&quot;10000&quot;&nbsp;/&gt;&nbsp;&nbsp;--&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;/bean&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;!--&nbsp;发送消息的目的地（主题）&nbsp;--&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;bean&nbsp;id=&quot;topicDest&quot;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;class=&quot;org.apache.activemq.command.ActiveMQTopic&quot;&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;!--&nbsp;设置消息队列的名字&nbsp;--&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;constructor-arg&nbsp;index=&quot;0&quot;&nbsp;value=&quot;myTopic&quot;&nbsp;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;/bean&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;!--&nbsp;配置TopicJms模板&nbsp;&nbsp;--&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;bean&nbsp;id=&quot;jmsTopicTemplate&quot;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;class=&quot;org.springframework.jms.core.JmsTemplate&quot;&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;property&nbsp;name=&quot;connectionFactory&quot;&nbsp;ref=&quot;connectionFactory&quot;&nbsp;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;property&nbsp;name=&quot;defaultDestination&quot;&nbsp;ref=&quot;topicDest&quot;&nbsp;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;!--&nbsp;配置是否为发布订阅者模式，默认为false&nbsp;--&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;property&nbsp;name=&quot;pubSubDomain&quot;&nbsp;value=&quot;true&quot;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;!--&lt;property&nbsp;name=&quot;receiveTimeout&quot;&nbsp;value=&quot;10000&quot;&nbsp;/&gt;&nbsp;&nbsp;--&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;/bean&gt;&nbsp;&nbsp;</li>
+</ol>
+
+<p>&nbsp;</p>
+
+<p>receiveTimeout表示接收消息时的超时时间，设置的为10秒，因为如果不设置的话，加入接收消息时是阻塞着的，那么将一直阻塞下去。配置完成了。但是我不建议设置这个时间,如果到达设置时间之后,生产者没有运行,消费者接受到Message对象为null,测试可能会出现异常，而且消费者将停止接受消息.那么如何使用JmsTemplate发送消息呢?</p>
+
+<p>spring的beanfactory得到一个jmsTemplate的实例和消息目标的实例，发送消息，够简单的吧。首先我们还从queue方式开始。下面我们就来编写具体代码。</p>
+
+<p>4、编写Point-to-Point&nbsp;(点对点)代码</p>
+
+<p>新建生产者类QueueProducerService.java，代码如下：</p>
+
+<p>&nbsp;</p>
+
+<p><strong>[java]</strong>&nbsp;<a href="http://blog.csdn.net/dwc_fly/article/details/10306805" target="_blank" title="view plain">view plain</a><a href="http://blog.csdn.net/dwc_fly/article/details/10306805" target="_blank" title="copy">copy</a></p>
+
+<p>&nbsp;</p>
+
+<p><embed allowscriptaccess="always" bgcolor="#ffffff" height="19" pluginspage="http://www.macromedia.com/go/getflashplayer" quality="best" src="http://static.blog.csdn.net/scripts/ZeroClipboard/ZeroClipboard.swf" type="application/x-shockwave-flash" width="19" wmode="transparent"></embed></p>
+
+<ol>
+	<li>package&nbsp;jms.mq.spring;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>import&nbsp;java.util.Date;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>import&nbsp;javax.jms.Destination;&nbsp;&nbsp;</li>
+	<li>import&nbsp;javax.jms.JMSException;&nbsp;&nbsp;</li>
+	<li>import&nbsp;javax.jms.Message;&nbsp;&nbsp;</li>
+	<li>import&nbsp;javax.jms.Session;&nbsp;&nbsp;</li>
+	<li>import&nbsp;javax.jms.TextMessage;&nbsp;&nbsp;</li>
+	<li>import&nbsp;org.springframework.jms.core.JmsTemplate;&nbsp;&nbsp;</li>
+	<li>import&nbsp;org.springframework.jms.core.MessageCreator;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>public&nbsp;class&nbsp;QueueProducerService{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;JmsTemplate&nbsp;jmsTemplate;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;Destination&nbsp;destination;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;void&nbsp;send()&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;MessageCreator&nbsp;messageCreator&nbsp;=&nbsp;new&nbsp;MessageCreator()&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;Message&nbsp;createMessage(Session&nbsp;session)&nbsp;throws&nbsp;JMSException&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;TextMessage&nbsp;message&nbsp;=&nbsp;session.createTextMessage();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;message.setText(&quot;QueueProducerService发送消息&quot;+new&nbsp;Date());&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return&nbsp;message;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;};&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;jmsTemplate.send(this.destination,messageCreator);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;void&nbsp;setJmsTemplate(JmsTemplate&nbsp;jmsTemplate)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;this.jmsTemplate&nbsp;=&nbsp;jmsTemplate;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;void&nbsp;setDestination(Destination&nbsp;destination)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;this.destination&nbsp;=&nbsp;destination;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>}&nbsp;&nbsp;</li>
+</ol>
+
+<p>&nbsp;</p>
+
+<p>生产者编写完了，下面我们来编写消费者，上面说了，发送消息的时候，spring的beanfactory得到一个jmsTemplate的实例和消息目标的实例，然后发送，那么接受的时候肯定也是得到一个jmsTemplate的实例和消息目标的实例，然后接受，下面我们来看具体代码。</p>
+
+<p>新建一个消费者类QueueConsumerService.java，具体代码如下：</p>
+
+<p>&nbsp;</p>
+
+<p><strong>[java]</strong>&nbsp;<a href="http://blog.csdn.net/dwc_fly/article/details/10306805" target="_blank" title="view plain">view plain</a><a href="http://blog.csdn.net/dwc_fly/article/details/10306805" target="_blank" title="copy">copy</a></p>
+
+<p>&nbsp;</p>
+
+<p><embed allowscriptaccess="always" bgcolor="#ffffff" height="19" pluginspage="http://www.macromedia.com/go/getflashplayer" quality="best" src="http://static.blog.csdn.net/scripts/ZeroClipboard/ZeroClipboard.swf" type="application/x-shockwave-flash" width="19" wmode="transparent"></embed></p>
+
+<ol>
+	<li>package&nbsp;jms.mq.spring;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>import&nbsp;javax.jms.Destination;&nbsp;&nbsp;</li>
+	<li>import&nbsp;javax.jms.JMSException;&nbsp;&nbsp;</li>
+	<li>import&nbsp;javax.jms.TextMessage;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>import&nbsp;org.springframework.jms.core.JmsTemplate;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>public&nbsp;class&nbsp;QueueConsumerService{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;JmsTemplate&nbsp;jmsTemplate;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;Destination&nbsp;destination;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;void&nbsp;receive()&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;TextMessage&nbsp;message&nbsp;=&nbsp;(TextMessage)&nbsp;jmsTemplate.receive();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;try&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;System.out.println(&quot;QueueConsumerService收到消息：&quot;+message.getText());&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;catch&nbsp;(JMSException&nbsp;e)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;e.printStackTrace();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;void&nbsp;setJmsTemplate(JmsTemplate&nbsp;jmsTemplate)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;this.jmsTemplate&nbsp;=&nbsp;jmsTemplate;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;void&nbsp;setDestination(Destination&nbsp;destination)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;this.destination&nbsp;=&nbsp;destination;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>}&nbsp;&nbsp;</li>
+</ol>
+
+<p>&nbsp;</p>
+
+<p>代码编写完毕，下面要进行bean的配置，在applicationContext.xml中加入如下代码实例化对象和依赖注入:</p>
+
+<p>&nbsp;</p>
+
+<p><strong>[html]</strong>&nbsp;<a href="http://blog.csdn.net/dwc_fly/article/details/10306805" target="_blank" title="view plain">view plain</a><a href="http://blog.csdn.net/dwc_fly/article/details/10306805" target="_blank" title="copy">copy</a></p>
+
+<p>&nbsp;</p>
+
+<p><embed allowscriptaccess="always" bgcolor="#ffffff" height="19" pluginspage="http://www.macromedia.com/go/getflashplayer" quality="best" src="http://static.blog.csdn.net/scripts/ZeroClipboard/ZeroClipboard.swf" type="application/x-shockwave-flash" width="19" wmode="transparent"></embed></p>
+
+<ol>
+	<li>&lt;bean&nbsp;id=&quot;queueProducerService&quot;&nbsp;class=&quot;jms.mq.spring.QueueProducerService&quot;&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;property&nbsp;name=&quot;jmsTemplate&quot;&nbsp;ref=&quot;jmsQueueTemplate&quot;&nbsp;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;property&nbsp;name=&quot;destination&quot;&nbsp;ref=&quot;queueDest&quot;&nbsp;/&gt;&nbsp;&nbsp;</li>
+	<li>&lt;/bean&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&lt;bean&nbsp;id=&quot;queueConsumerService&quot;&nbsp;class=&quot;jms.mq.spring.QueueConsumerService&quot;&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;property&nbsp;name=&quot;jmsTemplate&quot;&nbsp;ref=&quot;jmsQueueTemplate&quot;&nbsp;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;property&nbsp;name=&quot;destination&quot;&nbsp;ref=&quot;queueDest&quot;&nbsp;/&gt;&nbsp;&nbsp;</li>
+	<li>&lt;/bean&gt;&nbsp;&nbsp;</li>
+</ol>
+
+<p>&nbsp;</p>
+
+<p>需要的业务代码都已编写完毕，下面编写测试代码。新建一个生产者的测试类QueueProducerTest.java。具体代码如下：</p>
+
+<p><strong>[java]</strong>&nbsp;<a href="http://blog.csdn.net/dwc_fly/article/details/10306805" target="_blank" title="view plain">view plain</a><a href="http://blog.csdn.net/dwc_fly/article/details/10306805" target="_blank" title="copy">copy</a></p>
+
+<p>&nbsp;</p>
+
+<p><embed allowscriptaccess="always" bgcolor="#ffffff" height="19" pluginspage="http://www.macromedia.com/go/getflashplayer" quality="best" src="http://static.blog.csdn.net/scripts/ZeroClipboard/ZeroClipboard.swf" type="application/x-shockwave-flash" width="19" wmode="transparent"></embed></p>
+
+<ol>
+	<li>package&nbsp;jms.mq.spring;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>import&nbsp;org.springframework.context.ApplicationContext;&nbsp;&nbsp;</li>
+	<li>import&nbsp;org.springframework.context.support.ClassPathXmlApplicationContext;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>public&nbsp;class&nbsp;QueueProducerTest&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;private&nbsp;static&nbsp;ApplicationContext&nbsp;appContext&nbsp;=&nbsp;new&nbsp;ClassPathXmlApplicationContext(&nbsp;&quot;applicationContext.xml&quot;);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;private&nbsp;static&nbsp;void&nbsp;send()&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;QueueProducerService&nbsp;producerService&nbsp;=&nbsp;(QueueProducerService)&nbsp;appContext.getBean(&quot;queueProducerService&quot;);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;producerService.send();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;/**&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;*&nbsp;@param&nbsp;args&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;*/&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;static&nbsp;void&nbsp;main(String[]&nbsp;args)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;send();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>}&nbsp;&nbsp;</li>
+</ol>
+
+<p>再建一个消费者的测试类，QueueConsumerTest.java，具体代码如下：</p>
+
+<p>&nbsp;</p>
+
+<p><strong>[java]</strong>&nbsp;<a href="http://blog.csdn.net/dwc_fly/article/details/10306805" target="_blank" title="view plain">view plain</a><a href="http://blog.csdn.net/dwc_fly/article/details/10306805" target="_blank" title="copy">copy</a></p>
+
+<p>&nbsp;</p>
+
+<p><embed allowscriptaccess="always" bgcolor="#ffffff" height="19" pluginspage="http://www.macromedia.com/go/getflashplayer" quality="best" src="http://static.blog.csdn.net/scripts/ZeroClipboard/ZeroClipboard.swf" type="application/x-shockwave-flash" width="19" wmode="transparent"></embed></p>
+
+<ol>
+	<li>package&nbsp;jms.mq.spring;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>import&nbsp;org.springframework.context.ApplicationContext;&nbsp;&nbsp;</li>
+	<li>import&nbsp;org.springframework.context.support.ClassPathXmlApplicationContext;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>public&nbsp;class&nbsp;QueueConsumerTest&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;private&nbsp;static&nbsp;ApplicationContext&nbsp;appContext&nbsp;=&nbsp;new&nbsp;ClassPathXmlApplicationContext(&nbsp;&quot;applicationContext.xml&quot;);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;private&nbsp;static&nbsp;void&nbsp;receive()&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;QueueConsumerService&nbsp;consumerService&nbsp;=&nbsp;(QueueConsumerService)&nbsp;appContext.getBean(&quot;queueConsumerService&quot;);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;consumerService.receive();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;static&nbsp;void&nbsp;main(String[]&nbsp;args)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;receive();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>}&nbsp;&nbsp;</li>
+</ol>
+
+<p>&nbsp;</p>
+
+<p>&nbsp;</p>
+
+<p>5、运行point-point(点对点)程序</p>
+
+<p>所有代码都编写完了，我们来看一下我们的劳动成果。运行生产者测试类。控制台打印出如下内容，画线标注的就是我们发送的内容：</p>
+
+<p><img alt="" src="http://img.blog.csdn.net/20130825223804750?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQvZGVuZ3dhbmNodWFu/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70/gravity/SouthEast" /></p>
+
+<p>6、编写Publisher/Subscriber(发布/订阅者)代码</p>
+
+<p>新建发布者TopicPublisherService.java，内容如下：</p>
+
+<p><strong>[java]</strong>&nbsp;<a href="http://blog.csdn.net/dwc_fly/article/details/10306805" target="_blank" title="view plain">view plain</a><a href="http://blog.csdn.net/dwc_fly/article/details/10306805" target="_blank" title="copy">copy</a></p>
+
+<p>&nbsp;</p>
+
+<p><embed allowscriptaccess="always" bgcolor="#ffffff" height="19" pluginspage="http://www.macromedia.com/go/getflashplayer" quality="best" src="http://static.blog.csdn.net/scripts/ZeroClipboard/ZeroClipboard.swf" type="application/x-shockwave-flash" width="19" wmode="transparent"></embed></p>
+
+<ol>
+	<li>package&nbsp;jms.mq.spring;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>import&nbsp;java.util.Date;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>import&nbsp;javax.jms.Destination;&nbsp;&nbsp;</li>
+	<li>import&nbsp;javax.jms.JMSException;&nbsp;&nbsp;</li>
+	<li>import&nbsp;javax.jms.MapMessage;&nbsp;&nbsp;</li>
+	<li>import&nbsp;javax.jms.Message;&nbsp;&nbsp;</li>
+	<li>import&nbsp;javax.jms.Session;&nbsp;&nbsp;</li>
+	<li>import&nbsp;javax.jms.TextMessage;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>import&nbsp;org.springframework.jms.core.JmsTemplate;&nbsp;&nbsp;</li>
+	<li>import&nbsp;org.springframework.jms.core.MessageCreator;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>import&nbsp;jms.spring.QueueProducerService;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>public&nbsp;class&nbsp;TopicPublisherService{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;JmsTemplate&nbsp;jmsTemplate;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;Destination&nbsp;destination;&nbsp;&nbsp;</li>
+	<li>&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;void&nbsp;send()&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;MessageCreator&nbsp;messageCreator&nbsp;=&nbsp;new&nbsp;MessageCreator()&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;Message&nbsp;createMessage(Session&nbsp;session)&nbsp;throws&nbsp;JMSException&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;TextMessage&nbsp;message&nbsp;=&nbsp;session.createTextMessage();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;message.setText(&quot;QueueProducerService发送消息&quot;+new&nbsp;Date());&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return&nbsp;message;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;};&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;jmsTemplate.send(this.destination,messageCreator);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;void&nbsp;setJmsTemplate(JmsTemplate&nbsp;jmsTemplate)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;this.jmsTemplate&nbsp;=&nbsp;jmsTemplate;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;void&nbsp;setDestination(Destination&nbsp;destination)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;this.destination&nbsp;=&nbsp;destination;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>}&nbsp;&nbsp;</li>
+</ol>
+
+<p>再新建一个订阅者TopicSubscriberService.java,代码如下。</p>
+
+<p><strong>[java]</strong>&nbsp;<a href="http://blog.csdn.net/dwc_fly/article/details/10306805" target="_blank" title="view plain">view plain</a><a href="http://blog.csdn.net/dwc_fly/article/details/10306805" target="_blank" title="copy">copy</a></p>
+
+<p>&nbsp;</p>
+
+<p><embed allowscriptaccess="always" bgcolor="#ffffff" height="19" pluginspage="http://www.macromedia.com/go/getflashplayer" quality="best" src="http://static.blog.csdn.net/scripts/ZeroClipboard/ZeroClipboard.swf" type="application/x-shockwave-flash" width="19" wmode="transparent"></embed></p>
+
+<ol>
+	<li>package&nbsp;jms.mq.spring;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>import&nbsp;javax.jms.Destination;&nbsp;&nbsp;</li>
+	<li>import&nbsp;javax.jms.JMSException;&nbsp;&nbsp;</li>
+	<li>import&nbsp;javax.jms.TextMessage;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>import&nbsp;org.springframework.jms.core.JmsTemplate;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>import&nbsp;jms.spring.QueueConsumerService;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>public&nbsp;class&nbsp;TopicSubscriberService{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;JmsTemplate&nbsp;jmsTemplate;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;Destination&nbsp;destination;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;void&nbsp;receive()&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;TextMessage&nbsp;message&nbsp;=&nbsp;(TextMessage)&nbsp;jmsTemplate.receive();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;try&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;System.out.println(&quot;QueueConsumerService收到消息：&quot;+message.getText());&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;catch&nbsp;(JMSException&nbsp;e)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;e.printStackTrace();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;void&nbsp;setJmsTemplate(JmsTemplate&nbsp;jmsTemplate)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;this.jmsTemplate&nbsp;=&nbsp;jmsTemplate;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;void&nbsp;setDestination(Destination&nbsp;destination)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;this.destination&nbsp;=&nbsp;destination;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>}&nbsp;&nbsp;</li>
+</ol>
+
+<p>在配置文件中applicationContext.xml增加如下配置：</p>
+
+<p><strong>[html]</strong>&nbsp;<a href="http://blog.csdn.net/dwc_fly/article/details/10306805" target="_blank" title="view plain">view plain</a><a href="http://blog.csdn.net/dwc_fly/article/details/10306805" target="_blank" title="copy">copy</a></p>
+
+<p>&nbsp;</p>
+
+<p><embed allowscriptaccess="always" bgcolor="#ffffff" height="19" pluginspage="http://www.macromedia.com/go/getflashplayer" quality="best" src="http://static.blog.csdn.net/scripts/ZeroClipboard/ZeroClipboard.swf" type="application/x-shockwave-flash" width="19" wmode="transparent"></embed></p>
+
+<ol>
+	<li>&lt;span&nbsp;style=&quot;white-space:pre&quot;&gt;&nbsp;&nbsp;&lt;/span&gt;&lt;bean&nbsp;id=&quot;topicPublisherService&quot;&nbsp;class=&quot;jms.mq.spring.TopicPublisherService&quot;&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;property&nbsp;name=&quot;jmsTemplate&quot;&nbsp;ref=&quot;jmsTopicTemplate&quot;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;property&nbsp;name=&quot;destination&quot;&nbsp;ref=&quot;topicDest&quot;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;/bean&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;bean&nbsp;id=&quot;topicSubscriberService&quot;&nbsp;class=&quot;jms.mq.spring.TopicSubscriberService&quot;&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;property&nbsp;name=&quot;jmsTemplate&quot;&nbsp;ref=&quot;jmsTopicTemplate&quot;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;property&nbsp;name=&quot;destination&quot;&nbsp;ref=&quot;topicDest&quot;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;/bean&gt;&nbsp;&nbsp;</li>
+</ol>
+
+<p>&nbsp;</p>
+
+<p>编写测试程序发布者测试类，TopicPublisherTest.java</p>
+
+<p>&nbsp;</p>
+
+<p><strong>[java]</strong>&nbsp;<a href="http://blog.csdn.net/dwc_fly/article/details/10306805" target="_blank" title="view plain">view plain</a><a href="http://blog.csdn.net/dwc_fly/article/details/10306805" target="_blank" title="copy">copy</a></p>
+
+<p>&nbsp;</p>
+
+<p><embed allowscriptaccess="always" bgcolor="#ffffff" height="19" pluginspage="http://www.macromedia.com/go/getflashplayer" quality="best" src="http://static.blog.csdn.net/scripts/ZeroClipboard/ZeroClipboard.swf" type="application/x-shockwave-flash" width="19" wmode="transparent"></embed></p>
+
+<ol>
+	<li>package&nbsp;jms.mq.spring;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>import&nbsp;org.springframework.context.ApplicationContext;&nbsp;&nbsp;</li>
+	<li>import&nbsp;org.springframework.context.support.ClassPathXmlApplicationContext;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>public&nbsp;class&nbsp;TopicPublisherTest&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;private&nbsp;static&nbsp;ApplicationContext&nbsp;appContext&nbsp;=&nbsp;new&nbsp;ClassPathXmlApplicationContext(&nbsp;&quot;applicationContext.xml&quot;);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;private&nbsp;static&nbsp;void&nbsp;send()&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;TopicPublisherService&nbsp;topicPublisherService&nbsp;=&nbsp;(TopicPublisherService)&nbsp;appContext.getBean(&quot;topicPublisherService&quot;);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;topicPublisherService.send();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;static&nbsp;void&nbsp;main(String[]&nbsp;args)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;send();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>}&nbsp;&nbsp;</li>
+</ol>
+
+<p>编写测试程序订阅者测试类，TopicSubscriberTest.java</p>
+
+<p><strong>[java]</strong>&nbsp;<a href="http://blog.csdn.net/dwc_fly/article/details/10306805" target="_blank" title="view plain">view plain</a><a href="http://blog.csdn.net/dwc_fly/article/details/10306805" target="_blank" title="copy">copy</a></p>
+
+<p>&nbsp;</p>
+
+<p><embed allowscriptaccess="always" bgcolor="#ffffff" height="19" pluginspage="http://www.macromedia.com/go/getflashplayer" quality="best" src="http://static.blog.csdn.net/scripts/ZeroClipboard/ZeroClipboard.swf" type="application/x-shockwave-flash" width="19" wmode="transparent"></embed></p>
+
+<ol>
+	<li>package&nbsp;jms.mq.spring;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>import&nbsp;org.springframework.context.ApplicationContext;&nbsp;&nbsp;</li>
+	<li>import&nbsp;org.springframework.context.support.ClassPathXmlApplicationContext;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>public&nbsp;class&nbsp;TopicSubscriberTest&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;private&nbsp;static&nbsp;ApplicationContext&nbsp;appContext&nbsp;=&nbsp;new&nbsp;ClassPathXmlApplicationContext(&nbsp;&quot;applicationContext.xml&quot;);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;private&nbsp;static&nbsp;void&nbsp;receive()&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;TopicSubscriberService&nbsp;topicSubscriberService&nbsp;=&nbsp;(TopicSubscriberService)&nbsp;appContext.getBean(&quot;topicSubscriberService&quot;);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;topicSubscriberService.receive();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;static&nbsp;void&nbsp;main(String[]&nbsp;args)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;receive();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>}&nbsp;&nbsp;</li>
+</ol>
+
+<p>7.Publisher/Subscriber(发布/订阅者)程序</p>
+
+<p>先运行订阅者，再运行发布者，可以看到订阅者能打印信息；但是反之就不行，这就是Publisher/Subscriber(发布/订阅者)的特性;</p>
+
+<p>跟Point-Point(点对点)对比的话,不管运行生存者还是消费者，都会打印信息,可以阅读前一章<a href="http://blog.csdn.net/dengwanchuan/article/details/10241345" target="_blank">http://blog.csdn.net/dengwanchuan/article/details/10241345</a>了解这两种模式的区别和联系。</p>
+
+<p>&nbsp;</p>
+
+<p>&nbsp;</p>
+
+<p>附加完整的applicationContext.xml配置文件</p>
+
+<p>&nbsp;</p>
+
+<p><strong>[html]</strong>&nbsp;<a href="http://blog.csdn.net/dwc_fly/article/details/10306805" target="_blank" title="view plain">view plain</a><a href="http://blog.csdn.net/dwc_fly/article/details/10306805" target="_blank" title="copy">copy</a></p>
+
+<p>&nbsp;</p>
+
+<p><embed allowscriptaccess="always" bgcolor="#ffffff" height="19" pluginspage="http://www.macromedia.com/go/getflashplayer" quality="best" src="http://static.blog.csdn.net/scripts/ZeroClipboard/ZeroClipboard.swf" type="application/x-shockwave-flash" width="19" wmode="transparent"></embed></p>
+
+<ol>
+	<li>&lt;?xml&nbsp;version=&quot;1.0&quot;&nbsp;encoding=&quot;GBK&quot;?&gt;&nbsp;&nbsp;</li>
+	<li>&lt;beans&nbsp;xmlns=&quot;http://www.springframework.org/schema/beans&quot;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;xmlns:xsi=&quot;http://www.w3.org/2001/XMLSchema-instance&quot;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;xsi:schemaLocation=&quot;http://www.springframework.org/schema/beans&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;http://www.springframework.org/schema/beans/spring-beans.xsd&quot;&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;!--&nbsp;配置JMS连接工厂&nbsp;--&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;bean&nbsp;id=&quot;connectionFactory&quot;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;class=&quot;org.apache.activemq.ActiveMQConnectionFactory&quot;&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;property&nbsp;name=&quot;brokerURL&quot;&nbsp;value=&quot;tcp://localhost:61616&quot;&nbsp;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;/bean&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;!--&nbsp;发送消息的目的地（队列）&nbsp;--&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;bean&nbsp;id=&quot;queueDest&quot;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;class=&quot;org.apache.activemq.command.ActiveMQQueue&quot;&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;!--&nbsp;设置消息队列的名字&nbsp;--&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;constructor-arg&nbsp;index=&quot;0&quot;&nbsp;value=&quot;myQueue&quot;&nbsp;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;/bean&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;!--&nbsp;配置Jms模板&nbsp;&nbsp;--&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;bean&nbsp;id=&quot;jmsQueueTemplate&quot;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;class=&quot;org.springframework.jms.core.JmsTemplate&quot;&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;property&nbsp;name=&quot;connectionFactory&quot;&nbsp;ref=&quot;connectionFactory&quot;&nbsp;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;property&nbsp;name=&quot;defaultDestination&quot;&nbsp;ref=&quot;queueDest&quot;&nbsp;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;!--&lt;property&nbsp;name=&quot;receiveTimeout&quot;&nbsp;value=&quot;10000&quot;&nbsp;/&gt;&nbsp;&nbsp;--&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;/bean&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;!--&nbsp;发送消息的目的地（主题）&nbsp;--&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;bean&nbsp;id=&quot;topicDest&quot;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;class=&quot;org.apache.activemq.command.ActiveMQTopic&quot;&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;!--&nbsp;设置消息队列的名字&nbsp;--&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;constructor-arg&nbsp;index=&quot;0&quot;&nbsp;value=&quot;myTopic&quot;&nbsp;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;/bean&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;!--&nbsp;配置TopicJms模板&nbsp;&nbsp;--&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;bean&nbsp;id=&quot;jmsTopicTemplate&quot;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;class=&quot;org.springframework.jms.core.JmsTemplate&quot;&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;property&nbsp;name=&quot;connectionFactory&quot;&nbsp;ref=&quot;connectionFactory&quot;&nbsp;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;property&nbsp;name=&quot;defaultDestination&quot;&nbsp;ref=&quot;topicDest&quot;&nbsp;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;!--&nbsp;配置是否为发布订阅者模式，默认为false&nbsp;--&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;property&nbsp;name=&quot;pubSubDomain&quot;&nbsp;value=&quot;true&quot;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;!--&lt;property&nbsp;name=&quot;receiveTimeout&quot;&nbsp;value=&quot;10000&quot;&nbsp;/&gt;&nbsp;&nbsp;--&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;/bean&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;bean&nbsp;id=&quot;queueProducerService&quot;&nbsp;class=&quot;jms.mq.spring.QueueProducerService&quot;&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;property&nbsp;name=&quot;jmsTemplate&quot;&nbsp;ref=&quot;jmsQueueTemplate&quot;&nbsp;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;property&nbsp;name=&quot;destination&quot;&nbsp;ref=&quot;queueDest&quot;&nbsp;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;/bean&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;bean&nbsp;id=&quot;queueConsumerService&quot;&nbsp;class=&quot;jms.mq.spring.QueueConsumerService&quot;&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;property&nbsp;name=&quot;jmsTemplate&quot;&nbsp;ref=&quot;jmsQueueTemplate&quot;&nbsp;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;property&nbsp;name=&quot;destination&quot;&nbsp;ref=&quot;queueDest&quot;&nbsp;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;/bean&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;bean&nbsp;id=&quot;topicPublisherService&quot;&nbsp;class=&quot;jms.mq.spring.TopicPublisherService&quot;&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;property&nbsp;name=&quot;jmsTemplate&quot;&nbsp;ref=&quot;jmsTopicTemplate&quot;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;property&nbsp;name=&quot;destination&quot;&nbsp;ref=&quot;topicDest&quot;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;/bean&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;bean&nbsp;id=&quot;topicSubscriberService&quot;&nbsp;class=&quot;jms.mq.spring.TopicSubscriberService&quot;&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;property&nbsp;name=&quot;jmsTemplate&quot;&nbsp;ref=&quot;jmsTopicTemplate&quot;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;property&nbsp;name=&quot;destination&quot;&nbsp;ref=&quot;topicDest&quot;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;/bean&gt;&nbsp;&nbsp;</li>
+	<li>&lt;/beans&gt;&nbsp;&nbsp;</li>
+</ol>
+
+<p>&nbsp;</p>
+
+<p>&nbsp;</p>
+
+<p>《三》</p>
+
+<p>&nbsp;</p>
+
+<p>对于让spring管理监听的实现方式有两种方法，一种是自己写监听器，然后交给spring的监听适配器管理，再由监听容器管理监听适配器，另一种是写一个实现MessageListener接口的类。第一种在第一章涉及到，但是没有交给spring托管.其实实现的方法很简单，在j2ee mvc模式中,用到spring的aop特性.这章讲第</p>
+
+<p>二种方法，这样消费者可以时时接受到生产者的消息，订阅者可以时时接受到发布者的消息.不用循环接受。</p>
+
+<p>&nbsp;</p>
+
+<p><strong>1.Queue（点对点）方式</strong></p>
+
+<p>&nbsp;</p>
+
+<p>消费者QueueConsumerMessageListener类，具体如下：</p>
+
+<p>&nbsp;</p>
+
+<p><strong>[java]</strong>&nbsp;<a href="http://blog.csdn.net/dwc_fly/article/details/10834005" target="_blank" title="view plain">view plain</a><a href="http://blog.csdn.net/dwc_fly/article/details/10834005" target="_blank" title="copy">copy</a></p>
+
+<p>&nbsp;</p>
+
+<p><embed allowscriptaccess="always" bgcolor="#ffffff" height="19" pluginspage="http://www.macromedia.com/go/getflashplayer" quality="best" src="http://static.blog.csdn.net/scripts/ZeroClipboard/ZeroClipboard.swf" type="application/x-shockwave-flash" width="19" wmode="transparent"></embed></p>
+
+<ol>
+	<li>package&nbsp;jms.mq.spring;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>import&nbsp;javax.jms.JMSException;&nbsp;&nbsp;</li>
+	<li>import&nbsp;javax.jms.Message;&nbsp;&nbsp;</li>
+	<li>import&nbsp;javax.jms.MessageListener;&nbsp;&nbsp;</li>
+	<li>import&nbsp;javax.jms.TextMessage;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>public&nbsp;class&nbsp;QueueConsumerMessageListener&nbsp;implements&nbsp;MessageListener{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;void&nbsp;onMessage(Message&nbsp;msg)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if(msg&nbsp;instanceof&nbsp;TextMessage){&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;TextMessage&nbsp;textMessage&nbsp;=&nbsp;(TextMessage)&nbsp;msg;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;try&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;System.out.println(&quot;--队列&nbsp;MessageListener收到信息：&quot;+textMessage.getText());&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;catch&nbsp;(JMSException&nbsp;e)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;e.printStackTrace();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>}&nbsp;&nbsp;</li>
+</ol>
+
+<p>&nbsp;</p>
+
+<p>&nbsp;</p>
+
+<p><strong>2.Topic（发布/订阅）方式</strong></p>
+
+<p>订阅者实现类TopicSubscriberMessageListener类,具体如下:</p>
+
+<p><strong>[java]</strong>&nbsp;<a href="http://blog.csdn.net/dwc_fly/article/details/10834005" target="_blank" title="view plain">view plain</a><a href="http://blog.csdn.net/dwc_fly/article/details/10834005" target="_blank" title="copy">copy</a></p>
+
+<p>&nbsp;</p>
+
+<p><embed allowscriptaccess="always" bgcolor="#ffffff" height="19" pluginspage="http://www.macromedia.com/go/getflashplayer" quality="best" src="http://static.blog.csdn.net/scripts/ZeroClipboard/ZeroClipboard.swf" type="application/x-shockwave-flash" width="19" wmode="transparent"></embed></p>
+
+<ol>
+	<li>package&nbsp;jms.mq.spring;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>import&nbsp;javax.jms.JMSException;&nbsp;&nbsp;</li>
+	<li>import&nbsp;javax.jms.Message;&nbsp;&nbsp;</li>
+	<li>import&nbsp;javax.jms.MessageListener;&nbsp;&nbsp;</li>
+	<li>import&nbsp;javax.jms.TextMessage;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>public&nbsp;class&nbsp;TopicSubscriberMessageListener&nbsp;implements&nbsp;MessageListener{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;void&nbsp;onMessage(Message&nbsp;msg)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if(msg&nbsp;instanceof&nbsp;TextMessage){&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;TextMessage&nbsp;textMessage&nbsp;=&nbsp;(TextMessage)&nbsp;msg;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;try&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;System.out.println(&quot;--订阅者&nbsp;MessageListener收到信息：&quot;+textMessage.getText());&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;catch&nbsp;(JMSException&nbsp;e)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;e.printStackTrace();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>}&nbsp;&nbsp;</li>
+</ol>
+
+<p><br />
+&nbsp;</p>
+
+<p><strong>3.修改配置文件</strong></p>
+
+<p>&nbsp;</p>
+
+<p><strong>[html]</strong>&nbsp;<a href="http://blog.csdn.net/dwc_fly/article/details/10834005" target="_blank" title="view plain">view plain</a><a href="http://blog.csdn.net/dwc_fly/article/details/10834005" target="_blank" title="copy">copy</a></p>
+
+<p>&nbsp;</p>
+
+<p><embed allowscriptaccess="always" bgcolor="#ffffff" height="19" pluginspage="http://www.macromedia.com/go/getflashplayer" quality="best" src="http://static.blog.csdn.net/scripts/ZeroClipboard/ZeroClipboard.swf" type="application/x-shockwave-flash" width="19" wmode="transparent"></embed></p>
+
+<ol>
+	<li>&lt;!--&nbsp;实现接口的方式&nbsp;--&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;bean&nbsp;id=&quot;queueConsumerMessageListener&quot;&nbsp;class=&quot;jms.mq.spring.QueueConsumerMessageListener&quot;&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;/bean&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;!--&nbsp;新增一个队列地址名字不能跟上面的重复&nbsp;--&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;bean&nbsp;id=&quot;queueConsumerMessageListenerDest&quot;&nbsp;class=&quot;org.apache.activemq.command.ActiveMQQueue&quot;&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;constructor-arg&nbsp;index=&quot;0&quot;&nbsp;value=&quot;myMessageListenerQueue&quot;&nbsp;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;/bean&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;bean&nbsp;id=&quot;myMsgQueuelistenerContainer&quot;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;class=&quot;org.springframework.jms.listener.DefaultMessageListenerContainer&quot;&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;property&nbsp;name=&quot;connectionFactory&quot;&nbsp;ref=&quot;connectionFactory&quot;&nbsp;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;property&nbsp;name=&quot;destination&quot;&nbsp;ref=&quot;queueConsumerMessageListenerDest&quot;&nbsp;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;property&nbsp;name=&quot;messageListener&quot;&nbsp;ref=&quot;queueConsumerMessageListener&quot;&nbsp;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;property&nbsp;name=&quot;receiveTimeout&quot;&nbsp;value=&quot;10000&quot;&nbsp;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;/bean&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;bean&nbsp;id=&quot;topicSubscriberMessageListener&quot;&nbsp;class=&quot;jms.mq.spring.TopicSubscriberMessageListener&quot;&gt;&lt;/bean&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;bean&nbsp;id=&quot;topicSubscriberMessageListenerDest&quot;&nbsp;class=&quot;org.apache.activemq.command.ActiveMQTopic&quot;&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;constructor-arg&nbsp;index=&quot;0&quot;&nbsp;value=&quot;myMessageListenerTopic&quot;&nbsp;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;/bean&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;bean&nbsp;id=&quot;myMsgTopiclistenerContainer&quot;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;class=&quot;org.springframework.jms.listener.DefaultMessageListenerContainer&quot;&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;property&nbsp;name=&quot;connectionFactory&quot;&nbsp;ref=&quot;connectionFactory&quot;&nbsp;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;property&nbsp;name=&quot;destination&quot;&nbsp;ref=&quot;topicSubscriberMessageListenerDest&quot;&nbsp;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;property&nbsp;name=&quot;messageListener&quot;&nbsp;ref=&quot;topicSubscriberMessageListener&quot;&nbsp;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;property&nbsp;name=&quot;pubSubDomain&quot;&nbsp;value=&quot;true&quot;&nbsp;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;property&nbsp;name=&quot;receiveTimeout&quot;&nbsp;value=&quot;10000&quot;&nbsp;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;/bean&gt;&nbsp;&nbsp;</li>
+</ol>
+
+<p><br />
+顺便将上一章的配置也改一下</p>
+
+<p>&nbsp;</p>
+
+<p><strong>[html]</strong>&nbsp;<a href="http://blog.csdn.net/dwc_fly/article/details/10834005" target="_blank" title="view plain">view plain</a><a href="http://blog.csdn.net/dwc_fly/article/details/10834005" target="_blank" title="copy">copy</a></p>
+
+<p>&nbsp;</p>
+
+<p><embed allowscriptaccess="always" bgcolor="#ffffff" height="19" pluginspage="http://www.macromedia.com/go/getflashplayer" quality="best" src="http://static.blog.csdn.net/scripts/ZeroClipboard/ZeroClipboard.swf" type="application/x-shockwave-flash" width="19" wmode="transparent"></embed></p>
+
+<ol>
+	<li>&lt;bean&nbsp;id=&quot;queueProducerService&quot;&nbsp;class=&quot;jms.mq.spring.QueueProducerService&quot;&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;property&nbsp;name=&quot;jmsTemplate&quot;&nbsp;ref=&quot;jmsQueueTemplate&quot;&nbsp;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;!--&lt;property&nbsp;name=&quot;destination&quot;&nbsp;ref=&quot;queueDest&quot;&nbsp;/&gt;&nbsp;--&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;property&nbsp;name=&quot;destination&quot;&nbsp;ref=&quot;queueConsumerMessageListenerDest&quot;&nbsp;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;/bean&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;bean&nbsp;id=&quot;queueConsumerService&quot;&nbsp;class=&quot;jms.mq.spring.QueueConsumerService&quot;&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;property&nbsp;name=&quot;jmsTemplate&quot;&nbsp;ref=&quot;jmsQueueTemplate&quot;&nbsp;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;property&nbsp;name=&quot;destination&quot;&nbsp;ref=&quot;queueDest&quot;&nbsp;/&gt;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;/bean&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;bean&nbsp;id=&quot;topicPublisherService&quot;&nbsp;class=&quot;jms.mq.spring.TopicPublisherService&quot;&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;property&nbsp;name=&quot;jmsTemplate&quot;&nbsp;ref=&quot;jmsTopicTemplate&quot;&nbsp;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;!--&nbsp;&lt;property&nbsp;name=&quot;destination&quot;&nbsp;ref=&quot;topicDest&quot;&nbsp;/&gt;&nbsp;--&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;property&nbsp;name=&quot;destination&quot;&nbsp;ref=&quot;topicSubscriberMessageListenerDest&quot;&nbsp;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;/bean&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;bean&nbsp;id=&quot;topicSubscriberService&quot;&nbsp;class=&quot;jms.mq.spring.TopicSubscriberService&quot;&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;property&nbsp;name=&quot;jmsTemplate&quot;&nbsp;ref=&quot;jmsTopicTemplate&quot;&nbsp;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;property&nbsp;name=&quot;destination&quot;&nbsp;ref=&quot;topicDest&quot;&nbsp;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;/bean&gt;&nbsp;&nbsp;</li>
+</ol>
+
+<p>&nbsp;</p>
+
+<p>注意是修改 bean id为queueProducerService和的topicPublisherService的destination</p>
+
+<p>&nbsp;</p>
+
+<p><strong>4.运行</strong></p>
+
+<p>Queue（点对点）方式,只运行QueueProducerTest.java,结果如下</p>
+
+<p><img alt="" src="http://img.blog.csdn.net/20130901192248062?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQvZHdjX2ZseQ==/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70/gravity/SouthEast" /></p>
+
+<p>&nbsp;</p>
+
+<p>Topic（发布/订阅）方式,只运行TopicPublisherTest.java,结果如下</p>
+
+<p><img alt="" src="http://img.blog.csdn.net/20130901192312640?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQvZHdjX2ZseQ==/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70/gravity/SouthEast" /></p>
+
+<p>&nbsp;</p>
+
+<p>ok,如果Queue（点对点）方式和Topic（发布/订阅）方式运行的结果如上图所示，说明你成功了.</p>
+
+<p>&nbsp;</p>
+
+<p>&nbsp;</p>
+
+<p>&nbsp;</p>
+
+<p>&nbsp;</p>
+
+<p>《四》</p>
+
+<p>&nbsp;</p>
+
+<p>前几章都是直接发送MapMessage类型的数据,拿前面的例子来讲,如果生产者发送的是TextMessage，消费者也是必须TextMessage;如果我们自己要发送的数据不是TextMessage类型,而消费者还是TextMessage的，那该怎么办？难道每次接受后都要增加一个转换方法么？其实spring早就考虑到这种情况了。转化器在很多组件中都是必不缺少的东西Spring的MessageConverter接口提供了对消息转换的支持。</p>
+
+<p>&nbsp;</p>
+
+<p><strong>1、转换类的相关代码POJO</strong></p>
+
+<p>新建一个类MsgPoJo，就是一个简单的Pojo类。具体代码如下：</p>
+
+<p><strong>[java]</strong>&nbsp;<a href="http://blog.csdn.net/dwc_fly/article/details/11096071" target="_blank" title="view plain">view plain</a><a href="http://blog.csdn.net/dwc_fly/article/details/11096071" target="_blank" title="copy">copy</a></p>
+
+<p>&nbsp;</p>
+
+<p><embed allowscriptaccess="always" bgcolor="#ffffff" height="19" pluginspage="http://www.macromedia.com/go/getflashplayer" quality="best" src="http://static.blog.csdn.net/scripts/ZeroClipboard/ZeroClipboard.swf" type="application/x-shockwave-flash" width="19" wmode="transparent"></embed></p>
+
+<ol>
+	<li>package&nbsp;jms.mq.spring;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>import&nbsp;java.io.Serializable;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>public&nbsp;class&nbsp;MsgPoJo&nbsp;implements&nbsp;Serializable{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;private&nbsp;String&nbsp;id;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;private&nbsp;String&nbsp;text;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;String&nbsp;getId()&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return&nbsp;id;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;void&nbsp;setId(String&nbsp;id)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;this.id&nbsp;=&nbsp;id;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;String&nbsp;getText()&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return&nbsp;text;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;void&nbsp;setText(String&nbsp;text)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;this.text&nbsp;=&nbsp;text;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>}&nbsp;&nbsp;</li>
+</ol>
+
+<p>&nbsp;</p>
+
+<p><strong>2.转换类的实现</strong></p>
+
+<p>新建一个类MsgConverter.java，实现MessageConverter接口。生成的代码如下</p>
+
+<p>&nbsp;</p>
+
+<p><strong>[java]</strong>&nbsp;<a href="http://blog.csdn.net/dwc_fly/article/details/11096071" target="_blank" title="view plain">view plain</a><a href="http://blog.csdn.net/dwc_fly/article/details/11096071" target="_blank" title="copy">copy</a></p>
+
+<p>&nbsp;</p>
+
+<p><embed allowscriptaccess="always" bgcolor="#ffffff" height="19" pluginspage="http://www.macromedia.com/go/getflashplayer" quality="best" src="http://static.blog.csdn.net/scripts/ZeroClipboard/ZeroClipboard.swf" type="application/x-shockwave-flash" width="19" wmode="transparent"></embed></p>
+
+<ol>
+	<li>package&nbsp;jms.mq.spring;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>import&nbsp;javax.jms.JMSException;&nbsp;&nbsp;</li>
+	<li>import&nbsp;javax.jms.Message;&nbsp;&nbsp;</li>
+	<li>import&nbsp;javax.jms.Session;&nbsp;&nbsp;</li>
+	<li>import&nbsp;javax.jms.TextMessage;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>import&nbsp;org.springframework.jms.support.converter.MessageConversionException;&nbsp;&nbsp;</li>
+	<li>import&nbsp;org.springframework.jms.support.converter.MessageConverter;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>public&nbsp;class&nbsp;MsgConverter&nbsp;implements&nbsp;MessageConverter{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;@Override&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;Object&nbsp;fromMessage(Message&nbsp;message)&nbsp;throws&nbsp;JMSException,&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;MessageConversionException&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if&nbsp;(!(message&nbsp;instanceof&nbsp;TextMessage))&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;throw&nbsp;new&nbsp;MessageConversionException(&quot;Message&nbsp;is&nbsp;not&nbsp;TextMessage&quot;);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;System.out.println(&quot;--转换接收的消息--&quot;);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;TextMessage&nbsp;textMessage&nbsp;=&nbsp;(TextMessage)&nbsp;message;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;MsgPoJo&nbsp;msgPojo&nbsp;=&nbsp;new&nbsp;MsgPoJo();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;String[]&nbsp;texts=textMessage.getText().split(&quot;,&quot;);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;msgPojo.setId(texts[0]);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;msgPojo.setText(texts[1]);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return&nbsp;msgPojo;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;@Override&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;Message&nbsp;toMessage(Object&nbsp;object,&nbsp;Session&nbsp;session)&nbsp;throws&nbsp;JMSException,&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;MessageConversionException&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if&nbsp;(!(object&nbsp;instanceof&nbsp;MsgPoJo))&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;throw&nbsp;new&nbsp;MessageConversionException(&quot;obj&nbsp;is&nbsp;not&nbsp;MsgPojo&quot;);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;System.out.println(&quot;--转换发送的消息--&quot;);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;MsgPoJo&nbsp;msgPojo&nbsp;=&nbsp;(MsgPoJo)&nbsp;object;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;TextMessage&nbsp;textMessage&nbsp;=&nbsp;session.createTextMessage();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;textMessage.setText(msgPojo.getId()+&quot;,&quot;+msgPojo.getText());&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return&nbsp;&nbsp;textMessage;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>}&nbsp;&nbsp;</li>
+</ol>
+
+<p>&nbsp;</p>
+
+<p>&nbsp;</p>
+
+<p>代码很简单就是做些转换，有fromMessage和toMessage两个方法,真好对应发送转换toMessage和接受转换fromMessage。此时，发送和接收消息要换成template.convertAndSend(message)；template.receiveAndConvert()。接下来我做一些配置，让spring知道我们的转换类。修改applicationContext.xml中jms模版配置的代码，修改后的代码如下：</p>
+
+<p><strong>[html]</strong>&nbsp;<a href="http://blog.csdn.net/dwc_fly/article/details/11096071" target="_blank" title="view plain">view plain</a><a href="http://blog.csdn.net/dwc_fly/article/details/11096071" target="_blank" title="copy">copy</a></p>
+
+<p>&nbsp;</p>
+
+<p><embed allowscriptaccess="always" bgcolor="#ffffff" height="19" pluginspage="http://www.macromedia.com/go/getflashplayer" quality="best" src="http://static.blog.csdn.net/scripts/ZeroClipboard/ZeroClipboard.swf" type="application/x-shockwave-flash" width="19" wmode="transparent"></embed></p>
+
+<ol>
+	<li>&lt;!--&nbsp;类转换&nbsp;--&gt;&nbsp;&nbsp;</li>
+	<li>&lt;bean&nbsp;id=&quot;msgConverter&quot;&nbsp;class=&quot;jms.mq.spring.MsgConverter&quot;&gt;&lt;/bean&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&lt;!--&nbsp;配置Jms模板&nbsp;--&gt;&nbsp;&nbsp;</li>
+	<li>&lt;bean&nbsp;id=&quot;jmsQueueTemplate&quot;&nbsp;class=&quot;org.springframework.jms.core.JmsTemplate&quot;&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;property&nbsp;name=&quot;connectionFactory&quot;&nbsp;ref=&quot;connectionFactory&quot;&nbsp;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;property&nbsp;name=&quot;defaultDestination&quot;&nbsp;ref=&quot;queueDest&quot;&nbsp;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;!--&lt;property&nbsp;name=&quot;receiveTimeout&quot;&nbsp;value=&quot;10000&quot;&nbsp;/&gt;&nbsp;--&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;!--&nbsp;类转换&nbsp;--&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;property&nbsp;name=&quot;messageConverter&quot;&nbsp;ref=&quot;msgConverter&quot;&gt;&lt;/property&gt;&nbsp;&nbsp;</li>
+	<li>&lt;/bean&gt;&nbsp;&nbsp;</li>
+</ol>
+
+<p>注意:如果你有队列监听容器配置,配置jmsQueueTemplate和jmsTopicTemplate可能与队列容器配置冲突。</p>
+
+<p><strong>3、业务相关代码和配置</strong></p>
+
+<p>在QueueProducerService.java增加convertAndSend()方法并在其实现类中实现，实现类的代码如下：</p>
+
+<p>&nbsp;</p>
+
+<p><strong>[java]</strong>&nbsp;<a href="http://blog.csdn.net/dwc_fly/article/details/11096071" target="_blank" title="view plain">view plain</a><a href="http://blog.csdn.net/dwc_fly/article/details/11096071" target="_blank" title="copy">copy</a></p>
+
+<p>&nbsp;</p>
+
+<p><embed allowscriptaccess="always" bgcolor="#ffffff" height="19" pluginspage="http://www.macromedia.com/go/getflashplayer" quality="best" src="http://static.blog.csdn.net/scripts/ZeroClipboard/ZeroClipboard.swf" type="application/x-shockwave-flash" width="19" wmode="transparent"></embed></p>
+
+<ol>
+	<li>package&nbsp;jms.mq.spring;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>import&nbsp;java.util.Date;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>import&nbsp;javax.jms.Destination;&nbsp;&nbsp;</li>
+	<li>import&nbsp;javax.jms.JMSException;&nbsp;&nbsp;</li>
+	<li>import&nbsp;javax.jms.Message;&nbsp;&nbsp;</li>
+	<li>import&nbsp;javax.jms.Session;&nbsp;&nbsp;</li>
+	<li>import&nbsp;javax.jms.TextMessage;&nbsp;&nbsp;</li>
+	<li>import&nbsp;org.springframework.jms.core.JmsTemplate;&nbsp;&nbsp;</li>
+	<li>import&nbsp;org.springframework.jms.core.MessageCreator;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>public&nbsp;class&nbsp;QueueProducerService{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;JmsTemplate&nbsp;jmsTemplate;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;Destination&nbsp;destination;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;void&nbsp;send()&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;MessageCreator&nbsp;messageCreator&nbsp;=&nbsp;new&nbsp;MessageCreator()&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;Message&nbsp;createMessage(Session&nbsp;session)&nbsp;throws&nbsp;JMSException&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;TextMessage&nbsp;message&nbsp;=&nbsp;session.createTextMessage();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;message.setText(&quot;QueueProducerService发送消息&quot;+new&nbsp;Date());&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return&nbsp;message;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;};&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;jmsTemplate.send(this.destination,messageCreator);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;void&nbsp;convertAndSend(){&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;MsgPoJo&nbsp;msgPojo&nbsp;=&nbsp;new&nbsp;MsgPoJo();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;msgPojo.setId(&quot;1&quot;);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;msgPojo.setText(&quot;first&nbsp;msg&quot;);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;System.out.println(&quot;--发送消息：msgPojo.id为&quot;+msgPojo.getId()+&quot;；msgPojo.text为&quot;+msgPojo.getText());&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;jmsTemplate.convertAndSend(this.destination,&nbsp;msgPojo);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;void&nbsp;setJmsTemplate(JmsTemplate&nbsp;jmsTemplate)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;this.jmsTemplate&nbsp;=&nbsp;jmsTemplate;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;void&nbsp;setDestination(Destination&nbsp;destination)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;this.destination&nbsp;=&nbsp;destination;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>}&nbsp;&nbsp;</li>
+</ol>
+
+<p>&nbsp;</p>
+
+<p>同样在QueueConsumerService.java中增加receiveAndConvert()方法并在其实现类中实现，实现类的代码如下：</p>
+
+<p>&nbsp;</p>
+
+<p><strong>[java]</strong>&nbsp;<a href="http://blog.csdn.net/dwc_fly/article/details/11096071" target="_blank" title="view plain">view plain</a><a href="http://blog.csdn.net/dwc_fly/article/details/11096071" target="_blank" title="copy">copy</a></p>
+
+<p>&nbsp;</p>
+
+<p><embed allowscriptaccess="always" bgcolor="#ffffff" height="19" pluginspage="http://www.macromedia.com/go/getflashplayer" quality="best" src="http://static.blog.csdn.net/scripts/ZeroClipboard/ZeroClipboard.swf" type="application/x-shockwave-flash" width="19" wmode="transparent"></embed></p>
+
+<ol>
+	<li>package&nbsp;jms.mq.spring;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>import&nbsp;javax.jms.Destination;&nbsp;&nbsp;</li>
+	<li>import&nbsp;javax.jms.JMSException;&nbsp;&nbsp;</li>
+	<li>import&nbsp;javax.jms.TextMessage;&nbsp;&nbsp;</li>
+	<li>import&nbsp;org.springframework.jms.core.JmsTemplate;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>public&nbsp;class&nbsp;QueueConsumerService{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;JmsTemplate&nbsp;jmsTemplate;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;Destination&nbsp;destination;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;void&nbsp;receive()&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;TextMessage&nbsp;message&nbsp;=&nbsp;(TextMessage)&nbsp;jmsTemplate.receive();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;try&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;System.out.println(&quot;QueueConsumerService收到消息：&quot;+message.getText());&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;catch&nbsp;(JMSException&nbsp;e)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;e.printStackTrace();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;void&nbsp;receiveAndConvert()&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;MsgPoJo&nbsp;msgPojo&nbsp;=&nbsp;(MsgPoJo)jmsTemplate.receiveAndConvert();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if(msgPojo!=null){&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;System.out.println(&quot;--收到消息：msgPojo.id为&quot;+msgPojo.getId()+&quot;;msgPojo.text为&quot;+msgPojo.getText());&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;void&nbsp;setJmsTemplate(JmsTemplate&nbsp;jmsTemplate)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;this.jmsTemplate&nbsp;=&nbsp;jmsTemplate;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;void&nbsp;setDestination(Destination&nbsp;destination)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;this.destination&nbsp;=&nbsp;destination;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>}&nbsp;&nbsp;</li>
+</ol>
+
+<p>&nbsp;</p>
+
+<p>&nbsp;</p>
+
+<p>修改我们的两个测试类，增加对转换方法的调用，不再赘述，直接上代码：</p>
+
+<p>QueueConsumerTest.java测试类</p>
+
+<p><strong>[java]</strong>&nbsp;<a href="http://blog.csdn.net/dwc_fly/article/details/11096071" target="_blank" title="view plain">view plain</a><a href="http://blog.csdn.net/dwc_fly/article/details/11096071" target="_blank" title="copy">copy</a></p>
+
+<p>&nbsp;</p>
+
+<p><embed allowscriptaccess="always" bgcolor="#ffffff" height="19" pluginspage="http://www.macromedia.com/go/getflashplayer" quality="best" src="http://static.blog.csdn.net/scripts/ZeroClipboard/ZeroClipboard.swf" type="application/x-shockwave-flash" width="19" wmode="transparent"></embed></p>
+
+<ol>
+	<li>package&nbsp;jms.mq.spring;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>import&nbsp;org.springframework.context.ApplicationContext;&nbsp;&nbsp;</li>
+	<li>import&nbsp;org.springframework.context.support.ClassPathXmlApplicationContext;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>public&nbsp;class&nbsp;QueueConsumerTest&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;private&nbsp;static&nbsp;ApplicationContext&nbsp;appContext&nbsp;=&nbsp;new&nbsp;ClassPathXmlApplicationContext(&nbsp;&quot;applicationContext.xml&quot;);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;private&nbsp;static&nbsp;void&nbsp;receive()&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;QueueConsumerService&nbsp;consumerService&nbsp;=&nbsp;(QueueConsumerService)&nbsp;appContext.getBean(&quot;queueConsumerService&quot;);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;consumerService.receive();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;private&nbsp;static&nbsp;void&nbsp;receiveAndConvert()&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;QueueConsumerService&nbsp;consumerService&nbsp;=&nbsp;(QueueConsumerService)&nbsp;appContext.getBean(&quot;queueConsumerService&quot;);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;consumerService.receiveAndConvert();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;static&nbsp;void&nbsp;main(String[]&nbsp;args)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//receive();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;receiveAndConvert();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>}&nbsp;&nbsp;</li>
+</ol>
+
+<p>QueueProducerTest.java测试类</p>
+
+<p><strong>[java]</strong>&nbsp;<a href="http://blog.csdn.net/dwc_fly/article/details/11096071" target="_blank" title="view plain">view plain</a><a href="http://blog.csdn.net/dwc_fly/article/details/11096071" target="_blank" title="copy">copy</a></p>
+
+<p>&nbsp;</p>
+
+<p><embed allowscriptaccess="always" bgcolor="#ffffff" height="19" pluginspage="http://www.macromedia.com/go/getflashplayer" quality="best" src="http://static.blog.csdn.net/scripts/ZeroClipboard/ZeroClipboard.swf" type="application/x-shockwave-flash" width="19" wmode="transparent"></embed></p>
+
+<ol>
+	<li>package&nbsp;jms.mq.spring;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>import&nbsp;org.springframework.context.ApplicationContext;&nbsp;&nbsp;</li>
+	<li>import&nbsp;org.springframework.context.support.ClassPathXmlApplicationContext;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>public&nbsp;class&nbsp;QueueProducerTest&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;private&nbsp;static&nbsp;ApplicationContext&nbsp;appContext&nbsp;=&nbsp;new&nbsp;ClassPathXmlApplicationContext(&nbsp;&quot;applicationContext.xml&quot;);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;private&nbsp;static&nbsp;void&nbsp;send()&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;QueueProducerService&nbsp;producerService&nbsp;=&nbsp;(QueueProducerService)&nbsp;appContext.getBean(&quot;queueProducerService&quot;);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;producerService.send();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;private&nbsp;static&nbsp;void&nbsp;convertAndSend()&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;QueueProducerService&nbsp;producerService&nbsp;=&nbsp;(QueueProducerService)&nbsp;appContext.getBean(&quot;queueProducerService&quot;);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;producerService.convertAndSend();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;static&nbsp;void&nbsp;main(String[]&nbsp;args)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//send();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;convertAndSend();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>}&nbsp;&nbsp;</li>
+</ol>
+
+<p>&nbsp;</p>
+
+<p>代码编写完毕，我们看一下我们的劳动成果。首先运行生产者类和消费者控制台信息如下：</p>
+
+<p><img alt="" src="http://img.blog.csdn.net/20130904210938218?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQvZHdjX2ZseQ==/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70/gravity/SouthEast" /></p>
+
+<p><img alt="" src="http://img.blog.csdn.net/20130904210850437?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQvZHdjX2ZseQ==/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70/gravity/SouthEast" /></p>
+
+<p>&nbsp;</p>
+
+<p>收到的内容与发的内容相同，说明转换成功了。如果这一部分的程序使用的队列跟上面的一样，那你会发现发送的时候打印出的信息不值上面的一个，还包括一个接收的信息，这是为什么呢？了解spring原理的人应该知道，spring是把所有类都加载到内容中，当然也包括我们上门写的按个实现MessageListener的一个消费者类，他们也在运行，如果监听的地址跟你送的地址正好相同的话，他也有可能收到这个信息。所以在测试的时候要注意修改配置文件。</p>
+
+<p>&nbsp;</p>
+
+<p><strong>[html]</strong>&nbsp;<a href="http://blog.csdn.net/dwc_fly/article/details/11096071" target="_blank" title="view plain">view plain</a><a href="http://blog.csdn.net/dwc_fly/article/details/11096071" target="_blank" title="copy">copy</a></p>
+
+<p>&nbsp;</p>
+
+<p><embed allowscriptaccess="always" bgcolor="#ffffff" height="19" pluginspage="http://www.macromedia.com/go/getflashplayer" quality="best" src="http://static.blog.csdn.net/scripts/ZeroClipboard/ZeroClipboard.swf" type="application/x-shockwave-flash" width="19" wmode="transparent"></embed></p>
+
+<ol>
+	<li>&lt;bean&nbsp;id=&quot;queueProducerService&quot;&nbsp;class=&quot;jms.mq.spring.QueueProducerService&quot;&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;property&nbsp;name=&quot;jmsTemplate&quot;&nbsp;ref=&quot;jmsQueueTemplate&quot;&nbsp;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;property&nbsp;name=&quot;destination&quot;&nbsp;ref=&quot;queueDest&quot;&nbsp;/&gt;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&lt;/bean&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&lt;bean&nbsp;id=&quot;queueConsumerService&quot;&nbsp;class=&quot;jms.mq.spring.QueueConsumerService&quot;&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;property&nbsp;name=&quot;jmsTemplate&quot;&nbsp;ref=&quot;jmsQueueTemplate&quot;&nbsp;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;property&nbsp;name=&quot;destination&quot;&nbsp;ref=&quot;queueDest&quot;&nbsp;/&gt;&nbsp;&nbsp;&nbsp;</li>
+	<li>&lt;/bean&gt;&nbsp;&nbsp;</li>
+</ol>
+
+<p>&nbsp;</p>
+
+<p><strong>4、监听器上的使用方式</strong></p>
+
+<p>我再来学习一下跟监听器联合使用的方式，只在发布订阅者模式上演示一下。我们先来修改发布者的实现方式，在发布者中增加convertAndSend方法并在其实现类中实现,订阅者监听器没有类转换,不用修改，发布者修改后的代码如下：</p>
+
+<p>&nbsp;</p>
+
+<p><strong>[java]</strong>&nbsp;<a href="http://blog.csdn.net/dwc_fly/article/details/11096071" target="_blank" title="view plain">view plain</a><a href="http://blog.csdn.net/dwc_fly/article/details/11096071" target="_blank" title="copy">copy</a></p>
+
+<p>&nbsp;</p>
+
+<p><embed allowscriptaccess="always" bgcolor="#ffffff" height="19" pluginspage="http://www.macromedia.com/go/getflashplayer" quality="best" src="http://static.blog.csdn.net/scripts/ZeroClipboard/ZeroClipboard.swf" type="application/x-shockwave-flash" width="19" wmode="transparent"></embed></p>
+
+<ol>
+	<li>package&nbsp;jms.mq.spring;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>import&nbsp;java.util.Date;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>import&nbsp;javax.jms.Destination;&nbsp;&nbsp;</li>
+	<li>import&nbsp;javax.jms.JMSException;&nbsp;&nbsp;</li>
+	<li>import&nbsp;javax.jms.MapMessage;&nbsp;&nbsp;</li>
+	<li>import&nbsp;javax.jms.Message;&nbsp;&nbsp;</li>
+	<li>import&nbsp;javax.jms.Session;&nbsp;&nbsp;</li>
+	<li>import&nbsp;javax.jms.TextMessage;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>import&nbsp;org.springframework.jms.core.JmsTemplate;&nbsp;&nbsp;</li>
+	<li>import&nbsp;org.springframework.jms.core.MessageCreator;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>import&nbsp;jms.spring.QueueProducerService;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>public&nbsp;class&nbsp;TopicPublisherService{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;JmsTemplate&nbsp;jmsTemplate;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;Destination&nbsp;destination;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;void&nbsp;send()&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;MessageCreator&nbsp;messageCreator&nbsp;=&nbsp;new&nbsp;MessageCreator()&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;Message&nbsp;createMessage(Session&nbsp;session)&nbsp;throws&nbsp;JMSException&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;TextMessage&nbsp;message&nbsp;=&nbsp;session.createTextMessage();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;message.setText(&quot;QueueProducerService发送消息&quot;+new&nbsp;Date());&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return&nbsp;message;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;};&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;jmsTemplate.send(this.destination,messageCreator);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;void&nbsp;convertAndSend(Object&nbsp;obj)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;System.out.println(&quot;--发送PoJo对象...&quot;);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;jmsTemplate.convertAndSend(destination,&nbsp;obj);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;void&nbsp;setJmsTemplate(JmsTemplate&nbsp;jmsTemplate)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;this.jmsTemplate&nbsp;=&nbsp;jmsTemplate;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;void&nbsp;setDestination(Destination&nbsp;destination)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;this.destination&nbsp;=&nbsp;destination;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>}&nbsp;&nbsp;</li>
+</ol>
+
+<p>&nbsp;</p>
+
+<p>发布订阅者配置文件如下</p>
+
+<p>&nbsp;</p>
+
+<p><strong>[html]</strong>&nbsp;<a href="http://blog.csdn.net/dwc_fly/article/details/11096071" target="_blank" title="view plain">view plain</a><a href="http://blog.csdn.net/dwc_fly/article/details/11096071" target="_blank" title="copy">copy</a></p>
+
+<p>&nbsp;</p>
+
+<p><embed allowscriptaccess="always" bgcolor="#ffffff" height="19" pluginspage="http://www.macromedia.com/go/getflashplayer" quality="best" src="http://static.blog.csdn.net/scripts/ZeroClipboard/ZeroClipboard.swf" type="application/x-shockwave-flash" width="19" wmode="transparent"></embed></p>
+
+<ol>
+	<li>&lt;!--&nbsp;配置TopicJms模板&nbsp;--&gt;&nbsp;&nbsp;</li>
+	<li>&lt;bean&nbsp;id=&quot;jmsTopicTemplate&quot;&nbsp;class=&quot;org.springframework.jms.core.JmsTemplate&quot;&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;property&nbsp;name=&quot;connectionFactory&quot;&nbsp;ref=&quot;connectionFactory&quot;&nbsp;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;property&nbsp;name=&quot;defaultDestination&quot;&nbsp;ref=&quot;topicDest&quot;&nbsp;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;!--&nbsp;配置是否为发布订阅者模式，默认为false&nbsp;--&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;property&nbsp;name=&quot;pubSubDomain&quot;&nbsp;value=&quot;true&quot;&nbsp;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;!--&lt;property&nbsp;name=&quot;receiveTimeout&quot;&nbsp;value=&quot;10000&quot;&nbsp;/&gt;&nbsp;--&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;property&nbsp;name=&quot;messageConverter&quot;&nbsp;ref=&quot;msgConverter&quot;&gt;&lt;/property&gt;&nbsp;&nbsp;</li>
+	<li>&lt;/bean&gt;&nbsp;&nbsp;</li>
+</ol>
+
+<p><strong>[html]</strong>&nbsp;<a href="http://blog.csdn.net/dwc_fly/article/details/11096071" target="_blank" title="view plain">view plain</a><a href="http://blog.csdn.net/dwc_fly/article/details/11096071" target="_blank" title="copy">copy</a></p>
+
+<p>&nbsp;</p>
+
+<p><embed allowscriptaccess="always" bgcolor="#ffffff" height="19" pluginspage="http://www.macromedia.com/go/getflashplayer" quality="best" src="http://static.blog.csdn.net/scripts/ZeroClipboard/ZeroClipboard.swf" type="application/x-shockwave-flash" width="19" wmode="transparent"></embed></p>
+
+<ol>
+	<li>&lt;bean&nbsp;id=&quot;topicPublisherService&quot;&nbsp;class=&quot;jms.mq.spring.TopicPublisherService&quot;&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;property&nbsp;name=&quot;jmsTemplate&quot;&nbsp;ref=&quot;jmsTopicTemplate&quot;&nbsp;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;!--&nbsp;&lt;property&nbsp;name=&quot;destination&quot;&nbsp;ref=&quot;topicDest&quot;&nbsp;/&gt;&nbsp;--&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;property&nbsp;name=&quot;destination&quot;&nbsp;ref=&quot;topicSubscriberMessageListenerDest&quot;&nbsp;/&gt;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;/bean&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;bean&nbsp;id=&quot;topicSubscriberService&quot;&nbsp;class=&quot;jms.mq.spring.TopicSubscriberService&quot;&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;property&nbsp;name=&quot;jmsTemplate&quot;&nbsp;ref=&quot;jmsTopicTemplate&quot;&nbsp;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;property&nbsp;name=&quot;destination&quot;&nbsp;ref=&quot;topicDest&quot;&nbsp;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;/bean&gt;&nbsp;&nbsp;</li>
+</ol>
+
+<p>&nbsp;</p>
+
+<p>修改上面的发布测试类，修改增加对新增方法的调用，修改后的内容如下：</p>
+
+<p><strong>[java]</strong>&nbsp;<a href="http://blog.csdn.net/dwc_fly/article/details/11096071" target="_blank" title="view plain">view plain</a><a href="http://blog.csdn.net/dwc_fly/article/details/11096071" target="_blank" title="copy">copy</a></p>
+
+<p>&nbsp;</p>
+
+<p><embed allowscriptaccess="always" bgcolor="#ffffff" height="19" pluginspage="http://www.macromedia.com/go/getflashplayer" quality="best" src="http://static.blog.csdn.net/scripts/ZeroClipboard/ZeroClipboard.swf" type="application/x-shockwave-flash" width="19" wmode="transparent"></embed></p>
+
+<ol>
+	<li>package&nbsp;jms.mq.spring;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>import&nbsp;org.springframework.context.ApplicationContext;&nbsp;&nbsp;</li>
+	<li>import&nbsp;org.springframework.context.support.ClassPathXmlApplicationContext;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>public&nbsp;class&nbsp;TopicPublisherTest&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;private&nbsp;static&nbsp;ApplicationContext&nbsp;appContext&nbsp;=&nbsp;new&nbsp;ClassPathXmlApplicationContext(&nbsp;&quot;applicationContext.xml&quot;);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;private&nbsp;static&nbsp;void&nbsp;send()&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;TopicPublisherService&nbsp;topicPublisherService&nbsp;=&nbsp;(TopicPublisherService)&nbsp;appContext.getBean(&quot;topicPublisherService&quot;);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;topicPublisherService.send();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;private&nbsp;static&nbsp;void&nbsp;convertAndSend()&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;TopicPublisherService&nbsp;topicPublisherService&nbsp;=&nbsp;(TopicPublisherService)&nbsp;appContext.getBean(&quot;topicPublisherService&quot;);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;MsgPoJo&nbsp;msgPoJo&nbsp;=&nbsp;new&nbsp;MsgPoJo();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;msgPoJo.setId(&quot;1&quot;);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;msgPoJo.setText(&quot;测试内容&quot;);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;topicPublisherService.convertAndSend(msgPoJo);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;static&nbsp;void&nbsp;main(String[]&nbsp;args)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//send();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;convertAndSend();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>}&nbsp;&nbsp;</li>
+</ol>
+
+<p>运行发布测试类,运行结果如下：</p>
+
+<p><img alt="" src="http://img.blog.csdn.net/20130904212539250?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQvZHdjX2ZseQ==/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70/gravity/SouthEast" /></p>
+
+<p>写在到这里,ActiveMQ与spring整合就讲完了，主要讲了ActiveMQ与spring的简单整合,监听器和类转换这些主要功能.</p>
+
+<p>呵呵，写到不好,请大家不要拍砖。</p>
+
+<p>&nbsp;</p>
+
+<p>&nbsp;</p>
+
+<p>《五》</p>
+
+<p>&nbsp;</p>
+
+<p>前面几章讲了ActiveMQ以及ActiveMQ与spring的整合,这是jms的ActiveMQ实现。但是jms到底是什么呢。如果开始就讲解这些理论比较强的东西，可能比较难理解，但是现在结合前面几章的实例对比就比较容易上手了。</p>
+
+<p>&nbsp;</p>
+
+<p><strong>1、.JMS 的概念</strong></p>
+
+<p>&nbsp;</p>
+
+<p>&nbsp;&nbsp; &nbsp;JMS(Java Message Service)，即 Java 消息服务，是一组 Java 应用程序接口，用以提供创建、发接、接收、读取消息的服务。SUN 只提供接口，由不同的厂商根据该接口提供自己的实现。</p>
+
+<p>&nbsp;</p>
+
+<p><strong>2、.JMS 的目标</strong></p>
+
+<p><strong>&nbsp; &nbsp;</strong>更好地理解 JMS 有助于了解 JMS 规范的制定者设置的目标。现在，市场上有许多企业消息产品，生产这些产品的几家公司也参与了 JMS 的开发。</p>
+
+<p>&nbsp; &nbsp;现有的这些系统的能力和功能各不相同。这些制定者知道如果 JMS 结合所有现有系统的所有功能，那么它会变得过于复杂。同样，他们相信，他们也不能让 JMS 只局限于所有系统共有的那些特性。</p>
+
+<p>&nbsp; &nbsp;制定者相信，让 JMS 包括实现&ldquo;高级的企业应用程序&rdquo;所需要的所有功能是很重要的。</p>
+
+<p>&nbsp; &nbsp;JMS 规范中声明， JMS 的目标是：</p>
+
+<ul>
+	<li>定义一组消息公用概念和实用工具。</li>
+	<li>最少化程序员使用消息时必须学习的概念。</li>
+	<li>最大化消息应用程序的可移植性。&nbsp;</li>
+	<li>最小化实现一个提供者所需的工作量。</li>
+	<li>为点对点和 pub/sub&nbsp;域&nbsp;提供客户机接口。&ldquo;域&rdquo;是用于在前面讨论的消息模型的 JMS 术语。（注意：提供者不需要实现两个域。）</li>
+</ul>
+
+<p><strong>3、.JMS 中间件</strong></p>
+
+<p><strong>&nbsp; 1).</strong>IBM MQ 系列产品提供的服务使得应用程序可以使用消息队列进行交流，通过一系列基于 Java 的 API 提供了 MQseries 在 Java 中应用开发的方法。它支持点到点和发布/订阅两种消息模式。</p>
+
+<p><br />
+<strong>&nbsp; 2).</strong>WebLogic是BEA公司实现的基于工业标准的J2EE应用服务器，支持大多数企业级JavaAPI，它完全兼容 JMS 规范，支持点到点和发布/订阅消息模式，它支持消息的多点广播、持久消息存储的文件和数据库、XML 消息，以及动态创建持久队列和主题。</p>
+
+<p><br />
+<strong>&nbsp; 3).</strong>JBoss 是 JBoss 公司开发的一个免费开源的应用服务器，它提供了 EJB 运行的环境，并能够结合 EJB 进行 JMS 消息的收取，支持点到点模型和发布/订阅模型。<br />
+<br />
+<strong>&nbsp; 4).</strong>ActiveMQ 是一个基于 Apache 2.0 Licenced 发布的开放源代码的 JMS 产品，它能够提供点到点消息模式和发布/订阅消息模式，支持 JBoss、Geronimo 等开源应用服务器，支持 Spring 框架的消息驱动，新增了一个 P2P 传输层，可以用于创建可靠的 P2P JMS 网络连接，拥有消息持久化、事务、集群支持等 JMS 基础设施服务。<br />
+<br />
+<strong>&nbsp; 5).</strong>OpenJMS 是一个开源的 JMS 规范的实现，它支持点对点模型和发布/订阅模型，支持同步与异步消息发送、可视化管理界面，支持 Applet，能够与 Jakarta Tomcat 这样的 Servlet容器结合，支持 RMI、TCP、HTTP 与 SSL 协议。</p>
+
+<p>&nbsp;</p>
+
+<p><strong>4、.JMS特性</strong></p>
+
+<p>&nbsp; &nbsp; &nbsp;在 JMS 之前，每一家 MOM 厂商都用专有 API 为应用程序提供对其产品的访问，通常可用于许多种语言，其中包括 Java 语言。JMS 通过 MOM 产品为 Java 程序提供了一个发送和接收消息的标准的、便利的方法。用 JMS 编写的程序可以在任何实现 JMS 标准的 MOM 上运行。JMS 是由 Sun Microsystems 开发的，它为 Java 程序员提供一种访问企业消息系统的方法，即&nbsp;面向消息的中间件&nbsp;（MOM）。MOM 通过中间媒介以间接方式在应用程序之间异步传送数据，用这种方法提供一种以松散耦合的灵活方式集成应用程序的机制。</p>
+
+<p>&nbsp; &nbsp; 要执行并测试这些程序，需要访问 JMS 的供应商实现。大多数 Java 2 Enterprise Edition （J2EE）供应商都会提供 JMS 的一种实现(也就是上面说的JMS中间件)。要想获得设置 JMS 运行时程序和执行程序的有关信息，请参阅供应商文档。</p>
+
+<p>&nbsp; &nbsp; 它为 Java 程序提供一种访问&nbsp;企业消息系统&nbsp;的方法。在讨论 JMS 之前，我们分来析一下企业消息系统。</p>
+
+<p>&nbsp; &nbsp;企业消息系统，即&nbsp;面向消息的中间件（MOM），提供了以松散耦合的灵活方式集成应用程序的一种机制。它们提供了基于&nbsp;存储和转发&nbsp;的应用程序之间的异步数据发送，即应用程序彼此不直接通信，而是与作为中介的 MOM 通信。</p>
+
+<p>MOM 提供了有保证的消息发送（至少是在尽可能地做到这一点），应用程序开发人员无需了解远程过程调用（PRC）和网络/通信协议的细节。</p>
+
+<p>&nbsp; &nbsp;<strong>&nbsp;1)消息灵活性</strong></p>
+
+<p>MOM 将消息路由给应用程序 B，这样，消息就可以存在于完全不同的计算机上，MOM 负责处理网络通信。如果网络连接不可用， MOM 会存储消息，直到连接变得可用时，再将消息转发给应用程序 B。</p>
+
+<p>灵活性的另一方面体现在，当应用程序 A 发送其消息时，应用程序 B 甚至可以不处于执行状态。MOM 将保留这个消息，直到应用程序 B 开始执行并试着检索消息为止。这还防止了应用程序 A 因为等待应用程序 B 检索消息而出现阻塞。</p>
+
+<p>这种异步通信要求应用程序的设计与现在大多数应用程序不同，不过，对于时间无关或并行处理，它可能是一个极其有用的方法。</p>
+
+<p>&nbsp; &nbsp;<strong>&nbsp;2)松散耦合</strong></p>
+
+<p>企业消息系统的真正威力在于应用程序的&nbsp;松散耦合。在前一页的图表中，由应用程序 A 发送消息指定一个特定目标，如&ldquo;订单处理&rdquo;。而现在，是由应用程序 B 提供订单处理功能。</p>
+
+<p>但是在将来，我们可以用不同的订单处理程序替换应用程序 B，应用程序 A 将不再是明智之选。替换应用程序将继续发送消息完成&ldquo;订单处理&rdquo;，而消息也仍将得到处理。</p>
+
+<p>同样，我们也可以替换应用程序 A，只要替换应用程序继续发送消息进行&ldquo;订单处理&rdquo;，订单处理程序就无需知道是否有一个新的应用程序在发送订单。</p>
+
+<p><strong>5.JMS模式</strong></p>
+
+<p>最初，开发企业消息系统是为了实现&nbsp;点对点模型&nbsp;（PTP），由一个应用程序生成的每个消息都由另一个应用程序接收。近年来，出现了一种新的模型，叫做&nbsp;发布与订阅&nbsp;（或者 pub/sub）。</p>
+
+<p>Pub/sub 用称为&nbsp;主题（topic）&nbsp;的内容分层结构代替了 PTP 模型中的惟一目的地，发送应用程序&nbsp;发布&nbsp;自己的消息，指出消息描述的是有关分层结构中的一个主题的信息。</p>
+
+<p>希望接收这些消息的应用程序&nbsp;订阅了 这个主题。订阅包含子主题的分层结构中的主题的订阅者可以接收该主题和其子主题发表的所有消息。</p>
+
+<p>多个应用程序可以就一个主题发布和订阅消息，而应用程序对其他人仍然是匿名的。MOM 起着&nbsp;代理（broker）&nbsp;的作用，将一个主题已发表的消息路由给该主题的所有订阅者。</p>
+
+<p>JMS 应用程序由以下元素组成：</p>
+
+<ul>
+	<li>JMS 客户机。&nbsp;用 JMS API 发送和接收消息的 Java 程序。</li>
+	<li>非 JMS 客户机。&nbsp;认识到传统程序通常整个 JMS 应用程序的一部分是非常重要的，在规划时必须优先考虑它们的存在。</li>
+	<li>消息。就JMS 应用程序设计而言，通过JMS 和非 JMS 客户机所交换的消息的格式和内容是完整的。</li>
+	<li>JMS 提供者。&nbsp;如前所述，JMS 定义了一组接口，供应者必须提供特定于其 MOM 产品的具体实现。</li>
+	<li>管理对象。&nbsp;消息系统提供者的管理员创建的、独立于提供者的专有技术的对象。</li>
+</ul>
+
+<p>&nbsp;</p>
+
+<p><strong>6、.JMS管理对象</strong></p>
+
+<p>&nbsp;</p>
+
+<p>MOM 产品的提供者在实现消息时使用的机制和技术有很大不同。为了保持 JMS 客户机的可移植性，实现了 JMS 接口的对象必须与提供者的专有技术隔离。</p>
+
+<p>完成这项任务的机制是&nbsp;管理对象。这些实现 JMS 接口的对象由提供者的消息系统的管理员创建，并被放置在 JNDI 名字空间中。</p>
+
+<p>然后由 JMS 程序检索这些对象，通过它们实现的 JMS 接口访问这些对象。JMS 提供者必须提供允许创建受管理对象及它们在 JNDI 名字空间中的存放地的工具。</p>
+
+<p>有两种受管理对象：</p>
+
+<ul>
+	<li><code>ConnectionFactory</code>：用于创建到提供者的底层消息系统的连接。</li>
+	<li><code>Destination</code>：用 JMS 客户机来指定正发送消息的目的地或正接收消息的来源。</li>
+</ul>
+
+<p>尽管受管理对象本身就是特定于提供者实现的类的例子，但可以使用可移植机制（JNDI）检索它们，并且可以通过可移植接口（JMS）访问它们。JMS 程序只需要知道管理对象的 JNDI 名称和 JMS 接口类型即可，无需了解特定于提供者的知识。</p>
+
+<p>&nbsp;</p>
+
+<p><strong>7、.JMS接口</strong></p>
+
+<p>&nbsp;</p>
+
+<p>JMS 定义了一组封装各种消息概念的高级接口。而这些接口又因为两个消息域&mdash;&mdash;PTP 和 pub/sub&mdash;&mdash;进行了进一步地定义和定制。</p>
+
+<p>高级接口包括：</p>
+
+<ul>
+	<li><code>ConnectionFactory</code>：一个创建&nbsp;<code>Connection</code>&nbsp;的受管理对象。</li>
+	<li><code>Connection</code>：连接到提供者的活动连接。</li>
+	<li><code>Destination</code>：一个封装消息目的地的身份的受管理对象，如消息的来源地和发送地。</li>
+	<li><code>Session</code>：发送和接收消息的单线程环境。为了简化，并且因为&nbsp;<code>Session</code>&nbsp;控制事务的缘故，通过多个线程进行并发访问受到了限制。可以将多个&nbsp;<code>Session</code>&nbsp;用于多线程应用程序。</li>
+	<li><code>MessageProducer</code>：用于发送消息。</li>
+	<li><code>MessageConsumer</code>：用于接收消息。</li>
+</ul>
+
+<p>&nbsp;</p>
+
+<p>下表列出了从每一个高级接口继承的特定于域的接口。</p>
+
+<p>&nbsp;</p>
+
+<p>高级接口PTP 域Pub/sub 域</p>
+
+<table border="1">
+	<tbody>
+		<tr>
+		</tr>
+		<tr>
+			<td><code>ConnectionFactory</code></td>
+			<td><code>QueueConnectionFactory</code></td>
+			<td><code>TopicConnectionFactory</code></td>
+		</tr>
+		<tr>
+			<td><code>Connection</code></td>
+			<td><code>QueueConnection</code></td>
+			<td><code>TopicConnection</code></td>
+		</tr>
+		<tr>
+			<td><code>Destination</code></td>
+			<td><code>Queue</code></td>
+			<td><code>Topic</code></td>
+		</tr>
+		<tr>
+			<td><code>Session</code></td>
+			<td><code>QueueSession</code></td>
+			<td><code>TopicSession</code></td>
+		</tr>
+		<tr>
+			<td><code>MessageProducer</code></td>
+			<td><code>QueueSender</code></td>
+			<td><code>TopicPublisher</code></td>
+		</tr>
+		<tr>
+			<td><code>MessageConsumer</code></td>
+			<td><code>QueueReceiver</code>，<code>QueueBrowser</code></td>
+			<td><code>TopicSubscriber</code></td>
+		</tr>
+	</tbody>
+</table>
+
+<p>&nbsp;</p>
+
+<p>&nbsp;</p>
+
+<p>在 JMS 以前的版本中，高级接口是特定于域的接口的父接口，并且只包含在两个域中共有的那些功能。JMS 提供者没有提供高级接口的实现。在 JMS 1.1 中，一些高级接口现在则被认为是&ldquo;公用接口&rdquo;，并且它们包含两个域的所有功能； JMS 提供者必须提供这些接口的实现。尽管公用接口仍然是特定于域的接口的父接口，但它们现在是 JMS 客户机编程的首选方法，并且它们提供特定于域的接口只为了后向兼容。</p>
+
+<p>下面重新列出了前一小节中的表，展示了一些公用接口。</p>
+
+<p>&nbsp;</p>
+
+<p>JMS 公用接口PTP 域Pub/sub 域</p>
+
+<table border="1">
+	<tbody>
+		<tr>
+		</tr>
+		<tr>
+			<td><code>ConnectionFactory</code></td>
+			<td><code>QueueConnectionFactory</code></td>
+			<td><code>TopicConnectionFactory</code></td>
+		</tr>
+		<tr>
+			<td><code>Connection</code></td>
+			<td><code>QueueConnection</code></td>
+			<td><code>TopicConnection</code></td>
+		</tr>
+		<tr>
+			<td><code>Destination</code></td>
+			<td><code>Queue</code></td>
+			<td><code>Topic</code></td>
+		</tr>
+		<tr>
+			<td><code>Session</code></td>
+			<td><code>QueueSession</code></td>
+			<td><code>TopicSession</code></td>
+		</tr>
+		<tr>
+			<td><code>MessageProducer</code></td>
+			<td><code>QueueSender</code></td>
+			<td><code>TopicPublisher</code></td>
+		</tr>
+		<tr>
+			<td><code>MessageConsumer</code></td>
+			<td><code>QueueReceiver</code>,<code>QueueBrowser</code></td>
+			<td><code>TopicSubscriber</code></td>
+		</tr>
+	</tbody>
+</table>
+
+<p>&nbsp;</p>
+
+<p>统一有公用接口的域会导致继承这些方法的一些特定于域的类不再适合它的域。如果在客户机代码中出现这种情况，JMS 提供者需要使用 IllegalStateException。</p>
+
+<p>&nbsp;</p>
+
+<p><strong>8、jms开发</strong></p>
+
+<p>&nbsp;</p>
+
+<p>一个典型的 JMS 程序要经过以下步骤才能开始产生和使用消息：</p>
+
+<ol>
+	<li>通过 JNDI 查询&nbsp;<code>ConnectionFactory</code>&nbsp;。</li>
+	<li>通过 JNDI 查询一个或者多个&nbsp;<code>Destination</code>。</li>
+	<li>用&nbsp;<code>ConnectionFactory</code>&nbsp;创建一个&nbsp;<code>Connection</code>。</li>
+	<li>用&nbsp;<code>Connection</code>&nbsp;创建一个或者多个&nbsp;<code>Session</code>。</li>
+	<li>用&nbsp;<code>Session</code>&nbsp;和&nbsp;<code>Destination</code>&nbsp;创建所需要的&nbsp;<code>MessageProducer</code>&nbsp;和&nbsp;<code>MessageConsumer</code>。</li>
+	<li>启动&nbsp;<code>Connection</code>。</li>
+</ol>
+
+<p>这时，消息就可以开始流动，应用程序可以根据需要接收、处理和发送消息。 在后面几节中，我们将开发 JMS 程序，您将会看到这些步骤的细节。</p>
+
+<p>&nbsp;</p>
+
+<p><strong>9、jms消息</strong></p>
+
+<p>&nbsp;</p>
+
+<p>&nbsp;</p>
+
+<p>消息系统的核心当然是消息。JMS 为不同类型的内容提供了几种消息类型，但所有消息都是从&nbsp;<code>Message</code>&nbsp;接口派生出来的。</p>
+
+<p><code>Message</code>&nbsp;分为三个组成部分：</p>
+
+<ul>
+	<li>header&nbsp;是一组标准字段，客户机和提供者都用它们来标识和路由消息。</li>
+	<li>Properties&nbsp;提供了一个给消息添加可选标题字段的实用工具。如果应用程序需要用标准标题字段没有提供的方法对消息进行归类或分类，那么可以为消息添加一个属性来实现这种归类和分类；提供了&nbsp;<code>set&lt;Type&gt;Property(...)</code>&nbsp;和&nbsp;<code>get&lt;Type&gt;Property(...)</code>&nbsp;方法来设置和获得各种 Java 类型的属性，其中包括&nbsp;<code>Object</code>。JMS 定义了提供者可以选择性提供的一组标准属性。</li>
+	<li>消息的&nbsp;body&nbsp;包含将 发送到接收应用程序的内容。每一个消息接口都专用于它所支持的内容类型。</li>
+</ul>
+
+<p>&nbsp;</p>
+
+<p><strong>10、header属性</strong></p>
+
+<p>&nbsp;</p>
+
+<p>下面列出了&nbsp;<code>Message</code>&nbsp;的每一个标题字段的名称、它对应的 Java 类型和字段的描述：</p>
+
+<ul>
+	<li><code>JMSMessageID</code>&mdash;&mdash;类型为&nbsp;<code>string</code>
+
+	<p>惟一标识提供者发送的每一条消息。这个字段是在发送过程中由提供者设置的，客户机只能在消息发送后才能确定消息的&nbsp;<code>JMSMessageID</code>。</p>
+	</li>
+	<li><code>JMSDestination</code>&mdash;&mdash;类型为&nbsp;<code>Destination</code>
+	<p>消息发送的&nbsp;<code>Destination</code>，在发送过程中由提供者设置。</p>
+	</li>
+	<li><code>JMSDeliveryMode</code>&mdash;&mdash;类型为&nbsp;<code>int</code>
+	<p>包含值&nbsp;<code>DeliveryMode.PERSISTENT</code>&nbsp;或者&nbsp;<code>DeliveryMode.NON_PERSISTENT</code>。持久性消息被传输并且只被传输一次，非持久性消息最多被传输一次。要知道&ldquo;最多一次&rdquo;包括根本不传输。非持久性消息在应用程序或者系统出故障时被提供者弄丢。因此要格外小心，确保持久性消息不受故障的影响。这比开销通常被认为是发送持久性消息方面的开销，在决定消息的发送模式时，必须仔细考虑，在可靠性和性能之间进行权衡。</p>
+	</li>
+	<li><code>JMSTimestamp</code>&mdash;&mdash;类型为&nbsp;<code>long</code>
+	<p>提供者发送消息的时间，由提供者在发送过程中设置。</p>
+	</li>
+	<li><code>JMSExpiration</code>&mdash;&mdash;类型为&nbsp;<code>long</code>
+	<p>消息失效的时间。这个值是在发送过程中计算的，是发送方法的生存时间（time-to-live）值和当前时间值的和。提供者不应发送过期的消息。值 0 表明消息不会过期。</p>
+	</li>
+	<li><code>JMSPriority</code>&mdash;&mdash;类型为&nbsp;<code>int</code>
+	<p>消息的优先级，由提供者在发送过程中设置。优先级 0 的优先级最低，优先级 9 的优先级最高。</p>
+	</li>
+	<li><code>JMSCorrelationID</code>&mdash;&mdash;类型为&nbsp;<code>string</code>
+	<p>通常用来链接响应消息与请求消息，由发送消息的 JMS 程序设置。响应来自另一个 JMS 程序的消息的 JMS 程序将正响应消息的&nbsp;<code>JMSMessageID</code>&nbsp;拷贝到这个字段中，这样，正作出响应的程序就可以与它所发出的特定请求的响应相&nbsp;关联。</p>
+	</li>
+	<li><code>JMSReplyTo</code>&mdash;&mdash;类型为&nbsp;<code>Destination</code>
+	<p>请求程序用它来指出回复消息应发送的地方，由发送消息的 JMS 程序设置。</p>
+	</li>
+	<li><code>JMSType</code>&mdash;&mdash;类型为&nbsp;<code>string</code>
+	<p>JMS 程序用它来指出消息的类型。一些提供者维护着一个消息类型仓库，并用该字段引用仓库中的定义类型，在这里，JMS 程序不应该使用这个字段。</p>
+	</li>
+	<li><code>JMSRedelivered</code>&mdash;&mdash;类型为&nbsp;<code>boolean</code>
+	<p>指出消息被过早地发送给了 JMS 程序，程序不知道消息的接收者是谁；由提供者在接收过程中设置。</p>
+	</li>
+</ul>
+
+<p>&nbsp;</p>
+
+<p>&nbsp;</p>
+
+<p><strong>11、标准属性</strong></p>
+
+<p>&nbsp;</p>
+
+<p>下面列表给出了&nbsp;<code>Message</code>&nbsp;的每一个标准属性的名称、它对应的 Java 类型和该属性的说明。提供者对标准属性的支持是可选的。JMS 为这些属性和将来 JMS 定义的属性保留了 &ldquo;JMSX&rdquo; 属性名。</p>
+
+<ul>
+	<li><code>JMSXUserID</code>&mdash;&mdash;类型为&nbsp;<code>string</code>
+
+	<p>发送消息的用户的身份。</p>
+	</li>
+	<li><code>JMSXApplID</code>&mdash;&mdash;类型为&nbsp;<code>string</code>
+	<p>发送消息的应用程序的身份。</p>
+	</li>
+	<li><code>JMSXDeliveryCount</code>&mdash;&mdash;类型为&nbsp;<code>int</code>
+	<p>已经尝试发送消息的次数。</p>
+	</li>
+	<li><code>JMSXGroupID</code>&mdash;&mdash;类型为&nbsp;<code>string</code>
+	<p>该消息所属的消息组的身份。</p>
+	</li>
+	<li><code>JMSXGroupSeq</code>&mdash;&mdash;类型为&nbsp;<code>int</code>
+	<p>该消息在消息组中的序号。</p>
+	</li>
+	<li><code>JMSXProducerTXID</code>&mdash;&mdash;类型为&nbsp;<code>string</code>
+	<p>生成该消息的事务的身份。</p>
+	</li>
+	<li><code>JMSXConsumerTXID</code>&mdash;&mdash;类型为&nbsp;<code>string</code>
+	<p>使用该消息的事务的身份。</p>
+	</li>
+	<li><code>JMSXRcvTimestamp</code>&mdash;&mdash;类型为&nbsp;<code>long</code>
+	<p>JMS 将消息发送给客户的时间。</p>
+	</li>
+	<li><code>JMSXState</code>&mdash;&mdash;类型为&nbsp;<code>int</code>
+	<p>提供者用它来维护消息的消息仓库，通常，它与 JMS 生产者和客户关系不大。</p>
+	</li>
+	<li><code>JMSX_&lt;vendor_name&gt;</code>
+	<p>为特定于提供者的属性而保留。</p>
+
+	<p>&nbsp;</p>
+
+	<p>&nbsp;</p>
+	</li>
+</ul>
+
+<p>《六》</p>
+
+<p>&nbsp;</p>
+
+<p>&nbsp;</p>
+
+<p>&nbsp;</p>
+
+<p>&nbsp;</p>
+
+<p>&nbsp;</p>
+
+<p>1、product发送JMS消息</p>
+
+<p>&nbsp;</p>
+
+<p>Java代码&nbsp;&nbsp;<a href="http://yuxisanren.iteye.com/blog/1918024" target="_blank" title="收藏这段代码"><img alt="收藏代码" src="http://yuxisanren.iteye.com/images/icon_star.png" /></a></p>
+
+<ol start="1">
+	<li>public&nbsp;class&nbsp;QueueSend&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;static&nbsp;void&nbsp;main(String[]&nbsp;args)&nbsp;throws&nbsp;JMSException&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ConnectionFactory&nbsp;connectionfactory&nbsp;=&nbsp;new&nbsp;ActiveMQConnectionFactory(&quot;tcp://localhost:61616&quot;);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//创建与JMS服务的连接:ConnectionFactory被管理的对象，由客户端创建，用来创建一个连接对象&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Connection&nbsp;connection&nbsp;=&nbsp;connectionfactory.createConnection();//获取连接，connection一个到JMS系统提供者的活动连接&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Session&nbsp;session&nbsp;=connection.createSession(false,Session.AUTO_ACKNOWLEDGE&nbsp;);//打开会话，一个单独的发送和接受消息的线程上下文&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;QueueSend&nbsp;qs&nbsp;=&nbsp;new&nbsp;QueueSend();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;qs.sendTextMsg(session,&quot;使用jms发送文本消息&quot;,&quot;queue.msgText&quot;);//发送文本类型的消息&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;MapMessage&nbsp;mapMsg&nbsp;=&nbsp;session.createMapMessage();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;mapMsg.setString(&quot;name&quot;,&nbsp;&quot;李寻欢1&quot;);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;mapMsg.setBoolean(&quot;IsHero&quot;,&nbsp;true);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;mapMsg.setInt(&quot;age&quot;,&nbsp;35);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;qs.sendMap(session,&nbsp;mapMsg,&nbsp;&quot;queue.msgMap&quot;);//发送map类型的消息&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Person&nbsp;person&nbsp;=&nbsp;new&nbsp;Person(&quot;阿飞&quot;,&nbsp;23,&nbsp;&quot;北京.大兴&quot;);//发送Object类型消息&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;qs.sendObj(session,&nbsp;person,&nbsp;&quot;queue.msgObj&quot;);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;session.close();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;connection.close();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;/*&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;*&nbsp;发送文本消息&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;*/&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;void&nbsp;sendTextMsg(Session&nbsp;session,String&nbsp;MsgContent,String&nbsp;name)&nbsp;throws&nbsp;JMSException{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Queue&nbsp;queue&nbsp;=&nbsp;new&nbsp;ActiveMQQueue(name);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;MessageProducer&nbsp;msgProducer&nbsp;=&nbsp;session.createProducer(queue);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Message&nbsp;msg&nbsp;=&nbsp;session.createTextMessage(MsgContent);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;msgProducer.send(msg);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;System.out.println(&quot;文本消息已发送&quot;);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;/*&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;*&nbsp;发送MAP类型消息&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;*/&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;void&nbsp;sendMap(Session&nbsp;session,MapMessage&nbsp;map,String&nbsp;name)&nbsp;throws&nbsp;JMSException{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Queue&nbsp;queue&nbsp;=&nbsp;new&nbsp;ActiveMQQueue(name);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;MessageProducer&nbsp;msgProducer&nbsp;=&nbsp;session.createProducer(queue);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;msgProducer.send(map);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;System.out.println(&quot;Map格式的消息已发送&quot;);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;/*&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;*&nbsp;发送Object类型消息&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;*/&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;void&nbsp;sendObj(Session&nbsp;session,Object&nbsp;obj,String&nbsp;name)&nbsp;throws&nbsp;JMSException{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Destination&nbsp;&nbsp;queue&nbsp;=&nbsp;new&nbsp;ActiveMQQueue(name);//分装消息的目的标示&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;MessageProducer&nbsp;msgProducer&nbsp;=&nbsp;session.createProducer(queue);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ObjectMessage&nbsp;objMsg=session.createObjectMessage((Serializable)&nbsp;obj);//发送对象时必须让该对象实现serializable接口&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;MessageProducer&nbsp;msgPorducer&nbsp;=session.createProducer(queue);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;msgPorducer.send(objMsg);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;System.out.println(&quot;Object类型的消息已发送&quot;);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>}&nbsp;&nbsp;</li>
+</ol>
+
+<p>&nbsp;当消息发送成功时我们可以再web消息管理端看到产生了如下图所示的三条消息。</p>
+
+<p><img alt="" src="http://dl2.iteye.com/upload/attachment/0087/7736/afd7dfd9-706b-3113-a5af-4dea15423e4d.jpg" style="height:321px; width:700px" title="点击查看原始大小图片" /><br />
+&nbsp;2、consumer消费消息</p>
+
+<p>&nbsp;</p>
+
+<p>接受jms消息代码&nbsp;&nbsp;<a href="http://yuxisanren.iteye.com/blog/1918024" target="_blank" title="收藏这段代码"><img alt="收藏代码" src="http://yuxisanren.iteye.com/images/icon_star.png" /></a></p>
+
+<ol start="1">
+	<li>public&nbsp;class&nbsp;QueueAccept&nbsp;implements&nbsp;MessageListener{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;static&nbsp;void&nbsp;main(String[]&nbsp;args)&nbsp;throws&nbsp;JMSException&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ConnectionFactory&nbsp;connectionfactory&nbsp;=null;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Connection&nbsp;connection=null;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Session&nbsp;session=null;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if(connectionfactory==null){&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;connectionfactory&nbsp;=&nbsp;new&nbsp;ActiveMQConnectionFactory(&quot;tcp://localhost:61616&quot;);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if(connection==null){&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;connection&nbsp;=&nbsp;connectionfactory.createConnection();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;connection.start();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;session&nbsp;=&nbsp;connection.createSession(false,&nbsp;Session.AUTO_ACKNOWLEDGE);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Queue&nbsp;queue&nbsp;=&nbsp;new&nbsp;ActiveMQQueue(&quot;queue.msgText&quot;);//根据发送的名称接受消息&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;MessageConsumer&nbsp;consumer&nbsp;=&nbsp;session.createConsumer(queue);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;consumer.setMessageListener(new&nbsp;QueueAccept());//不继承MessageListener时可以用consumer.receive()手动接受消息&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Queue&nbsp;queue1&nbsp;=&nbsp;new&nbsp;ActiveMQQueue(&quot;queue.msgMap&quot;);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;MessageConsumer&nbsp;consumer1&nbsp;=&nbsp;session.createConsumer(queue1);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;consumer1.setMessageListener(new&nbsp;QueueAccept());&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Queue&nbsp;queue2&nbsp;=&nbsp;new&nbsp;ActiveMQQueue(&quot;queue.msgObj&quot;);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;MessageConsumer&nbsp;consumer2&nbsp;=&nbsp;session.createConsumer(queue2);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;consumer2.setMessageListener(new&nbsp;QueueAccept());&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;void&nbsp;onMessage(Message&nbsp;message)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/**&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;*&nbsp;接受文本类型的消息&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;*/&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if(message&nbsp;instanceof&nbsp;TextMessage){&nbsp;//instanceof&nbsp;测试它所指向的对象是否是TextMessage类&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;TextMessage&nbsp;text&nbsp;=&nbsp;(TextMessage)&nbsp;message;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;try&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;System.out.println(&quot;发送的文本消息内容为：&quot;+text.getText());&nbsp;//接受文本消息&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;catch&nbsp;(JMSException&nbsp;e)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;e.printStackTrace();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/**&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;*&nbsp;接受Map类型的消息&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;*/&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if(message&nbsp;instanceof&nbsp;MapMessage){&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;MapMessage&nbsp;map&nbsp;=&nbsp;(MapMessage)&nbsp;message;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;try&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;System.out.println(&quot;姓名：&quot;+map.getString(&quot;name&quot;));&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;System.out.println(&quot;是否是英雄：&quot;+map.getBoolean(&quot;IsHero&quot;));&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;System.out.println(&quot;年龄:&quot;+map.getInt(&quot;age&quot;));&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;catch&nbsp;(JMSException&nbsp;e)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;e.printStackTrace();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if(message&nbsp;instanceof&nbsp;ObjectMessage){&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ObjectMessage&nbsp;objMsg&nbsp;=&nbsp;(ObjectMessage)&nbsp;message;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;try&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Person&nbsp;person=(Person)&nbsp;objMsg.getObject();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;System.out.println(&quot;用户名：&quot;+person.getName()+&quot;年龄:&quot;+person.getAge()+&quot;地址：&quot;+person.getAddress());&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;catch&nbsp;(JMSException&nbsp;e)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;e.printStackTrace();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+</ol>
+
+<p>&nbsp;客户端运行后接受到的消息：</p>
+
+<p><img alt="" src="http://dl2.iteye.com/upload/attachment/0087/7740/fe864b9d-e1b6-30e9-b80e-2ad1638996d1.jpg" style="height:150px; width:629px" /><br />
+&nbsp; &nbsp; 在上边的代码中，我们在发送Object对象时，我们发送的对象需要实现serializable接口。记得刚找工作的时候有一回有个面试官问到，为什么一个类要实现serializable接口，也许许多人新人都不知道为什么，只能按照背的面试题中的答案去说。刚好这个demo中遇到了这个问题，就继续复习一下java的基础吧。一个类只有实现了serializable才是可以序列化的，通俗的讲实现了serializable接口后我们将可以把这个类，在网络上进行发送，或者将这个类存入到硬盘，序列化的目的就是保存一个对象。</p>

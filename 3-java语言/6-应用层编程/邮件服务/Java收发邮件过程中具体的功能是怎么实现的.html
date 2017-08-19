@@ -1,0 +1,115 @@
+Java收发邮件过程中具体的功能是怎么实现的
+
+http://zhidao.baidu.com/link?url=yEs8Jw2LO6ySGT015RnwB1PY-cBsFi7Ou0hUtaxoaquoSp5WLZCITCFNFPsF3bbCQ56eWlpUm_u_x70i8kSbC7b2W13IW3ulVD-MtP0Y-Xi
+
+1.SMTP协议
+	用户连上邮件服务器后，要想给它发送一封电子邮件，需要遵循一定的通迅规则，SMTP协议就是用于定义这种通讯规则的。
+	因而，通常我们也把处理用户smtp请求（邮件发送请求）的邮件服务器称之为SMTP服务器。(25)
+
+2.POP3协议
+	同样，用户若想从邮件服务器管理的电子邮箱中接收一封电子邮件的话，他连上邮件服务器后，也需要遵循一定的通迅格式，POP3协议用于定义这种通讯格式。
+	因而，通常我们也把处理用户pop3请求（邮件接收请求）的邮件服务器称之为POP3服务器。(110)
+
+3.邮件收发相关的API
+	3.1JavaMail API按其功能划分通常可分为如下三大类：
+	创建和解析邮件内容的API ：Message类是创建和解析邮件的核心API，它的实例对象代表一封电子邮件。 
+	3.2发送邮件的API：Transport类是发送邮件的核心API类，它的实例对象代表实现了某个邮件发送协议的邮件发送对象，例如SMTP协议。 
+	接收邮件的API：Store类是接收邮件的核心API类，它的实例对象代表实现了某个邮件接收协议的邮件接收对象，例如POP3协议。 
+	3.3Session类 
+	Session类用于定义整个应用程序所需的环境信息，以及收集客户端与邮件服务器建立网络连接的会话信息，如邮件服务器的主机名、端口号、采用的邮件发送和接收协议等。Session对象根据这些信息构建用于邮件收发的Transport和Store对象，以及为客户端创建Message对象时提供信息支持。 
+
+4.邮件组织结构相关的API
+	MimeMessage类表示整封邮件。
+	MimeBodyPart类表示邮件的一个MIME消息。
+	MimeMultipart类表示一个由多个MIME消息组合成的组合MIME消息。
+
+5.具体的例子程序
+	package cn.edu.dlmu.send;
+	 
+	import java.util.Properties;
+	 
+	import javax.activation.DataHandler;
+	import javax.activation.FileDataSource;
+	import javax.mail.Message;
+	import javax.mail.Session;
+	import javax.mail.Transport;
+	import javax.mail.internet.InternetAddress;
+	import javax.mail.internet.MimeBodyPart;
+	import javax.mail.internet.MimeMessage;
+	import javax.mail.internet.MimeMultipart;
+	import javax.mail.internet.MimeUtility;
+	 
+	public class SendMail {
+	 
+	    public static void main(String[] args) throws Exception {
+	         
+	         
+	         
+	        Properties prop = new Properties();
+	        //连接的邮件服务器的主机名
+	        prop.setProperty("mail.smtp.host", "smtp.sina.com.cn");
+	        //发送邮件的协议
+	        prop.setProperty("mail.transport.protocol", "smtp");
+	        //是否向邮件服务器提交认证
+	        prop.setProperty("mail.smtp.auth", "true");
+	         
+	        //创建session
+	        Session session = Session.getInstance(prop);
+	        session.setDebug(true);
+	        //得到transport
+	        Transport ts = session.getTransport();
+	        //连接邮件服务器
+	        ts.connect("smtp.sina.com.cn", "xxxx@sina.com", "xxxxx");
+	        //发送邮件
+	        MimeMessage message = createMessage(session);
+	        ts.sendMessage(message, message.getAllRecipients());
+	        ts.close();
+	    }
+	     
+	    public static MimeMessage createMessage(Session session) throws Exception {
+	         
+	        MimeMessage message = new MimeMessage(session);
+	         
+	        //设置邮件的基本信息
+	        message.setFrom(new InternetAddress("xxxx@sina.com"));
+	        message.setRecipient(Message.RecipientType.TO, new InternetAddress("1219070362@qq.com"));
+	        message.setSubject("test");
+	         
+	        //正文
+	        MimeBodyPart text = new MimeBodyPart();
+	            //设置charaset可以解决中文正文的乱码问题，内嵌可下载的图片
+	        text.setContent("你好xxx，<img src='c:/dog.jpg' />测试成功！<img src='cid:aaa.jpg' />", "text/html;charset=gbk");
+	        //图片1
+	        MimeBodyPart image = new MimeBodyPart();
+	        image.setDataHandler(new DataHandler(new FileDataSource("src/88.jpg")));
+	        image.setContentID("aaa.jpg");
+	        //附件
+	        MimeBodyPart attach = new MimeBodyPart();
+	        DataHandler dh = new DataHandler(new FileDataSource("src/javamail架包.jar"));
+	        attach.setDataHandler(dh);
+	            //解决文件中文乱码问题
+	        attach.setFileName(MimeUtility.encodeText(dh.getName()));
+	         
+	        //描述正文和图片的关系
+	        MimeMultipart mp = new MimeMultipart();
+	        mp.addBodyPart(text);
+	        mp.addBodyPart(image);
+	        mp.setSubType("related");
+	         
+	        //描述正文和附件
+	        MimeMultipart mp2 = new MimeMultipart();
+	        mp2.addBodyPart(attach);
+	        //将正文封装为一个body
+	        MimeBodyPart content = new MimeBodyPart();
+	        content.setContent(mp);
+	         
+	        mp2.addBodyPart(content);
+	        mp2.setSubType("mixed");
+	         
+	        message.setContent(mp2);
+	        message.saveChanges();
+	         
+	        return message;
+	    }
+	     
+	}
