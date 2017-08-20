@@ -1,0 +1,691 @@
+<h1>常用开源框架中设计模式使用分析</h1>
+
+<h1>一、前言</h1>
+
+<p>说起来设计模式，大家应该都耳熟能详，设计模式代表了软件设计的最佳实践，是经过不断总结提炼出来的代码设计经验的分类总结，这些模式或者可以简化代码，或者可以是代码逻辑开起来清晰，或者对功能扩展很方便&hellip;。</p>
+
+<p>设计模式按照使用场景可以分为三大类：创建型模式（Creational Patterns）、结构型模式（Structural Patterns）、行为型模式（Behavioral Patterns）。</p>
+
+<p>&nbsp;</p>
+
+<ul>
+	<li>创建型模式（Creational Patterns）<br />
+	对对象的实例化过程进行抽象，这使得一个系统可以不用关心这些对象是如何创建，组合，呈现的，对于类创建模式来说通过使用继承改变实例化的类，对于对象创建模式来说通过使用代理来实例化所需要的对象。</li>
+	<li>结构型模式（Structural Patterns）<br />
+	通过对多个类和对象进行组合得到复杂结构的类，一般使用继承继承或者成员变量引用形式来实现。</li>
+	<li>行为型模式（Behavioral Patterns）<br />
+	行为模式不仅表达了对象和类，还表达了他们之间的交互，涉及到了对象和算法的分配。</li>
+</ul>
+
+<p><img alt="image.png" src="http://ata2-img.cn-hangzhou.img-pub.aliyun-inc.com/e2497a2424a0630f4c01c5e58b6dd346.png" /></p>
+
+<p>下面就带大家看下开源框架框架中是如何应用这些经典设计模式的。</p>
+
+<h1>二、责任链设计模式（Chain of Responsibility Pattern）</h1>
+
+<h2>2.1 介绍</h2>
+
+<p>责任链模式是把多个对象串联起来形成一个链状结构，让每个对象都有机会对事件发送者的请求进行处理。责任链模式是设计模式中的行为模式，设计意图是为了使事件发送者和事件接受者之间解耦。通常责任链链中的每个对象都有下一个对象的引入（例如tomcat 里面StandardPipeline用来管理valve），或者有个同一个链管理工厂里面使用数组存放了所有的对象（例如tomcat里面ApplicationFilterChain用来关系filter）。</p>
+
+<h2>2.2 Tomcat中Valve链</h2>
+
+<p>Tomcat中StandardEngine,StandardHost,StandardContext里面都有自己StandardPipeline,下面以StandardEngine里面StandardPipeline为例讲解</p>
+
+<p><img alt="image.png" src="http://ata2-img.cn-hangzhou.img-pub.aliyun-inc.com/20b73c2458ca0136d5efe7d6f193c417.png" /></p>
+
+<p>从上面类图可知道每个Valve都要继承ValveBase类，该类里面有一个Valve的引用，实际是链中下一个节点对象，Valve就是通过每个Valve里面的next串联为链的。</p>
+
+<p><img alt="image.png" src="http://ata2-img.cn-hangzhou.img-pub.aliyun-inc.com/8c99655f81863ec5c57e8e082ccc9ef7.png" /></p>
+
+<p>每个valve的invoke方法里面调用next.invoke激活链中下一个节点,并且StandardEngine,StandardHost,StandardContext都有一个basic valve这个valve在链的末尾用来激活子容器的valve链。</p>
+
+<h2>2.3 Tomcat中Filter链</h2>
+
+<p>Tomcat中Filter链是使用ApplicationFilterChain来管理的，具体结构如下图：</p>
+
+<p><img alt="image.png" src="http://ata2-img.cn-hangzhou.img-pub.aliyun-inc.com/d606b841a986e77a88385f7c8332a553.png" /></p>
+
+<p>可知Filter链不是像Valve一样在内部维护下个节点的引用，而是在ApplicationFilterChain中搞了个数组存放所有的Filter，并通过n统计Filter总个数，pos是当前filter的下标。</p>
+
+<p>ApplicationFilterChain的doFilter代码如下：</p>
+
+<pre>
+<code>public void doFilter(ServletRequest request, ServletResponse response)
+        throws IOException, ServletException {
+        ...
+        internalDoFilter(request,response);
+        ...
+    }
+
+private void internalDoFilter(ServletRequest request, 
+                                  ServletResponse response)
+        throws IOException, ServletException {
+
+        // Call the next filter if there is one
+        if (pos &lt; n) {
+
+            //获取filter链中下标为pos的filter
+            ApplicationFilterConfig filterConfig = filters[pos++];
+            Filter filter = null;
+            try {
+                filter = filterConfig.getFilter();
+                support.fireInstanceEvent(InstanceEvent.BEFORE_FILTER_EVENT,
+                                          filter, request, response);
+
+                if (request.isAsyncSupported() &amp;&amp; &quot;false&quot;.equalsIgnoreCase(
+                        filterConfig.getFilterDef().getAsyncSupported())) {
+                    request.setAttribute(Globals.ASYNC_SUPPORTED_ATTR,
+                            Boolean.FALSE);
+                }
+
+                ...
+
+                //调用自定义filter的dofilter方法
+                filter.doFilter(request, response, this);
+
+
+                support.fireInstanceEvent(InstanceEvent.AFTER_FILTER_EVENT,
+                                          filter, request, response);
+            } 
+            ....
+
+    }
+   .....
+}
+</code></pre>
+
+<p><code>注：这两种方式的区别是啥,就是说那些场景下使用2.2，什么情况下使用2.3这个目前还没有搞清楚有</code><br />
+<code>知道的麻烦在本帖留言帮我解惑下^^</code></p>
+
+<h2>2.4 使用场景</h2>
+
+<ul>
+	<li>当一个请求需要<br />
+	根据请求参数的不同由不同对象来处理时候。</li>
+	<li>当一个请求需要固定对象顺序处理，并且可扩展性的在固定顺序里面插入新的对象进行处理时候。</li>
+</ul>
+
+<h1>三、工厂模式（Factory Pattern）</h1>
+
+<h2>3.1 介绍</h2>
+
+<p>工厂模式是创建型模式，他封装了对象的创建过程，调用者使用具体的工厂方法根据参数就可以获取对应的对象。</p>
+
+<h2>3.2 Spring框架中BeanFactory</h2>
+
+<p><img alt="image.png" src="http://ata2-img.cn-hangzhou.img-pub.aliyun-inc.com/c59510036dffc99b7910ac6a19bf5653.png" /></p>
+
+<p>如图BeanFactory接口提供了getBean方法，在AbstractBeanFactory中实现了该方法，经过层层继承，实现，最后DefaultListableBeanFactory实现了BeanDefinitionRegistry接口用来保存bean定义，继承了AbstractAutowireCapableBeanFactory用来支撑autowired。</p>
+
+<p><strong>一个例子</strong></p>
+
+<pre>
+<code>@Test
+public void testBeanFactoy() throws NamingException, SQLException, ParseException, IOException {
+
+    //创建Bean工厂
+    DefaultListableBeanFactory bf = new DefaultListableBeanFactory();
+
+    //给bean工厂添加bean定义,解析xml里面的bean放入bean工厂
+    loadBeanDefinitions(bf);
+
+    //根据名字从bean工厂获取bean
+    Hello hello = (Hello) bf.getBean(&quot;hello&quot;);
+    hello.sayHello();
+
+    Hello2 hello2 = (Hello2) bf.getBean(&quot;hello2&quot;);
+    hello2.sayHello();
+
+
+}
+
+protected void loadBeanDefinitions(DefaultListableBeanFactory beanFactory) throws IOException {
+    XmlBeanDefinitionReader beanDefinitionReader = new XmlBeanDefinitionReader(beanFactory);
+
+    String[] configLocations = new String[] { &quot;beans2.xml&quot; };
+    if (configLocations != null) {
+        beanDefinitionReader.loadBeanDefinitions(configLocations);
+    }
+}
+</code></pre>
+
+<h2>3.3 使用场景</h2>
+
+<ul>
+	<li>不同条件下创建不同实例，用于统一管理bean</li>
+	<li>不同条件下调用不同工厂方法获取不同场景下的bean</li>
+</ul>
+
+<h1>四、单例设计模式（Singleton Pattern）</h1>
+
+<h2>4.1 介绍</h2>
+
+<p>单例模式是一种创建型模式，单例模式提供一个创建对象的接口，但是多次调用该接口返回的是同一个实例的引用，目的是为了保证只有一个实例，并且提供一个访问这个实例的统一接口。</p>
+
+<h2>4.2 Spring中单例bean的创建</h2>
+
+<p>Spring中默认配置的bean的scope为singleton，也就是单例作用域。那么看看它是如何做到的。<br />
+在AbstractBeanFactory类里面的doGetBean方法：</p>
+
+<pre>
+<code>protected Object doGetBean(
+            final String name, final Class requiredType, final Object[] args, boolean typeCheckOnly) throws BeansException {
+
+    final String beanName = transformedBeanName(name);
+    Object bean = null;
+
+    // 解决set循环依赖
+    Object sharedInstance = getSingleton(beanName);
+    if (sharedInstance != null &amp;&amp; args == null) {
+        ...
+    }
+
+    else {
+        ...
+        // 创建单件bean.
+        if (mbd.isSingleton()) {
+            sharedInstance = getSingleton(beanName, new ObjectFactory() {
+                public Object getObject() throws BeansException {
+                    try {
+                        return createBean(beanName, mbd, args);
+                    }
+                    catch (BeansException ex) {
+                    ...
+                        throw ex;
+                    }
+                }
+            });
+            bean = getObjectForBeanInstance(sharedInstance, name, beanName, mbd);
+        }
+       //创建原型bean
+        else if (mbd.isPrototype()) {
+            ...
+        }
+        //创建request作用域bean
+        else {
+            ...
+        }
+    }
+            ...
+    return bean;
+}
+</code></pre>
+
+<p>getSingleton代码：</p>
+
+<pre>
+<code>public Object getSingleton(String beanName, ObjectFactory singletonFactory) {
+    Assert.notNull(beanName, &quot;&#39;beanName&#39; must not be null&quot;);
+    synchronized (this.singletonObjects) {
+        Object singletonObject = this.singletonObjects.get(beanName);
+        if (singletonObject == null) {
+            ...
+            beforeSingletonCreation(beanName);
+            ...
+            try {
+                singletonObject = singletonFactory.getObject();
+            }
+            catch (BeanCreationException ex) {
+                ...
+            }
+            finally {
+                if (recordSuppressedExceptions) {
+                    this.suppressedExceptions = null;
+                }
+                afterSingletonCreation(beanName);
+            }
+            addSingleton(beanName, singletonObject);
+        }
+        return (singletonObject != NULL_OBJECT ? singletonObject : null);
+    }
+}
+
+protected void addSingleton(String beanName, Object singletonObject) {
+    synchronized (this.singletonObjects) {
+        this.singletonObjects.put(beanName, (singletonObject != null ? singletonObject : NULL_OBJECT));
+        this.singletonFactories.remove(beanName);
+        this.earlySingletonObjects.remove(beanName);
+        this.registeredSingletons.add(beanName);
+    }
+}
+
+private final Map singletonObjects = CollectionFactory.createConcurrentMapIfPossible(16);
+</code></pre>
+
+<p>可知Spring内部四通过一个ConcurrentMap来管理单件bean的。获取bean时候会先看看singletonObjects中是否有，有则直接返回，没有则创建后放入。</p>
+
+<p>看个时序图：<br />
+<img alt="image.png" src="http://ata2-img.cn-hangzhou.img-pub.aliyun-inc.com/eff5e609e82e4ea24b21829a3743b0d1.png" /></p>
+
+<p>Spring的bean工厂管理的单例模式管理的是多个bean实例的单例，是工厂模式管理所有的bean,而每个bean的创建又使用了单例模式。</p>
+
+<h2>4.4 使用场景</h2>
+
+<ul>
+	<li>同一个jvm应用的不同模块需要使用同一个对象实例进行信息共享。</li>
+	<li>需要同一个实例来生成全局统一的序列号</li>
+</ul>
+
+<h1>五、原型设计模式（Prototype Pattern）</h1>
+
+<h2>5.1 介绍</h2>
+
+<p>相比单例设计模式，原型模式是每次创建一个对象，下面看下spring是如何使用原型模式的</p>
+
+<h2>5.2 Spring中原型bean的创建</h2>
+
+<p>创建原型bean需要在xml特别说明：</p>
+
+<pre>
+<code>    &lt;bean id=&quot;hello&quot; class=&quot;com.zlx.demo.Hello&quot; scope=&quot;prototype&quot;/&gt;
+</code></pre>
+
+<pre>
+<code>protected &lt;T&gt; T doGetBean(
+        final String name, final Class&lt;T&gt; requiredType, final Object[] args, boolean typeCheckOnly)
+        throws BeansException {
+
+    final String beanName = transformedBeanName(name);
+    Object bean;
+
+    // Eagerly check singleton cache for manually registered singletons.
+    Object sharedInstance = getSingleton(beanName);
+    if (sharedInstance != null &amp;&amp; args == null) {
+     ...
+    }
+
+    else {
+        ...
+
+        try {
+            ...
+
+            // Create bean instance.
+            if (mbd.isSingleton()) {
+                ...
+            }
+            //创建原型bean
+            else if (mbd.isPrototype()) {
+                // It&#39;s a prototype -&gt; create a new instance.
+                Object prototypeInstance = null;
+                try {
+                    beforePrototypeCreation(beanName);
+                    prototypeInstance = createBean(beanName, mbd, args);
+                }
+                finally {
+                    afterPrototypeCreation(beanName);
+                }
+                bean = getObjectForBeanInstance(prototypeInstance, name, beanName, mbd);
+            }
+
+            else {
+                ...
+            }
+        }
+        catch (BeansException ex) {
+            cleanupAfterBeanCreationFailure(beanName);
+            throw ex;
+        }
+    }
+ ...
+    return (T) bean;
+}
+</code></pre>
+
+<p>createBean函数里面则是根据bean定义创建新bean，感兴趣的可以看看。</p>
+
+<h2>5.3 使用场景</h2>
+
+<ul>
+	<li>当有业务场景使用某个bean时候需要使用自己的一个拷贝的时候使用。</li>
+</ul>
+
+<h1>六、 策略模式（Strategy Pattern）</h1>
+
+<h2>6.1 介绍</h2>
+
+<p>策略模式属于行为性模式，它定义一系列的算法对象,使用时候可以使它们相互替换。</p>
+
+<h2>6.2 Spring中bean实例化策略</h2>
+
+<p>首先看下类图：</p>
+
+<p><img alt="image.png" src="http://ata2-img.cn-hangzhou.img-pub.aliyun-inc.com/6de7194766087d8afcb6d1760046882c.png" /></p>
+
+<p>从图知道：接口InstantiationStrategy是实例化策略接口类，它定义了三个实例化接口，然后SimpleInstantiationStrategy实现了该策略，它主要做一些简单的根据构造函数实例号bean的工作，然后CglibSubclassingInstantiationStrategy又继承了SimpleInstantiationStrategy新增了方法注入方式根据cglib生成代理类实例化方法。</p>
+
+<p>在AbstractAutowireCapableBeanFactory中管理了该策略的一个对象，默认是CglibSubclassingInstantiationStrategy策略，运行时候可以通过setInstantiationStrategy改变实例化策略，如果你自己写个个策略的话。</p>
+
+<h2>6.3 Spring中Aop代理策略</h2>
+
+<p><img alt="image.png" src="http://ata2-img.cn-hangzhou.img-pub.aliyun-inc.com/40d1cac8a73f55f6396f76542cdb6de0.png" /></p>
+
+<p>首先看AopProxyFactory接口类提供了createAopProxy接口，这个是策略模式的接口方法。然后DefaultAopProxyFactory实现了该接口作为策略的实现者。然后ProxyCreatorSupport里面引用了AopProxyFactory，并且提供了get,set方法用来运行时改变策略，这里Spring只实现了DefaultAopProxyFactory这一个策略，如果需要自己也可以写个。</p>
+
+<p>DefaultAopProxyFactory里面的createAopProxy的逻辑如下，可以在运行时根据参数决定用Cglib策略还是JDK动态代理策略生成代理类：</p>
+
+<pre>
+<code>    public AopProxy createAopProxy(AdvisedSupport config) throws AopConfigException {
+
+        //如果XML打开了优化开关，或者设置为了代理目标类，或者目前类没有接口
+        if (config.isOptimize() || config.isProxyTargetClass() || hasNoUserSuppliedProxyInterfaces(config)) {
+            Class&lt;?&gt; targetClass = config.getTargetClass();
+            if (targetClass == null) {
+                throw new AopConfigException(&quot;TargetSource cannot determine target class: &quot; +
+                        &quot;Either an interface or a target is required for proxy creation.&quot;);
+            }
+
+            //如果有接口，或者通过Proxy.newProxyInstance生成的，则使用jdk动态代理
+            if (targetClass.isInterface() || Proxy.isProxyClass(targetClass)) {
+                return new JdkDynamicAopProxy(config);
+            }
+
+            //使用cglib
+            return new ObjenesisCglibAopProxy(config);
+        }
+        else {
+            //使用jdk动态代理
+            return new JdkDynamicAopProxy(config);
+        }
+    }
+</code></pre>
+
+<p>另外AopProxy也是一个策略接口类，具体实现的策略为JdkDynamicAopProxy，CglibAopProxy，ObjenesisCglibAopProxy</p>
+
+<h2>6.4 Tomcat中Digester解析server.xml</h2>
+
+<p>tomcat中的Digester是为了解析server.xml的，其中每个元素都有一个解析规则就是Rule ,类图如下：<br />
+DigestER一开始先指定不同的解析策略（Rule），然后在具体解析Server.xml时候根据节点不同使用不同解析策略来解析节点。</p>
+
+<p><img alt="image.png" src="http://ata2-img.cn-hangzhou.img-pub.aliyun-inc.com/56b66d501ee51f2c4d0113cf2459371b.png" /></p>
+
+<p>如图在解析每个节点时候会先找到该节点对应的解析策略，然后循环去调用所有解析策略的方法去处理。</p>
+
+<h2>6.5 使用场景</h2>
+
+<ul>
+	<li>运行时根据条件的不同使用不同的策略处理一个事情，与责任链不同在于，责任链是一个链条，一个事情可以被责任链里面所有节点处理，而 策略模式则是只有有一个对象来处理。</li>
+</ul>
+
+<h2>七、 门面模式（Facade Pattern）</h2>
+
+<h2>7.1 介绍</h2>
+
+<p>门面模式是一种结构性模式，它通过新增一个门面类对外暴露系统提供的一部分功能，或者屏蔽了内部系统的复杂性，对外部仅仅暴露一个简单的接口，或者通过调用不同的服务对外提供统一的接口，让使用者对这些内部服务透明化。</p>
+
+<h2>7.2 模板引擎Velocity中门面模式使用</h2>
+
+<p>Velocity里面的VelocityEngine和Velocity类都是RuntimeInstance类的门面，后者提供了模板渲染的所有功能，前两者则是内部维护RuntimeInstance的实例，具体工作还是委托给RuntimeInstance来实现。<br />
+关于Veloctiy可以参考：http://ifeve.com/velocity%E5%8E%9F%E7%90%86%E6%8E%A2%E7%A9%B6/</p>
+
+<p><img alt="image.png" src="http://ata2-img.cn-hangzhou.img-pub.aliyun-inc.com/e4c27a3df97cba6963c12c45089f9efe.png" /></p>
+
+<p>如图 RuntimeInstance提供了Velocity引擎的所用功能，VelocityEngine内部直接引用了RuntimeInstance的一个实例，VelocityEngine对外暴露的服务都是委托RuntimeInstance实现，并且每次new一个VelocityEngine内部都会有RuntimeInstance的一个实例被创建。而Velocity类调用了单例模式类RuntimeSingleton里面的方法，RuntimeSingleton又是RuntimeInstance的一个单例模式。</p>
+
+<h2>7.3 使用场景</h2>
+
+<ul>
+	<li>当需要对外屏蔽一个系统的复杂性时候可以考虑使用门面模式对外提供简单可读性高的接口类</li>
+	<li>当需要对外部暴露系统一部分权限的接口时候可以考虑使用门面模式减少系统权限。</li>
+	<li>当系统需要调用不同服务汇总后在对外提供服务时候可以考虑使用门面模式对外屏蔽细节，之暴露一个接口。</li>
+</ul>
+
+<h1>九、装饰器模式（Decorator Pattern）</h1>
+
+<h2>9.1 介绍</h2>
+
+<p>装饰器模式是一种结构性模式，它作用是对对象已有功能进行增强，但是不改变原有对象结构。这避免了通过继承方式进行功能扩充导致的类体系臃肿。</p>
+
+<h2>9.2 Spring中BeanDefinitionDecorator</h2>
+
+<p>先看下类图：</p>
+
+<p><img alt="image.png" src="http://ata2-img.cn-hangzhou.img-pub.aliyun-inc.com/b63a4f70fffe0d1e65cd22cf50da57b6.png" /></p>
+
+<p>如图ScopedProxyBeanDefinitionDecorator实现了decorate方法用来对scope作用域为request的bean定义进行包装。<br />
+具体时序图为：</p>
+
+<p><img alt="image.png" src="http://ata2-img.cn-hangzhou.img-pub.aliyun-inc.com/88e7f221230e447ac513d7db8fd07f76.png" /></p>
+
+<pre>
+<code>class ScopedProxyBeanDefinitionDecorator implements BeanDefinitionDecorator {
+
+    private static final String PROXY_TARGET_CLASS = &quot;proxy-target-class&quot;;
+
+    @Override
+    public BeanDefinitionHolder decorate(Node node, BeanDefinitionHolder definition, ParserContext parserContext) {
+        boolean proxyTargetClass = true;
+        if (node instanceof Element) {
+            Element ele = (Element) node;
+            if (ele.hasAttribute(PROXY_TARGET_CLASS)) {
+                proxyTargetClass = Boolean.valueOf(ele.getAttribute(PROXY_TARGET_CLASS));
+            }
+        }
+
+        // 创建scoped的代理类，并注册到容器
+        BeanDefinitionHolder holder =
+                ScopedProxyUtils.createScopedProxy(definition, parserContext.getRegistry(), proxyTargetClass);
+        String targetBeanName = ScopedProxyUtils.getTargetBeanName(definition.getBeanName());
+        parserContext.getReaderContext().fireComponentRegistered(
+                new BeanComponentDefinition(definition.getBeanDefinition(), targetBeanName));
+        return holder;
+    }
+
+}
+</code></pre>
+
+<p>关于ScopedProxyBeanDefinitionDecorator干啥用的那：</p>
+
+<pre>
+<code>
+  &lt;bean id=&quot;lavaPvgInfo&quot; class=&quot;com.alibaba.lava.privilege.PrivilegeInfo&quot;
+        scope=&quot;request&quot;&gt;
+        &lt;property name=&quot;aesKey&quot; value=&quot;666&quot; /&gt;
+        &lt;aop:scoped-proxy /&gt;
+    &lt;/bean&gt;
+</code></pre>
+
+<p>其实就是处理<code>&lt;aop:scoped-proxy /&gt;</code><br />
+的，具体作用是包装lavaPvgInfo的bean定义为ScopedProxyFactoryBean，作用是实现request作用域bean.</p>
+
+<h2>9.3 commons-collections包中ListUtils</h2>
+
+<p><img alt="image.png" src="http://ata2-img.cn-hangzhou.img-pub.aliyun-inc.com/e61a6d3f8dfdd0478f69f2c1a42eef40.png" /></p>
+
+<p>如图</p>
+
+<p>ListUtils中的四个方法分别依赖list的四种装饰器类对List功能进行扩充和限制。<br />
+其中FixedSizeList类通过禁止add/remove操作保证list的大小固定，但是可以修改元素内容<br />
+其中UnmodifiableList类通过禁用add,clear,remove,set,保证list的内容不被修改<br />
+其中SynchronizedList类通过使用Lock 来保证add,set,get,remove等的同步安全<br />
+其中LazyList类则当调用get方法发现list里面不存在对象时候，自动使用factory创建对象.</p>
+
+<h2>9.4 使用场景</h2>
+
+<ul>
+	<li>在不改变原有类结构基础上，新增或者限制或者改造功能时候。</li>
+</ul>
+
+<h1>十、适配器模式（Adapter Pattern）</h1>
+
+<h2>10.1 介绍</h2>
+
+<p>适配器模式属于结构性模式，它为两个不同接口之间互通提供了一种手段。</p>
+
+<h2>10.2 Spring中MethodInterceptor适配器</h2>
+
+<p>在Spring Aop框架中，MethodInterceptor接口被用来拦截指定的方法，对方法进行增强。</p>
+
+<p><img alt="image.png" src="http://ata2-img.cn-hangzhou.img-pub.aliyun-inc.com/75a2a0a3959b207e1a60fbab5f9e30ee.png" /></p>
+
+<p>大家都知道在Aop中每个advistor 里面会有一个advice具体做切面动作，Spring提供了AspectJAfterReturningAdvice，AspectJMethodBeforeAdvice，AspectJAroundAdvice，AspectJAfterAdvice这几个advice,在XML 配置aop时候会指定<code>&lt;aop:after-returning/&gt;,&lt;aop:before/&gt;,&lt;aop:around/&gt;,&lt;aop:after/&gt;</code>,其实内部就是创建上面对应的这些advice。</p>
+
+<p>从图知道AspectJAfterReturningAdvice和AspectJMethodBeforeAdvice没有实现MethodInterceptor接口，其他两者则实现了该接口。而Spring Aop的方法拦截器却必须是实现了MethodInterceptor的，所以Spring提供了对应的适配器来适配这个问题,分别是MethodBeforeAdviceAdapter和AfterReturningAdviceAdapter和ThrowsAdviceAdapter。</p>
+
+<p><img alt="image.png" src="http://ata2-img.cn-hangzhou.img-pub.aliyun-inc.com/cd2f54487f6e14e6235d0a267627573f.png" /></p>
+
+<p>看下DefaultAdvisorAdapterRegistry的 getInterceptors方法：</p>
+
+<pre>
+<code>public MethodInterceptor[] getInterceptors(Advisor advisor) throws UnknownAdviceTypeException {
+    List&lt;MethodInterceptor&gt; interceptors = new ArrayList&lt;MethodInterceptor&gt;(3);
+
+    //从advistor中获取advice
+    Advice advice = advisor.getAdvice();
+
+    //如果实现了MethodInterceptor则直接加入，比如AspectJAroundAdvice，AspectJAfterAdvice
+    if (advice instanceof MethodInterceptor) {
+        interceptors.add((MethodInterceptor) advice);
+    }
+
+    //否者看是否有当前advice的适配器，首先检验是否支持，支持则返回对应的适配器
+    for (AdvisorAdapter adapter : this.adapters) {
+        if (adapter.supportsAdvice(advice)) {
+            interceptors.add(adapter.getInterceptor(advisor));
+        }
+    }
+    if (interceptors.isEmpty()) {
+        throw new UnknownAdviceTypeException(advisor.getAdvice());
+    }
+    return interceptors.toArray(new MethodInterceptor[interceptors.size()]);
+}
+</code></pre>
+
+<p>以MethodBeforeAdviceAdapter为例子看下：</p>
+
+<pre>
+<code>class MethodBeforeAdviceAdapter implements AdvisorAdapter, Serializable {
+
+    public boolean supportsAdvice(Advice advice) {
+        return (advice instanceof MethodBeforeAdvice);
+    }
+
+    public MethodInterceptor getInterceptor(Advisor advisor) {
+        MethodBeforeAdvice advice = (MethodBeforeAdvice) advisor.getAdvice();
+        return new MethodBeforeAdviceInterceptor(advice);
+    }
+
+}
+
+public class MethodBeforeAdviceInterceptor implements MethodInterceptor, Serializable {
+
+    private MethodBeforeAdvice advice;
+
+    /**
+     * Create a new MethodBeforeAdviceInterceptor for the given advice.
+     * @param advice the MethodBeforeAdvice to wrap
+     */
+    public MethodBeforeAdviceInterceptor(MethodBeforeAdvice advice) {
+        Assert.notNull(advice, &quot;Advice must not be null&quot;);
+        this.advice = advice;
+    }
+
+    public Object invoke(MethodInvocation mi) throws Throwable {
+        this.advice.before(mi.getMethod(), mi.getArguments(), mi.getThis() );
+        return mi.proceed();
+    }
+
+}
+</code></pre>
+
+<p>可知MethodBeforeAdviceInterceptor继承了MethodInterceptor作为了一个适配器内部委托请求给MethodBeforeAdvice。</p>
+
+<h2>10.3 使用场景</h2>
+
+<ul>
+	<li>两个系统交互时候由于接口参数不一样没办法直接对接，则可以搞个适配器接口做参数转换。</li>
+	<li>适配器模式经常是在一个系统或者设计已经定型时候用的，而不是在初始设计时候。一般是因为不影响现在业务情况下，通过适配方式统一接口</li>
+</ul>
+
+<h1>十一、模板设计模式（Template Pattern）</h1>
+
+<h2>11.1 前言</h2>
+
+<p>模板设计模式是一种行为设计模式，它使用一个抽象类定义了一个模板，这个模板里面定义了一系列的接口，子类则只需要继承该抽象类并且根据需要重写一部分接口。</p>
+
+<h2>11.2 ibatis2中AbstractDAOTemplate</h2>
+
+<p><img alt="image.png" src="http://ata2-img.cn-hangzhou.img-pub.aliyun-inc.com/f6bf791105a4c5cd71d2f71de2a444d9.png" /></p>
+
+<p>如图AbstractDAOTemplate是抽象模板类，里面定义了configure方法，configure方法里面定义了好多protected方法，其中就有些是抽象方法。类SpringDAOTemplate，IbatisDAOTemplate，GenericCIDAOTemplate，GenericSIDAOTemplate则继承了AbstractDAOTemplate类并重写了一部分方法。</p>
+
+<h2>11.3 Tomcat中Digester里面的Rule</h2>
+
+<p>tomcat中的Digester是为了解析server.xml的，其中每个元素都有一个解析规则就是Rule ,类图如下：</p>
+
+<p><img alt="image.png" src="http://ata2-img.cn-hangzhou.img-pub.aliyun-inc.com/c3ca4c784de18fd55815f6ced37e6c80.png" /></p>
+
+<p>如图：Rule是抽象类，对于每个解析的节点来说Rule提供了解析所需所有的方法，而他的子类则根据自己的特殊性重写一部分方法来支持自己的特性。</p>
+
+<h2>11.4 Tomcat中Endpoint</h2>
+
+<p><img alt="image.png" src="http://ata2-img.cn-hangzhou.img-pub.aliyun-inc.com/087f7bf611623f2c47434503fb6b1b2c.png" /></p>
+
+<p>如图AbstractEndpoint是个抽象类，定义了Endpoint的所有接口，然后JIoEndpoint继承了该类并且重写了一部分重要的方法实现了BIO方式endpoint,NioEndpoint则重写了方法实现了NIO的endpoint.</p>
+
+<h2>11.5使用场景</h2>
+
+<ul>
+	<li>当多个子类具有共同的操作流程逻辑，并且其中某些流程节点操作需要自己定制化时候。</li>
+</ul>
+
+<h1>十二、 建造者模式（Builder Pattern）</h1>
+
+<h2>12.1 前言</h2>
+
+<p>建造者模式是一种创建型模式，将一个复制对象的创建屏蔽到接口内部，用户使用时候只需要传递固定的参数，内部就会执行复杂逻辑后返回会用户需要的对象，用户不需要知道创建的细节。</p>
+
+<h2>12.2 Mybatis中的SqlSessionFactoryBuilder</h2>
+
+<p><img alt="image.png" src="http://ata2-img.cn-hangzhou.img-pub.aliyun-inc.com/b440781fc0397c69ed0a2e2d4635a1a8.png" /></p>
+
+<p>如图mybaits中的SqlSessionFactoryBuilder就是典型的创建者模式，他内部有多个build方法，根据参数的不同创建出SqlSessionFactory对象，使用者只需要传递具体参数而不用关系内部是如何创建出需要的对象的。SqlSessionFactoryBean大家应该很熟悉，在xml里面配置的。</p>
+
+<h2>12.3 使用场景</h2>
+
+<ul>
+	<li>当一个对象比较复杂并且容易出错时候，可以考虑这种模式去屏蔽创造细节。</li>
+</ul>
+
+<h1>十三、 观察者模式（Observer Pattern）</h1>
+
+<h2>13.1 前言</h2>
+
+<p>观察者模式是一种行为模式，它定义了当一个对象的状态或者属性发生变化时候，通通知其他对这些状态感兴趣的对象。观察者模式也叫发布-订阅模式，就是说当你订阅了摸一个主体时候，如果发布者改变了主题内容，那么所有订阅这个主体者都会受到通知。</p>
+
+<h2>13.2 Spring中ApplicationListener</h2>
+
+<p><img alt="image.png" src="http://ata2-img.cn-hangzhou.img-pub.aliyun-inc.com/8b62f919ddbf094b4cdb851d0446beee.png" /></p>
+
+<p>如图 黄色部分的listener们可以认为是订阅者，红色的context是发布者，context在IOC不同状态会给这些订阅者发布不同的消息通知订阅者容器状态。蓝色的为具体的事件（这里为容器不同状态），其中ContextRefreshedEvent是IOC刷新完成（也就是bean解析完成，创建完毕并且autowired完成）后的事件这个经常用。<br />
+。这里context并不是直接来管理黄色的listener订阅者的，而是委托给了绿色的部分，该部分是可以增加删除订阅者，并且发布事件给订阅者。</p>
+
+<p>其实Tomact中的Lifecycle也是这种机制，这里不再赘述。</p>
+
+<h2>13.3 使用场景</h2>
+
+<ul>
+	<li>满足发布-订阅条件的，当一个对象状态或者属性变化，需要把这种变化通知到订阅者时候。</li>
+</ul>
+
+<h1>十四、命令模式（Command Pattern）</h1>
+
+<h2>14.1 介绍</h2>
+
+<p>命令模式是一种行为模式，通过把命令封装为一个对象，命令发送者把命令对象发出后，就不去管是谁来接受处理这个命令，命令接受者接受到命令对象后进行处理，也不用管命令是谁发出的，所以命令模式实现了发送者与接受者之间的解耦，而具体把命令发送给谁还需要一个控制器。</p>
+
+<h2>14.2 Tomcat中命令模式</h2>
+
+<p>tomcat作为一个服务器本身会接受外部大量请求，当一个请求过来后tomcat根据域名去找对应的host,找到host后会根据应用名去找具体的context(应用)，然后具体应用处理请求。对于具体host来说他不关心这个请求是谁给的，对应请求来说他不必关心谁来处理，但是两者是通过request封装请求对象进行关联起来。</p>
+
+<p><img alt="image.png" src="http://ata2-img.cn-hangzhou.img-pub.aliyun-inc.com/584d243a3666907fe537d7a35165cafb.png" /></p>
+
+<p>tomcat中Connector作为命令发出者，Connector接受到请求后把请求内容封装为request对象（命令对象），然后使用CoyoteAdapter作为分发器把请求具体发配到具体的host,host在根据request对象找到具体的context,至此找到了具体的应用，交给具体应用处理。</p>
+
+<p>另外对于使用springmvc的应用来说，上面找到具体应用，但是具体交给那个controller来处理那，这是不是也是命令模式的使用那。</p>
+
+<h2>14.3 使用场景</h2>
+
+<ul>
+	<li>当事件发送者和接受者直接需要完全解耦（直接并不存在引用关系）时候。</li>
+</ul>
