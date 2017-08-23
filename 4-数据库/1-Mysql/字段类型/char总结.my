@@ -150,3 +150,123 @@ select f from t where f = N&#39;xx&#39;<br />
 3、不确定长度，要查询且希望利用索引的话，用nvarchar类型吧，将它们设到400；<br />
 4、不查询的话没什么好说的，用nvarchar(4000)<br />
 5、性格豪爽的可以只用3和4，偶尔用用1，毕竟这是一种额外说明，等于告诉别人说，我一定需要长度为X位的数据</strong></p>
+
+<p>&nbsp;</p>
+
+<h1><a href="http://www.cnblogs.com/flqcchblog/p/4560781.html" id="cb_post_title_url">数据库中char、varchar、varchar2、nvarchar之间的关系</a></h1>
+
+<p>符串&ldquo;abc&quot;，对于CHAR (20)，表示你存储的字符将占20个字节(包括17个空字符)，而同样的VARCHAR2 (20)则只占用3个字节的长度，20只是最大值，当你存储的字符小于20时，按实际长度存储。&nbsp;</p>
+
+<p>oracle中，会有一个varchar2型的数据类型，varchar2型与varchar型的区别：</p>
+
+<p>1、varchar2把所有字符都占两字节处理(一般情况下)，varchar只对汉字和全角等字符占两字节，数字，英文字符等都是一个字节；<br />
+2、VARCHAR2把空串等同于null处理，而varchar仍按照空串处理；<br />
+3、VARCHAR2字符要用几个字节存储，要看数据库使用的字符集，<br />
+大部分情况下建议使用varchar2类型，可以保证更好的兼容性。</p>
+
+<p>varchar(n),nvarchar(n) 中的n怎么解释：<br />
+　　nvarchar(n)最多能存n个字符，不区分中英文。<br />
+　　varchar(n)最多能存n个字节，一个中文是两个字节。<br />
+所占空间：<br />
+　　nvarchar(n)一个字符会占两个字节空间。<br />
+　　varchar(n)中文占两字节空间，英文占一个。<br />
+n的取值范围：<br />
+　　nvarchar(n)&nbsp;&nbsp; n的范围是：1与4000之间<br />
+　　varchar(n)&nbsp;&nbsp; n的范围是：1与8000之间<br />
+n的大小是否会影响性能：<br />
+　　varchar及nvarchar里的长度 n 不会影响空间大小及性能。除非n是max并且内容大于4000或8000<br />
+　　设置n更多的是业务需要，如限制身份证只能输入18位，再多就报错，或者防止恶意攻击撑爆硬盘。对空间及性能都没有影响<br />
+n设置多大比较好：<br />
+　　既然对空间及性能都没有影响，那我们只要考虑业务需要就可以了，我分析过微软的数据库，大都设置为：256，也会看到64,128,512,max等，可能是便于记忆吧。<br />
+varchar(n),nvarchar(n)存储空间举例解释：<br />
+　　包含 n 个字符的可变长度 Unicode 字符数据。字节的存储大小是所输入字符个数的两倍。&nbsp;<br />
+　　两字段分别有字段值：我和coffee&nbsp;<br />
+　　那么varchar字段占2&times;2+6=10个字节的存储空间，而nvarchar字段占8&times;2=16个字节的存储空间。&nbsp;<br />
+　　如字段值只是英文可选择varchar，而字段值存在较多的双字节（中文、韩文等）字符时用nvarchar。<br />
+varchar和nvarchar如何选择？<br />
+　　varchar在SQL Server中是采用单字节来存储数据的，nvarchar是使用Unicode来存储数据的．中文字符存储到SQL Server中会保存为两个字节（一般采用Unicode编码），英文字符保存到数据库中，如果字段的类型为varchar，则只会占用一个字节，而如果字段的类型为nvarchar，则会占用两个字节．<br />
+　　正常情况下，我们使用varchar也可以存储中文字符，但是如果遇到操作系统是英文操作系统并且对中文字体的支持不全面时, 在SQL Server存储中文字符为varchar就会出现乱码(显示为??)．而且正常情况下，主机都会支持中文的环境，所以如果使用varchar来存储数据，在开发阶段是发现不了的．多数情况下，在布署的时候也不会有问题．<br />
+　　但是！如果布署的主机是英文操作系统，并且不支持中文环境，那问题就出来了．所有的varchar字段在存储中文的时候都会变成乱码（显示为??）．而且一般情况下你不会知道这是因为你采用了错误的数据类型来存储所造成的，你会试着去装中文字体，试着去设置操作系统的语言环境．．．这些都不能解决问题，唯一能解决问题的是把数据库字段的类型个性为nvarchar（或者nchar）．对项目管理比较熟悉的朋友应该都知道，到布署阶段再来修改数据库是一个很恐怖的事情．<br />
+　　使用nvarchar的另一个非常好处就是在判断字符串的时候可以不需要考虑中英文两种字符的差别．<br />
+　　当然，使用nvarchar存储英文字符会增大一倍的存储空间．但是在存储代价已经很低廉的情况下，优先考虑兼容性会给你带来更多好处的．<br />
+　　所以在Design的时候应该尽量使用nvarchar来存储数据．只有在你确保该字段不会保存中文的时候，才采用varchar来存储．</p>
+
+<p>如果 varchar(300) 和 varchar(8000) 都存储相同的字符数，性能上是没有差别的，存储行为上也没有不同。因为它们都有相同的存储结构，两个字节的偏移，两个字节的列数（如果表中所有的列都是 varchar 类型）。区别只在于存储容量上。<br />
+大多数的性能比较都集中在 varchar 和 char，varchar 和 varchar(max) 上。还有，行外存储（SQL Server 2005 支持的）。<br />
+<br />
+　　varchar(max) （lob 类型）与 varchar 存储方式是不同的。<br />
+　　当 LOB 数据足够小时，可以考虑将数据直接存储在数据行（行所在的数据页面）中，从而可以避免额外的读取 LOB 页面，提升访问 LOB 数据的效率（将 LOB 数据直接存储在数据页面的阈值由 text in row 选项设置）。<br />
+而当 LOB 数据大于此阈值，或者所在行的大小超过了 8060 字节（单行最大 SIZE），LOB 数据将会存储在 LOB 页面，而在数据页面中保留一个指向 LOB 页面的 16 字节的指针。其访问效率当然会将低。<br />
+另外还有，恶意用户可以利用这一点&ldquo;撑爆&rdquo;你的磁盘。</p>
+
+<p>&nbsp;</p>
+
+<p>1.错误提示：</p>
+
+<p>&nbsp; &nbsp; &nbsp;mysql的Data truncation: Data too long for column &#39;path&#39; at row 1</p>
+
+<p>错误原因：</p>
+
+<p>　　　1.字段过长而导致出错的,</p>
+
+<p>&nbsp; &nbsp; &nbsp; &nbsp; 2. 可能是因为数据库里的表设置的字符集不相同。</p>
+
+<p>解决办法：</p>
+
+<p>　　varchar(10) &mdash;&mdash;&gt;varchar(20)</p>
+
+<p>　　alter table `cms_activity_test` convert to character set gbk collate gbk_chinese_ci;(单独修改指定表的字符集)</p>
+
+<p>&nbsp;</p>
+
+<p>其他参考：</p>
+
+<p>mysql和oracle做数据同步。其中表的一个字段在mysql中设置为<strong>varchar(6),</strong>Oracle中为<strong>varchar2(6)</strong><br />
+但mysql中能正常存放的数据同步到oracle中却抱<strong>ORA-12899: value too large for column</strong>错误。<br />
+这是为什么呢？</p>
+
+<p><strong>mysql中varchar(6)代表可以存放6个汉字，6个字母，或6个数字。<br />
+oracle中varchar2(6)代表可以中存放6个字节。即oracle中varchar2的长度代表字节数而不是字符数。<br />
+mysql中一个汉字占三个字节，Oracle中一个汉字占两个字节。</strong></p>
+
+<p>虽然mysql varchar 和orache varchar2中字段设置相同的长度，但oracle中却存放不下</p>
+
+<p>SQL&gt; insert into toracle values(&#39;北京蒙迪艾尔&#39;);<br />
+insert into toracle values(&#39;北京蒙迪艾尔&#39;)<br />
+ORA-12899: value too large for column &quot;SCOTT&quot;.&quot;TORACLE&quot;.&quot;NAME&quot; (actual: 12, maximum: 6)</p>
+
+<p>-- 在oracle中varchar2(6)中插入6个汉字失败</p>
+
+<pre>
+1.varchar2把所有字符都占两字节处理(一般情况下)，varchar只对汉字和全角等字符占两字节，数字，英文字符等都是一个字节；
+2.VARCHAR2把空串等同于null处理，而varchar仍按照空串处理；
+3.VARCHAR2字符要用几个字节存储，要看数据库使用的字符集，
+大部分情况下建议使用varchar2类型，可以保证更好的兼容性。</pre>
+
+<p>&nbsp;</p>
+
+<h1><a href="http://www.cnblogs.com/iyangyuan/p/3491215.html" id="cb_post_title_url">oracle数据库中varchar2陷阱</a></h1>
+
+<p>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; oracle数据库相信大家都比较熟悉，数据库中有一种非常常用的数据类型：字符串型。</p>
+
+<p>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 对应该类型，在oracle中有三种比较常用的类型：varchar2(byte)、varchar2(char)、nvarchar2()。</p>
+
+<p>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 那么这三种类型到底有什么区别呢？</p>
+
+<p>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 首先，我们要时刻记清：<strong>无论是</strong><strong>varchar2</strong><strong>还是nvarchar2</strong><strong>，最大字节数都是4000</strong><strong>。</strong></p>
+
+<p>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<strong>varchar2(byte)</strong>：就是默认的表示方式，比如我们写成：varchar2(100)，就相当于varchar2(100 byte)，<strong>表示最大字节数是</strong><strong>100</strong><strong>，该字段最多能容纳100</strong><strong>个字节，强调空间大小</strong>。由于我们描述的是字节，因此，保存汉字等字符时，就要小心了。如果你的数据库用的是GBK编码，那么一个汉字将占用2个字节，最多能存50个汉字，如果你的数据库用的是UTF8编码，那么一个汉字将占用3个字节，最多能存33个汉字。</p>
+
+<p>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<strong>varchar2(char)</strong><strong>：表示最大字符数是100</strong><strong>，该字段最多能容纳100</strong><strong>个字符，强调个数。</strong>假设我们写成varchar2(100 char)，那么无论是数字、字母、汉字，都看成一个字符，最多写100个，当然，汉字越多，占用的空间越大，同样遵循上边的数据库编码原则。例如：存入一个汉字，底层占2或3个字节，存入一个字母，占1个字节，<strong>绝对不是某些文章所说</strong><strong>1</strong><strong>个字母或数字也占2</strong><strong>或3</strong><strong>个字节！</strong></p>
+
+<p>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<strong>nvarchar2()</strong><strong>：没有byte</strong><strong>、char</strong><strong>之分，类似于varchar2(char)</strong><strong>，只不过nvarchar2()</strong><strong>屏蔽了数据库编码，无论是何种编码，nvarchar2()</strong><strong>中一个汉字都占两个字节。</strong></p>
+
+<p>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 一般的教程，也就到这了，可是如果再多一步思考，会发现一个致命问题。</p>
+
+<p>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 实际应用中，很可能会出现这种写法：varchar2(1400 char)，我们主观的认为，这个字段最长不能超过1400个字符，这意味着我们可能会存入1399个字符，貌似很正确的样子。</p>
+
+<p>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 但是，如果这1399个字符都是汉字，字符长度并没有超过1400，看起来一切正常，但实际上我们损失了一部分数据，为什么？</p>
+
+<p>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<strong>因为1399</strong><strong>个汉字，按UTF8</strong><strong>编码来说(99%</strong><strong>的项目都是UTF8</strong><strong>编码吧。。)</strong><strong>，需要占用1399*3=4197</strong><strong>个字节，而文章开篇就说，无论是什么char</strong><strong>，最大长度就是4000</strong><strong>字节，一个也不能多，因此多出来的197</strong><strong>个字节，都会抹去，而整个过程中，无任何错误提示，你的数据就这样蒸发了！</strong></p>
+
+<p>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 所以，对于GBK编码的数据库而言，安全的写法为：varchar2(2000 char)、nvarchar2(2000)，对于UTF8编码的数据库而言，安全的写法为：varchar2(1333 char)、nvarchar2(2000)。</p>
