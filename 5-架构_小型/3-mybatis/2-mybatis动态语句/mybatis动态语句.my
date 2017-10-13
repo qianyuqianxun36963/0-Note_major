@@ -1,0 +1,280 @@
+<h1>MySQL动态语句 if set choose where foreach trim</h1>
+
+<p>MyBatis的动态SQL是基于OGNL表达式的，它可以帮助我们方便的在SQL语句中实现某些逻辑。</p>
+
+<p>MyBatis中用于实现动态SQL的元素主要有：</p>
+
+<p>&nbsp;</p>
+
+<ul>
+	<li>if</li>
+	<li>choose（when，otherwise）</li>
+	<li>trim</li>
+	<li>where</li>
+	<li>set</li>
+	<li>foreach</li>
+</ul>
+
+<h2><strong>if</strong></h2>
+
+<p><strong>if</strong>就是简单的条件判断，利用if语句我们可以实现某些简单的条件选择。先来看如下一个例子：</p>
+
+<p>Xml代码 &nbsp;<img alt="收藏代码" src="http://haohaoxuexi.iteye.com/images/icon_star.png" /></p>
+
+<ol start="1">
+	<li>&lt;select&nbsp;id=&quot;dynamicIfTest&quot;&nbsp;parameterType=&quot;Blog&quot;&nbsp;resultType=&quot;Blog&quot;&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;select&nbsp;*&nbsp;from&nbsp;t_blog&nbsp;where&nbsp;11&nbsp;=&nbsp;1&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;if&nbsp;test=&quot;title&nbsp;!=&nbsp;null&quot;&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;and&nbsp;title&nbsp;=&nbsp;#{title}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;/if&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;if&nbsp;test=&quot;content&nbsp;!=&nbsp;null&quot;&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;and&nbsp;content&nbsp;=&nbsp;#{content}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;/if&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;if&nbsp;test=&quot;owner&nbsp;!=&nbsp;null&quot;&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;and&nbsp;owner&nbsp;=&nbsp;#{owner}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;/if&gt;&nbsp;&nbsp;</li>
+	<li>&lt;/select&gt;&nbsp;&nbsp;</li>
+</ol>
+
+<p>这条语句的意思非常简单，如果你提供了title参数，那么就要满足title=#{title}，同样如果你提供了Content和Owner的时候，它们也需要满足相应的条件，之后就是返回满足这些条件的所有Blog，这是非常有用的一个功能，以往我们使用其他类型框架或者直接使用JDBC的时候， 如果我们要达到同样的选择效果的时候，我们就需要拼SQL语句，这是极其麻烦的，比起来，上述的动态SQL就要简单多了。</p>
+
+<h2><strong>choose</strong></h2>
+
+<p><strong>choose</strong>元素的作用就相当于JAVA中的switch语句，基本上跟JSTL中的choose的作用和用法是一样的，通常都是与when和otherwise搭配的。看如下一个例子：</p>
+
+<p>Xml代码 &nbsp;<img alt="收藏代码" src="http://haohaoxuexi.iteye.com/images/icon_star.png" /></p>
+
+<ol start="1">
+	<li>&lt;select&nbsp;id=&quot;dynamicChooseTest&quot;&nbsp;parameterType=&quot;Blog&quot;&nbsp;resultType=&quot;Blog&quot;&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;select&nbsp;*&nbsp;from&nbsp;t_blog&nbsp;where&nbsp;11&nbsp;=&nbsp;1&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;choose&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;when&nbsp;test=&quot;title&nbsp;!=&nbsp;null&quot;&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;and&nbsp;title&nbsp;=&nbsp;#{title}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/when&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;when&nbsp;test=&quot;content&nbsp;!=&nbsp;null&quot;&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;and&nbsp;content&nbsp;=&nbsp;#{content}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/when&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;otherwise&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;and&nbsp;owner&nbsp;=&nbsp;&quot;owner1&quot;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/otherwise&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;/choose&gt;&nbsp;&nbsp;</li>
+	<li>&lt;/select&gt;&nbsp;&nbsp;</li>
+</ol>
+
+<p>when元素表示当when中的条件满足的时候就输出其中的内容，跟JAVA中的switch效果差不多的是按照条件的顺序，当when中有条件满足的时候，就会跳出choose，即所有的when和otherwise条件中，只有一个会输出，当所有的我很条件都不满足的时候就输出otherwise中的内容。所以上述语句的意思非常简单， 当title!=null的时候就输出and titlte = #{title}，不再往下判断条件，当title为空且content!=null的时候就输出and content = #{content}，当所有条件都不满足的时候就输出otherwise中的内容。</p>
+
+<h2><strong>where</strong></h2>
+
+<p><strong>where</strong>语句的作用主要是简化SQL语句中where中的条件判断的，先看一个例子，再解释一下where的好处。</p>
+
+<p>Xml代码 &nbsp;<img alt="收藏代码" src="http://haohaoxuexi.iteye.com/images/icon_star.png" /></p>
+
+<ol start="1">
+	<li>&lt;select&nbsp;id=&quot;dynamicWhereTest&quot;&nbsp;parameterType=&quot;Blog&quot;&nbsp;resultType=&quot;Blog&quot;&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;select&nbsp;*&nbsp;from&nbsp;t_blog&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;where&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;if&nbsp;test=&quot;title&nbsp;!=&nbsp;null&quot;&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;title&nbsp;=&nbsp;#{title}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/if&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;if&nbsp;test=&quot;content&nbsp;!=&nbsp;null&quot;&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;and&nbsp;content&nbsp;=&nbsp;#{content}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/if&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;if&nbsp;test=&quot;owner&nbsp;!=&nbsp;null&quot;&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;and&nbsp;owner&nbsp;=&nbsp;#{owner}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/if&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;/where&gt;&nbsp;&nbsp;</li>
+	<li>&lt;/select&gt;&nbsp;&nbsp;</li>
+</ol>
+
+<p>&nbsp;where元素的作用是会在写入where元素的地方输出一个where，另外一个好处是你不需要考虑where元素里面的条件输出是什么样子的，MyBatis会智能的帮你处理，如果所有的条件都不满足那么MyBatis就会查出所有的记录，如果输出后是and 开头的，MyBatis会把第一个and忽略，当然如果是or开头的，MyBatis也会把它忽略；此外，在where元素中你不需要考虑空格的问题，MyBatis会智能的帮你加上。像上述例子中，如果title=null， 而content != null，那么输出的整个语句会是select * from t_blog where content = #{content}，而不是select * from t_blog where and content = #{content}，因为MyBatis会智能的把首个and 或 or 给忽略。</p>
+
+<h2><strong>trim</strong></h2>
+
+<p><strong>trim</strong>元素的主要功能是可以在自己包含的内容前加上某些前缀，也可以在其后加上某些后缀，与之对应的属性是prefix和suffix；可以把包含内容的首部某些内容覆盖，即忽略，也可以把尾部的某些内容覆盖，对应的属性是prefixOverrides和suffixOverrides；正因为trim有这样的功能，所以我们也可以非常简单的利用trim来代替where元素的功能，示例代码如下：</p>
+
+<p>Xml代码 &nbsp;<img alt="收藏代码" src="http://haohaoxuexi.iteye.com/images/icon_star.png" /></p>
+
+<ol start="1">
+	<li>&lt;select&nbsp;id=&quot;dynamicTrimTest&quot;&nbsp;parameterType=&quot;Blog&quot;&nbsp;resultType=&quot;Blog&quot;&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;select&nbsp;*&nbsp;from&nbsp;t_blog&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;trim&nbsp;prefix=&quot;where&quot;&nbsp;prefixOverrides=&quot;and&nbsp;|or&quot;&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;if&nbsp;test=&quot;title&nbsp;!=&nbsp;null&quot;&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;title&nbsp;=&nbsp;#{title}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/if&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;if&nbsp;test=&quot;content&nbsp;!=&nbsp;null&quot;&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;and&nbsp;content&nbsp;=&nbsp;#{content}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/if&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;if&nbsp;test=&quot;owner&nbsp;!=&nbsp;null&quot;&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;or&nbsp;owner&nbsp;=&nbsp;#{owner}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/if&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;/trim&gt;&nbsp;&nbsp;</li>
+	<li>&lt;/select&gt;&nbsp;&nbsp;</li>
+</ol>
+
+<h2><strong>set</strong></h2>
+
+<p><strong>set</strong>元素主要是用在更新操作的时候，它的主要功能和where元素其实是差不多的，主要是在包含的语句前输出一个set，然后如果包含的语句是以逗号结束的话将会把该逗号忽略，如果set包含的内容为空的话则会出错。有了set元素我们就可以动态的更新那些修改了的字段。下面是一段示例代码：</p>
+
+<p>Xml代码 &nbsp;<img alt="收藏代码" src="http://haohaoxuexi.iteye.com/images/icon_star.png" /></p>
+
+<ol start="1">
+	<li>&lt;update&nbsp;id=&quot;dynamicSetTest&quot;&nbsp;parameterType=&quot;Blog&quot;&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;update&nbsp;t_blog&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;set&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;if&nbsp;test=&quot;title&nbsp;!=&nbsp;null&quot;&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;title&nbsp;=&nbsp;#{title},&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/if&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;if&nbsp;test=&quot;content&nbsp;!=&nbsp;null&quot;&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;content&nbsp;=&nbsp;#{content},&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/if&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;if&nbsp;test=&quot;owner&nbsp;!=&nbsp;null&quot;&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;owner&nbsp;=&nbsp;#{owner}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/if&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;/set&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;where&nbsp;id&nbsp;=&nbsp;#{id}&nbsp;&nbsp;</li>
+	<li>&lt;/update&gt;&nbsp;&nbsp;</li>
+</ol>
+
+<p>&nbsp;上述示例代码中，如果set中一个条件都不满足，即set中包含的内容为空的时候就会报错。</p>
+
+<h2><strong>foreach</strong></h2>
+
+<p><strong>foreach</strong>的主要用在构建in条件中，它可以在SQL语句中进行迭代一个集合。foreach元素的属性主要有item，index，collection，open，separator，close。item表示集合中每一个元素进行迭代时的别名，index指定一个名字，用于表示在迭代过程中，每次迭代到的位置，open表示该语句以什么开始，separator表示在每次进行迭代之间以什么符号作为分隔符，close表示以什么结束，在使用foreach的时候最关键的也是最容易出错的就是collection属性，该属性是必须指定的，但是在不同情况下，该属性的值是不一样的，主要有一下3种情况：</p>
+
+<ol>
+	<li>如果传入的是单参数且参数类型是一个List的时候，collection属性值为list</li>
+	<li>如果传入的是单参数且参数类型是一个array数组的时候，collection的属性值为array</li>
+	<li>如果传入的参数是多个的时候，我们就需要把它们封装成一个Map了，<strong>当然单参数也可以封装成map</strong>，实际上如果你在传入参数的时候，在MyBatis里面也是会把它封装成一个Map的，map的key就是参数名，所以这个时候collection属性值就是传入的List或array对象在自己封装的map里面的key</li>
+</ol>
+
+<p>下面分别来看看上述三种情况的示例代码：</p>
+
+<p>1.单参数List的类型：</p>
+
+<p>Xml代码 &nbsp;<img alt="收藏代码" src="http://haohaoxuexi.iteye.com/images/icon_star.png" /></p>
+
+<ol start="1">
+	<li>&lt;select&nbsp;id=&quot;dynamicForeachTest&quot;&nbsp;resultType=&quot;Blog&quot;&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;select&nbsp;*&nbsp;from&nbsp;t_blog&nbsp;where&nbsp;id&nbsp;in&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;foreach&nbsp;collection=&quot;list&quot;&nbsp;index=&quot;index&quot;&nbsp;item=&quot;item&quot;&nbsp;open=&quot;(&quot;&nbsp;separator=&quot;,&quot;&nbsp;close=&quot;)&quot;&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;#{item}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;/foreach&gt;&nbsp;&nbsp;</li>
+	<li>&lt;/select&gt;&nbsp;&nbsp;</li>
+</ol>
+
+<p>&nbsp;上述collection的值为list，对应的Mapper是这样的</p>
+
+<p>Java代码 &nbsp;<img alt="收藏代码" src="http://haohaoxuexi.iteye.com/images/icon_star.png" /></p>
+
+<ol start="1">
+	<li>public&nbsp;List&lt;Blog&gt;&nbsp;dynamicForeachTest(List&lt;Integer&gt;&nbsp;ids);&nbsp;&nbsp;</li>
+</ol>
+
+<p>&nbsp;测试代码：</p>
+
+<p>Java代码 &nbsp;<img alt="收藏代码" src="http://haohaoxuexi.iteye.com/images/icon_star.png" /></p>
+
+<ol start="1">
+	<li>@Test&nbsp;&nbsp;</li>
+	<li>public&nbsp;void&nbsp;dynamicForeachTest()&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;SqlSession&nbsp;session&nbsp;=&nbsp;Util.getSqlSessionFactory().openSession();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;BlogMapper&nbsp;blogMapper&nbsp;=&nbsp;session.getMapper(BlogMapper.class);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;List&lt;Integer&gt;&nbsp;ids&nbsp;=&nbsp;new&nbsp;ArrayList&lt;Integer&gt;();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;ids.add(1);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;ids.add(3);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;ids.add(6);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;List&lt;Blog&gt;&nbsp;blogs&nbsp;=&nbsp;blogMapper.dynamicForeachTest(ids);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;for&nbsp;(Blog&nbsp;blog&nbsp;:&nbsp;blogs)&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;System.out.println(blog);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;session.close();&nbsp;&nbsp;</li>
+	<li>}&nbsp;&nbsp;</li>
+</ol>
+
+<p>&nbsp;</p>
+
+<p>2.单参数array数组的类型：</p>
+
+<p>Xml代码 &nbsp;<img alt="收藏代码" src="http://haohaoxuexi.iteye.com/images/icon_star.png" /></p>
+
+<ol start="1">
+	<li>&lt;select&nbsp;id=&quot;dynamicForeach2Test&quot;&nbsp;resultType=&quot;Blog&quot;&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;select&nbsp;*&nbsp;from&nbsp;t_blog&nbsp;where&nbsp;id&nbsp;in&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;foreach&nbsp;collection=&quot;array&quot;&nbsp;index=&quot;index&quot;&nbsp;item=&quot;item&quot;&nbsp;open=&quot;(&quot;&nbsp;separator=&quot;,&quot;&nbsp;close=&quot;)&quot;&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;#{item}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;/foreach&gt;&nbsp;&nbsp;</li>
+	<li>&lt;/select&gt;&nbsp;&nbsp;</li>
+</ol>
+
+<p>&nbsp;上述collection为array，对应的Mapper代码：</p>
+
+<p>Java代码 &nbsp;<img alt="收藏代码" src="http://haohaoxuexi.iteye.com/images/icon_star.png" /></p>
+
+<ol start="1">
+	<li>public&nbsp;List&lt;Blog&gt;&nbsp;dynamicForeach2Test(int[]&nbsp;ids);&nbsp;&nbsp;</li>
+</ol>
+
+<p>&nbsp;对应的测试代码：</p>
+
+<p>Java代码 &nbsp;<img alt="收藏代码" src="http://haohaoxuexi.iteye.com/images/icon_star.png" /></p>
+
+<ol start="1">
+	<li>@Test&nbsp;&nbsp;</li>
+	<li>public&nbsp;void&nbsp;dynamicForeach2Test()&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;SqlSession&nbsp;session&nbsp;=&nbsp;Util.getSqlSessionFactory().openSession();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;BlogMapper&nbsp;blogMapper&nbsp;=&nbsp;session.getMapper(BlogMapper.class);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;int[]&nbsp;ids&nbsp;=&nbsp;new&nbsp;int[]&nbsp;{1,3,6,9};&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;List&lt;Blog&gt;&nbsp;blogs&nbsp;=&nbsp;blogMapper.dynamicForeach2Test(ids);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;for&nbsp;(Blog&nbsp;blog&nbsp;:&nbsp;blogs)&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;System.out.println(blog);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;session.close();&nbsp;&nbsp;</li>
+	<li>}&nbsp;&nbsp;</li>
+</ol>
+
+<p>&nbsp;</p>
+
+<p>3.自己把参数封装成Map的类型</p>
+
+<p>Xml代码 &nbsp;<img alt="收藏代码" src="http://haohaoxuexi.iteye.com/images/icon_star.png" /></p>
+
+<ol start="1">
+	<li>&lt;select&nbsp;id=&quot;dynamicForeach3Test&quot;&nbsp;resultType=&quot;Blog&quot;&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;select&nbsp;*&nbsp;from&nbsp;t_blog&nbsp;where&nbsp;title&nbsp;like&nbsp;&quot;%&quot;#{title}&quot;%&quot;&nbsp;and&nbsp;id&nbsp;in&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;foreach&nbsp;collection=&quot;ids&quot;&nbsp;index=&quot;index&quot;&nbsp;item=&quot;item&quot;&nbsp;open=&quot;(&quot;&nbsp;separator=&quot;,&quot;&nbsp;close=&quot;)&quot;&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;#{item}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;/foreach&gt;&nbsp;&nbsp;</li>
+	<li>&lt;/select&gt;&nbsp;&nbsp;</li>
+</ol>
+
+<p>上述collection的值为ids，是传入的参数Map的key，对应的Mapper代码：</p>
+
+<p>Java代码 &nbsp;<img alt="收藏代码" src="http://haohaoxuexi.iteye.com/images/icon_star.png" /></p>
+
+<ol start="1">
+	<li>public&nbsp;List&lt;Blog&gt;&nbsp;dynamicForeach3Test(Map&lt;String,&nbsp;Object&gt;&nbsp;params);&nbsp;&nbsp;</li>
+</ol>
+
+<p>&nbsp;&nbsp;对应测试代码：</p>
+
+<p>Java代码 &nbsp;<img alt="收藏代码" src="http://haohaoxuexi.iteye.com/images/icon_star.png" /></p>
+
+<ol start="1">
+	<li>@Test&nbsp;&nbsp;</li>
+	<li>public&nbsp;void&nbsp;dynamicForeach3Test()&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;SqlSession&nbsp;session&nbsp;=&nbsp;Util.getSqlSessionFactory().openSession();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;BlogMapper&nbsp;blogMapper&nbsp;=&nbsp;session.getMapper(BlogMapper.class);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;final&nbsp;List&lt;Integer&gt;&nbsp;ids&nbsp;=&nbsp;new&nbsp;ArrayList&lt;Integer&gt;();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;ids.add(1);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;ids.add(2);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;ids.add(3);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;ids.add(6);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;ids.add(7);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;ids.add(9);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;Map&lt;String,&nbsp;Object&gt;&nbsp;params&nbsp;=&nbsp;new&nbsp;HashMap&lt;String,&nbsp;Object&gt;();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;params.put(&quot;ids&quot;,&nbsp;ids);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;params.put(&quot;title&quot;,&nbsp;&quot;中国&quot;);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;List&lt;Blog&gt;&nbsp;blogs&nbsp;=&nbsp;blogMapper.dynamicForeach3Test(params);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;for&nbsp;(Blog&nbsp;blog&nbsp;:&nbsp;blogs)&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;System.out.println(blog);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;session.close();&nbsp;&nbsp;</li>
+	<li>} &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;&nbsp;欢迎加我的qq技术群425783133</li>
+</ol>
