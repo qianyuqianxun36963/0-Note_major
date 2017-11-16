@@ -1,0 +1,321 @@
+<h1>zookeeper+activemq+集群消息中间件搭建</h1>
+
+<p>原创作品，允许转载，转载时请务必以超链接形式标明文章&nbsp;<a href="http://crfsz.blog.51cto.com/7835882/1872778" target="_blank">原始出处</a>&nbsp;、作者信息和本声明。否则将追究法律责任。<a href="http://crfsz.blog.51cto.com/7835882/1872778">http://crfsz.blog.51cto.com/7835882/1872778</a></p>
+
+<p><strong>ZooKeeper</strong>是一个分布式的，开放源码的分布式应用程序协调服务，它包含一个简单的原语集，分布式应用程序可以基于它实现同步服务，配置维护和命名服务等。Zookeeper是hadoop的一个子项目，在分布式应用中，由于工程师不能很好地使用锁机制，以及基于消息的协调机制不适合在某些应用中使用，因此需要有一种可靠的、可扩展的、分布式的、可配置的协调机制来统一系统的状态<br />
+<br />
+<strong>运行原理</strong>：Zookeeper的核心是原子广播，这个机制保证了各个Server之间的同步。实现这个机制的协议叫做Zab协议。Zab协议有两种模式，它们分别是恢复模式（选主）和广播模式（同步）。当服务启动或者在领导者崩溃后，Zab就进入了恢复模式，当领导者被选举出来，且大多数Server完成了和leader的状态同步以后，恢复模式就结束了。状态同步保证了leader和Server具有相同的系统状态。为了保证事务的顺序一致性，zookeeper采用了递增的事务id号（zxid）来标识事务。所有的提议（proposal）都在被提出的时候加上了zxid。实现中zxid是一个64位的数字，它高32位是epoch用来标识leader关系是否改变，每次一个leader被选出来，它都会有一个新的epoch，标识当前属于那个leader的统治时期。低32位用于递增计数。<br />
+每个Server在工作过程中有三种状态：<br />
+LOOKING：当前Server不知道leader是谁，正在搜寻<br />
+LEADING：当前Server即为选举出来的leader<br />
+FOLLOWING：leader已经选举出来，当前Server与之同步<br />
+<br />
+<br />
+一、前期准备<br />
+<br />
+环境需要6台机器：hosts文件要保持一致<br />
+<br />
+编辑/etc/hosts文件：<br />
+127.0.0.1&nbsp;&nbsp; localhost localhost.localdomain localhost4localhost4.localdomain4<br />
+::1&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; localhost localhost.localdomainlocalhost6 localhost6.localdomain6<br />
+192.168.1.105 node105<br />
+192.168.1.106 node106<br />
+192.168.1.107 node107<br />
+192.168.1.108 node108<br />
+192.168.1.109 node109<br />
+192.168.1.110 node110<br />
+<br />
+主机名定义为：node105依次排列<br />
+<br />
+开始安装：<br />
+root身份登录系统 将jdk-7u76-linux-x64.tar.gz拷贝到/opt下面<br />
+<br />
+cd /opt<br />
+tar zxvf jdk-7u76-linux-x64.tar.gz<br />
+<br />
+解压后生成的文件名字叫做jdk1.7.0_76<br />
+<br />
+vim /etc/profile<br />
+把如下代码放到文件的最后面<br />
+export JAVA_HOME=/opt/jdk1.7.0_76<br />
+export JAVA_BIN=/opt/jdk1.7.0_76/bin<br />
+export JRE_HOME=$JAVA_HOME/jre<br />
+export CLASSPATH=.:$JAVA_HOME/lib/dt.jar:$JAVA_HOME/lib/tools.jar:$JRE_HOME/lib/rt.jar<br />
+export PATH=$PATH:$JAVA_HOME/bin:$JRE_HOME/bin<br />
+export JAVA_HOME JAVA_BIN PATH CLASSPATH<br />
+<br />
+source/etc/profile 使变量生效<br />
+<br />
+<br />
+二、zookeeper的部署 (三个节点上部署)<br />
+192.168.1.105,192.168.1.106,192.168.1.107三个节点上要部署zookeeper<br />
+将zookeeper-3.4.6.tar.gz 上传到/opt下面<br />
+cd /opt<br />
+tar -zxzf zookeeper-3.4.6.tar.gz<br />
+ln -s zookeeper-3.4.6&nbsp;&nbsp; zookeeper<br />
+<br />
+mkdir /opt/zookeeper/data&nbsp;&nbsp;&nbsp; &nbsp;<br />
+这是zk数据存储目录<br />
+cd /opt/zookeeper/data<br />
+vi myid<br />
+如果是node105则内容为1，如果是node106则内容为2，如果是node107则内容为3</p>
+
+<p>&nbsp;</p>
+
+<p>mkdir /opt/zookeeper/logs&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; &nbsp;<br />
+这是zk日志存储目录<br />
+<br />
+cp /opt/zookeeper/conf/zoo_sample.cfg&nbsp;&nbsp;&nbsp; /opt/zookeeper/conf/zoo.cfg<br />
+--zookeeper启动时会读取zookeeper/conf/zoo.cfg文件内容，zookeeper/conf/ 下面默认是没有zoo.cfg文件的, 因此我们可以根据zookeeper/conf/zoo_sample.cfg来生成zookeeper/conf/zoo.cfg<br />
+vi /opt/zookeeper/conf/zoo.cfg<br />
+添加如下内容<br />
+dataDir=/opt/zookeeper/data<br />
+dataLogDir=/opt/zookeeper/logs<br />
+<br />
+server.1=node105:2888:3888<br />
+server.2=node106:2888:3888<br />
+server.3=node107:2888:3888<br />
+<br />
+dataDir=/data/app/zookeeper/data<br />
+dataLogDir=/data/app/zookeeper/logs<br />
+<br />
+<br />
+各个节点启服务：<br />
+/opt/zookeeper/bin/zkServer.sh start<br />
+/opt/zookeeper/bin/zkServer.sh status<br />
+<br />
+node1<br />
+/opt/zookeeper/bin/zkServer.sh status<br />
+JMX enabled by default<br />
+Using config: /opt/zookeeper/bin/../conf/zoo.cfg<br />
+Mode: follower<br />
+<br />
+node2<br />
+/opt/zookeeper/bin/zkServer.sh status<br />
+JMX enabled by default<br />
+Using config: /opt/zookeeper/bin/../conf/zoo.cfg<br />
+Mode: follower<br />
+<br />
+node3<br />
+/opt/zookeeper/bin/zkServer.sh status<br />
+JMX enabled by default<br />
+Using config: /opt/zookeeper/bin/../conf/zoo.cfg<br />
+Mode: leader</p>
+
+<p><br />
+可见node3为zookeepr leader<br />
+<br />
+<br />
+<br />
+三、单集群activeMQ的部署<br />
+规划<br />
+192.168.1.105,192.168.1.106,192.168.1.107组成的是第一个集群，假设名字叫做cluster001&nbsp; zookeeper+mq<br />
+如果有第二个集群<br />
+192.168.1.108,192.168.1.109,192.168.1.110组成的是第二个集群，假设名字叫做cluster002&nbsp; mq<br />
+<br />
+<br />
+<br />
+本文档只演示cluster001的部署，cluster002的部署类似于cluster001。<br />
+<br />
+2.cluster001集群的部署<br />
+1)分别在三台主机中创建/opt/activemq/cluster001目录&nbsp;<br />
+$ mkdir -p /opt/activemq/cluster001&nbsp;<br />
+上传apache-activemq-5.11.1-bin.tar.gz到/opt/activemq/cluster001目录&nbsp;<br />
+&nbsp;<br />
+2)解压并按节点命名&nbsp;<br />
+$ cd /opt/activemq/cluster001&nbsp;<br />
+$ tar -xvf apache-activemq-5.11.1-bin.tar.gz&nbsp;<br />
+$ mv apache-activemq-5.11.1 node-0X&nbsp; &nbsp;<br />
+&nbsp;(X代表节点号, 1表示node105、2表示node106、3表示node107，下同)&nbsp;<br />
+&nbsp;&nbsp;<br />
+3)集群配置：&nbsp;<br />
+&nbsp;在 3 个 ActiveMQ 节点中配置 conf/activemq.xml 中的持久化适配器。修改其中 bind、zkAddress、<br />
+hostname和zkPath。注意：每个ActiveMQ的BrokerName必须相同，否则不能加入集群。<br />
+vim /opt/activemq/cluster001/node-01/conf/activemq.xml<br />
+vim /opt/activemq/cluster001/node-02/conf/activemq.xml<br />
+vim /opt/activemq/cluster001/node-03/conf/activemq.xml&nbsp;<br />
+<br />
+<br />
+<br />
+Node-01中的配置:&nbsp;<br />
+&lt;broker xmlns=&quot;http://activemq.apache.org/schema/core&quot; brokerName=&quot;cluster001&quot; dataDirectory=&quot;${activemq.data}&quot;&gt;&nbsp;<br />
+&lt;persistenceAdapter&gt;&nbsp;<br />
+&lt;!-- kahaDB directory=&quot;${activemq.data}/kahadb&quot;/ --&gt;&nbsp;<br />
+&lt;replicatedLevelDB&nbsp;<br />
+directory=&quot;${activemq.data}/leveldb&quot;&nbsp;<br />
+replicas=&quot;3&quot;&nbsp;<br />
+bind=&quot;tcp://0.0.0.0:62621&quot;&nbsp;<br />
+zkAddress=&quot;192.168.1.105:2181,192.168.1.106:2181,192.168.1.107:2181&quot;&nbsp;<br />
+hostname=&quot;node105&quot;&nbsp;<br />
+zkPath=&quot;/activemq/leveldb-stores&quot;&nbsp;<br />
+/&gt;&nbsp;<br />
+&lt;/persistenceAdapter&gt;&nbsp;<br />
+&lt;/broker&gt;&nbsp;<br />
+<br />
+&lt;destinationPolicy&gt;<br />
+&nbsp;&nbsp;&nbsp; &lt;policyMap&gt;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; &lt;policyEntries&gt;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; &lt;policyEntry topic=&quot;&gt;&quot; &gt;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; &lt;!-- The constantPendingMessageLimitStrategy is used to prevent<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; slow topic consumers to block producers and affect other consumers<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; by limiting the number of messages that are retained<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; For more information, see:<br />
+<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; http://activemq.apache.org/slow-consumer-handling.html<br />
+<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; --&gt;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; &lt;pendingMessageLimitStrategy&gt;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; &lt;constantPendingMessageLimitStrategy limit=&quot;1000&quot;/&gt;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; &lt;/pendingMessageLimitStrategy&gt;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; &lt;/policyEntry&gt;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; &nbsp;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&lt;!-- 绿色标记的是要添加的代码 --&gt;<br />
+&lt;policyEntry queue=&quot;&gt;&quot; enableAudit=&quot;false&quot;&gt;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp;&nbsp; &lt;networkBridgeFilterFactory&gt;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; &lt;conditionalNetworkBridgeFilterFactory replayWhenNoConsumers=&quot;true&quot;/&gt;&nbsp;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &lt;/networkBridgeFilterFactory&gt;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&lt;/policyEntry&gt;<br />
+<br />
+&nbsp;&nbsp;&nbsp;&nbsp; &lt;/policyEntries&gt;<br />
+<br />
+&nbsp;&nbsp;&nbsp; &lt;/policyMap&gt;<br />
+&lt;/destinationPolicy&gt;<br />
+<br />
+<br />
+&nbsp;&nbsp; &nbsp;Node-02中的配置:&nbsp;<br />
+&lt;broker xmlns=&quot;http://activemq.apache.org/schema/core&quot; brokerName=&quot;cluster001&quot;dataDirectory=&quot;${activemq.data}&quot;&gt;&nbsp;<br />
+&lt;persistenceAdapter&gt;&nbsp;<br />
+&lt;!-- kahaDB directory=&quot;${activemq.data}/kahadb&quot;/ --&gt;&nbsp;<br />
+&lt;replicatedLevelDB&nbsp;<br />
+directory=&quot;${activemq.data}/leveldb&quot;&nbsp;<br />
+replicas=&quot;3&quot;&nbsp;<br />
+bind=&quot;tcp://0.0.0.0:62621&quot;&nbsp;<br />
+zkAddress=&quot;192.168.1.105:2181,192.168.1.106:2181,192.168.1.107:2181&quot;&nbsp;<br />
+hostname=&quot;node106&quot;&nbsp;<br />
+zkPath=&quot;/activemq/leveldb-stores&quot;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; /&gt;&nbsp;<br />
+&lt;/persistenceAdapter&gt;&nbsp;<br />
+&lt;/broker&gt;&nbsp;<br />
+<br />
+<br />
+&lt;destinationPolicy&gt;<br />
+&nbsp;&nbsp;&nbsp; &lt;policyMap&gt;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; &lt;policyEntries&gt;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; &lt;policyEntry topic=&quot;&gt;&quot; &gt;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; &lt;!-- The constantPendingMessageLimitStrategy is used to prevent<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; slow topic consumers to block producers and affect other consumers<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; by limiting the number of messages that are retained<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; For more information, see:<br />
+<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; http://activemq.apache.org/slow-consumer-handling.html<br />
+<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; --&gt;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; &lt;pendingMessageLimitStrategy&gt;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; &lt;constantPendingMessageLimitStrategy limit=&quot;1000&quot;/&gt;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; &lt;/pendingMessageLimitStrategy&gt;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; &lt;/policyEntry&gt;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; &nbsp;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&lt;!-- 绿色标记的是要添加的代码 --&gt;<br />
+&lt;policyEntry queue=&quot;&gt;&quot; enableAudit=&quot;false&quot;&gt;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp;&nbsp; &lt;networkBridgeFilterFactory&gt;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; &lt;conditionalNetworkBridgeFilterFactory replayWhenNoConsumers=&quot;true&quot;/&gt;&nbsp;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &lt;/networkBridgeFilterFactory&gt;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&lt;/policyEntry&gt;<br />
+<br />
+&nbsp;&nbsp;&nbsp;&nbsp; &lt;/policyEntries&gt;<br />
+<br />
+&nbsp;&nbsp;&nbsp; &lt;/policyMap&gt;<br />
+&lt;/destinationPolicy&gt;<br />
+<br />
+<br />
+&nbsp;&nbsp; &nbsp;Node-03中的配置:&nbsp;<br />
+&lt;broker xmlns=&quot;http://activemq.apache.org/schema/core&quot; brokerName=&quot;cluster001&quot; dataDirectory=&quot;${activemq.data}&quot;&gt;&nbsp;<br />
+&lt;persistenceAdapter&gt;&nbsp;<br />
+&lt;!-- kahaDB directory=&quot;${activemq.data}/kahadb&quot;/ --&gt;&nbsp;<br />
+&lt;replicatedLevelDB&nbsp;<br />
+directory=&quot;${activemq.data}/leveldb&quot;&nbsp;<br />
+replicas=&quot;3&quot;&nbsp;<br />
+bind=&quot;tcp://0.0.0.0:62621&quot;&nbsp;<br />
+zkAddress=&quot;192.168.1.105:2181,192.168.1.106:2181,192.168.1.107:2181&quot;&nbsp;<br />
+hostname=&quot;node107&quot;&nbsp;<br />
+zkPath=&quot;/activemq/leveldb-stores&quot;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; /&gt;&nbsp;<br />
+&lt;/persistenceAdapter&gt;&nbsp;<br />
+&lt;/broker&gt;&nbsp;<br />
+&nbsp;<br />
+&lt;destinationPolicy&gt;<br />
+&nbsp;&nbsp;&nbsp; &lt;policyMap&gt;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; &lt;policyEntries&gt;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; &lt;policyEntry topic=&quot;&gt;&quot; &gt;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; &lt;!-- The constantPendingMessageLimitStrategy is used to prevent<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; slow topic consumers to block producers and affect other consumers<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; by limiting the number of messages that are retained<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; For more information, see:<br />
+<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; http://activemq.apache.org/slow-consumer-handling.html<br />
+<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; --&gt;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; &lt;pendingMessageLimitStrategy&gt;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; &lt;constantPendingMessageLimitStrategy limit=&quot;1000&quot;/&gt;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; &lt;/pendingMessageLimitStrategy&gt;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; &lt;/policyEntry&gt;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; &nbsp;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&lt;!-- 绿色标记的是要添加的代码 --&gt;<br />
+&lt;policyEntry queue=&quot;&gt;&quot; enableAudit=&quot;false&quot;&gt;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp;&nbsp; &lt;networkBridgeFilterFactory&gt;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; &lt;conditionalNetworkBridgeFilterFactory replayWhenNoConsumers=&quot;true&quot;/&gt;&nbsp;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &lt;/networkBridgeFilterFactory&gt;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&lt;/policyEntry&gt;<br />
+<br />
+&nbsp;&nbsp;&nbsp;&nbsp; &lt;/policyEntries&gt;<br />
+<br />
+&nbsp;&nbsp;&nbsp; &lt;/policyMap&gt;<br />
+&lt;/destinationPolicy&gt;<br />
+<br />
+4)按顺序启动3个ActiveMQ节点：&nbsp;<br />
+$nohup /opt/activemq/cluster001/node-01/bin/activemq start &amp;<br />
+$nohup /opt/activemq/cluster001/node-02/bin/activemq start &amp;<br />
+$nohup /opt/activemq/cluster001/node-03/bin/activemq start &amp;<br />
+<br />
+<br />
+<br />
+<br />
+<br />
+四、多集群activeMQ的部署<br />
+这里只演示双集群的部署，三集群或n集群的部署都是类似的。<br />
+<br />
+修改所有主机的activemq.xml文件<br />
+在&lt;persistenceAdapter&gt; 前面添加：<br />
+&lt;networkConnectors&gt; &nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; &lt;networkConnector&nbsp; uri=&quot;multicast://default&quot;/&gt;<br />
+&lt;/networkConnectors&gt;<br />
+在&lt;transportConnector name=&quot;openwire&quot;&gt; 标签的末尾添加：<br />
+discoveryUri=&quot;multicast://default&quot;<br />
+<br />
+&nbsp;</p>
+
+<p>使用及验证：</p>
+
+<p>#jps<br />
+1522 QuorumPeerMain<br />
+2661 Jps<br />
+2139 activemq.jar</p>
+
+<p>#ps -ef |grep ac 查看进程</p>
+
+<p>找到起端口：8161&nbsp;</p>
+
+<p>&nbsp;</p>
+
+<p>图示：</p>
+
+<p>访问：<a href="http://192.168.1.150:8161/admin/" target="_blank">http://192.168.1.150:8161/admin/</a>&nbsp; 账户及密码： admin&nbsp; admin</p>
+
+<p>&nbsp;</p>
+
+<p><a href="http://s5.51cto.com/wyfs02/M00/8A/29/wKioL1gpqaaCun_IAAFeJT7jaM8849.png" target="_blank"><img alt="wKioL1gpqaaCun_IAAFeJT7jaM8849.png" src="http://s5.51cto.com/wyfs02/M00/8A/29/wKioL1gpqaaCun_IAAFeJT7jaM8849.png" style="width:650px" title="ccc.png" /></a></p>
+
+<p>&nbsp;<br />
+<br />
+<br />
+&nbsp;</p>

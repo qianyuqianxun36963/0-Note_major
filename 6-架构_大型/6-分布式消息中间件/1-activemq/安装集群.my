@@ -1,0 +1,180 @@
+<h1><a href="http://www.cnblogs.com/leihenqianshang/articles/5623858.html" id="cb_post_title_url">ActiveMQ笔记(4)：搭建Broker集群(cluster)</a></h1>
+
+<p>介绍了基于Networks of Borkers的2节点HA方案，这一篇继续来折腾Networks of Brokers，当应用规模日渐增长时，2节点的broker可能仍然抗不住访问压力，这时候就需要多加一些broker，弄一个更大规模的Broker集群，但是怎么合理设置broker之间的网络桥接，却是有讲究的，先来看一种不太好的设计：</p>
+
+<p>&nbsp;<img alt="" src="http://images2015.cnblogs.com/blog/27612/201603/27612-20160326233603792-510527302.gif" /></p>
+
+<p>这个架构看上去没瑕疵，没毛病，3个broker之间两两互通，整体可用性极高，但是从消息的路由角度来看，却不是一个好的设计，当producer向broker1发送一条消息时，Consumer得到消息的路径可能有如下2条：</p>
+
+<p>a） producer -&gt; broker1 -&gt; broker2&nbsp;</p>
+
+<p>b） producer -&gt; broker1 -&gt; broker3 -&gt; broker2&nbsp;&nbsp;</p>
+
+<p>当broker更多时，情况会更复杂，比如下面这张图：</p>
+
+<p><img alt="" src="http://images2015.cnblogs.com/blog/27612/201603/27612-20160326234011073-1815268387.gif" /></p>
+
+<p>消息的路由途径将会更多：</p>
+
+<p>a) producer -&gt; broker1 -&gt; broker4</p>
+
+<p>b) producer -&gt; broker1 -&gt; broker2 -&gt; broker4</p>
+
+<p>c) producer -&gt; broker1 -&gt; broker2 -&gt; broker3 -&gt;&nbsp;broker4</p>
+
+<p>d) producer -&gt; broker1 -&gt; broker3 -&gt; broker4</p>
+
+<p>不难想像，每多经过一个节点，消息处理的延时将会增加一些，如果Broker越多，情况越复杂，最终系统对外表现为消息处理有时很快，有时很慢，整体性能很不稳定，所以实际生产中，不要采用所有Broker之间两两互连的方案。</p>
+
+<p>合理的方案如下：</p>
+
+<p><img alt="" src="http://images2015.cnblogs.com/blog/27612/201603/27612-20160326234618104-1630004598.gif" /></p>
+
+<p>这张图的灵感，应该来自组建局域网中的星形网络，在中心放置一个Borker充当Hub，与其它所有Broker互连，这样不管Consumer连接到外围的哪个Broker，消息的路由途径都比较稳定(最多经过3个Broker)，这种架构性能虽然稳定了，但是中心的Hub就变成单点隐患，如果中间的DockerHub挂了，整个系统也就废了。</p>
+
+<p>改进后的架构如下：</p>
+
+<p><img alt="" src="http://images2015.cnblogs.com/blog/27612/201603/27612-20160326235113183-2049846046.png" /></p>
+
+<p>本质上仍然是一个星形网络，只不过将hub弄成二个互备，然后每个hub都与其它外围的broker相连，消费者连接到broker1/broker2/broker3，生产者(Producer)连接到hub1/hub2，消息的最长路径不超过3个broker (注：生产者也可以连接到broker1/2/3，与消费者一样，但是消息经过的最长路径会变成4)</p>
+
+<p>如果以后要扩张，比如增加了Broker4,Broker5...，直接修改hub1/2上的配置，增加与新的broker的连接即可，不影响消息的路由途径长度。</p>
+
+<p>最后，在本机演练一把，给出一些配置示例：</p>
+
+<p>1、端口规划</p>
+
+<p><code>activemq1: 61616 (broker1)</code></p>
+
+<p><code>activemq2: 61626 (broker2)</code></p>
+
+<p><code>activemq3: 61636 (broker3)</code></p>
+
+<p><code>activemq4: 61646 (broker-hub1)</code></p>
+
+<p><code>activemq5: 61656 (broker-hub2)</code></p>
+
+<p>2、activemq.xml配置共5个activemq实例，端口61616、61626、61636为broker1、broker2、broker3，61645、61656为broker-hub1、broker-hub2</p>
+
+<p>以boker1为例，配置文件内容如下：</p>
+
+<p>&lt;beans<br />
+xmlns=&quot;http://www.springframework.org/schema/beans&quot;<br />
+xmlns:xsi=&quot;http://www.w3.org/2001/XMLSchema-instance&quot;<br />
+xsi:schemaLocation=&quot;http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd<br />
+http://activemq.apache.org/schema/core http://activemq.apache.org/schema/core/activemq-core.xsd&quot;&gt;</p>
+
+<p>&lt;bean class=&quot;org.springframework.beans.factory.config.PropertyPlaceholderConfigurer&quot;&gt;<br />
+&lt;property name=&quot;locations&quot;&gt;<br />
+&lt;value&gt;file:${activemq.conf}/credentials.properties&lt;/value&gt;<br />
+&lt;/property&gt;<br />
+&lt;/bean&gt;</p>
+
+<p>&lt;broker xmlns=&quot;http://activemq.apache.org/schema/core&quot; brokerName=&quot;broker1&quot;&gt;&nbsp;<br />
+&lt;persistenceAdapter&gt;<br />
+&lt;kahaDB directory=&quot;${activemq.data}/kahadb&quot;/&gt;<br />
+&lt;/persistenceAdapter&gt;<br />
+&lt;transportConnectors&gt;<br />
+&lt;transportConnector name=&quot;openwire&quot;<br />
+uri=&quot;tcp://0.0.0.0:61616?maximumConnections=1000&amp;amp;wireFormat.maxFrameSize=104857600&quot;/&gt;<br />
+&lt;/transportConnectors&gt;<br />
+&lt;/broker&gt;</p>
+
+<p>&lt;import resource=&quot;jetty.xml&quot;/&gt;<br />
+&lt;/beans&gt;</p>
+
+<p>broker2及broker3，大家参考该配置修改端口号及brokerName即可。</p>
+
+<p>broker-hub1的配置：</p>
+
+<p>&lt;beans<br />
+xmlns=&quot;http://www.springframework.org/schema/beans&quot;<br />
+xmlns:xsi=&quot;http://www.w3.org/2001/XMLSchema-instance&quot;<br />
+xsi:schemaLocation=&quot;http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd<br />
+http://activemq.apache.org/schema/core http://activemq.apache.org/schema/core/activemq-core.xsd&quot;&gt;</p>
+
+<p>&lt;bean class=&quot;org.springframework.beans.factory.config.PropertyPlaceholderConfigurer&quot;&gt;<br />
+&lt;property name=&quot;locations&quot;&gt;<br />
+&lt;value&gt;file:${activemq.conf}/credentials.properties&lt;/value&gt;<br />
+&lt;/property&gt;<br />
+&lt;/bean&gt;</p>
+
+<p>&lt;broker xmlns=&quot;http://activemq.apache.org/schema/core&quot; brokerName=&quot;broker-hub1&quot;&gt;<br />
+&lt;networkConnectors&gt;<br />
+&lt;networkConnector uri=&quot;static:(tcp://127.0.0.1:61656,tcp://127.0.0.1:61616,tcp://127.0.0.1:61626,tcp://127.0.0.1:61636)&quot; duplex=&quot;true&quot;/&gt;&nbsp;<br />
+&lt;/networkConnectors&gt;<br />
+&lt;persistenceAdapter&gt;<br />
+&lt;kahaDB directory=&quot;${activemq.data}/kahadb&quot;/&gt;<br />
+&lt;/persistenceAdapter&gt;<br />
+&lt;transportConnectors&gt;<br />
+&lt;transportConnector name=&quot;openwire&quot;<br />
+uri=&quot;tcp://0.0.0.0:61646?maximumConnections=1000&amp;amp;wireFormat.maxFrameSize=104857600&quot;/&gt;<br />
+&lt;/transportConnectors&gt;<br />
+&lt;/broker&gt;</p>
+
+<p>&lt;import resource=&quot;jetty.xml&quot;/&gt;<br />
+&lt;/beans&gt;</p>
+
+<p>broker-hub2的配置：</p>
+
+<p>&lt;beans<br />
+xmlns=&quot;http://www.springframework.org/schema/beans&quot;<br />
+xmlns:xsi=&quot;http://www.w3.org/2001/XMLSchema-instance&quot;<br />
+xsi:schemaLocation=&quot;http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd<br />
+http://activemq.apache.org/schema/core http://activemq.apache.org/schema/core/activemq-core.xsd&quot;&gt;</p>
+
+<p>&lt;bean class=&quot;org.springframework.beans.factory.config.PropertyPlaceholderConfigurer&quot;&gt;<br />
+&lt;property name=&quot;locations&quot;&gt;<br />
+&lt;value&gt;file:${activemq.conf}/credentials.properties&lt;/value&gt;<br />
+&lt;/property&gt;<br />
+&lt;/bean&gt;</p>
+
+<p>&lt;broker xmlns=&quot;http://activemq.apache.org/schema/core&quot; brokerName=&quot;broker-hub2&quot;&gt;<br />
+&lt;networkConnectors&gt;&nbsp;<br />
+&lt;networkConnector uri=&quot;static:(tcp://127.0.0.1:61616,tcp://127.0.0.1:61626,tcp://127.0.0.1:61636)&quot; duplex=&quot;true&quot;/&gt;<br />
+&lt;/networkConnectors&gt;<br />
+&lt;persistenceAdapter&gt;<br />
+&lt;kahaDB directory=&quot;${activemq.data}/kahadb&quot;/&gt;<br />
+&lt;/persistenceAdapter&gt;<br />
+&lt;transportConnectors&gt;<br />
+&lt;transportConnector name=&quot;openwire&quot;<br />
+uri=&quot;tcp://0.0.0.0:61656?maximumConnections=1000&amp;amp;wireFormat.maxFrameSize=104857600&quot;/&gt;<br />
+&lt;/transportConnectors&gt;<br />
+&lt;/broker&gt;</p>
+
+<p>&lt;import resource=&quot;jetty.xml&quot;/&gt;<br />
+&lt;/beans&gt;</p>
+
+<p>3、java代码中spring配置文件</p>
+
+<p>a)&nbsp;生产者</p>
+
+<p>&lt;bean id=&quot;jmsFactory&quot; class=&quot;org.apache.activemq.pool.PooledConnectionFactory&quot; destroy-method=&quot;stop&quot;&gt;<br />
+&lt;property name=&quot;connectionFactory&quot;&gt;<br />
+&lt;bean class=&quot;org.apache.activemq.ActiveMQConnectionFactory&quot;&gt;<br />
+&lt;!--broker服务的地址--&gt;<br />
+&lt;property name=&quot;brokerURL&quot; value=&quot;failover:(tcp://localhost:61646,tcp://localhost:61656)&quot;/&gt;<br />
+&lt;!--默认值为1000,如果不需要这么大,可以调小--&gt;<br />
+&lt;property name=&quot;maxThreadPoolSize&quot; value=&quot;100&quot;/&gt;<br />
+&lt;!--&lt;property name=&quot;userName&quot; value=&quot;system&quot;/&gt;--&gt;<br />
+&lt;!--&lt;property name=&quot;password&quot; value=&quot;manager&quot;/&gt;--&gt;<br />
+&lt;/bean&gt;<br />
+&lt;/property&gt;<br />
+&lt;/bean&gt;</p>
+
+<p>b)&nbsp;消费者</p>
+
+<p>&lt;bean id=&quot;jmsFactory&quot; class=&quot;org.apache.activemq.pool.PooledConnectionFactory&quot; destroy-method=&quot;stop&quot;&gt;<br />
+&lt;property name=&quot;connectionFactory&quot;&gt;<br />
+&lt;bean class=&quot;org.apache.activemq.ActiveMQConnectionFactory&quot;&gt;<br />
+&lt;!--broker服务的地址--&gt;<br />
+&lt;property name=&quot;brokerURL&quot; value=&quot;failover:(tcp://localhost:61616,tcp://localhost:61626,tcp://localhost:61636)&quot;/&gt;<br />
+&lt;!--默认值为1000,如果不需要这么大,可以调小--&gt;<br />
+&lt;property name=&quot;maxThreadPoolSize&quot; value=&quot;100&quot;/&gt;<br />
+&lt;!--&lt;property name=&quot;userName&quot; value=&quot;system&quot;/&gt;--&gt;<br />
+&lt;!--&lt;property name=&quot;password&quot; value=&quot;manager&quot;/&gt;--&gt;<br />
+&lt;/bean&gt;<br />
+&lt;/property&gt;<br />
+&lt;/bean&gt;</p>
+
+<p>&nbsp;</p>

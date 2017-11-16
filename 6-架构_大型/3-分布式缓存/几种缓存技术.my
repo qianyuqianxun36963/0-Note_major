@@ -1,0 +1,340 @@
+<h1>ehcache memcache redis 三大缓存男高音</h1>
+
+<p><strong>最近项目组有用到这三个缓存，去各自的官方看了下,觉得还真的各有千秋！今天特意归纳下各个缓存的优缺点，仅供参考！</strong></p>
+
+<p><strong>&nbsp;Ehcache</strong></p>
+
+<p>在java项目广泛的使用。它是一个开源的、设计于提高在数据从RDBMS中取出来的高花费、高延迟采取的一种缓存方案。正因为Ehcache具有健壮性（基于java开发）、被认证（具有apache 2.0 &nbsp;license）、充满特色（稍后会详细介绍），所以被用于大型复杂分布式web application的各个节点中。</p>
+
+<p>什么特色？</p>
+
+<p>&nbsp;</p>
+
+<p>1. &nbsp;够快</p>
+
+<p>Ehcache的发行有一段时长了，经过几年的努力和不计其数的性能测试，Ehcache终被设计于large, high concurrency systems.</p>
+
+<p>&nbsp;</p>
+
+<p>2. 够简单</p>
+
+<p>开发者提供的接口非常简单明了，从Ehcache的搭建到运用运行仅仅需要的是你宝贵的几分钟。其实很多开发者都不知道自己用在用Ehcache，Ehcache被广泛的运用于其他的开源项目</p>
+
+<p>比如：hibernate</p>
+
+<p>&nbsp;</p>
+
+<p>3.够袖珍</p>
+
+<p>关于这点的特性，官方给了一个很可爱的名字small foot print ，一般Ehcache的发布版本不会到2M，V 2.2.3 &nbsp;才 668KB。</p>
+
+<p>&nbsp;</p>
+
+<p>4.&nbsp;够轻量</p>
+
+<p>核心程序仅仅依赖slf4j这一个包，没有之一！</p>
+
+<p>&nbsp;</p>
+
+<p>5.好扩展</p>
+
+<p>Ehcache提供了对大数据的内存和硬盘的存储，最近版本允许多实例、保存对象高灵活性、提供LRU、LFU、FIFO淘汰算法，基础属性支持热配置、支持的插件多</p>
+
+<p>&nbsp;</p>
+
+<p>6.监听器</p>
+
+<p>缓存管理器监听器 （CacheManagerListener）和 缓存监听器（CacheEvenListener）,做一些统计或数据一致性广播挺好用的</p>
+
+<p>如何使用？</p>
+
+<p>够简单就是Ehcache的一大特色，自然用起来just so easy!</p>
+
+<p>贴一段基本使用代码</p>
+
+<pre>
+CacheManager manager = CacheManager.newInstance(&quot;src/config/ehcache.xml&quot;);
+Ehcache cache = new Cache(&quot;testCache&quot;, 5000, false, false, 5, 2);
+cacheManager.addCache(cache);</pre>
+
+<pre>
+代码中有个ehcache.xml文件，现在来介绍一下这个文件中的一些属性</pre>
+
+<ol start="1">
+	<li>&nbsp; &nbsp; &nbsp; &nbsp;name:缓存名称。</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;maxElementsInMemory：缓存最大个数。</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;eternal:对象是否永久有效，一但设置了，timeout将不起作用。</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;timeToIdleSeconds：设置对象在失效前的允许闲置时间（单位：秒）。仅当eternal=false对象不是永久有效时使用，可选属性，默认值是0，也就是可闲置时间无穷大。</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;timeToLiveSeconds：设置对象在失效前允许存活时间,最大时间介于创建时间和失效时间之间。仅当eternal=false对象不是永久有效时使用，默认是0.，也就是对象存活时 间无穷大。</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;overflowToDisk：当内存中对象数量达到maxElementsInMemory时，Ehcache将会对象写到磁盘中。</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;diskSpoolBufferSizeMB：这个参数设置DiskStore（磁盘缓存）的缓存区大小。默认是30MB。每个Cache都应该有自己的一个缓冲区。</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;maxElementsOnDisk：硬盘最大缓存个数。</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;diskPersistent：是否缓存虚拟机重启期数据&nbsp;Whether&nbsp;the&nbsp;disk&nbsp;store&nbsp;persists&nbsp;between&nbsp;restarts&nbsp;of&nbsp;the&nbsp;Virtual&nbsp;Machine.&nbsp;The&nbsp;default&nbsp;value&nbsp;is&nbsp;false.</li>
+	<li>&nbsp; &nbsp; &nbsp; &nbsp;diskExpiryThreadIntervalSeconds：磁盘失效线程运行时间间隔，默认是120秒。</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;memoryStoreEvictionPolicy：当达到maxElementsInMemory限制时，Ehcache将会根据指定的策略去清理内存。默认策略是LRU。你可以设置为 FIFO或是LFU。</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;clearOnFlush：内存数量最大时是否清除。</li>
+</ol>
+
+<p>&nbsp;</p>
+
+<p><strong>memcache</strong></p>
+
+<p>memcache 是一种高性能、分布式对象缓存系统，最初设计于缓解动态网站数据库加载数据的延迟性，你可以把它想象成一个大的内存HashTable，就是一个key-value键值缓存。Danga Interactive为了LiveJournal所发展的，以BSD license释放的一套开放源代码软件。</p>
+
+<p>&nbsp;</p>
+
+<p>1.依赖</p>
+
+<p>memcache C语言所编写，依赖于最近版本的GCC和libevent。GCC是它的编译器，同事基于libevent做socket io。在安装memcache时保证你的系统同事具备有这两个环境。</p>
+
+<p>&nbsp;</p>
+
+<p>2.多线程支持</p>
+
+<p>memcache支持多个cpu同时工作，在memcache安装文件下有个叫threads.txt中特别说明，By default, memcached is compiled as a single-threaded application.默认是单线程编译安装，如果你需要多线程则需要修改./configure --enable-threads，为了支持多核系统，前提是你的系统必须具有多线程工作模式。开启多线程工作的线程数默认是4，如果线程数超过cpu数容易发生操作死锁的概率。结合自己业务模式选择才能做到物尽其用。</p>
+
+<p>&nbsp;</p>
+
+<p>3.高性能</p>
+
+<p>通过libevent完成socket 的通讯，理论上性能的瓶颈落在网卡上。</p>
+
+<p>&nbsp;</p>
+
+<p>简单安装：</p>
+
+<p>1.分别把memcached和libevent下载回来，放到 /tmp 目录下：</p>
+
+<p># cd /tmp</p>
+
+<p># wget http://www.danga.com/memcached/dist/memcached-1.2.0.tar.gz</p>
+
+<p># wget http://www.monkey.org/~provos/libevent-1.2.tar.gz</p>
+
+<p><img alt="" src="http://img.my.csdn.net/uploads/201301/17/1358386757_5640.jpg" /></p>
+
+<p>2.先安装libevent：</p>
+
+<p># tar zxvf libevent-1.2.tar.gz</p>
+
+<p># cd libevent-1.2</p>
+
+<p># ./configure -prefix=/usr</p>
+
+<p># make （如果遇到提示gcc 没有安装则先安装gcc)</p>
+
+<p># make install</p>
+
+<p>3.测试libevent是否安装成功：</p>
+
+<p># ls -al /usr/lib | grep libevent</p>
+
+<p>lrwxrwxrwx 1 root root 21 11?? 12 17:38 libevent-1.2.so.1 -&gt; libevent-1.2.so.1.0.3</p>
+
+<p>-rwxr-xr-x 1 root root 263546 11?? 12 17:38 libevent-1.2.so.1.0.3</p>
+
+<p>-rw-r-r- 1 root root 454156 11?? 12 17:38 libevent.a</p>
+
+<p>-rwxr-xr-x 1 root root 811 11?? 12 17:38 libevent.la</p>
+
+<p>lrwxrwxrwx 1 root root 21 11?? 12 17:38 libevent.so -&gt; libevent-1.2.so.1.0.3</p>
+
+<p>还不错，都安装上了。</p>
+
+<p>4.安装memcached，同时需要安装中指定libevent的安装位置：</p>
+
+<p># cd /tmp</p>
+
+<p># tar zxvf memcached-1.2.0.tar.gz</p>
+
+<p># cd memcached-1.2.0</p>
+
+<p># ./configure -with-libevent=/usr</p>
+
+<p># make</p>
+
+<p># make install</p>
+
+<p>如果中间出现报错，请仔细检查错误信息，按照错误信息来配置或者增加相应的库或者路径。</p>
+
+<p>安装完成后会把memcached放到 /usr/local/bin/memcached ，</p>
+
+<p>5.测试是否成功安装memcached：</p>
+
+<p># ls -al /usr/local/bin/mem*</p>
+
+<p>-rwxr-xr-x 1 root root 137986 11?? 12 17:39 /usr/local/bin/memcached</p>
+
+<p>-rwxr-xr-x 1 root root 140179 11?? 12 17:39 /usr/local/bin/memcached-debug</p>
+
+<p>启动memcache服务</p>
+
+<p>&nbsp;</p>
+
+<p>启动Memcached服务：</p>
+
+<p>&nbsp;</p>
+
+<p>1.启动Memcache的服务器端：</p>
+
+<p># /usr/local/bin/memcached -d -m 8096 -u root -l 192.168.77.105 -p 12000 -c 256 -P /tmp/memcached.pid</p>
+
+<p>-d选项是启动一个守护进程，</p>
+
+<p>-m是分配给Memcache使用的内存数量，单位是MB，我这里是8096MB，</p>
+
+<p>-u是运行Memcache的用户，我这里是root，</p>
+
+<p>-l是监听的服务器IP地址，如果有多个地址的话，我这里指定了服务器的IP地址192.168.77.105，</p>
+
+<p>-p是设置Memcache监听的端口，我这里设置了12000，最好是1024以上的端口，</p>
+
+<p>-c选项是最大运行的并发连接数，默认是1024，我这里设置了256，按照你服务器的负载量来设定，</p>
+
+<p>-P是设置保存Memcache的pid文件，我这里是保存在 /tmp/memcached.pid，</p>
+
+<p>&nbsp;</p>
+
+<p>2.如果要结束Memcache进程，执行：</p>
+
+<p># cat&nbsp;/tmp/memcached.pid 或者 ps -aux | grep memcache &nbsp; （找到对应的进程id号）</p>
+
+<p># kill 进程id号</p>
+
+<p>也可以启动多个守护进程，不过端口不能重复。</p>
+
+<p>&nbsp;memcache 的连接</p>
+
+<p>telnet &nbsp;ip &nbsp; port&nbsp;</p>
+
+<p>注意连接之前需要再memcache服务端把memcache的防火墙规则加上</p>
+
+<p>-A RH-Firewall-1-INPUT -m state --state NEW -m tcp -p tcp --dport 3306 -j ACCEPT&nbsp;</p>
+
+<p>重新加载防火墙规则</p>
+
+<p>service iptables restart</p>
+
+<p>OK ,现在应该就可以连上memcache了</p>
+
+<p>在客户端输入stats 查看memcache的状态信息</p>
+
+<p><img alt="" src="http://img.my.csdn.net/uploads/201301/17/1358386780_1884.jpg" /></p>
+
+<p>&nbsp;</p>
+
+<p>pid &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;memcache服务器的进程ID</p>
+
+<p>uptime &nbsp; &nbsp; &nbsp;服务器已经运行的秒数</p>
+
+<p>time &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; 服务器当前的unix时间戳</p>
+
+<p>version &nbsp; &nbsp; memcache版本</p>
+
+<p>pointer_size &nbsp; &nbsp; &nbsp; &nbsp; 当前操作系统的指针大小（32位系统一般是32bit）</p>
+
+<p>rusage_user &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;进程的累计用户时间</p>
+
+<p>rusage_system &nbsp; &nbsp;进程的累计系统时间</p>
+
+<p>curr_items &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;服务器当前存储的items数量</p>
+
+<p>total_items &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; 从服务器启动以后存储的items总数量</p>
+
+<p>bytes &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; 当前服务器存储items占用的字节数</p>
+
+<p>curr_connections &nbsp; &nbsp; &nbsp; &nbsp;当前打开着的连接数</p>
+
+<p>total_connections &nbsp; &nbsp; &nbsp; &nbsp;从服务器启动以后曾经打开过的连接数</p>
+
+<p>connection_structures &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;服务器分配的连接构造数</p>
+
+<p>cmd_get get命令 &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;（获取）总请求次数</p>
+
+<p>cmd_set set命令 &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;（保存）总请求次数</p>
+
+<p>get_hits &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;总命中次数</p>
+
+<p>get_misses &nbsp; &nbsp; &nbsp; &nbsp;总未命中次数</p>
+
+<p>evictions &nbsp; &nbsp; 为获取空闲内存而删除的items数（分配给memcache的空间用满后需要删除旧的items来得到空间分配给新的items）</p>
+
+<p>bytes_read &nbsp; &nbsp;读取字节数（请求字节数）</p>
+
+<p>bytes_written &nbsp; &nbsp; 总发送字节数（结果字节数）</p>
+
+<p>limit_maxbytes &nbsp; &nbsp; 分配给memcache的内存大小（字节）</p>
+
+<p>threads &nbsp; &nbsp; &nbsp; &nbsp; 当前线程数</p>
+
+<pre>
+
+&nbsp;</pre>
+
+<h3>redis</h3>
+
+<p>&nbsp;redis是在memcache之后编写的，大家经常把这两者做比较，如果说它是个key-value store 的话但是它具有丰富的数据类型，我想暂时把它叫做缓存数据流中心，就像现在物流中心那样，order、package、store、classification、distribute、end。现在还很流行的LAMP PHP架构 不知道和 redis+mysql 或者 redis + mongodb的性能比较（听群里的人说mongodb分片不稳定）。</p>
+
+<p>先说说reidis的特性</p>
+
+<p>&nbsp;</p>
+
+<p>1. 支持持久化</p>
+
+<p>&nbsp; &nbsp; &nbsp;redis的本地持久化支持两种方式：RDB和AOF。RDB 在redis.conf配置文件里配置持久化触发器，AOF指的是redis没增加一条记录都会保存到持久化文件中（保存的是这条记录的生成命令），如果不是用redis做DB用的话还会不要开AOF ，数据太庞大了，重启恢复的时候是一个巨大的工程！</p>
+
+<p>&nbsp;</p>
+
+<p>2.丰富的数据类型</p>
+
+<p>&nbsp; &nbsp; redis 支持 String 、Lists、sets、sorted sets、hashes 多种数据类型,新浪微博会使用redis做nosql主要也是它具有这些类型，时间排序、职能排序、我的微博、发给我的这些功能List 和 sorted set</p>
+
+<p>&nbsp; &nbsp;的强大操作功能息息相关</p>
+
+<p>&nbsp;</p>
+
+<p>3.高性能</p>
+
+<p>&nbsp; &nbsp;这点跟memcache很想象，内存操作的级别是毫秒级的比硬盘操作秒级操作自然高效不少，较少了磁头寻道、数据读取、页面交换这些高开销的操作！这也是NOSQL冒出来的原因吧，应该是高性能</p>
+
+<p>&nbsp; 是基于RDBMS的衍生产品，虽然RDBMS也具有缓存结构，但是始终在app层面不是我们想要的那么操控的。</p>
+
+<p>&nbsp;</p>
+
+<p>4.replication</p>
+
+<p>&nbsp; &nbsp; redis提供主从复制方案，跟mysql一样增量复制而且复制的实现都很相似，这个复制跟AOF有点类似复制的是新增记录命令，主库新增记录将新增脚本发送给从库，从库根据脚本生成记录，这个过程非常快，就看网络了，一般主从都是在同一个局域网，所以可以说redis的主从近似及时同步，同事它还支持一主多从，动态添加从库，从库数量没有限制。 主从库搭建，我觉得还是采用网状模式，如果使用链式（master-slave-slave-slave-slave&middot;&middot;&middot;&middot;&middot;）如果第一个slave出现宕机重启，首先从master 接收 数据恢复脚本，这个是阻塞的，如果主库数据几TB的情况恢复过程得花上一段时间，在这个过程中其他的slave就无法和主库同步了。</p>
+
+<p>&nbsp;</p>
+
+<p>5.更新快</p>
+
+<p>&nbsp; &nbsp;这点好像从我接触到redis到目前为止 已经发了大版本就4个，小版本没算过。redis作者是个非常积极的人，无论是邮件提问还是论坛发帖，他都能及时耐心的为你解答，维护度很高。有人维护的话，让我们用的也省心和放心。目前作者对redis 的主导开发方向是redis的集群方向。</p>
+
+<p>redis的安装</p>
+
+<p>&nbsp;</p>
+
+<p>redis的安装其实还是挺简单的，总的来说就三步：下载tar包，解压tar包，安装。</p>
+
+<p>不过最近我在2.6.7后用centos 5.5 32bit 时碰到一个安装问题，下面我就用图片分享下安装过程碰到的问题，在redis 文件夹内执行make时有个如下的错&nbsp;undefined reference to &#39;__sync_add_and_fetch_4&#39;</p>
+
+<p><img alt="" src="http://img.my.csdn.net/uploads/201301/17/1358386799_7255.jpg" /></p>
+
+<p>上网找了了好多最后在 &nbsp;https://github.com/antirez/redis/issues/736 找到解决方案，write CFLAGS= -march=i686 on src/Makefile head!</p>
+
+<p><img alt="" src="http://img.my.csdn.net/uploads/201301/17/1358386810_2580.jpg" /></p>
+
+<p>记得要把刚安装失败的文件删除，重新解压新的安装文件，修改Makefile文件，再make安装。就不会发现原来那个错误了</p>
+
+<p>关于redis的一些属性注释和基本类型操作在上一篇redis 的开胃菜有详细的说明，这里就不再重复累赘了（实质是想偷懒 ，哈哈！）</p>
+
+<p>&nbsp;</p>
+
+<p>最后，把memcache和redis放在一起不得不会让人想到两者的比较，谁快谁好用啊，群里面已经为这个事打架很久了，我就把我看到的在这里跟大家分享下。</p>
+
+<p>在别人发了一个memcache性能比redis好很多后，redis 作者 antirez 发表了一篇博文，主要是说到如何给redis 和 memcache 做压力测试，文中讲到有个人说许多开源软件都应该丢进厕所，因为他们的压力测试脚本太2了，作者对这个说明了一番。redis &nbsp;vs &nbsp;memcache is&nbsp;&nbsp;definitely an apple to apple comparison。 呵呵，很明确吧，两者的比较是不是有点鸡蛋挑骨头的效果，作者在相同的运行环境做了三次测试取多好的值，得到的结果如下图:</p>
+
+<p><img alt="" src="http://img.my.csdn.net/uploads/201301/17/1358386822_6395.png" /></p>
+
+<p>需要申明的是此次测试在单核心处理的过程的数据，memcache是支持多核心多线程操作的（默认没开）所以在默认情况下上图具有参考意义，若然则memcache快于redis。那为什么redis不支持多线程多核心处理呢？作者也发表了一下自己的看法，首先是多线程不变于bug的修复，其实是不易软件的扩展，还有数据一致性问题因为redis所有的操作都是原子操作，作者用到一个词nightmare 噩梦，呵呵！ &nbsp;当然不支持多线程操作，肯定也有他的弊端的比如性能想必必然差，作者从2.2版本后专注redis cluster的方向开发来缓解其性能上的弊端，说白了就是纵向不行，横向提高。</p>
