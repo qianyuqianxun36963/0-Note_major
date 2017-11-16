@@ -1,0 +1,1491 @@
+<h1>斐波那契堆(一)之 图文解析 和 C语言的实现</h1>
+
+<h3><strong>概要</strong></h3>
+
+<p>本章介绍斐波那契堆。和以往一样，本文会先对斐波那契堆的理论知识进行简单介绍，然后给出C语言的实现。后续再分别给出C++和Java版本的实现；实现的语言虽不同，但是原理如出一辙，选择其中之一进行了解即可。若文章有错误或不足的地方，请不吝指出！</p>
+
+<p><strong>目录</strong><br />
+1.&nbsp;<a href="http://www.cnblogs.com/skywang12345/p/3659060.html#a1">斐波那契堆的介绍</a><br />
+2.&nbsp;<a href="http://www.cnblogs.com/skywang12345/p/3659060.html#a2">斐波那契堆的基本操作</a><br />
+3.&nbsp;<a href="http://www.cnblogs.com/skywang12345/p/3659060.html#a3">斐波那契堆的C实现(完整源码)</a><br />
+4.&nbsp;<a href="http://www.cnblogs.com/skywang12345/p/3659060.html#a4">斐波那契堆的C测试程序</a></p>
+
+<p>转载请注明出处：<a href="http://www.cnblogs.com/skywang12345/p/3659060.html">http://www.cnblogs.com/skywang12345/p/3659060.html</a></p>
+
+<hr />
+<p><strong>更多内容：</strong><a href="http://www.cnblogs.com/skywang12345/p/3603935.html">数据结构与算法系列 目录</a></p>
+
+<p>(01)&nbsp;<a href="http://www.cnblogs.com/skywang12345/p/3659060.html">斐波那契堆(一)之 图文解析 和 C语言的实现</a>&nbsp;<br />
+(02)&nbsp;<a href="http://www.cnblogs.com/skywang12345/p/3659069.html">斐波那契堆(二)之 C++的实现</a>&nbsp;<br />
+(03)&nbsp;<a href="http://www.cnblogs.com/skywang12345/p/3659122.html">斐波那契堆(三)之 Java的实现</a></p>
+
+<p>&nbsp;</p>
+
+<h3><strong><a name="a1"></a>斐波那契堆的介绍</strong></h3>
+
+<p>斐波那契堆(Fibonacci heap)是堆中一种，它和二项堆一样，也是一种可合并堆；可用于实现合并优先队列。斐波那契堆比二项堆具有更好的平摊分析性能，它的合并操作的时间复杂度是O(1)。<br />
+与二项堆一样，它也是由一组堆最小有序树组成，并且是一种可合并堆。<br />
+与二项堆不同的是，斐波那契堆中的树不一定是二项树；而且二项堆中的树是有序排列的，但是斐波那契堆中的树都是有根而无序的。</p>
+
+<p><a href="http://images.cnitblog.com/i/497634/201404/111642221538159.jpg"><img alt="" src="http://images.cnitblog.com/i/497634/201404/111642221538159.jpg" style="height:281px; width:800px" /></a></p>
+
+<p>&nbsp;</p>
+
+<h3><strong><a name="a2"></a>斐波那契堆的基本操作</strong></h3>
+
+<p><strong>1. 基本定义</strong></p>
+
+<p><a href="javascript:void(0);" onclick="copyCnblogsCode(this)" title="复制代码"><img alt="复制代码" src="http://common.cnblogs.com/images/copycode.gif" /></a></p>
+
+<pre>
+typedef int Type;
+
+typedef struct _FibonacciNode
+{
+    Type   key;                     // 关键字(键值)
+    int degree;                     // 度数
+    struct _FibonacciNode *left;    // 左兄弟
+    struct _FibonacciNode *right;   // 右兄弟
+    struct _FibonacciNode *child;   // 第一个孩子节点
+    struct _FibonacciNode *parent;  // 父节点
+    int marked;                     //是否被删除第1个孩子(1表示删除，0表示未删除)
+}FibonacciNode, FibNode;</pre>
+
+<p><a href="javascript:void(0);" onclick="copyCnblogsCode(this)" title="复制代码"><img alt="复制代码" src="http://common.cnblogs.com/images/copycode.gif" /></a></p>
+
+<p>FibNode是斐波那契堆的节点类，它包含的信息较多。key是用于比较节点大小的，degree是记录节点的度，left和right分别是指向节点的左右兄弟，child是节点的第一个孩子，parent是节点的父节点，marked是记录该节点是否被删除第1个孩子(marked在删除节点时有用)。</p>
+
+<p>&nbsp;</p>
+
+<pre>
+typedef struct _FibonacciHeap{
+    int   keyNum;                   // 堆中节点的总数
+    int   maxDegree;                // 最大度
+    struct _FibonacciNode *min;     // 最小节点(某个最小堆的根节点)
+    struct _FibonacciNode **cons;   // 最大度的内存区域
+}FibonacciHeap, FibHeap;</pre>
+
+<p>FibHeap是斐波那契堆对应的类。min是保存当前堆的最小节点，keyNum用于记录堆中节点的总数，maxDegree用于记录堆中最大度，而cons在删除节点时来暂时保存堆数据的临时空间。</p>
+
+<p>&nbsp;</p>
+
+<p>下面看看斐波那契堆的内存结构图。</p>
+
+<p><a href="http://images.cnitblog.com/i/497634/201404/111643182933476.jpg"><img alt="" src="http://images.cnitblog.com/i/497634/201404/111643182933476.jpg" style="height:746px; width:900px" /></a></p>
+
+<p>从图中可以看出，斐波那契堆是由一组最小堆组成，这些最小堆的根节点组成了双向链表(后文称为&quot;<strong>根链表</strong>&quot;)；斐波那契堆中的最小节点就是&quot;根链表中的最小节点&quot;！</p>
+
+<p>PS.&nbsp;上面这幅图的结构和测试代码中的&quot;基本信息&quot;测试函数的结果是一致的；你可以通过测试程序来亲自验证！</p>
+
+<p>&nbsp;</p>
+
+<p><strong>2. 插入操作</strong></p>
+
+<p>插入操作非常简单：插入一个节点到堆中，直接将该节点插入到&quot;根链表的min节点&quot;之前即可；若被插入节点比&quot;min节点&quot;小，则更新&quot;min节点&quot;为被插入节点。</p>
+
+<p><a href="http://images.cnitblog.com/i/497634/201404/111644494183536.jpg"><img alt="" src="http://images.cnitblog.com/i/497634/201404/111644494183536.jpg" style="height:414px; width:400px" /></a></p>
+
+<p><em>上面是插入操作的示意图。</em></p>
+
+<p>斐波那契堆的根链表是&quot;双向链表&quot;，这里将min节点看作双向联表的表头(后文也是如此)。在插入节点时，每次都是&quot;将节点插入到min节点之前(即插入到双链表末尾)&quot;。此外，对于根链表中最小堆都只有一个节点的情况，插入操作就很演化成双向链表的插入操作。</p>
+
+<p>此外，插入操作示意图与测试程序中的&quot;插入操作&quot;相对应，感兴趣的可以亲自验证。</p>
+
+<p>&nbsp;</p>
+
+<p>插入操作代码</p>
+
+<p><a href="javascript:void(0);" onclick="copyCnblogsCode(this)" title="复制代码"><img alt="复制代码" src="http://common.cnblogs.com/images/copycode.gif" /></a></p>
+
+<pre>
+/*
+ * 将&quot;单个节点node&quot;加入&quot;链表root&quot;之前
+ *   a &hellip;&hellip; root
+ *   a &hellip;&hellip; node &hellip;&hellip; root
+ *
+ * 注意： 此处node是单个节点，而root是双向链表
+*/
+static void fib_node_add(FibNode *node, FibNode *root)
+{
+    node-&gt;left        = root-&gt;left;
+    root-&gt;left-&gt;right = node;
+    node-&gt;right       = root;
+    root-&gt;left        = node;
+}
+
+/*
+ * 将节点node插入到斐波那契堆heap中
+ */
+static void fib_heap_insert_node(FibHeap *heap, FibNode *node)
+{
+    if (heap-&gt;keyNum == 0)
+        heap-&gt;min = node;
+    else
+       {
+        fib_node_add(node, heap-&gt;min);
+        if (node-&gt;key &lt; heap-&gt;min-&gt;key)
+            heap-&gt;min = node;
+    }
+    heap-&gt;keyNum++;
+}</pre>
+
+<p><a href="javascript:void(0);" onclick="copyCnblogsCode(this)" title="复制代码"><img alt="复制代码" src="http://common.cnblogs.com/images/copycode.gif" /></a></p>
+
+<p>&nbsp;</p>
+
+<p><strong>3. 合并操作</strong></p>
+
+<p>合并操作和插入操作的原理非常类似：将一个堆的根链表插入到另一个堆的根链表上即可。简单来说，就是将两个双链表拼接成一个双向链表。</p>
+
+<p><a href="http://images.cnitblog.com/i/497634/201404/111646216536924.jpg"><img alt="" src="http://images.cnitblog.com/i/497634/201404/111646216536924.jpg" style="height:514px; width:700px" /></a></p>
+
+<p>上面是合并操作的示意图。该操作示意图与测试程序中的&quot;合并操作&quot;相对应！</p>
+
+<p>合并操作代码</p>
+
+<p><a href="javascript:void(0);" onclick="copyCnblogsCode(this)" title="复制代码"><img alt="复制代码" src="http://common.cnblogs.com/images/copycode.gif" /></a></p>
+
+<pre>
+/*
+ * 将双向链表b链接到双向链表a的后面
+ *
+ * 注意： 此处a和b都是双向链表
+*/
+static void fib_node_cat(FibNode *a, FibNode *b)
+{
+    FibNode *tmp;
+
+    tmp            = a-&gt;right;
+    a-&gt;right       = b-&gt;right;
+    b-&gt;right-&gt;left = a;
+    b-&gt;right       = tmp;
+    tmp-&gt;left      = b;
+}
+
+/*
+ * 将h1, h2合并成一个堆，并返回合并后的堆
+ */
+FibHeap* fib_heap_union(FibHeap *h1, FibHeap *h2)
+{
+    FibHeap *tmp;
+
+    if (h1==NULL)
+        return h2;
+    if (h2==NULL)
+        return h1;
+
+    // 以h1为&quot;母&quot;，将h2附加到h1上；下面是保证h1的度数大，尽可能的少操作。
+    if(h2-&gt;maxDegree &gt; h1-&gt;maxDegree)
+    {
+        tmp = h1;
+        h1 = h2;
+        h2 = tmp;
+    }
+
+    if((h1-&gt;min) == NULL)                // h1无&quot;最小节点&quot;
+    {
+        h1-&gt;min = h2-&gt;min;
+        h1-&gt;keyNum = h2-&gt;keyNum;
+        free(h2-&gt;cons);
+        free(h2);
+    }
+    else if((h2-&gt;min) == NULL)           // h1有&quot;最小节点&quot; &amp;&amp; h2无&quot;最小节点&quot;
+    {
+        free(h2-&gt;cons);
+        free(h2);
+    }                                   // h1有&quot;最小节点&quot; &amp;&amp; h2有&quot;最小节点&quot;
+    else
+    {
+        // 将&quot;h2中根链表&quot;添加到&quot;h1&quot;中
+        fib_node_cat(h1-&gt;min, h2-&gt;min);
+        if (h1-&gt;min-&gt;key &gt; h2-&gt;min-&gt;key)
+            h1-&gt;min = h2-&gt;min;
+        h1-&gt;keyNum += h2-&gt;keyNum;
+        free(h2-&gt;cons);
+        free(h2);
+    }
+
+    return h1;
+}</pre>
+
+<p><a href="javascript:void(0);" onclick="copyCnblogsCode(this)" title="复制代码"><img alt="复制代码" src="http://common.cnblogs.com/images/copycode.gif" /></a></p>
+
+<p>&nbsp;</p>
+
+<p><strong>4. 取出最小节点</strong></p>
+
+<p>抽取最小结点的操作是斐波那契堆中较复杂的操作。<br />
+(1）将要抽取最小结点的子树都直接串联在根表中；<br />
+(2）合并所有degree相等的树，直到没有相等的degree的树。</p>
+
+<p><a href="http://images.cnitblog.com/i/497634/201404/111647556224983.jpg"><img alt="" src="http://images.cnitblog.com/i/497634/201404/111647556224983.jpg" style="height:3030px; width:700px" /></a></p>
+
+<p>上面是取出最小节点的示意图。图中应该写的非常明白了，若有疑问，看代码。</p>
+
+<p>此外，该操作示意图与测试程序中的&quot;删除最小节点&quot;相对应！有兴趣的可以亲自验证。</p>
+
+<p>取出最小节点代码</p>
+
+<p><a href="javascript:void(0);" onclick="copyCnblogsCode(this)" title="复制代码"><img alt="复制代码" src="http://common.cnblogs.com/images/copycode.gif" /></a></p>
+
+<pre>
+/*
+ * 移除最小节点，并返回移除节点后的斐波那契堆
+ */
+FibNode* _fib_heap_extract_min(FibHeap *heap)
+{
+    if (heap==NULL || heap-&gt;min==NULL)
+        return NULL;
+
+    FibNode *child = NULL;
+    FibNode *min = heap-&gt;min;
+    // 将min每一个儿子(儿子和儿子的兄弟)都添加到&quot;斐波那契堆的根链表&quot;中
+    while (min-&gt;child != NULL)
+    {
+        child = min-&gt;child;
+        fib_node_remove(child);
+        if (child-&gt;right == child)
+            min-&gt;child = NULL;
+        else
+            min-&gt;child = child-&gt;right;
+
+        fib_node_add(child, heap-&gt;min);
+        child-&gt;parent = NULL;
+    }
+
+    // 将min从根链表中移除
+    fib_node_remove(min);
+    // 若min是堆中唯一节点，则设置堆的最小节点为NULL；
+    // 否则，设置堆的最小节点为一个非空节点(min-&gt;right)，然后再进行调节。
+    if (min-&gt;right == min)
+        heap-&gt;min = NULL;
+    else
+    {
+        heap-&gt;min = min-&gt;right;
+        fib_heap_consolidate(heap);
+    }
+    heap-&gt;keyNum--;
+
+    return min;
+}</pre>
+
+<p><a href="javascript:void(0);" onclick="copyCnblogsCode(this)" title="复制代码"><img alt="复制代码" src="http://common.cnblogs.com/images/copycode.gif" /></a></p>
+
+<p>其中fib_heap_consolidate(heap)的作用是合并斐波那契堆的根链表中相同度数的树，它的相关代码如下：</p>
+
+<p><img alt="" id="code_img_closed_da096675-045a-42ad-93dc-78b48cfabe4c" src="http://images.cnblogs.com/OutliningIndicators/ContractedBlock.gif" />&nbsp;View Code</p>
+
+<p>&nbsp;</p>
+
+<p><strong>5. 减小节点值</strong></p>
+
+<p>减少斐波那契堆中的节点的键值，这个操作的难点是：如果减少节点后破坏了&quot;最小堆&quot;性质，如何去维护呢？下面对一般性情况进行分析。<br />
+(1) 首先，将&quot;被减小节点&quot;从&quot;它所在的最小堆&quot;剥离出来；然后将&quot;该节点&quot;关联到&quot;根链表&quot;中。 倘若被减小的节点不是单独一个节点，而是包含子树的树根。则是将以&quot;被减小节点&quot;为根的子树从&quot;最小堆&quot;中剥离出来，然后将该树关联到根链表中。<br />
+(2) 接着，对&quot;被减少节点&quot;的原父节点进行&quot;级联剪切&quot;。所谓&quot;级联剪切&quot;，就是在被减小节点破坏了最小堆性质，并被切下来之后；再从&quot;它的父节点&quot;进行递归级联剪切操作。<br />
+&nbsp; &nbsp; &nbsp; 而级联操作的具体动作则是：若父节点(被减小节点的父节点)的marked标记为false，则将其设为true，然后退出。<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; 否则，将父节点从最小堆中切下来(方式和&quot;切被减小节点的方式&quot;一样)；然后递归对祖父节点进行&quot;级联剪切&quot;。<br />
+&nbsp; &nbsp; &nbsp; marked标记的作用就是用来标记&quot;该节点的子节点是否有被删除过&quot;，它的作用是来实现级联剪切。而级联剪切的真正目的是为了防止&quot;最小堆&quot;由二叉树演化成链表。<br />
+(3) 最后，别忘了对根链表的最小节点进行更新。</p>
+
+<p><a href="http://images.cnitblog.com/i/497634/201404/111649333403897.jpg"><img alt="" src="http://images.cnitblog.com/i/497634/201404/111649333403897.jpg" style="height:645px; width:400px" /></a></p>
+
+<p>上面是减小节点值的示意图。该操作示意图与测试程序中的&quot;减小节点&quot;相对应！</p>
+
+<p>减小节点值的代码</p>
+
+<p><a href="javascript:void(0);" onclick="copyCnblogsCode(this)" title="复制代码"><img alt="复制代码" src="http://common.cnblogs.com/images/copycode.gif" /></a></p>
+
+<pre>
+/* 
+ * 将斐波那契堆heap中节点node的值减少为key
+ */
+static void fib_heap_decrease(FibHeap *heap, FibNode *node, Type key)
+{
+    FibNode *parent;
+
+    if (heap==NULL || heap-&gt;min==NULL ||node==NULL) 
+        return ;
+
+    if ( key&gt;=node-&gt;key)
+    {
+        printf(&quot;decrease failed: the new key(%d) is no smaller than current key(%d)\n&quot;, key, node-&gt;key);
+        return ;
+    }
+
+    node-&gt;key = key;
+    parent = node-&gt;parent;
+    if (parent!=NULL &amp;&amp; node-&gt;key &lt; parent-&gt;key)
+    {
+        // 将node从父节点parent中剥离出来，并将node添加到根链表中
+        fib_heap_cut(heap, node, parent);
+        fib_heap_cascading_cut(heap, parent);
+    }
+
+    // 更新最小节点
+    if (node-&gt;key &lt; heap-&gt;min-&gt;key)
+        heap-&gt;min = node;
+}</pre>
+
+<p><a href="javascript:void(0);" onclick="copyCnblogsCode(this)" title="复制代码"><img alt="复制代码" src="http://common.cnblogs.com/images/copycode.gif" /></a></p>
+
+<p>其中，fib_heap_cut()和fib_heap_cascading_cut()的相关代码如下：</p>
+
+<p><img alt="" id="code_img_closed_67d96437-9503-480e-ae4c-848d0a139a8d" src="http://images.cnblogs.com/OutliningIndicators/ContractedBlock.gif" />&nbsp;View Code</p>
+
+<p>&nbsp;</p>
+
+<p><strong>6. 增加节点值</strong></p>
+
+<p>增加节点值和减少节点值类似，这个操作的难点也是如何维护&quot;最小堆&quot;性质。思路如下：<br />
+(1) 将&quot;被增加节点&quot;的&quot;左孩子和左孩子的所有兄弟&quot;都链接到根链表中。<br />
+(2) 接下来，把&quot;被增加节点&quot;添加到根链表；但是别忘了对其进行级联剪切。</p>
+
+<p><a href="http://images.cnitblog.com/i/497634/201404/111650112008396.jpg"><img alt="" src="http://images.cnitblog.com/i/497634/201404/111650112008396.jpg" style="height:825px; width:450px" /></a></p>
+
+<p>上面是增加节点值的示意图。该操作示意图与测试程序中的&quot;增大节点&quot;相对应！</p>
+
+<p>增加节点值的代码</p>
+
+<p><a href="javascript:void(0);" onclick="copyCnblogsCode(this)" title="复制代码"><img alt="复制代码" src="http://common.cnblogs.com/images/copycode.gif" /></a></p>
+
+<pre>
+/* 
+ * 将斐波那契堆heap中节点node的值增加为key
+ */
+static void fib_heap_increase(FibHeap *heap, FibNode *node, Type key)
+{
+    FibNode *child, *parent, *right;
+
+    if (heap==NULL || heap-&gt;min==NULL ||node==NULL) 
+        return ;
+
+    if (key &lt;= node-&gt;key)
+    {
+        printf(&quot;increase failed: the new key(%d) is no greater than current key(%d)\n&quot;, key, node-&gt;key);
+        return ;
+    }
+
+    // 将node每一个儿子(不包括孙子,重孙,...)都添加到&quot;斐波那契堆的根链表&quot;中
+    while (node-&gt;child != NULL)
+    {
+        child = node-&gt;child;
+        fib_node_remove(child);               // 将child从node的子链表中删除
+        if (child-&gt;right == child)
+            node-&gt;child = NULL;
+        else
+            node-&gt;child = child-&gt;right;
+
+        fib_node_add(child, heap-&gt;min);       // 将child添加到根链表中
+        child-&gt;parent = NULL;
+    }
+    node-&gt;degree = 0;
+    node-&gt;key = key;
+
+    // 如果node不在根链表中，
+    //     则将node从父节点parent的子链接中剥离出来，
+    //     并使node成为&quot;堆的根链表&quot;中的一员，
+    //     然后进行&quot;级联剪切&quot;
+    // 否则，则判断是否需要更新堆的最小节点
+    parent = node-&gt;parent;
+    if(parent != NULL)
+    {
+        fib_heap_cut(heap, node, parent);
+        fib_heap_cascading_cut(heap, parent);
+    }
+    else if(heap-&gt;min == node)
+    {
+        right = node-&gt;right;
+        while(right != node)
+        {
+            if(node-&gt;key &gt; right-&gt;key)
+                heap-&gt;min = right;
+            right = right-&gt;right;
+        }
+    }
+}</pre>
+
+<p><a href="javascript:void(0);" onclick="copyCnblogsCode(this)" title="复制代码"><img alt="复制代码" src="http://common.cnblogs.com/images/copycode.gif" /></a></p>
+
+<p>&nbsp;</p>
+
+<p><strong>7. 删除节点</strong></p>
+
+<p>删除节点，本文采用了操作是：&quot;取出最小节点&quot;和&quot;减小节点值&quot;的组合。<br />
+(1) 先将被删除节点的键值减少。减少后的值要比&quot;原最小节点的值&quot;即可。<br />
+(2) 接着，取出最小节点即可。</p>
+
+<p>删除节点值的代码</p>
+
+<p><a href="javascript:void(0);" onclick="copyCnblogsCode(this)" title="复制代码"><img alt="复制代码" src="http://common.cnblogs.com/images/copycode.gif" /></a></p>
+
+<pre>
+/*
+ * 删除结点node
+ */
+static void _fib_heap_delete(FibHeap *heap, FibNode *node)
+{
+    Type min = heap-&gt;min-&gt;key;
+    fib_heap_decrease(heap, node, min-1);
+    _fib_heap_extract_min(heap);
+    free(node);
+}</pre>
+
+<p><a href="javascript:void(0);" onclick="copyCnblogsCode(this)" title="复制代码"><img alt="复制代码" src="http://common.cnblogs.com/images/copycode.gif" /></a></p>
+
+<p><br />
+注意：关于斐波那契堆的&quot;更新&quot;、&quot;打印&quot;、&quot;销毁&quot;等接口就不再单独介绍了。后文的源码中有给出它们的实现代码，Please RTFSC(Read The Fucking Source Code)！</p>
+
+<p>&nbsp;</p>
+
+<h3><strong><a name="a3"></a>斐波那契堆的C实现(完整源码)</strong></h3>
+
+<p>斐波那契堆的头文件(fibonacci_heap.h)</p>
+
+<p><img alt="" id="code_img_opened_b1e73355-3b34-441e-a9d5-c1e003bd080e" src="http://images.cnblogs.com/OutliningIndicators/ExpandedBlockStart.gif" /></p>
+
+<p><a href="javascript:void(0);" onclick="copyCnblogsCode(this)" title="复制代码"><img alt="复制代码" src="http://common.cnblogs.com/images/copycode.gif" /></a></p>
+
+<pre>
+ 1 #ifndef _FIBONACCI_HEAP_H_
+ 2 #define _FIBONACCI_HEAP_H_
+ 3 
+ 4 typedef int Type;
+ 5 
+ 6 typedef struct _FibonacciNode
+ 7 {
+ 8     Type   key;                        // 关键字(键值)
+ 9     int degree;                        // 度数
+10     struct _FibonacciNode *left;    // 左兄弟
+11     struct _FibonacciNode *right;    // 右兄弟
+12     struct _FibonacciNode *child;    // 第一个孩子节点
+13     struct _FibonacciNode *parent;    // 父节点
+14     int marked;                       //是否被删除第1个孩子(1表示删除，0表示未删除)
+15 }FibonacciNode, FibNode;
+16 
+17 typedef struct _FibonacciHeap{
+18     int   keyNum;                    // 堆中节点的总数
+19     int   maxDegree;                // 最大度
+20     struct _FibonacciNode *min;        // 最小节点(某个最小堆的根节点)
+21     struct _FibonacciNode **cons;    // 最大度的内存区域
+22 }FibonacciHeap, FibHeap;
+23 
+24 // 创建Fibonacci堆
+25 FibHeap* fib_heap_make();
+26 // 新建键值为key的节点，并将其插入到斐波那契堆中
+27 void fib_heap_insert_key(FibHeap *heap, Type key);
+28 // 删除键值为key的结点
+29 void fib_heap_delete(FibHeap *heap, Type key);
+30 // 移除最小节点
+31 void fib_heap_extract_min(FibHeap *heap);
+32 // 更新heap的中的oldkey为newkey
+33 void fib_heap_update(FibHeap *heap, Type oldkey, Type newkey);
+34 // 将h1, h2合并成一个堆，并返回合并后的堆
+35 FibHeap* fib_heap_union(FibHeap *h1, FibHeap *h2);
+36 // 在斐波那契堆heap中是否存在键值为key的节点；存在返回1，否则返回0。
+37 int fib_heap_contains(FibHeap *heap, Type key);
+38 // 获取最小节点对应的值(保存在pkey中)；成功返回1，失败返回0。
+39 int fib_heap_get_min(FibHeap *heap, Type *pkey);
+40 // 销毁斐波那契堆
+41 void fib_heap_destroy(FibHeap *heap);
+42 // 打印&quot;斐波那契堆&quot;
+43 void fib_print(FibHeap *heap);
+44 
+45 #endif</pre>
+
+<p><a href="javascript:void(0);" onclick="copyCnblogsCode(this)" title="复制代码"><img alt="复制代码" src="http://common.cnblogs.com/images/copycode.gif" /></a></p>
+
+<p>斐波那契堆的实现文件(fibonacci_heap.c)</p>
+
+<p><img alt="" id="code_img_opened_777f4708-de5d-4a5c-bf63-a7467361074f" src="http://images.cnblogs.com/OutliningIndicators/ExpandedBlockStart.gif" /></p>
+
+<p><a href="javascript:void(0);" onclick="copyCnblogsCode(this)" title="复制代码"><img alt="复制代码" src="http://common.cnblogs.com/images/copycode.gif" /></a></p>
+
+<pre>
+  1 /**
+  2  * C语言实现的斐波那契堆
+  3  *
+  4  * @author skywang
+  5  * @date 2014/04/05
+  6  */
+  7 
+  8 #include &lt;stdio.h&gt;
+  9 #include &lt;stdlib.h&gt;
+ 10 #include &lt;math.h&gt;
+ 11 #include &lt;float.h&gt;
+ 12 #include &quot;fibonacci_heap.h&quot;
+ 13 
+ 14 #if 0
+ 15 #define LOG2(x) ({ \
+ 16         unsigned int _i = 0; \
+ 17         __asm__(&quot;bsr %1, %0&quot; : &quot;=r&quot; (_i) : &quot;r&quot; ((x))); \
+ 18         _i; })
+ 19 #else   // 注意：通过gcc编译时，要添加 -lm 选项。
+ 20 #define LOG2(x) ((log((double)(x))) / (log(2.0)))
+ 21 #endif
+ 22 
+ 23 
+ 24 static FibNode *fib_heap_search(FibHeap *heap, Type key);
+ 25  
+ 26 /* 
+ 27  * 将node从双链表移除
+ 28  */
+ 29 static void fib_node_remove(FibNode *node)
+ 30 {
+ 31     node-&gt;left-&gt;right = node-&gt;right;
+ 32     node-&gt;right-&gt;left = node-&gt;left;
+ 33 }
+ 34  
+ 35 /*
+ 36  * 将&quot;单个节点node&quot;加入&quot;链表root&quot;之前
+ 37  *   a &hellip;&hellip; root
+ 38  *   a &hellip;&hellip; node &hellip;&hellip; root
+ 39  *
+ 40  * 注意： 此处node是单个节点，而root是双向链表
+ 41 */
+ 42 static void fib_node_add(FibNode *node, FibNode *root)
+ 43 {
+ 44     node-&gt;left        = root-&gt;left;
+ 45     root-&gt;left-&gt;right = node;
+ 46     node-&gt;right       = root;
+ 47     root-&gt;left        = node;
+ 48 }
+ 49 
+ 50 /*
+ 51  * 将双向链表b链接到双向链表a的后面
+ 52  *
+ 53  * 注意： 此处a和b都是双向链表
+ 54 */
+ 55 static void fib_node_cat(FibNode *a, FibNode *b)
+ 56 {
+ 57     FibNode *tmp;
+ 58 
+ 59     tmp            = a-&gt;right;
+ 60     a-&gt;right       = b-&gt;right;
+ 61     b-&gt;right-&gt;left = a;
+ 62     b-&gt;right       = tmp;
+ 63     tmp-&gt;left      = b;
+ 64 }
+ 65 
+ 66  
+ 67 /*
+ 68  * 创建斐波那契堆
+ 69  */
+ 70 FibHeap* fib_heap_make()
+ 71 {
+ 72     FibHeap* heap;
+ 73 
+ 74     heap = (FibHeap *) malloc(sizeof(FibHeap));
+ 75     if (heap == NULL)
+ 76     {
+ 77         printf(&quot;Error: make FibHeap failed\n&quot;);
+ 78         return NULL;
+ 79     }
+ 80 
+ 81     heap-&gt;keyNum = 0;
+ 82     heap-&gt;maxDegree = 0;
+ 83     heap-&gt;min = NULL;
+ 84     heap-&gt;cons = NULL;
+ 85 
+ 86     return heap;
+ 87 }
+ 88  
+ 89 /*
+ 90  * 创建斐波那契堆的节点
+ 91  */
+ 92 static FibNode* fib_node_make(Type key)
+ 93 {
+ 94     FibNode * node;
+ 95 
+ 96     node = (FibNode *) malloc(sizeof(FibNode));
+ 97     if (node == NULL)
+ 98     {
+ 99         printf(&quot;Error: make Node failed\n&quot;);
+100         return NULL;
+101     }
+102     node-&gt;key    = key;
+103     node-&gt;degree = 0;
+104     node-&gt;left   = node;
+105     node-&gt;right  = node;
+106     node-&gt;parent = NULL;
+107     node-&gt;child  = NULL;
+108 
+109     return node;
+110 }
+111  
+112 /*
+113  * 将节点node插入到斐波那契堆heap中
+114  */
+115 static void fib_heap_insert_node(FibHeap *heap, FibNode *node)
+116 {
+117     if (heap-&gt;keyNum == 0)
+118         heap-&gt;min = node;
+119     else
+120        {
+121         fib_node_add(node, heap-&gt;min);
+122         if (node-&gt;key &lt; heap-&gt;min-&gt;key)
+123             heap-&gt;min = node;
+124     }
+125     heap-&gt;keyNum++;
+126 }
+127  
+128 /* 
+129  * 新建键值为key的节点，并将其插入到斐波那契堆中
+130  */
+131 void fib_heap_insert_key(FibHeap *heap, Type key)
+132 {
+133     FibNode *node;
+134 
+135     if (heap==NULL)
+136         return ;
+137 
+138     node = fib_node_make(key);
+139     if (node == NULL)
+140         return ;
+141 
+142     fib_heap_insert_node(heap, node);
+143 }
+144   
+145 /*
+146  * 将h1, h2合并成一个堆，并返回合并后的堆
+147  */
+148 FibHeap* fib_heap_union(FibHeap *h1, FibHeap *h2)
+149 {
+150     FibHeap *tmp;
+151 
+152     if (h1==NULL)
+153         return h2;
+154     if (h2==NULL)
+155         return h1;
+156 
+157     // 以h1为&quot;母&quot;，将h2附加到h1上；下面是保证h1的度数大，尽可能的少操作。
+158     if(h2-&gt;maxDegree &gt; h1-&gt;maxDegree)
+159     {
+160         tmp = h1;
+161         h1 = h2;
+162         h2 = tmp;
+163     }
+164 
+165     if((h1-&gt;min) == NULL)                // h1无&quot;最小节点&quot;
+166     {
+167         h1-&gt;min = h2-&gt;min;
+168         h1-&gt;keyNum = h2-&gt;keyNum;
+169         free(h2-&gt;cons);
+170         free(h2);
+171     }
+172     else if((h2-&gt;min) == NULL)           // h1有&quot;最小节点&quot; &amp;&amp; h2无&quot;最小节点&quot;
+173     {
+174         free(h2-&gt;cons);
+175         free(h2);
+176     }                                   // h1有&quot;最小节点&quot; &amp;&amp; h2有&quot;最小节点&quot;
+177     else
+178     {
+179         // 将&quot;h2中根链表&quot;添加到&quot;h1&quot;中
+180         fib_node_cat(h1-&gt;min, h2-&gt;min);
+181         if (h1-&gt;min-&gt;key &gt; h2-&gt;min-&gt;key)
+182             h1-&gt;min = h2-&gt;min;
+183         h1-&gt;keyNum += h2-&gt;keyNum;
+184         free(h2-&gt;cons);
+185         free(h2);
+186     }
+187 
+188     return h1;
+189 }
+190 
+191 /*
+192  * 将&quot;堆的最小结点&quot;从根链表中移除，
+193  * 这意味着&quot;将最小节点所属的树&quot;从堆中移除!
+194  */
+195 static FibNode *fib_heap_remove_min(FibHeap *heap)
+196 {
+197     FibNode *min = heap-&gt;min;
+198 
+199     if (heap-&gt;min == min-&gt;right)
+200         heap-&gt;min = NULL;
+201     else
+202     {
+203         fib_node_remove(min);
+204         heap-&gt;min = min-&gt;right;
+205     }
+206     min-&gt;left = min-&gt;right = min;
+207 
+208     return min;
+209 }
+210  
+211 /*
+212  * 将node链接到root根结点
+213  */
+214 static void fib_heap_link(FibHeap * heap, FibNode * node, FibNode *root)
+215 {
+216     // 将node从双链表中移除
+217     fib_node_remove(node);
+218     // 将node设为root的孩子
+219     if (root-&gt;child == NULL)
+220         root-&gt;child = node;
+221     else
+222         fib_node_add(node, root-&gt;child);
+223 
+224     node-&gt;parent = root;
+225     root-&gt;degree++;
+226     node-&gt;marked = 0;
+227 }
+228  
+229 /* 
+230  * 创建fib_heap_consolidate所需空间
+231  */
+232 static void fib_heap_cons_make(FibHeap * heap)
+233 {
+234     int old = heap-&gt;maxDegree;
+235 
+236     // 计算log2(x)，&quot;+1&quot;意味着向上取整！
+237     // ex. log2(13) = 3，向上取整为3+1=4。
+238     heap-&gt;maxDegree = LOG2(heap-&gt;keyNum) + 1;
+239 
+240     // 如果原本空间不够，则再次分配内存
+241     if (old &gt;= heap-&gt;maxDegree)
+242         return ;
+243 
+244     // 因为度为heap-&gt;maxDegree可能被合并，所以要maxDegree+1
+245     heap-&gt;cons = (FibNode **)realloc(heap-&gt;cons, 
+246             sizeof(FibHeap *) * (heap-&gt;maxDegree + 1));
+247 }
+248 
+249 /* 
+250  * 合并斐波那契堆的根链表中左右相同度数的树
+251  */
+252 static void fib_heap_consolidate(FibHeap *heap)
+253 {
+254     int i, d, D;
+255     FibNode *x, *y, *tmp;
+256 
+257     fib_heap_cons_make(heap);//开辟哈希所用空间
+258     D = heap-&gt;maxDegree + 1;
+259 
+260     for (i = 0; i &lt; D; i++)
+261         heap-&gt;cons[i] = NULL;
+262  
+263     // 合并相同度的根节点，使每个度数的树唯一
+264     while (heap-&gt;min != NULL)
+265     {
+266         x = fib_heap_remove_min(heap);    // 取出堆中的最小树(最小节点所在的树)
+267         d = x-&gt;degree;                    // 获取最小树的度数
+268         // heap-&gt;cons[d] != NULL，意味着有两棵树(x和y)的&quot;度数&quot;相同。
+269         while (heap-&gt;cons[d] != NULL)
+270         {
+271             y = heap-&gt;cons[d];            // y是&quot;与x的度数相同的树&quot; 
+272             if (x-&gt;key &gt; y-&gt;key)        // 保证x的键值比y小
+273             {
+274                 tmp = x;
+275                 x = y;
+276                 y = tmp;
+277 
+278             }
+279             fib_heap_link(heap, y, x);    // 将y链接到x中
+280             heap-&gt;cons[d] = NULL;
+281             d++;
+282         }
+283         heap-&gt;cons[d] = x;
+284     }
+285     heap-&gt;min = NULL;
+286  
+287     // 将heap-&gt;cons中的结点重新加到根表中
+288     for (i=0; i&lt;D; i++)
+289     {
+290         if (heap-&gt;cons[i] != NULL)
+291         {
+292             if (heap-&gt;min == NULL)
+293                 heap-&gt;min = heap-&gt;cons[i];
+294             else
+295             {
+296                 fib_node_add(heap-&gt;cons[i], heap-&gt;min);
+297                 if ((heap-&gt;cons[i])-&gt;key &lt; heap-&gt;min-&gt;key)
+298                     heap-&gt;min = heap-&gt;cons[i];
+299             }
+300         }
+301     }
+302 }
+303  
+304 /*
+305  * 移除最小节点，并返回移除节点后的斐波那契堆
+306  */
+307 FibNode* _fib_heap_extract_min(FibHeap *heap)
+308 {
+309     if (heap==NULL || heap-&gt;min==NULL)
+310         return NULL;
+311 
+312     FibNode *child = NULL;
+313     FibNode *min = heap-&gt;min;
+314     // 将min每一个儿子(儿子和儿子的兄弟)都添加到&quot;斐波那契堆的根链表&quot;中
+315     while (min-&gt;child != NULL)
+316     {
+317         child = min-&gt;child;
+318         fib_node_remove(child);
+319         if (child-&gt;right == child)
+320             min-&gt;child = NULL;
+321         else
+322             min-&gt;child = child-&gt;right;
+323 
+324         fib_node_add(child, heap-&gt;min);
+325         child-&gt;parent = NULL;
+326     }
+327 
+328     // 将min从根链表中移除
+329     fib_node_remove(min);
+330     // 若min是堆中唯一节点，则设置堆的最小节点为NULL；
+331     // 否则，设置堆的最小节点为一个非空节点(min-&gt;right)，然后再进行调节。
+332     if (min-&gt;right == min)
+333         heap-&gt;min = NULL;
+334     else
+335     {
+336         heap-&gt;min = min-&gt;right;
+337         fib_heap_consolidate(heap);
+338     }
+339     heap-&gt;keyNum--;
+340 
+341     return min;
+342 }
+343 
+344 void fib_heap_extract_min(FibHeap *heap)
+345 {
+346     FibNode *node;
+347 
+348     if (heap==NULL || heap-&gt;min==NULL)
+349         return ;
+350 
+351     node = _fib_heap_extract_min(heap);
+352     if (node!=NULL)
+353         free(node);
+354 }
+355 
+356 /*
+357  * 在斐波那契堆heap中是否存在键值为key的节点；存在返回1，否则返回0。
+358  */
+359 int fib_heap_get_min(FibHeap *heap, Type *pkey)
+360 {
+361     if (heap==NULL || heap-&gt;min==NULL || pkey==NULL)
+362         return 0;
+363 
+364     *pkey = heap-&gt;min-&gt;key;
+365     return 1;
+366 }
+367   
+368 /* 
+369  * 修改度数
+370  */
+371 static void renew_degree(FibNode *parent, int degree)
+372 {
+373     parent-&gt;degree -= degree;
+374     if (parent-&gt; parent != NULL)
+375         renew_degree(parent-&gt;parent, degree);
+376 }
+377  
+378 /* 
+379  * 将node从父节点parent的子链接中剥离出来，
+380  * 并使node成为&quot;堆的根链表&quot;中的一员。
+381  */
+382 static void fib_heap_cut(FibHeap *heap, FibNode *node, FibNode *parent)
+383 {
+384     fib_node_remove(node);
+385     renew_degree(parent, node-&gt;degree);
+386     // node没有兄弟
+387     if (node == node-&gt;right) 
+388         parent-&gt;child = NULL;
+389     else 
+390         parent-&gt;child = node-&gt;right;
+391 
+392     node-&gt;parent = NULL;
+393     node-&gt;left = node-&gt;right = node;
+394     node-&gt;marked = 0;
+395     // 将&quot;node所在树&quot;添加到&quot;根链表&quot;中
+396     fib_node_add(node, heap-&gt;min);
+397 }
+398 
+399 /* 
+400  * 对节点node进行&quot;级联剪切&quot;
+401  *
+402  * 级联剪切：如果减小后的结点破坏了最小堆性质，
+403  *     则把它切下来(即从所在双向链表中删除，并将
+404  *     其插入到由最小树根节点形成的双向链表中)，
+405  *     然后再从&quot;被切节点的父节点&quot;到所在树根节点递归执行级联剪枝
+406  */
+407 static void fib_heap_cascading_cut(FibHeap *heap, FibNode *node) 
+408 {
+409     FibNode *parent = node-&gt;parent;
+410     if (parent != NULL)
+411         return ;
+412 
+413     if (node-&gt;marked == 0) 
+414         node-&gt;marked = 1;
+415     else
+416     {
+417         fib_heap_cut(heap, node, parent);
+418         fib_heap_cascading_cut(heap, parent);
+419     }
+420 }
+421 
+422 /* 
+423  * 将斐波那契堆heap中节点node的值减少为key
+424  */
+425 static void fib_heap_decrease(FibHeap *heap, FibNode *node, Type key)
+426 {
+427     FibNode *parent;
+428 
+429     if (heap==NULL || heap-&gt;min==NULL ||node==NULL) 
+430         return ;
+431 
+432     if ( key&gt;=node-&gt;key)
+433     {
+434         printf(&quot;decrease failed: the new key(%d) is no smaller than current key(%d)\n&quot;, key, node-&gt;key);
+435         return ;
+436     }
+437 
+438     node-&gt;key = key;
+439     parent = node-&gt;parent;
+440     if (parent!=NULL &amp;&amp; node-&gt;key &lt; parent-&gt;key)
+441     {
+442         // 将node从父节点parent中剥离出来，并将node添加到根链表中
+443         fib_heap_cut(heap, node, parent);
+444         fib_heap_cascading_cut(heap, parent);
+445     }
+446 
+447     // 更新最小节点
+448     if (node-&gt;key &lt; heap-&gt;min-&gt;key)
+449         heap-&gt;min = node;
+450 }
+451 
+452 /* 
+453  * 将斐波那契堆heap中节点node的值增加为key
+454  */
+455 static void fib_heap_increase(FibHeap *heap, FibNode *node, Type key)
+456 {
+457     FibNode *child, *parent, *right;
+458 
+459     if (heap==NULL || heap-&gt;min==NULL ||node==NULL) 
+460         return ;
+461 
+462     if (key &lt;= node-&gt;key)
+463     {
+464         printf(&quot;increase failed: the new key(%d) is no greater than current key(%d)\n&quot;, key, node-&gt;key);
+465         return ;
+466     }
+467 
+468     // 将node每一个儿子(不包括孙子,重孙,...)都添加到&quot;斐波那契堆的根链表&quot;中
+469     while (node-&gt;child != NULL)
+470     {
+471         child = node-&gt;child;
+472         fib_node_remove(child);               // 将child从node的子链表中删除
+473         if (child-&gt;right == child)
+474             node-&gt;child = NULL;
+475         else
+476             node-&gt;child = child-&gt;right;
+477 
+478         fib_node_add(child, heap-&gt;min);       // 将child添加到根链表中
+479         child-&gt;parent = NULL;
+480     }
+481     node-&gt;degree = 0;
+482     node-&gt;key = key;
+483 
+484     // 如果node不在根链表中，
+485     //     则将node从父节点parent的子链接中剥离出来，
+486     //     并使node成为&quot;堆的根链表&quot;中的一员，
+487     //     然后进行&quot;级联剪切&quot;
+488     // 否则，则判断是否需要更新堆的最小节点
+489     parent = node-&gt;parent;
+490     if(parent != NULL)
+491     {
+492         fib_heap_cut(heap, node, parent);
+493         fib_heap_cascading_cut(heap, parent);
+494     }
+495     else if(heap-&gt;min == node)
+496     {
+497         right = node-&gt;right;
+498         while(right != node)
+499         {
+500             if(node-&gt;key &gt; right-&gt;key)
+501                 heap-&gt;min = right;
+502             right = right-&gt;right;
+503         }
+504     }
+505 }
+506 
+507 /* 
+508  * 更新二项堆heap的节点node的键值为key
+509  */
+510 void _fib_heap_update(FibHeap *heap, FibNode *node, Type key)
+511 {
+512     if(key &lt; node-&gt;key)
+513         fib_heap_decrease(heap, node, key);
+514     else if(key &gt; node-&gt;key)
+515         fib_heap_increase(heap, node, key);
+516     else
+517         printf(&quot;No need to update!!!\n&quot;);
+518 }
+519   
+520 void fib_heap_update(FibHeap *heap, Type oldkey, Type newkey)
+521 {
+522     FibNode *node;
+523 
+524     if (heap==NULL)
+525         return ;
+526 
+527     node = fib_heap_search(heap, oldkey);
+528     if (node!=NULL)
+529         _fib_heap_update(heap, node, newkey);
+530 }
+531 
+532 /*
+533  * 在最小堆root中查找键值为key的节点
+534  */
+535 static FibNode* fib_node_search(FibNode *root, Type key)
+536 {
+537     FibNode *t = root;    // 临时节点
+538     FibNode *p = NULL;    // 要查找的节点
+539 
+540     if (root==NULL)
+541         return root;
+542 
+543     do
+544     {
+545         if (t-&gt;key == key)
+546         {
+547             p = t;
+548             break;
+549         } 
+550         else
+551         {
+552             if ((p = fib_node_search(t-&gt;child, key)) != NULL) 
+553                 break;
+554         }    
+555         t = t-&gt;right;
+556     } while (t != root);
+557 
+558     return p;
+559 }
+560  
+561 /*
+562  * 在斐波那契堆heap中查找键值为key的节点
+563  */
+564 static FibNode *fib_heap_search(FibHeap *heap, Type key)
+565 {
+566     if (heap==NULL || heap-&gt;min==NULL)
+567         return NULL;
+568 
+569     return fib_node_search(heap-&gt;min, key);
+570 }
+571 
+572 /*
+573  * 在斐波那契堆heap中是否存在键值为key的节点。
+574  * 存在返回1，否则返回0。
+575  */
+576 int fib_heap_contains(FibHeap *heap, Type key)
+577 {
+578     return fib_heap_search(heap,key)!=NULL ? 1: 0;
+579 }
+580 
+581 /*
+582  * 删除结点node
+583  */
+584 static void _fib_heap_delete(FibHeap *heap, FibNode *node)
+585 {
+586     Type min = heap-&gt;min-&gt;key;
+587     fib_heap_decrease(heap, node, min-1);
+588     _fib_heap_extract_min(heap);
+589     free(node);
+590 }
+591 
+592 void fib_heap_delete(FibHeap *heap, Type key)
+593 {
+594     FibNode *node;
+595 
+596     if (heap==NULL || heap-&gt;min==NULL)
+597         return ;
+598 
+599     node = fib_heap_search(heap, key);
+600     if (node==NULL)
+601         return ;
+602 
+603     _fib_heap_delete(heap, node);
+604 }
+605  
+606 /* 
+607  * 销毁斐波那契堆
+608  */
+609 static void fib_node_destroy(FibNode *node)
+610 {
+611     FibNode *start = node;
+612 
+613     if(node == NULL)
+614         return;
+615 
+616     do {
+617         fib_node_destroy(node-&gt;child);
+618         // 销毁node，并将node指向下一个
+619         node = node-&gt;right;
+620         free(node-&gt;left);
+621     } while(node != start);
+622 }
+623  
+624 void fib_heap_destroy(FibHeap *heap)
+625 {
+626     fib_node_destroy(heap-&gt;min);
+627     free(heap-&gt;cons);
+628     free(heap);
+629 }
+630 
+631 /*
+632  * 打印&quot;斐波那契堆&quot;
+633  *
+634  * 参数说明：
+635  *     node       -- 当前节点
+636  *     prev       -- 当前节点的前一个节点(父节点or兄弟节点)
+637  *     direction  --  1，表示当前节点是一个左孩子;
+638  *                    2，表示当前节点是一个兄弟节点。
+639  */
+640 static void _fib_print(FibNode *node, FibNode *prev, int direction)
+641 {
+642     FibonacciNode *start=node;
+643 
+644     if (node==NULL)
+645         return ;
+646     do
+647     {
+648         if (direction == 1)
+649             printf(&quot;%8d(%d) is %2d&#39;s child\n&quot;, node-&gt;key, node-&gt;degree, prev-&gt;key);
+650         else
+651             printf(&quot;%8d(%d) is %2d&#39;s next\n&quot;, node-&gt;key, node-&gt;degree, prev-&gt;key);
+652 
+653         if (node-&gt;child != NULL)
+654             _fib_print(node-&gt;child, node, 1);
+655 
+656         // 兄弟节点
+657         prev = node;
+658         node = node-&gt;right;
+659         direction = 2;
+660     } while(node != start);
+661 }
+662 
+663 void fib_print(FibHeap *heap)
+664 {
+665     int i=0;
+666     FibonacciNode *p;
+667 
+668     if (heap==NULL || heap-&gt;min==NULL)
+669         return ;
+670 
+671     printf(&quot;== 斐波那契堆的详细信息: ==\n&quot;);
+672     p = heap-&gt;min;
+673     do {
+674         i++;
+675         printf(&quot;%2d. %4d(%d) is root\n&quot;, i, p-&gt;key, p-&gt;degree);
+676 
+677         _fib_print(p-&gt;child, p, 1);
+678         p = p-&gt;right;
+679     } while (p != heap-&gt;min);
+680     printf(&quot;\n&quot;);
+681 }</pre>
+
+<p><a href="javascript:void(0);" onclick="copyCnblogsCode(this)" title="复制代码"><img alt="复制代码" src="http://common.cnblogs.com/images/copycode.gif" /></a></p>
+
+<p>斐波那契堆的测试程序(main.c)</p>
+
+<p><img alt="" id="code_img_opened_7dbfbac2-eea4-41a2-bd41-b957618dd185" src="http://images.cnblogs.com/OutliningIndicators/ExpandedBlockStart.gif" /></p>
+
+<p><a href="javascript:void(0);" onclick="copyCnblogsCode(this)" title="复制代码"><img alt="复制代码" src="http://common.cnblogs.com/images/copycode.gif" /></a></p>
+
+<pre>
+  1 /**
+  2  * C语言实现的斐波那契堆
+  3  *
+  4  * @author skywang
+  5  * @date 2014/04/06
+  6  */
+  7 
+  8 #include &lt;stdio.h&gt;
+  9 #include &quot;fibonacci_heap.h&quot;
+ 10 
+ 11 #define DEBUG 0
+ 12 
+ 13 #if DEBUG
+ 14 #define log(x, ...)   printf(x, __VA_ARGS__)
+ 15 #else
+ 16 #define log(x, ...)   
+ 17 #endif
+ 18 
+ 19 #define LENGTH(a) ( (sizeof(a)) / (sizeof(a[0])) )
+ 20 
+ 21 // 共8个
+ 22 int a[] = {12,  7, 25, 15, 28, 
+ 23            33, 41, 1};
+ 24 // 共14个
+ 25 int b[] = {18, 35, 20, 42,  9, 
+ 26            31, 23,  6, 48, 11, 
+ 27            24, 52, 13, 2};
+ 28 
+ 29 // 验证&quot;基本信息(斐波那契堆的结构)&quot;
+ 30 void test_basic()
+ 31 {
+ 32     int i;
+ 33     int blen=LENGTH(b);
+ 34     FibHeap *hb = fib_heap_make();
+ 35 
+ 36     // 斐波那契堆hb
+ 37     printf(&quot;== 斐波那契堆(hb)中依次添加: &quot;);
+ 38     for(i=0; i&lt;blen; i++)
+ 39     {
+ 40         printf(&quot;%d &quot;, b[i]);
+ 41         fib_heap_insert_key(hb, b[i]);
+ 42     }
+ 43     printf(&quot;\n&quot;);
+ 44     printf(&quot;== 斐波那契堆(hb)删除最小节点\n&quot;);
+ 45     fib_heap_extract_min(hb);
+ 46     fib_print(hb);
+ 47 
+ 48     fib_heap_destroy(hb);
+ 49 }
+ 50 
+ 51 // 验证&quot;插入操作&quot;
+ 52 void test_insert()
+ 53 {
+ 54     int i;
+ 55     int alen=LENGTH(a);
+ 56     FibHeap *ha = fib_heap_make();
+ 57 
+ 58     // 斐波那契堆ha
+ 59     printf(&quot;== 斐波那契堆(ha)中依次添加: &quot;);
+ 60 
+ 61     for(i=0; i&lt;alen; i++)
+ 62     {
+ 63         printf(&quot;%d &quot;, a[i]);
+ 64         fib_heap_insert_key(ha, a[i]);
+ 65     }
+ 66     printf(&quot;\n&quot;);
+ 67     printf(&quot;== 斐波那契堆(ha)删除最小节点\n&quot;);
+ 68     fib_heap_extract_min(ha);
+ 69     fib_print(ha);
+ 70 
+ 71     // 插入50
+ 72     printf(&quot;== 插入50\n&quot;);
+ 73     fib_heap_insert_key(ha, 50);
+ 74     fib_print(ha);
+ 75 
+ 76     fib_heap_destroy(ha);
+ 77 }
+ 78 
+ 79 // 验证&quot;合并操作&quot;
+ 80 void test_union()
+ 81 {
+ 82     int i;
+ 83     int alen=LENGTH(a);
+ 84     int blen=LENGTH(b);
+ 85     FibHeap *ha = fib_heap_make();
+ 86     FibHeap *hb = fib_heap_make();
+ 87 
+ 88     // 斐波那契堆ha
+ 89     printf(&quot;== 斐波那契堆(ha)中依次添加: &quot;);
+ 90 
+ 91     for(i=0; i&lt;alen; i++)
+ 92     {
+ 93         printf(&quot;%d &quot;, a[i]);
+ 94         fib_heap_insert_key(ha, a[i]);
+ 95     }
+ 96     printf(&quot;\n&quot;);
+ 97     printf(&quot;== 斐波那契堆(ha)删除最小节点\n&quot;);
+ 98     fib_heap_extract_min(ha);
+ 99     fib_print(ha);
+100 
+101     // 斐波那契堆hb
+102     printf(&quot;== 斐波那契堆(hb)中依次添加: &quot;);
+103     for(i=0; i&lt;blen; i++)
+104     {
+105         printf(&quot;%d &quot;, b[i]);
+106         fib_heap_insert_key(hb, b[i]);
+107     }
+108     printf(&quot;\n&quot;);
+109     printf(&quot;== 斐波那契堆(hb)删除最小节点\n&quot;);
+110     fib_heap_extract_min(hb);
+111     fib_print(hb);
+112 
+113     // 将&quot;斐波那契堆hb&quot;合并到&quot;斐波那契堆ha&quot;中。
+114     printf(&quot;== 合并ha和hb\n&quot;);
+115     ha = fib_heap_union(ha, hb);
+116     fib_print(ha);
+117 
+118     // 销毁堆
+119     fib_heap_destroy(ha);
+120 }
+121 
+122 // 验证&quot;删除最小节点&quot;
+123 void test_remove_min()
+124 {
+125     int i;
+126     int alen=LENGTH(a);
+127     int blen=LENGTH(b);
+128     FibHeap *ha = fib_heap_make();
+129     FibHeap *hb = fib_heap_make();
+130 
+131     // 斐波那契堆ha
+132     printf(&quot;== 斐波那契堆(ha)中依次添加: &quot;);
+133 
+134     for(i=0; i&lt;alen; i++)
+135     {
+136         printf(&quot;%d &quot;, a[i]);
+137         fib_heap_insert_key(ha, a[i]);
+138     }
+139     printf(&quot;\n&quot;);
+140     printf(&quot;== 斐波那契堆(ha)删除最小节点\n&quot;);
+141     fib_heap_extract_min(ha);
+142     //fib_print(ha);
+143 
+144     // 斐波那契堆hb
+145     printf(&quot;== 斐波那契堆(hb)中依次添加: &quot;);
+146     for(i=0; i&lt;blen; i++)
+147     {
+148         printf(&quot;%d &quot;, b[i]);
+149         fib_heap_insert_key(hb, b[i]);
+150     }
+151     printf(&quot;\n&quot;);
+152     printf(&quot;== 斐波那契堆(hb)删除最小节点\n&quot;);
+153     fib_heap_extract_min(hb);
+154     //fib_print(hb);
+155 
+156     // 将&quot;斐波那契堆hb&quot;合并到&quot;斐波那契堆ha&quot;中。
+157     printf(&quot;== 合并ha和hb\n&quot;);
+158     ha = fib_heap_union(ha, hb);
+159     fib_print(ha);
+160 
+161     printf(&quot;== 删除最小节点\n&quot;);
+162     fib_heap_extract_min(ha);
+163     fib_print(ha);
+164 
+165     // 销毁堆
+166     fib_heap_destroy(ha);
+167 }
+168 
+169 // 验证&quot;减小节点&quot;
+170 void test_decrease()
+171 {
+172     int i;
+173     int blen=LENGTH(b);
+174     FibHeap *hb = fib_heap_make();
+175 
+176     // 斐波那契堆hb
+177     printf(&quot;== 斐波那契堆(hb)中依次添加: &quot;);
+178     for(i=0; i&lt;blen; i++)
+179     {
+180         printf(&quot;%d &quot;, b[i]);
+181         fib_heap_insert_key(hb, b[i]);
+182     }
+183     printf(&quot;\n&quot;);
+184     printf(&quot;== 斐波那契堆(hb)删除最小节点\n&quot;);
+185     fib_heap_extract_min(hb);
+186     fib_print(hb);
+187 
+188     printf(&quot;== 将20减小为2\n&quot;);
+189     fib_heap_update(hb, 20, 2);
+190     fib_print(hb);
+191 
+192     fib_heap_destroy(hb);
+193 }
+194 
+195 // 验证&quot;增大节点&quot;
+196 void test_increase()
+197 {
+198     int i;
+199     int blen=LENGTH(b);
+200     FibHeap *hb = fib_heap_make();
+201 
+202     // 斐波那契堆hb
+203     printf(&quot;== 斐波那契堆(hb)中依次添加: &quot;);
+204     for(i=0; i&lt;blen; i++)
+205     {
+206         printf(&quot;%d &quot;, b[i]);
+207         fib_heap_insert_key(hb, b[i]);
+208     }
+209     printf(&quot;\n&quot;);
+210     printf(&quot;== 斐波那契堆(hb)删除最小节点\n&quot;);
+211     fib_heap_extract_min(hb);
+212     fib_print(hb);
+213 
+214     fib_heap_update(hb, 20, 60);
+215     printf(&quot;== 将20增加为60\n&quot;);
+216     fib_print(hb);
+217 
+218     fib_heap_destroy(hb);
+219 }
+220 
+221 // 验证&quot;删除节点&quot;
+222 void test_delete()
+223 {
+224     int i;
+225     int blen=LENGTH(b);
+226     FibHeap *hb = fib_heap_make();
+227 
+228     // 斐波那契堆hb
+229     printf(&quot;== 斐波那契堆(hb)中依次添加: &quot;);
+230     for(i=0; i&lt;blen; i++)
+231     {
+232         printf(&quot;%d &quot;, b[i]);
+233         fib_heap_insert_key(hb, b[i]);
+234     }
+235     printf(&quot;\n&quot;);
+236     printf(&quot;== 斐波那契堆(hb)删除最小节点\n&quot;);
+237     fib_heap_extract_min(hb);
+238     fib_print(hb);
+239 
+240     fib_heap_delete(hb, 20);
+241     printf(&quot;== 删除节点20\n&quot;);
+242     fib_print(hb);
+243 
+244     fib_heap_destroy(hb);
+245 }
+246 
+247 void main()
+248 {
+249     // 验证&quot;基本信息(斐波那契堆的结构)&quot;
+250     test_basic();
+251     // 验证&quot;插入操作&quot;
+252     //test_insert();
+253     // 验证&quot;合并操作&quot;
+254     //test_union();
+255     // 验证&quot;删除最小节点&quot;
+256     //test_remove_min();
+257     // 验证&quot;减小节点&quot;
+258     //test_decrease();
+259     // 验证&quot;增大节点&quot;
+260     //test_increase();
+261     // 验证&quot;删除节点&quot;
+262     //test_delete();
+263 }</pre>
+
+<p><a href="javascript:void(0);" onclick="copyCnblogsCode(this)" title="复制代码"><img alt="复制代码" src="http://common.cnblogs.com/images/copycode.gif" /></a></p>
+
+<p>&nbsp;</p>
+
+<h3><strong><a name="a4"></a>斐波那契堆的C测试程序</strong></h3>
+
+<p>斐波那契堆的测试程序包括了<strong>&quot;插入&quot;、&quot;合并&quot;、&quot;增大&quot;、&quot;减小&quot;、&quot;删除&quot;、&quot;基本信息&quot;</strong>等几种功能的测试代码。默认是运行的&quot;基本信息(验证斐波那契堆的结构)&quot;测试代码，你可以根据自己的需要来对相应的功能进行验证！</p>
+
+<p>注意：C语言版的斐波那契堆的LOG2宏定义中使用了math.h，记得引入math库。例如，若你是在Linux下通过gcc编译，记得添加-lm参数(gcc *.c -lm)。</p>
+
+<p>下面是基本信息测试代码的运行结果：</p>
+
+<p><a href="javascript:void(0);" onclick="copyCnblogsCode(this)" title="复制代码"><img alt="复制代码" src="http://common.cnblogs.com/images/copycode.gif" /></a></p>
+
+<pre>
+== 斐波那契堆(hb)中依次添加: 18 35 20 42 9 31 23 6 48 11 24 52 13 2 
+== 斐波那契堆(hb)删除最小节点
+== 斐波那契堆的详细信息: ==
+ 1.    6(3) is root
+       9(0) is  6&#39;s child
+      18(1) is  9&#39;s next
+      35(0) is 18&#39;s child
+      20(2) is 18&#39;s next
+      42(0) is 20&#39;s child
+      23(1) is 42&#39;s next
+      31(0) is 23&#39;s child
+ 2.   11(2) is root
+      48(0) is 11&#39;s child
+      24(1) is 48&#39;s next
+      52(0) is 24&#39;s child
+ 3.   13(0) is root</pre>
+
+<p><a href="javascript:void(0);" onclick="copyCnblogsCode(this)" title="复制代码"><img alt="复制代码" src="http://common.cnblogs.com/images/copycode.gif" /></a></p>
