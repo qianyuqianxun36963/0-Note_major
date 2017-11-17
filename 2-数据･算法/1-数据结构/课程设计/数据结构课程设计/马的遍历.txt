@@ -1,0 +1,212 @@
+ #include<stdio.h>
+#include<stdlib.h>
+
+int chessboard[14][13];
+    
+int CanPass[14][13][8];
+
+typedef struct{  /*棋盘的八个方向*/
+    int y,x;
+}direction;
+direction dir[8]={{2,1},{1,2},{-1,2},{-2,1},{-2,-1},{-1,-2},{1,-2},{2,-1}};/*八个方向*/
+
+typedef struct{
+    int x,y;/*走过位置*/
+    int di;/*方向*/
+}pathnode;
+typedef struct{
+    pathnode pa[90];
+    int top;
+}path;/*顺序栈*/
+
+
+void Init_Path(path *p)
+{/*初始化栈*/
+    p->top=-1;
+}
+int Push_Path(path *p,pathnode t,int v)
+{/*压节点及其向下一位移动的方向入栈*/
+    if(p->top>=63+26*v)
+        return -1;
+    else
+    {
+        p->top++;
+        p->pa[p->top].x=t.x;
+        p->pa[p->top].y=t.y;
+        p->pa[p->top].di=t.di;
+        return 1;
+    }
+}
+int Empty(path p)
+{/*判断栈是否为空*/
+    if(p.top<0) return 1;
+    return 0;
+}
+int Pop_Path(path *p,pathnode *t)
+{/*出栈*/
+    if(Empty(*p))
+        return -1;
+    else
+    {
+        t->x=p->pa[p->top].x;
+        t->y=p->pa[p->top].y;
+        t->di=p->pa[p->top--].di;
+        return 1;
+    }
+}
+
+int Count(int x,int y)
+{/*计算每个节点周围有几个方向可以走*/
+    int count=0,i=0;
+    for(i=0;i<8;i++)
+        if(chessboard[x+1+dir[i].x][y+1+dir[i].y]==0)
+            count++;
+    return count;
+}
+int Find_Direction(int x,int y)
+{/*寻找下一个方向*/
+    int dire,min=9,count,d=9;
+
+    for(dire=0;dire<8;dire++)
+    {
+        if(chessboard[x+1+dir[dire].x][y+1+dir[dire].y]==0&&
+            CanPass[x+1][y+1][dire]==0)
+        {    
+            count=Count(x+dir[dire].x,y+dir[dire].y);
+            if(min>count)
+            {
+                min=count;
+                d=dire;
+            }
+        }
+    }
+    if(d<9)
+        return d;
+    else
+        return -1;
+}
+
+
+void Knight(int x,int y,int v)/*x,y表示出发位置*/
+{/*骑士遍历函数*/
+    int num=1,t,i;
+    path p;
+    pathnode f;
+    Init_Path(&p);
+    for(num=1;num<=64+26*v;num++)
+    {
+        t=Find_Direction(x,y);
+        if(t!=-1)
+        {/*正常找到下一个方向的情况下*/
+            chessboard[x+1][y+1]=num;
+            f.x=x;f.y=y;f.di=t;
+            Push_Path(&p,f,v);
+            x=x+dir[t].x;y=y+dir[t].y;
+        }
+        else if(num==64+26*v&&chessboard[x+1][y+1]==0)
+        {/*最后一次时t肯定是-1*/
+            chessboard[x+1][y+1]=num;
+            f.x=x;f.y=y;f.di=t;
+            Push_Path(&p,f,v);
+        }
+
+        else
+        {
+            if(Pop_Path(&p,&f)==-1)
+            {/*出栈且栈为空的情况*/
+                printf("!!!!!!!!!!!!无法为您找到一条适合的路径!!!!!!!!!!!!\n");
+                exit(0);
+            }
+            num-=2;
+            x=f.x;y=f.y;
+            CanPass[x+1][y+1][f.di]=1;
+        }/*end else */
+    }
+    /*根据栈中信息打印出骑士行走路径*/
+    printf("骑士巡游路径如下:\n  ");
+    for(i=0;i<64+26*v;i++)
+    {
+        printf("(%2d,%d)->",p.pa[i].x,p.pa[i].y);
+        if((i+1)%(8+v)==0)
+            printf("\b\b  \n->");
+    }
+    
+    printf("\b\b  \n");
+    printf("根据数组打印结果是:\n");
+
+    for(i=0;i<8+2*v;i++)
+    {/*根据棋盘数组来打印*/
+        for(t=0;t<8+v;t++)
+            printf("%4d",chessboard[i+2][t+2]);
+        printf("\n");
+    }
+
+}
+void Mark_Dir(int v)
+{/*由于三维数组赋初值比较困难，因而采用单独的函数实现*/
+    int i,j,k;
+    for(i=0;i<12+2*v;i++)
+        for(j=0;j<12+v;j++)
+            for(k=0;k<8;k++)
+                CanPass[i][j][k]=0;
+}
+void Mark_Che(int v)
+{/*标志棋盘函数*/
+    int i,j;
+    for(i=0;i<12+2*v;i++)/*首先全部标记为0*/
+        for(j=0;j<12+v;j++)
+            chessboard[i][j]=0;
+    for(i=0;i<2;i++)/*前面两行标记为1*/
+        for(j=0;j<12+v;j++)
+            chessboard[i][j]=1;
+    for(j=0;j<2;j++)/*前面两列*/
+        for(i=0;i<12+2*v;i++)
+            chessboard[i][j]=1;
+    for(j=10+v;j<12+v;j++)/*后面两列*/
+        for(i=0;i<12+2*v;i++)
+            chessboard[i][j]=1;
+    for(i=10+2*v;i<12+2*v;i++)
+        for(j=0;j<12+v;j++)/*后面两行*/
+            chessboard[i][j]=1;
+        
+}
+int main()
+{/*主函数*/
+    int x,y,v;
+    char ch='y';
+
+    while(ch=='y')
+    {   while(1){
+        printf("请选择棋盘类型(0:国际象棋，1:中国象棋):");
+        scanf("%d",&v);
+        if(v!=1&&v!=0)
+            printf("输入错误，请重新输入!\n");
+        else
+            break;
+    }
+    Mark_Che(v);
+    Mark_Dir(v);
+    while(1)
+    {
+        printf("请输入入口点横坐标：");
+        scanf("%d",&x);
+        if(x<1||x>8+2*v)
+            printf("输入错误，请重新输入!(横坐标在1-%d之间)\n",8+2*v);
+        else
+            break;
+    }
+    while(1)
+    {
+        printf("请输入入口点纵坐标：");
+        scanf("%d",&y);
+        if(y<1||y>8+v)
+            printf("输入错误，请重新输入!(纵坐标在1-%d之间)\n",8+v);
+        else
+            break;
+    }
+    Knight(x,y,v);
+    printf("继续(是：y;否：其他):");
+    fflush(stdin);
+    scanf("%c",&ch);
+    }
+}

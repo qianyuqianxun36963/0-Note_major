@@ -1,0 +1,217 @@
+<h1>SpringBoot使用Redis缓存</h1>
+
+<p>　　（1）pom.xml引入jar包，如下：</p>
+
+<pre>
+        &lt;dependency&gt;
+            &lt;groupId&gt;org.springframework.boot&lt;/groupId&gt;
+            &lt;artifactId&gt;spring-boot-starter-data-redis&lt;/artifactId&gt;
+        &lt;/dependency&gt;</pre>
+
+<p>　　（2）修改项目启动类，增加注解@EnableCaching，开启缓存功能，如下：</p>
+
+<pre>
+package springboot;
+
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.cache.annotation.EnableCaching;
+import org.springframework.scheduling.annotation.EnableScheduling;
+
+@SpringBootApplication
+@EnableScheduling
+@EnableCaching
+public class SpringbootApplication{
+
+    public static void main(String[] args) {
+        SpringApplication.run(SpringbootApplication.class, args);
+    }
+}
+</pre>
+
+<p>&nbsp;</p>
+
+<p>　　（3）application.properties中配置Redis连接信息，如下：</p>
+
+<pre>
+# Redis数据库索引（默认为0）
+spring.redis.database=0
+# Redis服务器地址
+spring.redis.host=172.31.19.222
+# Redis服务器连接端口
+spring.redis.port=6379
+# Redis服务器连接密码（默认为空）
+spring.redis.password=
+# 连接池最大连接数（使用负值表示没有限制）
+spring.redis.pool.max-active=8
+# 连接池最大阻塞等待时间（使用负值表示没有限制）
+spring.redis.pool.max-wait=-1
+# 连接池中的最大空闲连接
+spring.redis.pool.max-idle=8
+# 连接池中的最小空闲连接
+spring.redis.pool.min-idle=0
+# 连接超时时间（毫秒）
+spring.redis.timeout=0
+</pre>
+
+<p>　　（4）新建Redis缓存配置类RedisConfig，如下：</p>
+
+<pre>
+package springboot.config;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.cache.CacheManager;
+import org.springframework.cache.annotation.CachingConfigurerSupport;
+import org.springframework.cache.annotation.EnableCaching;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.data.redis.cache.RedisCacheManager;
+import org.springframework.data.redis.connection.RedisConnectionFactory;
+import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.serializer.Jackson2JsonRedisSerializer;
+
+import com.fasterxml.jackson.annotation.JsonAutoDetect;
+import com.fasterxml.jackson.annotation.PropertyAccessor;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
+
+/**
+ * Redis缓存配置类
+ * @author szekinwin
+ *
+ */
+@Configuration
+@EnableCaching
+public class RedisConfig extends CachingConfigurerSupport{
+
+    @Value(&quot;${spring.redis.host}&quot;)
+    private String host;
+    @Value(&quot;${spring.redis.port}&quot;)
+    private int port;
+    @Value(&quot;${spring.redis.timeout}&quot;)
+    private int timeout;
+    
+    //自定义缓存key生成策略
+//    @Bean
+//    public KeyGenerator keyGenerator() {
+//        return new KeyGenerator(){
+//            @Override
+//            public Object generate(Object target, java.lang.reflect.Method method, Object... params) {
+//                StringBuffer sb = new StringBuffer();
+//                sb.append(target.getClass().getName());
+//                sb.append(method.getName());
+//                for(Object obj:params){
+//                    sb.append(obj.toString());
+//                }
+//                return sb.toString();
+//            }
+//        };
+//    }
+    //缓存管理器
+    @Bean 
+    public CacheManager cacheManager(@SuppressWarnings(&quot;rawtypes&quot;) RedisTemplate redisTemplate) {
+        RedisCacheManager cacheManager = new RedisCacheManager(redisTemplate);
+        //设置缓存过期时间 
+        cacheManager.setDefaultExpiration(10000);
+        return cacheManager;
+    }
+    @Bean
+    public RedisTemplate&lt;String, String&gt; redisTemplate(RedisConnectionFactory factory){
+        StringRedisTemplate template = new StringRedisTemplate(factory);
+        setSerializer(template);//设置序列化工具
+        template.afterPropertiesSet();
+        return template;
+    }
+     private void setSerializer(StringRedisTemplate template){
+            @SuppressWarnings({ &quot;rawtypes&quot;, &quot;unchecked&quot; })
+            Jackson2JsonRedisSerializer jackson2JsonRedisSerializer = new Jackson2JsonRedisSerializer(Object.class);
+            ObjectMapper om = new ObjectMapper();
+            om.setVisibility(PropertyAccessor.ALL, JsonAutoDetect.Visibility.ANY);
+            om.enableDefaultTyping(ObjectMapper.DefaultTyping.NON_FINAL);
+            jackson2JsonRedisSerializer.setObjectMapper(om);
+            template.setValueSerializer(jackson2JsonRedisSerializer);
+     }
+}
+</pre>
+
+<p>　　（5）新建UserMapper，如下：</p>
+
+<pre>
+package springboot.dao;
+
+import org.apache.ibatis.annotations.Delete;
+import org.apache.ibatis.annotations.Insert;
+import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Param;
+import org.apache.ibatis.annotations.Select;
+import org.apache.ibatis.annotations.Update;
+import org.springframework.cache.annotation.CacheConfig;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.CachePut;
+import org.springframework.cache.annotation.Cacheable;
+
+import springboot.domain.User;
+
+@Mapper
+@CacheConfig(cacheNames = &quot;users&quot;)
+public interface UserMapper {
+
+    @Insert(&quot;insert into user(name,age) values(#{name},#{age})&quot;)
+    int addUser(@Param(&quot;name&quot;)String name,@Param(&quot;age&quot;)String age);
+    
+    @Select(&quot;select * from user where id =#{id}&quot;)
+    @Cacheable(key =&quot;#p0&quot;) 
+    User findById(@Param(&quot;id&quot;) String id);
+    
+    @CachePut(key = &quot;#p0&quot;)
+    @Update(&quot;update user set name=#{name} where id=#{id}&quot;)
+    void updataById(@Param(&quot;id&quot;)String id,@Param(&quot;name&quot;)String name);
+    
+    //如果指定为 true，则方法调用后将立即清空所有缓存
+    @CacheEvict(key =&quot;#p0&quot;,allEntries=true)
+    @Delete(&quot;delete from user where id=#{id}&quot;)
+    void deleteById(@Param(&quot;id&quot;)String id);
+    
+}
+</pre>
+
+<p>　　@Cacheable将查询结果缓存到redis中，（key=&quot;#p0&quot;）指定传入的第一个参数作为redis的key。</p>
+
+<p>　　@CachePut，指定key，将更新的结果同步到redis中</p>
+
+<p>　　@CacheEvict，指定key，删除缓存数据，allEntries=true,方法调用后将立即清除缓存</p>
+
+<p>　　（6）service层与controller层跟上一篇整合一样，启动redis服务器，redis服务器的安装与启动可以参考之前的博客，地址如下：</p>
+
+<p>　　　　http://www.cnblogs.com/gdpuzxs/p/6623171.html</p>
+
+<p>　　（7）配置log4j日志信息，如下：</p>
+
+<pre>
+## LOG4J配置
+log4j.rootCategory=DEBUG,stdout
+## 控制台输出
+log4j.appender.stdout=org.apache.log4j.ConsoleAppender
+log4j.appender.stdout.layout=org.apache.log4j.PatternLayout
+log4j.appender.stdout.layout.ConversionPattern=%d{yyyy-MM-dd HH:mm:ss,SSS} %5p %c{1}:%L - %m%n
+</pre>
+
+<p>&nbsp;　　（8）验证redis缓存</p>
+
+<p>　　首先我们向user表总插入一条数据，数据库显示如下：</p>
+
+<p>　　<img alt="" src="http://images2015.cnblogs.com/blog/961610/201707/961610-20170723152550049-259578829.png" /></p>
+
+<p>　　现在，我们查询一下user表中id=24的数据，观擦控制台输出的信息，如下：</p>
+
+<p>　　<img alt="" src="http://images2015.cnblogs.com/blog/961610/201707/961610-20170723152954518-967029571.png" style="height:312px; width:859px" /></p>
+
+<p>　　通过控制台输出信息我们可以知道，这次执行了数据库查询，并开启了Redis缓存查询结果。接下来我们再次查询user表中id=24的数据，观察控制台，如下：</p>
+
+<p>　　<img alt="" src="http://images2015.cnblogs.com/blog/961610/201707/961610-20170723153206627-1199057854.png" style="height:169px; width:858px" /></p>
+
+<p>　　通过控制台输出信息我们可以知道，这次并没有执行数据库查询，而是从Redis缓存中查询，并返回查询结果。我们查看redis中的信息，如下：</p>
+
+<p>　　<img alt="" src="http://images2015.cnblogs.com/blog/961610/201707/961610-20170723153438424-868168558.png" /></p>
+
+<p>　　方法finduser方法使用了注解@Cacheable(key=&quot;#p0&quot;)，即将id作为redis中的key值。当我们更新数据的时候，应该使用@CachePut(key=&quot;#p0&quot;)进行缓存数据的更新，否则将查询到脏数据。</p>
