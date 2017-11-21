@@ -1,0 +1,94 @@
+<h2><strong><a href="http://www.linuxidc.com/topicnews.aspx?tid=14" target="_blank" title="CentOS">CentOS</a>&nbsp;7上安装Tomcat</strong></h2>
+
+<p>1. JDK安装</p>
+
+<p>&nbsp; 0&gt;查看目前系统的jdk: java -version 查看系统是否有java，以及java版本。</p>
+
+<p>&nbsp; 1&gt;查看目前系统的jdk: rpm -qa | grep jdk</p>
+
+<p>&nbsp; 2&gt;查看yum库中有哪些JDK: yum search java|grep jdk</p>
+
+<p>&nbsp; 3&gt;选择要安装的版本的包名,进行安装: yum install java-1.7.0-openjdk-1.7.0.75.x86_64</p>
+
+<p>&nbsp; 4&gt;也可选择自己要安装的其它版本或最新版本的JDK.注意修改下面配置中的路径。</p>
+
+<p>2. 配置JDK</p>
+
+<p>&nbsp; &nbsp; 设置环境变量&nbsp; root@localhost ~]# vi /etc/profile</p>
+
+<p>&nbsp; &nbsp; 添加如下内容：</p>
+
+<p>&nbsp; &nbsp; #set java environment&nbsp; &nbsp;&nbsp;<br />
+&nbsp; &nbsp; JAVA_HOME=/usr/lib/jvm/java-1.7.0-openjdk-1.7.0.75.x86_64<br />
+&nbsp; &nbsp; JRE_HOME=$JAVA_HOME/jre<br />
+&nbsp; &nbsp; CLASS_PATH=.:$JAVA_HOME/lib/dt.jar:$JAVA_HOME/lib/tools.jar:$JRE_HOME/lib<br />
+&nbsp; &nbsp; PATH=$PATH:$JAVA_HOME/bin:$JRE_HOME/bin<br />
+&nbsp; &nbsp; export JAVA_HOME JRE_HOME CLASS_PATH PATH</p>
+
+<p>&nbsp; &nbsp; 让修改生效：[root@localhost java]# source /etc/profile</p>
+
+<p>3. 安装tomcat</p>
+
+<p>&nbsp; &nbsp; [root@admin local]cd /usr/local&nbsp; &nbsp;&nbsp;<br />
+&nbsp; &nbsp; [root@admin local]wget http://apache.fayea.com/tomcat/tomcat-7/v7.0.73/bin/apache-tomcat-7.0.73.tar.gz<br />
+&nbsp; &nbsp; [root@admin local]tar -zxv -f apache-tomcat-7.0.73.tar.gz // 解压压缩包&nbsp;<br />
+&nbsp; &nbsp; [root@admin local]rm -rf apache-tomcat-7.0.73.tar.gz // 删除压缩包&nbsp;<br />
+&nbsp; &nbsp; [root@admin local]mv apache-tomcat-7.0.73 tomcat</p>
+
+<p>启动tomcat:</p>
+
+<p>&nbsp; &nbsp; cd usr/local/tomcat/bin/&nbsp; &nbsp;&nbsp;<br />
+&nbsp; &nbsp; ./startup.sh</p>
+
+<p>4. 关闭firewalld， Centos默认的防火墙不是iptables，而是firewalld。所以需要关闭firewalld</p>
+
+<p>&nbsp; systemctl stop firewalld<br />
+&nbsp; systemctl disable firewalld</p>
+
+<p>5. 安装iptables，修改rules文件。</p>
+
+<p>&nbsp; &nbsp; 1&gt; 安装iptables&nbsp;</p>
+
+<p>&nbsp; #先检查是否安装了iptables<br />
+&nbsp; &nbsp; service iptables status<br />
+&nbsp; &nbsp; #安装iptables<br />
+&nbsp; &nbsp; yum install -y iptables<br />
+&nbsp; &nbsp; #升级iptables<br />
+&nbsp; &nbsp; yum update iptables&nbsp;<br />
+&nbsp; &nbsp; #安装iptables-services<br />
+&nbsp; &nbsp; yum install iptables-services</p>
+
+<p>&nbsp; &nbsp; 2&gt; 修改启用iptables。再在iptables文件里再加上开放8080端口(tomcat)</p>
+
+<p>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; vim /etc/sysconfig/iptables，新安装的第一次打开里面是空的，粘贴上下面的内容</p>
+
+<p>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; iptables -A INPUT -p tcp --dport 8080 -j ACCEPT 这句的意义是开放8080端口。&nbsp;</p>
+
+<p>&nbsp; &nbsp; # Firewall configuration written by system-config-firewall<br />
+&nbsp; &nbsp; # Manual customization of this file is not recommended.<br />
+&nbsp; &nbsp; *filter<br />
+&nbsp; &nbsp; :INPUT ACCEPT [0:0]<br />
+&nbsp; &nbsp; :FORWARD ACCEPT [0:0]<br />
+&nbsp; &nbsp; :OUTPUT ACCEPT [0:0]<br />
+&nbsp; &nbsp; -A INPUT -m state --state ESTABLISHED,RELATED -j ACCEPT<br />
+&nbsp; &nbsp; -A INPUT -p icmp -j ACCEPT<br />
+&nbsp; &nbsp; -A INPUT -i lo -j ACCEPT<br />
+&nbsp; &nbsp; -A INPUT -m state --state NEW -m tcp -p tcp --dport 22 -j ACCEPT<br />
+&nbsp; &nbsp; -A INPUT -m state --state NEW -m tcp -p tcp --dport 80 -j ACCEPT<br />
+&nbsp; &nbsp; -A INPUT -m state --state NEW -m tcp -p tcp --dport 3306 -j ACCEPT<br />
+&nbsp; &nbsp; -A INPUT -m state --state NEW -m tcp -p tcp --dport 8080 -j ACCEPT<br />
+&nbsp; &nbsp; -A INPUT -m state --state NEW -m tcp -p tcp --dport 8081 -j ACCEPT<br />
+&nbsp; &nbsp; -A INPUT -j REJECT --reject-with icmp-host-prohibited<br />
+&nbsp; &nbsp; -A FORWARD -j REJECT --reject-with icmp-host-prohibited<br />
+&nbsp; &nbsp; COMMIT</p>
+
+<p>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; 修改完保持退出。</p>
+
+<p>&nbsp; &nbsp; 3&gt; 开启iptables服务</p>
+
+<p>&nbsp; &nbsp; systemctl enable iptables.service&nbsp; &nbsp;&nbsp;<br />
+&nbsp; &nbsp; systemctl start iptables.service</p>
+
+<p>6. 验证</p>
+
+<p>&nbsp; &nbsp; 在浏览器输入http://127.0.0.1:8080/ 看到tomcat系统界面，说明安装成功！</p>
