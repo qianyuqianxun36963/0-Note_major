@@ -1,0 +1,134 @@
+<p><strong>在&nbsp;<a href="http://www.linuxidc.com/topicnews.aspx?tid=14" target="_blank" title="CentOS">CentOS</a>7 上安装 MySQL5.7</strong></p>
+
+<p>1 通过 SecureCRT 连接到阿里云 CentOS7 服务器；</p>
+
+<p>2 进入到目录 /usr/local/ 中：<br />
+cd /usr/local/</p>
+
+<p>3 创建目录 /usr/local/tools，如果有则忽略：&nbsp;<br />
+mkdir -p tools</p>
+
+<p>4 创建 /usr/local/mysql 目录，如果已存在则忽略：<br />
+mkdir -p mysql</p>
+
+<p>5 进入到目录 /usr/local/tools 中：<br />
+cd tools/</p>
+
+<p>6 查看系统中是否已安装 MySQL 服务：<br />
+rpm -qa | grep mysql<br />
+或<br />
+yum list installed | grep mysql</p>
+
+<p>7 如果已安装则删除 MySQL 及其依赖的包：<br />
+yum -y remove mysql-libs.x86_64</p>
+
+<p>8 下载 mysql57-community-release-el7-8.noarch.rpm 的 YUM 源：<br />
+wget&nbsp;<a href="http://repo.mysql.com/mysql57-community-release-el7-8.noarch.rpm">http://repo.mysql.com/mysql57-community-release-el7-8.noarch.rpm</a></p>
+
+<p>9 安装 mysql57-community-release-el7-8.noarch.rpm：<br />
+rpm -ivh mysql57-community-release-el7-8.noarch.rpm<br />
+安装完后，得到如下两个包：<br />
+mysql-community.repo<br />
+mysql-community-source.repo</p>
+
+<p>10 安装 MySQL：<br />
+yum install mysql-server<br />
+遇到疑问的地方，一路 Y 下去即可；<br />
+安装完毕后，在&nbsp; /var/log/mysqld.log 文件中会自动生成一个随机的密码，我们需要先取得这个随机密码，以用于登录 MySQL 服务端：<br />
+grep &quot;password&quot; /var/log/mysqld.log<br />
+打印如下内容：<br />
+A temporary password is generated for&nbsp;<a href="mailto:root@localhost">root@localhost</a>: hilX0U!9i3_6<br />
+我们复制&nbsp;<a href="mailto:root@localhost">root@localhost</a>: 后面的随机字符串，这个字符串就是 MySQL 在安装完成后为我们随机生成的密码；</p>
+
+<p>12 登录到 MySQL 服务端并更新用户 root 的密码：<br />
+mysql -u root -philX0U!9i3_6<br />
+打印出 MySQL 的版本即表明已登录；<br />
+设置用户 root 可以在任意 IP 下被访问：<br />
+grant all privileges on *.* to&nbsp;<a href="mailto:root@%22%">root@&quot;%</a>&quot; identified by &quot;新密码&quot;;<br />
+设置用户 root 可以在本地被访问：<br />
+grant all privileges on *.* to&nbsp;<a href="mailto:root@%22localhost">root@&quot;localhost</a>&quot; identified by &quot;新密码&quot;;<br />
+刷新权限使之生效：<br />
+flush privileges;<br />
+更新 MySQL 的用户 root的密码：<br />
+set password = password(&#39;新密码&#39;);&nbsp;<br />
+注意：由于 MySQL5.7 采用了密码强度验证插件 validate_password，故此我们需要设置一个有一定强度的密码；<br />
+输入 exit 后用新密码再次登录看看吧！</p>
+
+<p>13 查看 MySQL 当前都内置了哪些数据库：<br />
+mysql&gt; show databases;<br />
+我们发现其内置了如下一些数据库：<br />
+information_schema<br />
+mysql&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;&nbsp;<br />
+performance_schema<br />
+sys&nbsp;</p>
+
+<p>14 启动 MySQL 服务：<br />
+service mysqld start<br />
+<br />
+15 关闭 MySQL 服务：<br />
+service mysqld stop</p>
+
+<p>16 重启 MySQL 服务：<br />
+service mysqld restart</p>
+
+<p>17 查看 MySQL 的状态：<br />
+service mysqld status</p>
+
+<p>18 查看 MySQL 的字符集：<br />
+mysql&gt; show variables like &#39;%character%&#39;;<br />
++--------------------------+----------------------------+<br />
+| Variable_name&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; | Value&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; |<br />
++--------------------------+----------------------------+<br />
+| character_set_client&nbsp; &nbsp; | utf8&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; |<br />
+| character_set_connection | utf8&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; |<br />
+| character_set_database&nbsp; | latin1&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; |<br />
+| character_set_filesystem | binary&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; |<br />
+| character_set_results&nbsp; &nbsp; | utf8&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; |<br />
+| character_set_server&nbsp; &nbsp; | latin1&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; |<br />
+| character_set_system&nbsp; &nbsp; | utf8&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; |<br />
+| character_sets_dir&nbsp; &nbsp; &nbsp; | /usr/share/mysql/charsets/ |<br />
++--------------------------+----------------------------+<br />
+8 rows in set (0.01 sec)<br />
+查看指定的数据库中指定数据表的字符集，如查看 mysql 数据库中 servers 表的字符集：<br />
+&nbsp; show table status from mysql like &#39;%servers%&#39;;<br />
+查看指定数据库中指定表的全部列的字符集，如查看 mysql 数据库中 servers 表的全部的列的字符集：<br />
+show full columns from servers;</p>
+
+<p>19 设置 MySQL 的字符集为 UTF-8：<br />
+打开 /etc 目录下的 my.cnf 文件（此文件是 MySQL 的主配置文件）：<br />
+/etc/my.cnf<br />
+在 [mysqld] 前添加如下代码：<br />
+[client]<br />
+default-character-set=utf8<br />
+在 [mysqld] 后添加如下代码：<br />
+character_set_server=utf8<br />
+再次查看字符集：<br />
+mysql&gt; show variables like &#39;%character%&#39;;<br />
++--------------------------+----------------------------+<br />
+| Variable_name&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; | Value&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; |<br />
++--------------------------+----------------------------+<br />
+| character_set_client&nbsp; &nbsp; | utf8&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; |<br />
+| character_set_connection | utf8&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; |<br />
+| character_set_database&nbsp; | utf8&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; |<br />
+| character_set_filesystem | binary&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; |<br />
+| character_set_results&nbsp; &nbsp; | utf8&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; |<br />
+| character_set_server&nbsp; &nbsp; | utf8&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; |<br />
+| character_set_system&nbsp; &nbsp; | utf8&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; |<br />
+| character_sets_dir&nbsp; &nbsp; &nbsp; | /usr/share/mysql/charsets/ |<br />
++--------------------------+----------------------------+<br />
+8 rows in set (0.01 sec)</p>
+
+<p>20 /var/lib/mysql 是存放数据库文件的目录；</p>
+
+<p>21 /var/log 目录下的 mysqld.log 文件记录 MySQL 的日志；</p>
+
+<p>22 MySQL 采用的 TCP/IP 协议传输数据，默认端口号为 3306，我们可以通过如下命令查看：<br />
+netstat -anp</p>
+
+<p>23 忘记密码时，可用如下方法重置：<br />
+# service mysqld stop<br />
+# mysqld_safe --user=root --skip-grant-tables --skip-networking &amp;<br />
+# mysql -u root&nbsp;<br />
+mysql&gt; use mysql;<br />
+mysql&gt; update user set password=password(&quot;new_password&quot;) where user=&quot;root&quot;;&nbsp;<br />
+mysql&gt; flush privileges;</p>
