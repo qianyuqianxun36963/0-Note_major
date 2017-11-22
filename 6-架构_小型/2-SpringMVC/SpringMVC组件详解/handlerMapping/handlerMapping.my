@@ -1,0 +1,271 @@
+<h1>Spring 源码解析之HandlerMapping源码解析</h1>
+
+<h2>前言</h2>
+
+<blockquote>
+<p>这个是<a href="http://lib.csdn.net/base/javaee" target="_blank" title="Java EE知识库">spring</a>源码解析的第一篇，全文围绕着DispatcherServlet进行展开，Spring 的初始化基本都是通过DispatcherServlet进行初始化的，Spring boot除外，Spring boot是先初始化一个容器之后再初始化的DispatcherServlet，本文首先介绍Spring的HandlerMapping,本文的主要流程围绕着请求流程展开，而不是初始化流程，后续会按照流程的形式对源码进行解读，个人感觉这种方式比较容易理解。阅读源码的原因就是想了解Spring每个流程的实现，以及学习到更深层次的东西。</p>
+</blockquote>
+
+<h2>1.HandlerMapping功能分析</h2>
+
+<p>HandlerMapping是spring中最重要的一个类,主要功能就是为请求找到合适的处理器，现在Controller只是处理器的一种，目前我们自己公司自己实现了一套框架，前端<a href="http://lib.csdn.net/base/javascript" target="_blank" title="JavaScript知识库">js</a>可以直接调用后端 soa service，忽略controller的存在，适合一些无用户状态的场景,比如说rest接口。</p>
+
+<p>先来介绍下目前spring 已经提供的handlermapping</p>
+
+<h3>1.BeanNameUrlHandlerMapping</h3>
+
+<blockquote>
+<p>请求路径到bean name的映射</p>
+</blockquote>
+
+<h3>2.SimpleUrlHandlerMapping</h3>
+
+<blockquote>
+<p>最原始的spring使用方式，根struts差不多，通过配置请求路径对应处理的controller类，如下面例子</p>
+</blockquote>
+
+<pre>
+<code>&lt;bean id=&quot;simpleUrlMapping&quot; class=&quot;org.springframework.web.servlet.handler.SimpleUrlHandlerMapping&quot;&gt;
+&lt;property name=&quot;mappings&quot;&gt;
+&lt;props&gt;
+    &lt;prop key=&quot;/listCourses.go&quot;&gt;listCoursesController&lt;/prop&gt;
+    &lt;prop key=&quot;/login.go&quot;&gt;loginController&lt;/prop&gt;
+&lt;props&gt;
+&lt;property&gt;
+&lt;bean&gt;</code>
+</pre>
+
+<h3>3.ControllerBeanNameHandlerMapping</h3>
+
+<blockquote>
+<p>This is similar to BeanNameUrlHandlerMapping but doesn&rsquo;t expect bean names to follow the URL convention: It turns plain bean names into URLs by prepending a slash and optionally applying a specified prefix and/or suffix. However, it only does so for well-known controller types, as listed above (analogous to ControllerClassNameHandlerMapping).</p>
+</blockquote>
+
+<h3>4.ControllerClassNameHandlerMapping</h3>
+
+<blockquote>
+<p>这个主要是类名映射，看看下面就知道了&nbsp;<br />
+* WelcomeController -&gt; /welcome*&nbsp;<br />
+* HomeController -&gt; /home*&nbsp;<br />
+这种方式通常搭配着<code>MultiActionController</code>&nbsp;，比如/abc/to_add.do 这个表示调用AbcController.<a href="http://lib.csdn.net/base/java" target="_blank" title="Java 知识库">Java</a>下的to_add的方法。前提是AbcController.java继承MultiActionController</p>
+</blockquote>
+
+<h3>5.RequestMappingHandlerMapping（3.2之前是使用DefaultAnnotationHandlerMapping 这个去处理，但是后来弃用了）</h3>
+
+<blockquote>
+<p>这个就是现在默认的请求匹配方式，通过@RequestMapping 注解来决定调用方法和具体的类，也是最常用的一种。</p>
+</blockquote>
+
+<p>DispatcherServlet初始化的时候会调用<code>initHandlerMappings()</code>进行初始化</p>
+
+<pre>
+<code>protected void initStrategies(ApplicationContext context) {
+        initMultipartResolver(context);
+        initLocaleResolver(context);
+        initThemeResolver(context);
+        initHandlerMappings(context);
+        initHandlerAdapters(context);
+        initHandlerExceptionResolvers(context);
+        initRequestToViewNameTranslator(context);
+        initViewResolvers(context);
+        initFlashMapManager(context);
+    }
+  //初始化handlermapping
+  private void initHandlerMappings(ApplicationContext context) {
+        this.handlerMappings = null;
+        //判断是否默认添加所有的HandlerMappings,初始值是默认添加的
+        if (this.detectAllHandlerMappings) {
+            // Find all HandlerMappings in the ApplicationContext, including ancestor contexts.
+            Map&lt;String, HandlerMapping&gt; matchingBeans =
+                    BeanFactoryUtils.beansOfTypeIncludingAncestors(context, HandlerMapping.class, true, false);
+            if (!matchingBeans.isEmpty()) {
+                this.handlerMappings = new ArrayList&lt;HandlerMapping&gt;(matchingBeans.values());
+                // We keep HandlerMappings in sorted order.
+                //通过@order注解去排序
+                AnnotationAwareOrderComparator.sort(this.handlerMappings);
+            }
+        }
+        //如果不是默认添加所有的，那么就去context中找一个声明的bean
+        else {
+            try {
+                HandlerMapping hm = context.getBean(HANDLER_MAPPING_BEAN_NAME, HandlerMapping.class);
+                this.handlerMappings = Collections.singletonList(hm);
+            }
+            catch (NoSuchBeanDefinitionException ex) {
+                // Ignore, we&#39;ll add a default HandlerMapping later.
+            }
+        }
+
+        // Ensure we have at least one HandlerMapping, by registering
+        // a default HandlerMapping if no other mappings are found.
+        //如果上面两步没有找到可以使用的handlerMapping，那么就采用默认的handlerMapping
+        //默认的HandlerMapping都定义在了DispatcherServlet.properties中，大致定义了如下两个
+        //org.springframework.web.servlet.HandlerMapping=org.springframework.web.servlet.handler.BeanNameUrlHandlerMapping,\
+    //org.springframework.web.servlet.mvc.annotation.DefaultAnnotationHandlerMapping
+        if (this.handlerMappings == null) {
+            this.handlerMappings = getDefaultStrategies(context, HandlerMapping.class);
+            if (logger.isDebugEnabled()) {
+                logger.debug(&quot;No HandlerMappings found in servlet &#39;&quot; + getServletName() + &quot;&#39;: using default&quot;);
+            }
+        }
+    }</code>
+</pre>
+
+<blockquote>
+<p>下面是初始化之后的一个状态，我这边使用的是spring boot启动，大致会初始化10个handlermapping，如下图所示：</p>
+</blockquote>
+
+<p><img alt="Renderings" src="http://git.oschina.net/wangkang_daydayup/Learning_Summary/raw/master/spring/sourceCode/img/HandlerMapping/QQ20160517-0.png?dir=0&amp;filepath=spring%2FsourceCode%2Fimg%2FHandlerMapping%2FQQ20160517-0.png&amp;oid=d6cda8a923e06f8ff75ad6c09a7602064412a054&amp;sha=1c00a4cdcc2e22daf2a832b64d1929b46ffa71b7" title="" /></p>
+
+<blockquote>
+<p>下图可以看到，默认的<code>RequestMappingHandlerMapping</code>已经把所有路径映射进去,相关的spring拦截器也放到了<code>RequestMappingHandlerMapping</code>中，由此说来，拦截器其实是跟<code>RequestMappingHandlerMapping</code>进行关联的。</p>
+</blockquote>
+
+<p><img alt="Renderings" src="http://git.oschina.net/wangkang_daydayup/Learning_Summary/raw/master/spring/sourceCode/img/HandlerMapping/QQ20160517-1.png?dir=0&amp;filepath=spring%2FsourceCode%2Fimg%2FHandlerMapping%2FQQ20160517-1.png&amp;oid=d9a014a41938f86431105c6e132fedfd319b72f0&amp;sha=1c00a4cdcc2e22daf2a832b64d1929b46ffa71b7" title="" /></p>
+
+<h2>2. HandlerMapping流程分析</h2>
+
+<h3>HandlerMapping流程需要弄清楚几个类的定义:</h3>
+
+<h3>1. HandlerExecutionChain</h3>
+
+<blockquote>
+<p>(Handler execution chain, consisting of handler object and any handler interceptors. Returned by HandlerMapping&rsquo;s)根据英文的翻译来说<code>HandlerExecutionChain</code>是 handler的执行链，由一些handler object 和 handler interceptors组成,这个里面包含了interceptor的所有执行，包括这个请求是否通过preHandle，大致逻辑如下</p>
+</blockquote>
+
+<pre>
+<code>
+         boolean applyPreHandle(HttpServletRequest request, HttpServletResponse response) throws Exception {
+             //获取所有拦截器进行遍历
+            HandlerInterceptor[] interceptors = getInterceptors();
+            if (!ObjectUtils.isEmpty(interceptors)) {
+                for (int i = 0; i &lt; interceptors.length; i++) {
+                    HandlerInterceptor interceptor = interceptors[i];
+                    //判断拦截器是否可以继续执行
+                    if (!interceptor.preHandle(request, response, this.handler)) {
+                        triggerAfterCompletion(request, response, null);
+                        return false;
+                    }
+                    this.interceptorIndex = i;
+                }
+            }
+            return true;
+        }</code>
+</pre>
+
+<h3>2. HandlerAdapter</h3>
+
+<blockquote>
+<p><code>HandlerAdapter</code>&nbsp;这个是spring的核心功能，所有的请求对应Controller方法都是通过HandlerAdapter 大该作用就是进行方法映射和调用并且返回结果，对应spring中正常用法实现类是<code>HttpRequestHandlerAdapter</code>,一般基本的http请求都是通过这个进行处理的。</p>
+</blockquote>
+
+<h2>请求处理流程分析</h2>
+
+<p>先来看看这段代码，spring的核心。所有请求调用都是通过这里进行的，可以说是关键路径</p>
+
+<pre>
+<code>
+protected void doDispatch(HttpServletRequest request, HttpServletResponse response) throws Exception {
+        HttpServletRequest processedRequest = request;
+        HandlerExecutionChain mappedHandler = null;
+        boolean multipartRequestParsed = false;
+
+        WebAsyncManager asyncManager = WebAsyncUtils.getAsyncManager(request);
+
+        try {
+            ModelAndView mv = null;
+            Exception dispatchException = null;
+
+            try {
+                //优先判断一下是不是文件上传的request
+                processedRequest = checkMultipart(request);
+                multipartRequestParsed = (processedRequest != request);
+                //获取到相应处理该request的HandlerExecutionChain，
+                //静态资源一般都是由ResourceHttpRequestHandler进行处理的
+                // Determine handler for the current request.
+                mappedHandler = getHandler(processedRequest);
+                //如果没有找到相应的handler，这里就是大家经常从日志里面看到的这段英文No mapping found for HTTP request with URI
+                //这个地方没有找到相应的处理handler有两种处理方式，一种（默认）返回404的状态码，一种是直接抛出异常，第二种方式需要设置初始化参数的
+                //throwExceptionIfNoHandlerFound 这个参数设置成ture即可
+                if (mappedHandler == null || mappedHandler.getHandler() == null) {
+                    noHandlerFound(processedRequest, response);
+                    return;
+                }
+                //通过handler找到对应处理的handlerAdapter
+                // Determine handler adapter for the current request.
+                HandlerAdapter ha = getHandlerAdapter(mappedHandler.getHandler());
+
+                // Process last-modified header, if supported by the handler.
+                String method = request.getMethod();
+                boolean isGet = &quot;GET&quot;.equals(method);
+                if (isGet || &quot;HEAD&quot;.equals(method)) {
+                    long lastModified = ha.getLastModified(request, mappedHandler.getHandler());
+                    if (logger.isDebugEnabled()) {
+                        logger.debug(&quot;Last-Modified value for [&quot; + getRequestUri(request) + &quot;] is: &quot; + lastModified);
+                    }
+                    if (new ServletWebRequest(request, response).checkNotModified(lastModified) &amp;&amp; isGet) {
+                        return;
+                    }
+                }
+                //执行HandlerExecutionChain所有Interceptor中的preHandle方法，一旦有一个返回了false那么请求就不进行继续处理
+                //这也是为什么preHandle 返回了false就可以拦截用户继续执行了
+                if (!mappedHandler.applyPreHandle(processedRequest, response)) {
+                    return;
+                }
+                //实际调用的handler，如果是http请求会调用相应的HandlerMethod 这里里面包含了具体的方法，通过反射调用，如果有返回的视图，那么ModelAndView会返回相应的视图对象，如果只是普通请求或者json请求会返回null
+                // Actually invoke the handler.
+                mv = ha.handle(processedRequest, response, mappedHandler.getHandler());
+
+                if (asyncManager.isConcurrentHandlingStarted()) {
+                    return;
+                }
+                //这块会校验是否添加了视图，如果没有视图就会添加一个默认的视图，通过url的规则来拼凑
+                applyDefaultViewName(processedRequest, mv);
+                //这块逻辑是执行HandlerExecutionChain所有Interceptor中的postHandle方法，从这块代码看来，postHandle的执行时机是在执行完方法后没有把响应写入到response中执行的
+                mappedHandler.applyPostHandle(processedRequest, response, mv);
+            }
+            catch (Exception ex) {
+                dispatchException = ex;
+            }
+            //处理请求，把参数都写入到request里面
+            processDispatchResult(processedRequest, response, mappedHandler, mv, dispatchException);
+        }
+        catch (Exception ex) {
+            triggerAfterCompletion(processedRequest, response, mappedHandler, ex);
+        }
+        catch (Error err) {
+            triggerAfterCompletionWithError(processedRequest, response, mappedHandler, err);
+        }
+        finally {
+            if (asyncManager.isConcurrentHandlingStarted()) {
+                // Instead of postHandle and afterCompletion
+                if (mappedHandler != null) {
+                    //最后调用HandlerExecutionChain所有Interceptor中的postHandle方法
+                    mappedHandler.applyAfterConcurrentHandlingStarted(processedRequest, response);
+                }
+            }
+            else {
+                // Clean up any resources used by a multipart request.
+                if (multipartRequestParsed) {
+                    cleanupMultipart(processedRequest);
+                }
+            }
+        }
+    }</code>
+</pre>
+
+<blockquote>
+<p>下图是上述代码的一个大致流程</p>
+</blockquote>
+
+<p><img alt="Renderings" src="http://git.oschina.net/wangkang_daydayup/Learning_Summary/raw/master/spring/sourceCode/img/HandlerMapping/DispatcherServlet.png?dir=0&amp;filepath=spring%2FsourceCode%2Fimg%2FHandlerMapping%2FDispatcherServlet.png&amp;oid=639c41f30e644558d503836a595a3f1cef33d3c9&amp;sha=3f1eee1929365fd3546881725661c4490d004da1" title="" /></p>
+
+<h2>总结</h2>
+
+<p>遗留问题如下：&nbsp;<br />
+1.&nbsp;<code>getHandler(processedRequest)</code>&nbsp;这个方法是如何查找到对应处理的HandlerExecutionChain和HandlerMapping的，比如说静态资源的处理和请求的处理肯定是不同的HandlerMapping&nbsp;<br />
+2.&nbsp;<code>getHandlerAdapter(mappedHandler.getHandler());</code>如果取到对应的HandlerAdapter</p>
+
+<blockquote>
+<p>这个是解析的第一篇，如果在流程活着代码描述上不准确的，望大家多多指教</p>
+</blockquote>

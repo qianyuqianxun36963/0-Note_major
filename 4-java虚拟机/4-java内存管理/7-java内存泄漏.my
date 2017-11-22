@@ -1,0 +1,365 @@
+<h1>JAVA 内存泄露详解（原因、例子及解决）</h1>
+
+<p>Java的一个重要特性就是通过垃圾收集器(GC)自动管理内存的回收，而不需要程序员自己来释放内存。理论上Java中所有不会再被利用的对象所占用的内存，都可以被GC回收，但是Java也存在内存泄露，但它的表现与C++不同。</p>
+
+<p><img alt="01" src="http://blog.anxpp.com/usr/uploads/2016/05/2174327940.png" style="height:69px; width:602px" title="01" /></p>
+
+<h2>JAVA 中的内存管理</h2>
+
+<p>&nbsp; &nbsp; 要了解Java中的内存泄露，首先就得知道Java中的内存是如何管理的。</p>
+
+<p>&nbsp; &nbsp; 在Java程序中，我们通常使用new为对象分配内存，而这些内存空间都在堆（Heap）上。</p>
+
+<p>&nbsp; &nbsp; 下面看一个示例：</p>
+
+<pre>
+
+&nbsp;</pre>
+
+<ol>
+	<li>public class Simple {</li>
+	<li>public static void main(String args[]){</li>
+	<li>Object object1 = new Object();//obj1</li>
+	<li>Object object2 = new Object();//obj2</li>
+	<li>object2 = object1;</li>
+	<li>//...此时，obj2是可以被清理的</li>
+	<li>}</li>
+	<li>}</li>
+</ol>
+
+<p>&nbsp; &nbsp;&nbsp;Java使用有向图的方式进行内存管理：</p>
+
+<p>&nbsp; &nbsp;&nbsp;<img alt="02" src="http://blog.anxpp.com/usr/uploads/2016/05/3157178048.jpg" style="height:120px; width:265px" title="02" /></p>
+
+<p>&nbsp; &nbsp; 在有向图中，我们叫作obj1是可达的，obj2就是不可达的，显然不可达的可以被清理。</p>
+
+<p>&nbsp; &nbsp; 内存的释放，也即清理那些不可达的对象，是由GC决定和执行的，所以GC会监控每一个对象的状态，包括申请、引用、被引用和赋值等。<strong>释放对象的根本原则就是对象不会再被使用</strong>：</p>
+
+<ul>
+	<li>&nbsp; &nbsp; 给对象赋予了空值null，之后再没有调用过。</li>
+	<li>&nbsp; &nbsp; 另一个是给对象赋予了新值，这样重新分配了内存空间。</li>
+</ul>
+
+<p>&nbsp; &nbsp; 通常，会认为在堆上分配对象的代价比较大，但是GC却优化了这一操作：C++中，在堆上分配一块内存，会查找一块适用的内存加以分配，如果对象销毁，这块内存就可以重用；而Java中，就想一条长的带子，每分配一个新的对象，Java的&ldquo;堆指针&rdquo;就向后移动到尚未分配的区域。所以，Java分配内存的效率，可与C++媲美。</p>
+
+<p>&nbsp; &nbsp; 但是这种工作方式有一个问题：如果频繁的申请内存，资源将会耗尽。这时GC就介入了进来，它会回收空间，并使堆中的对象排列更紧凑。这样，就始终会有足够大的内存空间可以分配。</p>
+
+<p>&nbsp; &nbsp; gc清理时的引用计数方式：当引用连接至新对象时，引用计数+1；当某个引用离开作用域或被设置为null时，引用计数-1，GC发现这个计数为0时，就回收其占用的内存。这个开销会在引用程序的整个生命周期发生，并且不能处理循环引用的情况。所以这种方式只是用来说明GC的工作方式，而不会被任何一种Java虚拟机应用。</p>
+
+<p>&nbsp; &nbsp; 多数GC采用一种自适应的清理方式（加上其他附加的用于提升速度的技术），主要依据是找出任何&ldquo;活&rdquo;的对象，然后采用&ldquo;自适应的、分代的、停止-复制、标记-清理&rdquo;式的垃圾回收器。具体不介绍太多，这不是本文重点。</p>
+
+<p>&nbsp;</p>
+
+<h2>JAVA 中的内存泄露</h2>
+
+<p>&nbsp; &nbsp; Java中的内存泄露，广义并通俗的说，就是：不再会被使用的对象的内存不能被回收，就是内存泄露。</p>
+
+<p>&nbsp; &nbsp; Java中的内存泄露与C++中的表现有所不同。</p>
+
+<p>&nbsp; &nbsp; 在C++中，所有被分配了内存的对象，不再使用后，都必须程序员手动的释放他们。所以，每个类，都会含有一个析构函数，作用就是完成清理工作，如果我们忘记了某些对象的释放，就会造成内存泄露。</p>
+
+<p>&nbsp; &nbsp; 但是在Java中，我们不用（也没办法）自己释放内存，无用的对象由GC自动清理，这也极大的简化了我们的编程工作。但，实际有时候一些不再会被使用的对象，在GC看来不能被释放，就会造成内存泄露。</p>
+
+<p>&nbsp; &nbsp; 我们知道，对象都是有生命周期的，有的长，有的短，<strong>如果长生命周期的对象持有短生命周期的引用，就很可能会出现内存泄露</strong>。我们举一个简单的例子：</p>
+
+<pre>
+
+&nbsp;</pre>
+
+<ol>
+	<li>public class Simple {</li>
+	<li>Object object;</li>
+	<li>public void method1(){</li>
+	<li>object = new Object();</li>
+	<li>//...其他代码</li>
+	<li>}</li>
+	<li>}</li>
+</ol>
+
+<p>&nbsp; &nbsp; 这里的object实例，其实我们期望它只作用于method1()方法中，且其他地方不会再用到它，但是，当method1()方法执行完成后，object对象所分配的内存不会马上被认为是可以被释放的对象，只有在Simple类创建的对象被释放后才会被释放，严格的说，这就是一种内存泄露。解决方法就是将object作为method1()方法中的局部变量。当然，如果一定要这么写，可以改为这样：</p>
+
+<pre>
+
+&nbsp;</pre>
+
+<ol>
+	<li>public class Simple {</li>
+	<li>Object object;</li>
+	<li>public void method1(){</li>
+	<li>object = new Object();</li>
+	<li>//...其他代码</li>
+	<li>object = null;</li>
+	<li>}</li>
+	<li>}</li>
+</ol>
+
+<p>&nbsp; &nbsp; 这样，之前&ldquo;new Object()&rdquo;分配的内存，就可以被GC回收。</p>
+
+<p>&nbsp; &nbsp; 到这里，Java的内存泄露应该都比较清楚了。下面再进一步说明：</p>
+
+<ul>
+	<li>&nbsp; &nbsp; 在堆中的分配的内存，在没有将其释放掉的时候，就将所有能访问这块内存的方式都删掉（如指针重新赋值），这是针对c++等语言的，Java中的GC会帮我们处理这种情况，所以我们无需关心。</li>
+	<li>&nbsp; &nbsp; 在内存对象明明已经不需要的时候，还仍然保留着这块内存和它的访问方式（引用），这是所有语言都有可能会出现的内存泄漏方式。编程时如果不小心，我们很容易发生这种情况，如果不太严重，可能就只是短暂的内存泄露。</li>
+</ul>
+
+<p>&nbsp;</p>
+
+<h2>一些容易发生内存泄露的例子和解决方法</h2>
+
+<p>&nbsp; &nbsp; 像上面例子中的情况很容易发生，也是我们最容易忽略并引发内存泄露的情况，解决的原则就是尽量减小对象的作用域（比如android studio中，上面的代码就会发出警告，并给出的建议是将类的成员变量改写为方法内的局部变量）以及手动设置null值。</p>
+
+<p>&nbsp; &nbsp; 至于作用域，需要在我们编写代码时多注意；null值的手动设置，我们可以看一下Java容器LinkedList源码（可参考：<a href="http://blog.csdn.net/anxpp/article/details/51203591" target="_blank">Java之LinkedList源码解读（JDK 1.8）</a>）的删除指定节点的内部方法：</p>
+
+<ol>
+	<li>//删除指定节点并返回被删除的元素值</li>
+	<li>E unlink(Node&lt;E&gt; x) {</li>
+	<li>//获取当前值和前后节点</li>
+	<li>final E element = x.item;</li>
+	<li>final Node&lt;E&gt; next = x.next;</li>
+	<li>final Node&lt;E&gt; prev = x.prev;</li>
+	<li>if (prev == null) {</li>
+	<li>first = next; //如果前一个节点为空(如当前节点为首节点)，后一个节点成为新的首节点</li>
+	<li>} else {</li>
+	<li>prev.next = next;//如果前一个节点不为空，那么他先后指向当前的下一个节点</li>
+	<li>x.prev = null;</li>
+	<li>}</li>
+	<li>if (next == null) {</li>
+	<li>last = prev; //如果后一个节点为空(如当前节点为尾节点)，当前节点前一个成为新的尾节点</li>
+	<li>} else {</li>
+	<li>next.prev = prev;//如果后一个节点不为空，后一个节点向前指向当前的前一个节点</li>
+	<li>x.next = null;</li>
+	<li>}</li>
+	<li>x.item = null;</li>
+	<li>size--;</li>
+	<li>modCount++;</li>
+	<li>return element;</li>
+	<li>}</li>
+</ol>
+
+<p>&nbsp; &nbsp; 除了修改节点间的关联关系，我们还要做的就是赋值为null的操作，不管GC何时会开始清理，我们都应及时的将无用的对象标记为可被清理的对象。</p>
+
+<p>&nbsp; &nbsp; 我们知道Java容器ArrayList是数组实现的（可参考：<a href="http://blog.csdn.net/anxpp/article/details/51202290" target="_blank">Java之ArrayList源码解读（JDK 1.8）</a>），如果我们要为其写一个pop()（弹出）方法，可能会是这样：</p>
+
+<ol>
+	<li>public E pop(){</li>
+	<li>if(size == 0)</li>
+	<li>return null;</li>
+	<li>else</li>
+	<li>return (E) elementData[--size];</li>
+	<li>}</li>
+</ol>
+
+<p>&nbsp; &nbsp; 写法很简洁，但这里却会造成内存溢出：elementData[size-1]依然持有E类型对象的引用，并且暂时不能被GC回收。我们可以如下修改：</p>
+
+<ol>
+	<li>public E pop(){</li>
+	<li>if(size == 0)</li>
+	<li>return null;</li>
+	<li>else{</li>
+	<li>E e = (E) elementData[--size];</li>
+	<li>elementData[size] = null;</li>
+	<li>return e;</li>
+	<li>}</li>
+	<li>}</li>
+</ol>
+
+<p>&nbsp; &nbsp; 我们写代码并不能一味的追求简洁，首要是保证其正确性。</p>
+
+<h3>容器使用时的内存泄露</h3>
+
+<p>&nbsp; &nbsp; 在很多文章中可能看到一个如下内存泄露例子：</p>
+
+<pre>
+
+&nbsp;</pre>
+
+<ol>
+	<li>Vector v = new Vector();</li>
+	<li>for (int i = 1; i&lt;100; i++)</li>
+	<li>{</li>
+	<li>Object o = new Object();</li>
+	<li>v.add(o);</li>
+	<li>o = null;</li>
+	<li>}</li>
+</ol>
+
+<p>&nbsp; &nbsp; 可能很多人一开始并不理解，下面我们将上面的代码完整一下就好理解了：</p>
+
+<ol>
+	<li>void method(){</li>
+	<li>Vector vector = new Vector();</li>
+	<li>for (int i = 1; i&lt;100; i++)</li>
+	<li>{</li>
+	<li>Object object = new Object();</li>
+	<li>vector.add(object);</li>
+	<li>object = null;</li>
+	<li>}</li>
+	<li>//...对vector的操作</li>
+	<li>//...与vector无关的其他操作</li>
+	<li>}</li>
+</ol>
+
+<p>&nbsp; &nbsp; 这里内存泄露指的是在对vector操作完成之后，执行下面与vector无关的代码时，如果发生了GC操作，这一系列的object是没法被回收的，而此处的内存泄露可能是短暂的，因为在整个method()方法执行完成后，那些对象还是可以被回收。这里要解决很简单，手动赋值为null即可：</p>
+
+<ol>
+	<li>void method(){</li>
+	<li>Vector vector = new Vector();</li>
+	<li>for (int i = 1; i&lt;100; i++)</li>
+	<li>{</li>
+	<li>Object object = new Object();</li>
+	<li>vector.add(object);</li>
+	<li>object = null;</li>
+	<li>}</li>
+	<li>//...对v的操作</li>
+	<li>vector = null;</li>
+	<li>//...与v无关的其他操作</li>
+	<li>}</li>
+</ol>
+
+<p>&nbsp; &nbsp; 上面Vector已经过时了，不过只是使用老的例子来做内存泄露的介绍。我们使用容器时很容易发生内存泄露，就如上面的例子，不过上例中，容器时方法内的局部变量，造成的内存泄漏影响可能不算很大（但我们也应该避免），但是，如果这个容器作为一个类的成员变量，甚至是一个静态（static）的成员变量时，就要更加注意内存泄露了。</p>
+
+<p>&nbsp; &nbsp; 下面也是一种使用容器时可能会发生的错误:</p>
+
+<ol>
+	<li>public class CollectionMemory {</li>
+	<li>public static void main(String s[]){</li>
+	<li>Set&lt;MyObject&gt; objects = new LinkedHashSet&lt;MyObject&gt;();</li>
+	<li>objects.add(new MyObject());</li>
+	<li>objects.add(new MyObject());</li>
+	<li>objects.add(new MyObject());</li>
+	<li>System.out.println(objects.size());</li>
+	<li>while(true){</li>
+	<li>objects.add(new MyObject());</li>
+	<li>}</li>
+	<li>}</li>
+	<li>}</li>
+	<li>class MyObject{</li>
+	<li>//设置默认数组长度为99999更快的发生OutOfMemoryError</li>
+	<li>List&lt;String&gt; list = new ArrayList&lt;&gt;(99999);</li>
+	<li>}</li>
+</ol>
+
+<p>&nbsp; &nbsp; 运行上面的代码将很快报错：</p>
+
+<ol>
+	<li>3</li>
+	<li>Exception in thread &quot;main&quot; java.lang.OutOfMemoryError: Java heap space</li>
+	<li>at java.util.ArrayList.&lt;init&gt;(ArrayList.java:152)</li>
+	<li>at com.anxpp.memory.MyObject.&lt;init&gt;(CollectionMemory.java:21)</li>
+	<li>at com.anxpp.memory.CollectionMemory.main(CollectionMemory.java:16)</li>
+</ol>
+
+<p>&nbsp; &nbsp; 如果足够了解Java的容器，上面的错误是不可能发生的。这里也推荐一篇本人介绍Java容器的文章：...</p>
+
+<p>&nbsp; &nbsp; 容器Set只存放唯一的元素，是通过对象的equals()方法来比较的，但是Java中所有类都直接或间接继承至Object类，Object类的equals()方法比较的是对象的地址，上例中，就会一直添加元素直到内存溢出。</p>
+
+<p>&nbsp; &nbsp; 所以，上例严格的说是容器的错误使用导致的内存溢出。</p>
+
+<p>&nbsp; &nbsp; 就Set而言，remove()方法也是通过equals()方法来删除匹配的元素的，如果一个对象确实提供了正确的equals()方法，但是切记不要在修改这个对象后使用remove(Object o)，这也可能会发生内存泄露。</p>
+
+<h3>各种提供了close()方法的对象</h3>
+
+<p>&nbsp; &nbsp;&nbsp;比如数据库连接（dataSourse.getConnection()），网络连接(socket)和io连接，以及使用其他框架的时候，除非其显式的调用了其close()方法（或类似方法）将其连接关闭，否则是不会自动被GC回收的。其实原因依然是长生命周期对象持有短生命周期对象的引用。</p>
+
+<p>&nbsp; &nbsp; 可能很多人使用过Hibernate，我们操作数据库时，通过SessionFactory获取一个session：</p>
+
+<pre>
+
+&nbsp;</pre>
+
+<ol>
+	<li>Session session=sessionFactory.openSession();</li>
+</ol>
+
+<p>&nbsp; &nbsp; 完成后我们必须调用close()方法关闭：</p>
+
+<pre>
+
+&nbsp;</pre>
+
+<ol>
+	<li>session.close();</li>
+</ol>
+
+<p>&nbsp; &nbsp; SessionFactory就是一个长生命周期的对象，而session相对是个短生命周期的对象，但是框架这么设计是合理的：它并不清楚我们要使用session到多久，于是只能提供一个方法让我们自己决定何时不再使用。</p>
+
+<p>&nbsp; &nbsp; 因为在close()方法调用之前，可能会抛出异常而导致方法不能被调用，我们通常使用try语言，然后再finally语句中执行close()等清理工作：</p>
+
+<pre>
+
+&nbsp;</pre>
+
+<ol>
+	<li>try{</li>
+	<li>session=sessionFactory.openSession();</li>
+	<li>//...其他操作</li>
+	<li>}finally{</li>
+	<li>session.close();</li>
+	<li>}</li>
+</ol>
+
+<h3>单例模式导致的内存泄露</h3>
+
+<p>&nbsp; &nbsp; 单例模式，很多时候我们可以把它的生命周期与整个程序的生命周期看做差不多的，所以是一个长生命周期的对象。如果这个对象持有其他对象的引用，也很容易发生内存泄露。</p>
+
+<h3>内部类和外部模块的引用</h3>
+
+<p>&nbsp; &nbsp; 其实原理依然是一样的，只是出现的方式不一样而已。</p>
+
+<p>&nbsp;</p>
+
+<h2>与清理相关的方法</h2>
+
+<p>&nbsp; &nbsp; 本节主要谈论gc()和finalize()方法。</p>
+
+<h3>gc()</h3>
+
+<p>&nbsp; &nbsp;&nbsp;对于程序员来说，GC基本是透明的，不可见的。运行GC的函数是System.gc()，调用后启动垃圾回收器开始清理。</p>
+
+<p>&nbsp; &nbsp; 但是根据Java语言规范定义， 该函数不保证JVM的垃圾收集器一定会执行。因为，不同的JVM实现者可能使用不同的算法管理GC。通常，GC的线程的优先级别较低。</p>
+
+<p>&nbsp; &nbsp; JVM调用GC的策略也有很多种，有的是内存使用到达一定程度时，GC才开始工作，也有定时执行的，有的是平缓执行GC，有的是中断式执行GC。但通常来说，我们不需要关心这些。除非在一些特定的场合，GC的执行影响应用程序的性能，例如对于基于Web的实时系统，如网络游戏等，用户不希望GC突然中断应用程序执行而进行垃圾回收，那么我们需要调整GC的参数，让GC能够通过平缓的方式释放内存，例如将垃圾回收分解为一系列的小步骤执行，Sun提供的HotSpot JVM就支持这一特性。</p>
+
+<h3>finalize()</h3>
+
+<p>&nbsp; &nbsp; finalize()是Object类中的方法。</p>
+
+<p>&nbsp; &nbsp; 了解C++的都知道有个析构函数，但是注意，finalize()绝不等于C++中的析构函数。</p>
+
+<p>&nbsp; &nbsp; Java编程思想中是这么解释的：一旦GC准备好释放对象所占用的的存储空间，将先调用其finalize()方法，并在下一次GC回收动作发生时，才会真正回收对象占用的内存，所以一些清理工作，我们可以放到finalize()中。</p>
+
+<p>&nbsp; &nbsp; 该方法的一个重要的用途是：当在java中调用非java代码（如c和c++）时，在这些非java代码中可能会用到相应的申请内存的操作（如c的malloc()函数），而在这些非java代码中并没有有效的释放这些内存，就可以使用finalize()方法，并在里面调用本地方法的free()等函数。</p>
+
+<p>&nbsp; &nbsp; 所以finalize()并不适合用作普通的清理工作。</p>
+
+<p>&nbsp; &nbsp; 不过有时候，该方法也有一定的用处：</p>
+
+<p>&nbsp; &nbsp; 如果存在一系列对象，对象中有一个状态为false，如果我们已经处理过这个对象，状态会变为true，为了避免有被遗漏而没有处理的对象，就可以使用finalize()方法：</p>
+
+<pre>
+
+&nbsp;</pre>
+
+<ol>
+	<li>class MyObject{</li>
+	<li>boolean state = false;</li>
+	<li>public void deal(){</li>
+	<li>//...一些处理操作</li>
+	<li>state = true;</li>
+	<li>}</li>
+	<li>@Override</li>
+	<li>protected void finalize(){</li>
+	<li>if(!state){</li>
+	<li>System.out.println(&quot;ERROR:&quot; + &quot;对象未处理！&quot;);</li>
+	<li>}</li>
+	<li>}</li>
+	<li>//...</li>
+	<li>}</li>
+</ol>
+
+<p>&nbsp; &nbsp; 但是从很多方面了解，该方法都是被推荐不要使用的，并被认为是多余的。</p>
+
+<p>&nbsp;</p>
+
+<hr />
+<p>&nbsp; &nbsp; 总的来说，内存泄露问题，还是编码不认真导致的，我们并不能责怪JVM没有更合理的清理。</p>

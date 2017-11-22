@@ -1,9 +1,0 @@
-response.getOutputStream() 和 requonse.getWriter() 区别
-
-1
-	使用tomcat5容器调用response.getOutputStream()方法即可实现，但调用requonse.getWriter()方法时，输出二进制数据时（图片等内容无法显示）则出现“getWriter() has already been called for this response”异常。
-
-2
- 	使用tomcat6容器调用response.getOutputStream()方法时有中文字符会发生“java.io.CharConversionException:Not an ISO 8859-1 character:”异常，调用requonse.getWriter()方法时可实现文本字符串数据输出，调用response.getOutputStream()方法时可实现文本字符串数据输出，调用response可现实字节流数据的输出。
-	就上述出现的问题进行分析研究，阅读了tomcat6的源代码发现，在调用response.getOutputStream()方法时会判断是否已调用了requonse.getWriter()方法；相反在调用requonse.getWriter()方法时会判断是否已调用了response.getOutputStream()方法。
-	在tomcat5时并没有出现这个问题，使用response.getOutputStream()方法可现实两种数据输出，只是在使用requonse.getWriter()时发生异常，而在tomcat6下则必须针对不同的数据类型选择相应输出流，这时为什么呢？仔细阅读tomcat6源代码没有发现问题的根源，给出的参考时：在一次客户端请求的响应动作中，只能调用一种响应输出方法，要么是getWriter()要么是getOutputStream()，且如果使用getOutputStream()方法输出字符串格式的数据时，中文无法正常通过将发生“java.io.CharConversionException:Not an ISO 8859-1 character:”异常，在tomcat5下没有对getOutputStream()方法进行严格控制，中文字符串可正常通过。可见tomcat6的安全机制比tomcat5要严格，对于字符串格式的数据要求使用getWriter()方法输出响应，如果使用了getOutputStream()方法输出响应，则对输出的字符串数据进验证，要求高字节必须为0，显然中文是无法通过的。

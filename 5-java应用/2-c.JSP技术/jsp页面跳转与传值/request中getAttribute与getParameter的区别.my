@@ -1,0 +1,71 @@
+<h1>request.getAttribute()与request.getParameter()的区别</h1>
+
+<p>HttpServletRequest类既有getAttribute()方法，也由getParameter()方法，这两个方法有以下区别：<br />
+&nbsp;&nbsp;<br />
+（1）HttpServletRequest类有setAttribute()方法，而没有setParameter()方法&nbsp;&nbsp;</p>
+
+<p>（2）当两个Web组件之间为链接关系时，被链接的组件通过getParameter()方法来获得请求参数，例如假定welcome.jsp和authenticate.jsp之间为链接关系，welcome.jsp中有以下代码：&nbsp;&nbsp;<br />
+&nbsp;&nbsp; &nbsp;&lt;a&nbsp;href=&quot;authenticate.jsp?username=weiqin&quot;&gt;authenticate.jsp&nbsp;&lt;/a&gt;&nbsp;&nbsp;<br />
+&nbsp;&nbsp; &nbsp;或者：&nbsp;&nbsp;<br />
+&nbsp;&nbsp; &nbsp;&lt;form&nbsp;name=&quot;form1&quot;&nbsp;method=&quot;post&quot;&nbsp;action=&quot;authenticate.jsp&quot;&gt;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;请输入用户姓名：<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&lt;input&nbsp;type=&quot;text&quot;&nbsp;name=&quot;username&quot;&gt;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&lt;input&nbsp;type=&quot;submit&quot;&nbsp;name=&quot;Submit&quot;&nbsp;value=&quot;提交&quot;&gt;<br />
+&nbsp;&nbsp; &nbsp;&lt;/form&gt;&nbsp;&nbsp;<br />
+&nbsp;&nbsp; &nbsp;在authenticate.jsp中通过request.getParameter(&quot;username&quot;)方法来获得请求参数username:&nbsp;&nbsp;<br />
+&nbsp;&nbsp; &nbsp;&lt;%&nbsp;String&nbsp;username=request.getParameter(&quot;username&quot;);&nbsp;%&gt;&nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;</p>
+
+<p>（3）当两个Web组件之间为转发关系时，转发目标组件通过getAttribute()方法来和转发源组件共享request范围内的数据。假定authenticate.jsp和hello.jsp之间为转发关系。authenticate.jsp希望向hello.jsp传递当前的用户名字，如何传递这一数据呢？先在authenticate.jsp中调用setAttribute()方法：&nbsp;<br />
+&nbsp;&nbsp; &nbsp;&lt;%&nbsp;<br />
+&nbsp;&nbsp; &nbsp;String&nbsp;username=request.getParameter(&quot;username&quot;);&nbsp;<br />
+&nbsp;&nbsp; &nbsp;request.setAttribute(&quot;username&quot;，username);&nbsp;%&gt;<br />
+&nbsp;&nbsp; &nbsp;&lt;jsp:forward&nbsp;page=&quot;hello.jsp&quot;&nbsp;/&gt;&nbsp;&nbsp;<br />
+&nbsp;&nbsp; &nbsp;在hello.jsp中通过getAttribute()方法获得用户名字:&nbsp;&nbsp;<br />
+&nbsp;&nbsp; &nbsp;<br />
+&nbsp;&nbsp; &nbsp;&lt;%&nbsp;String&nbsp;username=(String)request.getAttribute(&quot;username&quot;);&nbsp;%&gt;&nbsp;Hello:&nbsp;&lt;%=username&nbsp;%&gt;&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;从更深的层次考虑，request.getParameter()方法传递的数据，会从Web客户端传到Web服务器端，代表HTTP请求数据。request.getParameter()方法返回String类型的数据。<br />
+&nbsp;&nbsp; &nbsp;request.setAttribute()和getAttribute()方法传递的数据只会存在于Web容器内部，在具有转发关系的Web组件之间共享。这两个方法能够设置Object类型的共享数据。 &nbsp; &nbsp;request.getAttribute()方法返回request范围内存在的对象，而request.getParameter()方法是获取http提交过来的数据。 &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;</p>
+
+<p><br />
+&nbsp;&nbsp; &nbsp;一般是string型用request.getParameter 对象的引用用request.getAttribute 当然啦，String也是对象</p>
+
+<h2>Request的getParameter和getAttribute方法的区别</h2>
+
+<p>&nbsp;&nbsp; &nbsp;HttpServletRequest.getParameter(&quot;modelName&quot;); 能取到想要的modelObject吗？经过测试之后，发现是不能的。后来想想，其实道理挺简单的，当两个Web组件之间为转发关系时，转发源会将要共享 request范围内的数据先用setAttribute将数据放入到HttpServletRequest对象中，然后转发目标通过 getAttribute方法来取得要共享的数据。而MVC中用的就是Web组件之间的转发啊！真是笨，怎么当时没有想到呢？</p>
+
+<p>&nbsp;&nbsp; &nbsp;下面整理一下getParameter和getAttribute的区别和各自的使用范围。</p>
+
+<p>&nbsp;&nbsp; &nbsp;（1）HttpServletRequest类有setAttribute()方法，而没有setParameter()方法</p>
+
+<p>&nbsp;&nbsp; &nbsp;（2）链接关系----当两个Web组件之间为链接关系时，被链接的组件通过getParameter()方法来获得请求参数，例如假定welcome.jsp和authenticate.&nbsp;&nbsp; &nbsp;jsp之间为链接关系，welcome.jsp中有以下代码：</p>
+
+<p>&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;get方式传参：<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&lt;a &nbsp;href=&quot;authenticate.jsp?username=wolf&quot;&gt;authenticate.jsp &lt;/a&gt;</p>
+
+<p>&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;post方式(form)传参：<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&lt;form &nbsp;name=&quot;form1&quot; method=&quot;post&quot; &nbsp;action=&quot;authenticate.jsp&quot;&gt; 请输入用户姓名：&lt;input &nbsp;type=&quot;text&quot; name=&quot;username&quot;&gt; &nbsp; &lt;input &nbsp;type=&quot;submit&quot; &nbsp;name=&quot;Submit&quot; value=&quot;提交&quot;&gt;&lt;/form&gt;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;在authenticate.jsp中通过request.getParameter(&quot;username&quot;)方法来获得请求参数username:<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&lt;% &nbsp;String &nbsp;username=request.getParameter(&quot;username&quot;); %&gt;</p>
+
+<p>&nbsp;&nbsp; &nbsp;（3）转发关系----当两个Web组件之间为转发关系时，转发目标组件通过getAttribute()方法来和转发源组件共享request范围内的数据。</p>
+
+<p>&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;假定 authenticate.jsp和hello.jsp之间为转发关系。authenticate.jsp希望向hello.jsp传递当前的用户名字， 如何传递这一数据呢？</p>
+
+<p>&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;先在authenticate.jsp中调用setAttribute()方法：<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&lt;% String username=request.getParameter(&quot;username&quot;); request.setAttribute(&quot;username&quot;，username); %&gt;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&lt;jsp:forward page=&quot;hello.jsp&quot; /&gt;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;在hello.jsp中通过getAttribute()方法获得用户名字:<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&lt;% String &nbsp;username=(String)request.getAttribute(&quot;username&quot;); %&gt; Hello: &lt;%=username %&gt;</p>
+
+<h2>从更深的层次考虑</h2>
+
+<p>&nbsp;&nbsp; &nbsp;request.getParameter()<br />
+&nbsp;&nbsp; &nbsp;方法传递的数据,会从Web客户端传到Web服务器端，代表HTTP请求数据。request.getParameter()方法返回String类型的数据。<br />
+&nbsp;&nbsp; &nbsp;<br />
+&nbsp;&nbsp; &nbsp;request.setAttribute()和getAttribute()方法传递的数据,只会存在于Web容器内部，在具有转发关系的Web组件之间共享。这两个方法能够设置Object类型的共享数据。<br />
+&nbsp;&nbsp; &nbsp;<br />
+&nbsp;&nbsp; &nbsp;request.getParameter()取得是通过容器的实现来<span class="marker">取得通过类似post，get等方式传入的数据</span>。<br />
+&nbsp;&nbsp; &nbsp;request.setAttribute()和getAttribute()只是在<span class="marker">web容器内部流转，仅仅是请求处理阶段</span>。</p>
+
+<p>&nbsp;&nbsp; &nbsp;<span class="marker">getAttribute是返回对象,getParameter返回字符串</span> 总的来说：request.getAttribute()方法返回request范围内存在的对象，而request.getParameter()方法是获取http提交过来的数据。</p>

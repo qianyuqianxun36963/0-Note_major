@@ -1,0 +1,706 @@
+<h2>jQuery html5Validate基于HTML5表单验证插件</h2>
+
+<p><small>这篇文章发布于 2012年12月20日，星期四，13:43，归类于&nbsp;<a href="http://www.zhangxinxu.com/wordpress/category/js/jquery-about/" rel="category tag">jquery相关</a>。 阅读 191604 次, 今日 3 次</small></p>
+
+<p>by&nbsp;<a href="http://www.zhangxinxu.com/">zhangxinxu</a>&nbsp;from&nbsp;<a href="http://www.zhangxinxu.com/">http://www.zhangxinxu.com</a><br />
+本文地址：<a href="http://www.zhangxinxu.com/wordpress/?p=2857">http://www.zhangxinxu.com/wordpress/?p=2857</a></p>
+
+<p><strong>更新于2014年12月18日 0:35</strong><br />
+本插件已经迁移至Github上更新与维护：<a href="https://github.com/zhangxinxu/html5Validate" target="_blank">https://github.com/zhangxinxu/html5Validate</a></p>
+
+<p><strong>更新于2016-02-25</strong><br />
+前面提到的新版目前线上已经可以访问：<br />
+<a href="http://mp.gtimg.cn/old_mp/assets/js/common/ui/Validate.js" target="_blank">http://mp.gtimg.cn/old_mp/assets/js/common/ui/Validate.js</a></p>
+
+<p><a href="http://www.zhangxinxu.com/study/201511/form-use-mpqq.html" target="_blank">demo体验狠狠地点击这里</a></p>
+
+<p>解决了之前组件如下不足：<br />
+1. 自定义验证顺序有问题；<br />
+2. 即时验证支持没内置；<br />
+3. 不能随意定制验证规则；</p>
+
+<p>等等。</p>
+
+<p>今年会开源，大家稍安~</p>
+
+<p><strong>更新于2016-07-08</strong><br />
+又有不少人问了，开源还需要时日。不过大家现在是可以使用的，下面是最简单使用，需要seajs:</p>
+
+<pre>
+&lt;script src=&quot;http://qidian.gtimg.com/lulu/theme/modern/js/plugin/sea.js&quot;&gt;&lt;/script&gt;
+&lt;script&gt;
+seajs.config({
+    &#39;base&#39;: &#39;http://qidian.gtimg.com/lulu/theme/modern/js&#39;
+}).use([&#39;common/ui/Validate&#39;], function(Validate) {
+    new Validate($(&#39;#form&#39;), callback, options);
+});</pre>
+
+<p>然后，我也把文档给独立出来了，您可以狠狠地点击这里：<a href="http://www.zhangxinxu.com/study/201607/validate.html" target="_blank">海量用户产品验证过的表单验证组件demo兼文档</a></p>
+
+<p>别看写得很多，其实基本使用很简单的。后面的文档只要是面向复杂定制的。</p>
+
+<p>如果上面的使用还是觉得不够简单，可以试试直接使用下面的JS地址：</p>
+
+<pre>
+&lt;script src=&quot;http://qidian.gtimg.com/c/=/lulu/theme/modern/js/common/ui/Validate.js,/lulu/theme/modern/js/common/ui/ErrorTip.js,/lulu/theme/modern/js/common/ui/Follow.js&quot;&gt;&lt;/script&gt;</pre>
+
+<p>可以直接使用包装器方法，例如：</p>
+
+<pre>
+$(form).validate(callback, options);</pre>
+
+<h3>一、前言</h3>
+
+<p>前3篇文章实际都是为本文做铺垫的，如果以下棋表示，前三篇是普通走棋，本篇是将军！</p>
+
+<p>目前市面上有不少表单验证插件，看似强大，实在糟糕！</p>
+
+<p>总结下，有以下一些问题：</p>
+
+<p>当JS出现错误的时候而无法正常运作的时候，验证就是聋子的耳朵&mdash;&mdash;摆设，即使在现代浏览器下也是如此。</p>
+
+<ol>
+	<li><strong>过多干预</strong><br />
+	包括：改变了表单元素UI, 为表单元素绑定过多事件等<br />
+	<img alt="表单验证与过多干预 张鑫旭-鑫空间-鑫生活" src="http://image.zhangxinxu.com/image/blog/201212/2012-12-14_160436.png" style="height:54px; width:227px" title="表单验证与过多干预" /></li>
+	<li><strong>布局等限制</strong><br />
+	包括：需要特定结构的布局，需要特定的类名或者ID<br />
+	<img alt="表单验证与布局限制 张鑫旭-鑫空间-鑫生活" src="http://image.zhangxinxu.com/image/blog/201212/2012-12-14_161027.png" style="height:57px; width:334px" title="表单验证与布局限制" /></li>
+	<li><strong>学习成本</strong><br />
+	包括：N多元作者自定义的属性，或者自定义的特定的数据结构<br />
+	<img alt="表单验证与学习成本 张鑫旭-鑫空间-鑫生活" src="http://image.zhangxinxu.com/image/blog/201212/2012-12-14_161734.png" style="height:97px; width:267px" title="表单验证与学习成本" /></li>
+	<li><strong>可用性</strong></li>
+</ol>
+
+<p><strong>面向未来的表单验证</strong></p>
+
+<ol>
+	<li><strong>验证驱动</strong><br />
+	验证信息HTML驱动，例如HTML5中<code>required</code>,&nbsp;<code>pattern</code>,&nbsp;<code>multiple</code>等</li>
+	<li><strong>验证形式</strong><br />
+	非即时响应，submit验证，如Chrome浏览器的处理；或者弱即时响应，如FireFox浏览器仅仅红色外发光。</li>
+	<li><strong>验证交互</strong><br />
+	浮动形式，尖角指示。<br />
+	<img alt="现代浏览器的验证出错提示 张鑫旭-鑫空间-鑫生活" src="http://image.zhangxinxu.com/image/blog/201212/2012-12-14_163255.png" style="height:117px; width:209px" title="现代浏览器的验证出错提示" /></li>
+</ol>
+
+<p>换言之，所谓面向未来的表单验证，是遵循W3C HTML5规范的表单验证，我们可以从目前领先的浏览器中看到大致雏形。而本文所有展示的html5Validate表单验证插件，就是基于这个未来设计的。</p>
+
+<h3>二、html5Validate概述</h3>
+
+<p>html5Validate插件的验证机制、交互形式甚至形式与Chrome浏览器HTML5表单内置验证走的很近。在使用的时候，就是写写原生的HTML5表单代码。我只想说：走阳光大道和过独木桥的感觉是完全不一样的。</p>
+
+<p>举个简单例子，一个邮箱验证，HTML5代码表示应该是下面这个样子：</p>
+
+<pre>
+&lt;input type=&quot;email&quot; required&gt;</pre>
+
+<p>好巧的是，使用html5Validate进行表单验证的时候，也是使用上面这段HTML代码！<img src="http://mat1.gtimg.com/www/mb/images/face/20.gif" /></p>
+
+<p>类似下面的绑定：</p>
+
+<pre>
+$(&quot;form&quot;).html5Validate();</pre>
+
+<p>于是，您在提交表单的时候会（在各个浏览器下）看到这样子的提示：<br />
+<img alt="请填写字段的提示" src="http://image.zhangxinxu.com/image/blog/201212/2012-12-17_150706.png" style="height:85px; width:225px" title="请填写字段的提示" />&nbsp;<img alt="请输入电子邮件的提示" src="http://image.zhangxinxu.com/image/blog/201212/2012-12-17_150729.png" style="height:82px; width:232px" title="请输入电子邮件的提示" /></p>
+
+<p>跟Chrome浏览器下的提示文字近似：<br />
+<img alt="Chrome浏览器无字段提示 张鑫旭-鑫空间-鑫生活" src="http://image.zhangxinxu.com/image/blog/201212/2012-12-17_150938.png" style="height:122px; width:187px" title="Chrome浏览器无字段提示" />&nbsp;<img alt="Chrome浏览器下邮件地址有误提示 张鑫旭-鑫空间-鑫生活" src="http://image.zhangxinxu.com/image/blog/201212/2012-12-17_151011.png" style="height:111px; width:238px" title="Chrome浏览器下邮件地址有误提示" /></p>
+
+<p>html5Validate支持我所知的HTML5验证相关的东西，如<code>type=&quot;email&quot;</code>,&nbsp;<code>type=&quot;number&quot;</code>,&nbsp;<code>type=&quot;tel&quot;</code>,&nbsp;<code>type=&quot;url&quot;</code>,&nbsp;<code>step</code>,&nbsp;<code>min</code>,&nbsp;<code>max</code>,&nbsp;<code>required</code>,&nbsp;<code>pattern</code>,&nbsp;<code>multiple</code>等，并有一些本地化扩展，如增加了<code>type=&quot;zipcode&quot;</code>邮编等，支持<code>type=&quot;hidden&quot;</code>的完整验证（HTML5中是忽略的），支持多type共存，例如<code>type=&quot;email|tel&quot;</code>, 可以让文本框输入邮箱或者手机号码。</p>
+
+<p><code>type=&quot;date&quot;</code>,&nbsp;<code>type=&quot;hour&quot;</code>,&nbsp;<code>type=&quot;password&quot;</code>等因为不同网站规则不一样，因此，没有放在html5Validate中，不过，您可以很简单地进行扩展，使您的项目支持之，这个后面会介绍（参见 part 9-4）。</p>
+
+<p>为了满足实际开发需求，额外增加了四个自定义属性值：<code>data-key</code>,<code>&nbsp;data-target</code>,&nbsp;<code>data-min</code>,&nbsp;<code>data-max</code>. 具体何用，下面会详细讲解。</p>
+
+<p>支持自动的全角转半角。</p>
+
+<p><code>注意</code>：<code>type=&quot;submit&quot;</code>,&nbsp;<code>type=&quot;reset&quot;</code>,&nbsp;<code>type=&quot;file&quot;</code>,&nbsp;<code>type=&quot;image&quot;</code>以及<code>disabled</code>的表单元素没有验证性可言，因此，下面所说的表单元素，并不包括他们。</p>
+
+<p><strong>兼容性</strong><br />
+html5Validate通过jQuery1.4+测试，支持正常IE6-IE10浏览器，FireFox, Chrome等现代浏览器。</p>
+
+<h3>三、demo、使用以及资源下载</h3>
+
+<blockquote>
+<p>以下灰色文字内容可忽略，已过时~</p>
+
+<p>您可以狠狠地点击这里：<a href="http://www.zhangxinxu.com/study/201212/jquery-html5validate-plugin-test.html" target="_blank">html5Validate表单验证jQuery插件测试demo</a></p>
+
+<p><strong>下载</strong><br />
+未压缩版JS：<a href="http://www.zhangxinxu.com/study/js/jquery-html5Validate.js" target="_blank">jquery-html5Validate.js</a><br />
+压缩版JS：<a href="http://www.zhangxinxu.com/study/js/mini/jquery-html5Validate-min.js" target="_blank">jquery-html5Validate-min.js</a></p>
+
+<p>zip源文件打包下载（含测试demo）（右键-[目标|源文件]另存为）：<a href="http://www.zhangxinxu.com/study/down/jquery-html5Validate.zip">jquery-html5Validate.zip</a></p>
+</blockquote>
+
+<p><strong>更新于2014年12月18日 0:35</strong><br />
+本插件作为jQuery插件迁移计划先头兵，已经迁移至Github上更新与维护：<a href="https://github.com/zhangxinxu/html5Validate" target="_blank">https://github.com/zhangxinxu/html5Validate</a></p>
+
+<p>资源下载、或者使用遇到什么问题，可以去Github上提问，我会及时更新与建设，也欢迎大家一起参与。</p>
+
+<p><strong>使用</strong></p>
+
+<ol>
+	<li>引用jQuery框架，示意：
+	<pre>
+&lt;script src=&quot;http://code.jquery.com/jquery-1.6.4.min.js&quot;&gt;&lt;/script&gt;</pre>
+	</li>
+	<li>引用html5Validate插件，示意：
+	<pre>
+&lt;script src=&quot;http://www.zhangxinxu.com/study/js/mini/jquery-html5Validate-min.js&quot;&gt;&lt;/script&gt;</pre>
+	</li>
+	<li>绑定调用：
+	<pre>
+$().html5Validate(callback, options);</pre>
+
+	<p>示意，假设测试表单<code>id</code>为<code>html5Form</code>，则有：</p>
+
+	<pre>
+$(&quot;#html5Form&quot;).html5Validate(function() {
+    // 全部验证通过，该干嘛干嘛~~
+});</pre>
+	</li>
+</ol>
+
+<p>//zxx: 还有一些实际应用的例子将会在本文后半部分展示。</p>
+
+<h3>四、可选参数以及详解</h3>
+
+<p>可选参数见下表：</p>
+
+<table border="0" cellpadding="0" cellspacing="1" style="width:100%">
+	<tbody>
+		<tr>
+			<th scope="col">参数名称</th>
+			<th scope="col">默认值</th>
+			<th scope="col">简单释义</th>
+		</tr>
+		<tr>
+			<td>novalidate</td>
+			<td>true</td>
+			<td>布尔型。是否取消现代浏览器的内置验证</td>
+		</tr>
+		<tr>
+			<td>submitEnabled</td>
+			<td>true</td>
+			<td>布尔型。表单中禁用的提交按钮是否使之可用</td>
+		</tr>
+		<tr>
+			<td>labelDrive</td>
+			<td>true</td>
+			<td>布尔型。是否优先使用label标签中的文字作为提示关键词</td>
+		</tr>
+		<tr>
+			<td>validate</td>
+			<td>function() { return true; }</td>
+			<td>包含返回值的函数，插件自带验证以外的其他验证</td>
+		</tr>
+	</tbody>
+</table>
+
+<p><strong>1. 参数novalidate</strong><br />
+既然html5Validate插件验证与原生HTML5验证公用一套HTML代码，显然就存在共存的问题。</p>
+
+<p>如果没有设计这个参数<code>novalidate</code>或者<code>novalidate</code>值为<code>false</code>, 则浏览器内置表单验证优先，全部pass之后才轮到插件进行验证，也就是说，两者是没有冲突的。其实，原本我是不打算设计这个参数的，因为，我觉得浏览器内置的验证以及交互效果很赞的，但是，IE10的出现让我速速打消了这个念头，因为，丫丑得我根本无法直视&mdash;&mdash;大红的粗框框！！<br />
+<img alt="令人啧舌的IE10 验证提示UI 张鑫旭-鑫空间-鑫生活" src="http://image.zhangxinxu.com/image/blog/201212/2012-12-07_174425.png" style="height:148px; width:368px" title="令人啧舌的IE10 验证提示UI" /></p>
+
+<p><code>novalidate</code>为HTML5表单内置的属性（<a href="http://www.w3.org/TR/html-markup/form.html#form.attrs.novalidate" target="_blank">W3C草案</a>），可以让现代浏览器（IE10+, FireFox, Chrome, Opera等）默认不对表单做验证（忽略<code>required</code>,&nbsp;<code>pattern</code>等）。html5Validate插件默认<code>novalidate: true</code>也就是说，其默认对包装器元素添加了<code>novalidate=&quot;novalidate&quot;</code>，以阻止浏览器的默认验证，下图代码为JS生成之后所截：<br />
+<img alt="novalidate的添加截图示意 张鑫旭-鑫空间-鑫生活" src="http://image.zhangxinxu.com/image/blog/201212/2012-12-17_163656.png" style="height:65px; width:564px" title="novalidate的添加截图示意" /></p>
+
+<p>这就是为什么测试demo在FireFox等浏览器下不出现内置提示效果的原因。</p>
+
+<p>可能您有这样的需求，您希望除了IE10以外的现代浏览器都使用浏览器自带的验证规则以及提示效果，怎么办，可以像下面这样？</p>
+
+<pre>
+var isIe10 = typeof document.msHidden !== &quot;undefiend&quot;;
+$(&quot;form&quot;).html5Validate($.noop, {
+    novalidate: isIe10? false: true
+});</pre>
+
+<p><strong>2. 参数submitEnabled</strong><br />
+这个参数的设计是很有必要的。</p>
+
+<p>很多时候，我们的表单是Ajax提交的，当页面加载不是很及时的时候&mdash;&mdash;如表单元素呈现，但验证脚本未绑定&mdash;&mdash;，用户回车一个输入框，悲剧来了，默认表单的<code>submit</code>被触发了，而不是ajax提交&hellip;&hellip;</p>
+
+<p>我不清楚其他团队是怎么处理的，我处理这类问题是表单元素的提交按钮默认<code>disabled</code>，在表单验证脚本绑定OK之后，去除<code>disabled</code>属性，使一切正常。</p>
+
+<p><code>submitEnabled</code>参数的作用就是让表单中的禁用的submit性质的按钮可用。</p>
+
+<p>例如，测试demo中，默认按钮是<code>disabled</code>的，这样，就算JS因网络等原因被block了，用户也无法提交表单，避免造成更加不好的体验。<br />
+<img alt="表单提交按钮默认disabled 张鑫旭-鑫空间-鑫生活" src="http://image.zhangxinxu.com/image/blog/201212/2012-12-17_172924.png" style="height:63px; width:451px" title="表单提交按钮默认disabled" /></p>
+
+<p>等验证事件初始化完毕，自然，<code>disabled</code>的按钮被<code>enabled</code>了。</p>
+
+<p>对于原生<code>submit()</code>的表单或者可以<code>submit()</code>的表单，此参数酱油，您可以无需<code>disabled</code>提交按钮。</p>
+
+<p><strong>3. 参数labelDrive</strong><br />
+顾名思意，<code>label</code>驱动。该参数针对错误提示框中的文字内容。</p>
+
+<p>这是与浏览器内置提示文字不一样的地方，优先label标签文字提示。什么意思？</p>
+
+<p><code>html5Validate</code>插件有两套文字提示机制。一种是label标签驱动，其次是内置固定提示文字，如&ldquo;请填写此字段&rdquo;。</p>
+
+<p>//zxx: 对于单复选框以及按钮，由于点击它们对应label标签会触发选中或者按钮事件，因此，对于这些元素，labelDrive参数是完全的酱油 &ndash; 提示文字与label毫无关系。对于下拉框而言，其在隐藏状态下，提示文字可以从label获取；非隐藏状态也是酱油。</p>
+
+<p>何为<code>label</code>标签驱动？举个例子：</p>
+
+<pre>
+&lt;label for=&quot;email&quot;&gt;邮箱：&lt;/label&gt;&lt;input type=&quot;email&quot; id=&quot;email&quot; required&gt;</pre>
+
+<p>上面HTML的提示文字就是：<br />
+<img alt="label标签驱动之邮箱提示 张鑫旭-鑫空间-鑫生活" src="http://image.zhangxinxu.com/image/blog/201212/2012-12-17_174344.png" style="height:84px; width:359px" title="label标签驱动之邮箱提示" /></p>
+
+<p>如果对应label标签中的文字是&ldquo;邮箱/手机&rdquo;，则提示文字是：<br />
+<img alt="label标签驱动之邮箱/手机提示 张鑫旭-鑫空间-鑫生活" src="http://image.zhangxinxu.com/image/blog/201212/2012-12-17_174438.png" style="height:82px; width:290px" title="label标签驱动之邮箱/手机提示" /></p>
+
+<p>也就是说&ldquo;<code>label</code>标签驱动&rdquo;就是把<code>label</code>标签中的文字作为提示关键字，这样子的提示更智能，同时也不会增加额外的HTML代码。</p>
+
+<p>该文字<strong>如何获取</strong>？<br />
+①找到与表单元素id对应的label元素(<code>for</code>关联)，如果没有则应用内置提示文字规则；<br />
+②获取<code>label</code>标签中的文字，过滤星号(*)，中文冒号(：)和英文冒号(:)，剩下的文字作为提示关键字出现在提示框中，如果输入框内容为空则提示&ldquo;您尚未输入***&rdquo;；格式不准确则提示&ldquo;您输入的***格式不准确&rdquo;。<br />
+③如果<code>label</code>标签文字与表单元素的<code>placeholder</code>值一样，则此<code>label</code>标签酱油。<br />
+④如果有多个label元素，符合要求的提示文字会累加。<br />
+⑤如果最后得到的<code>label</code>标签文字为空，同样应用泛泛的提示文字（如&ldquo;请填写此字段&rdquo;或&ldquo;内容格式不符合要求&rdquo;）。</p>
+
+<p><strong>小技巧</strong><br />
+你可以隐藏label标签（如demo中两个拖选）；或部分隐藏，如demo中评论部分：</p>
+
+<pre>
+&lt;label for=&quot;comment&quot;&gt;内容：&lt;/label&gt;&lt;textarea id=&quot;comment&quot; rows=&quot;5&quot; required data-min=&quot;5&quot; data-max=&quot;100&quot;&gt;</pre>
+
+<p>提示文字为&ldquo;您尚未输入评论内容&rdquo;，而不是&ldquo;您尚未输入评论&rdquo;。</p>
+
+<p><strong>4. 参数validate 新增于2013-06-19</strong><br />
+新增参数<code>validate</code>. 实际开发的时候，各类验证需求层出不穷。例如，今天@jason就在评论中提到，是否可以指定多选就3项。这不属于HTML5规范中验证，也不是常规验证需求，在插件中添加此方法是有违插件的设计原则的，因此，插件内部是不会支持这类验证的。</p>
+
+<p>在我的实际项目中，MooTools版的<code>html5Validate</code>插件是有一个可选参数<code>validate</code>，参数值为函数，就是一个额外验证的函数，专门对付一些特殊的验证需求。今天正好也为jQuery版增加下这个参数。</p>
+
+<p>插件内部是如此运作的，先执行插件内置的验证，然后，再执行<code>validate</code>这个验证函数，如果返回值是<code>true</code>，则执行我们相对表单进行的回调操作。</p>
+
+<p>言语苍白，demo明了。您可以狠狠地点击这里：<a href="http://www.zhangxinxu.com/study/201306/jquery-html5validate-plugin-validate-params.html" target="_blank">html5Validate新增validate参数demo</a></p>
+
+<p>demo中有两个额外的验证：一是前后密码需要一致；二是多选项至少选择3个。大致截图如下：<br />
+<img alt="测试需求" src="http://image.zhangxinxu.com/image/blog/201306/2013-06-19_184451.png" style="height:260px; width:536px" /></p>
+
+<p>然后，相关JS如下：</p>
+
+<pre>
+$(&quot;form&quot;).html5Validate(function() {
+        alert(&quot;验证全部通过！&quot;);
+        this.submit();
+    }, {
+    validate: function() {
+        // 下面这些就是额外的一些特殊验证
+        if ($(&quot;#pwdCheck&quot;).val() !== $(&quot;#pwd&quot;).val()) {
+            $(&quot;#pwdCheck&quot;).testRemind(&quot;前后密码不一致&quot;);
+            return false;  
+        } else if ($(&quot;input[type=&#39;checkbox&#39;]:checked&quot;).length &lt; 3) {
+            $(&quot;#checkBox&quot;).testRemind(&quot;至少选择3项&quot;);
+            return false;  
+        }
+       return true;  
+    }
+});</pre>
+
+<p>注意需要有Boolean类型返回值，验证出错返回<code>false</code>验证就会停止，效果达到。</p>
+
+<p><img alt="至少选择3项的提示" src="http://image.zhangxinxu.com/image/blog/201306/2013-06-19_184930.png" style="height:265px; width:507px" /></p>
+
+<h3>五、四个自定义属性</h3>
+
+<p>HTML5的表单验证html5Validate自然支持，但是，仅仅HTML5的东西貌似不能完全支持实际的各类需求，因此，html5Validate中还有4个自定义属性(就是前面提到的<code>data-key</code>,<code>&nbsp;data-target</code>,&nbsp;<code>data-min</code>和<code>data-max</code>)，帮助覆盖95%+的验证需求。</p>
+
+<p><strong>1. 自定义属性&rdquo;data-key&rdquo;和&rdquo;data-target&rdquo;</strong><br />
+这两个参数是为模拟表单（或称为&ldquo;自定义表单&rdquo;）设计的。</p>
+
+<p>何为模拟表单？如自定义的下拉框，或者星星评分选择等&hellip;&hellip;<br />
+<img alt="模拟表单星星评分示意 张鑫旭-鑫空间-鑫生活" src="http://image.zhangxinxu.com/image/blog/201212/2012-12-18_105152.png" style="height:95px; width:292px" title="模拟表单星星评分示意" /></p>
+
+<p><strong>① &ldquo;data-key&rdquo;作用</strong><br />
+模拟表单往往都是纯鼠标操作的，此时，类似&ldquo;请填写此字段&rdquo;或者&ldquo;您输入的&hellip;&hellip;&rdquo;就显得不准确，不准确的关键就是这里的操作动词&ldquo;填写&rdquo;与&ldquo;输入&rdquo;。<code>&quot;data-key&quot;</code>的值就表示这个关键动词，如demo中的第二个拖选：</p>
+
+<pre>
+&lt;label for=&quot;serverScore&quot; class=&quot;dn&quot;&gt;服务评分&lt;/label&gt;
+&lt;input type=&quot;hidden&quot; id=&quot;serverScore&quot; required data-key=&quot;拖选&quot; /&gt;</pre>
+
+<p>于是，提示的时候，就是：<br />
+<img alt="拖选提示截图" src="http://image.zhangxinxu.com/image/blog/201212/2012-12-18_114640.png" style="height:180px; width:270px" title="拖选提示截图" /></p>
+
+<p>注意：隐藏性质表单的<code>&quot;data-key&quot;</code>是可以缺省的，对于一般的隐藏输入框，默认<code>&quot;data-key&quot;</code>值为&ldquo;输入&rdquo;；对于隐藏的单复选框或下拉框，默认<code>&quot;data-key&quot;</code>值为&ldquo;选择&rdquo;。</p>
+
+<p><strong>① &ldquo;data-target&rdquo;作用</strong><br />
+从可用性上讲，模拟表单都有一个对应的隐藏不可见的真实表单元素，或<code>visibility:hidden</code>的<code>select</code>下拉框，或<code>hidden</code>类型的<code>input</code>框，或者<code>display:none</code>的<code>radio</code>们。</p>
+
+<p>要知道，这些隐藏表单的位置是捕获不到(<code>display:none;</code>)或者位置不准确的。因此，浮动提示框的位置无法确定；就算浮动框位置确定了，指向了一个看不见的东西，用户也会很奇怪的。面对这种情况，<code>&quot;data-target&quot;</code>应运而生。</p>
+
+<p><code>&quot;data-target&quot;</code>可将黄色提示框的目标元素从真实表单元素转移到模拟表单元素（其值正是模拟表单元素的id(或className)）。如果<code>&quot;data-target&quot;</code>不存在，或其值对应不到元素，则<code>alert</code>弹出提示，如上面这个截图。</p>
+
+<p>如果<code>&quot;data-target&quot;</code>对应元素存在，则就会像下面这样提示（demo中第一个拖选）- 乾坤大挪移：<br />
+<img alt="data-target效果示意截图" src="http://image.zhangxinxu.com/image/blog/201212/2012-12-18_123536.png" style="height:97px; width:371px" title="data-target效果示意截图" /></p>
+
+<p>HTML代码如下：</p>
+
+<pre>
+&lt;span id=&quot;hiddenRemind&quot; class=&quot;bar_bg&quot;&gt;&lt;i class=&quot;bar_btn&quot; data-rel=&quot;envirScore&quot;&gt;&lt;/i&gt;&lt;/span&gt;
+&lt;label for=&quot;envirScore&quot; class=&quot;dn&quot;&gt;环境评分&lt;/label&gt;
+&lt;input type=&quot;range&quot; id=&quot;envirScore&quot; class=&quot;dn&quot; required data-key=&quot;拖选&quot; data-target=&quot;hiddenRemind&quot; /&gt;</pre>
+
+<p><strong>2. 自定义属性&rdquo;data-max&rdquo;和&rdquo;data-min&rdquo;</strong><br />
+这两个自定义属性要好理解多了，一般用在文本域上或昵称文本框上，用做最多字符个数和最小字符个数限制。例如demo最后文本域：</p>
+
+<pre>
+&lt;textarea id=&quot;comment&quot; rows=&quot;5&quot; data-max=&quot;100&quot; data-min=&quot;5&quot; required&gt;&lt;/textarea&gt;</pre>
+
+<p>表示，评论内容需要5-100个字符。无论字符不足或者是超出，都会出现提示，其中，当内容超出的时候，html5Validate会自动帮你选中溢出部分的文字，例如下面截图：<br />
+<img alt="文字溢出的部分选中提示 张鑫旭-鑫空间-鑫生活" src="http://image.zhangxinxu.com/image/blog/201212/2012-12-18_143336.png" style="height:210px; width:496px" title="文字溢出的部分选中提示" /></p>
+
+<h3>六、一些验证类型的说明</h3>
+
+<p><strong>1. type=number, 整数与小数</strong><br />
+<code>type=number</code>文本框（数值文本框）的验证相对复杂点，这里有必要说下。数值文本框有<code>step</code>,&nbsp;<code>min</code>,&nbsp;<code>max</code>原生属性。<code>min</code>,&nbsp;<code>max</code>表示数值最小值和最大值，<code>step</code>缺省表示输入值必须整数，<code>step</code>为<code>0.1</code>表示输入值最多1位小数（<code>.00</code>结尾除外）。</p>
+
+<p>具体验证规则参见之前下的一步棋：<a href="http://www.zhangxinxu.com/wordpress/?p=2817" target="_blank">HTML5 number类型文本框step属性的验证机制</a></p>
+
+<p><strong>数值文本框的UI</strong><br />
+Chrome, Opera等浏览器下，数值文本框会有上下数值增减箭头；很多固执的设计师是无法容忍这个的: &ldquo;the ui is so terrible!&rdquo;<br />
+<img alt="数值文本框的上下箭头" src="http://image.zhangxinxu.com/image/blog/201212/2012-12-18_161102.png" style="height:54px; width:183px" /></p>
+
+<p>因此，实际上，不少团队的数值类型框还是老旧的<code>type=&quot;text&quot;</code>以避免浏览器自带的上下箭头。OK，冲突来了，html5Validate需要HTML5代码做验证，实际实现不能使用HTML5的东西，怎么办？</p>
+
+<p>很简单，在类型后面加个空格，例如，不是设置<code>type=&quot;number&quot;</code>，而是设置<code>type=&quot;number &quot;</code>或者<code>type=&quot;number|&quot;</code>.&nbsp;//zxx: 管道符用来支持多type公用</p>
+
+<p>html5Validate会自动过滤最后的空格，因此，相关的验证没有任何影响。</p>
+
+<p><strong>数值文本框与multiple</strong><br />
+数值文本框不支持<code>multiple</code>, 此规则与浏览器一致。<code>email</code>/<code>tel</code>等类型支持<code>multiple</code>，多个邮箱或手机号使用逗号(<code>,</code>)分隔。</p>
+
+<p><strong>2. 不得不提的type=range</strong><br />
+<code>type=range</code>与<code>type=number</code>是近亲，均有<code>step</code>,&nbsp;<code>min</code>,&nbsp;<code>max</code>原生属性。然而，目前以及今后很长的一段时间，在web项目上，就验证而言<code>type=range</code>几乎没有用武之地，原因是UI限制。何解？</p>
+
+<p>如果浏览器支持<code>type=range</code>，则用户完全是拖选操作（不能输入），几乎不存在范围溢出的情况，验证也几乎就是摆设；如果浏览器不支持<code>type=range</code>，其UI就是个普通输入框，其内部验证机制与<code>type=number</code>无异，如果撇开语义化以及可访问性不谈，是不是可以直接使用<code>type=number</code>？</p>
+
+<p>因此，个人看来，<code>type=range</code>只能作为隐藏的表单元素&mdash;&mdash;为自定义表单元素服务，如demo中第一个拖选。也正因为这个原因，html5Validate并未重视<code>type=range</code>.</p>
+
+<p><strong>3. type=radio以及 type=checkbox的验证规则</strong><br />
+无论是单选框还是复选框，只有是否必选的验证(<code>required</code>).</p>
+
+<p>对于同一组单选框（name值一致），只要有一个单选框设置<code>required</code>就可以了（为了性能，也建议这么做）。单选框的提示文字固定，取自Chrome浏览器，为&ldquo;请选择一个选项&rdquo;。</p>
+
+<p>对于复选框，哪个必选，就哪个需要设置<code>required</code>。其提示文字也是固定的，也是参考的Chrome浏览器，为&ldquo;如果要继续，请选中此框&rdquo;。不过，个人举得，复选框必选设置使非常让人蛋疼菊紧的。</p>
+
+<h3>七、内置插件testRemind介绍</h3>
+
+<p><a href="http://www.zhangxinxu.com/study/js/jquery-html5Validate.js" target="_blank">jquery-html5Validate.js</a>中还内置另外一个插件 &ndash; testRemind. 就是出现那个黄色提示框框的插件。</p>
+
+<p>用法如下：</p>
+
+<pre>
+$().testRemind(content, options);</pre>
+
+<p>其中，<code>content</code>为提示的内容，可以包含HTML字符串；<code>options</code>为可选参数。</p>
+
+<p><strong>可选参数</strong><br />
+参见下表：</p>
+
+<table border="0" cellpadding="0" cellspacing="1" style="width:100%">
+	<tbody>
+		<tr>
+			<th scope="col">参数名称</th>
+			<th scope="col">默认值</th>
+			<th scope="col">简单释义</th>
+		</tr>
+		<tr>
+			<td>size</td>
+			<td>6</td>
+			<td>数值。提示框尖角的尺寸大小</td>
+		</tr>
+		<tr>
+			<td>align</td>
+			<td>&ldquo;center&rdquo;</td>
+			<td>特定字符串。提示框三角的位置，其他可选值为&rdquo;left&rdquo;和&rdquo;right&rdquo;</td>
+		</tr>
+		<tr>
+			<td>css</td>
+			<td>
+			<pre>
+{
+    maxWidth: 280,
+    backgroundColor: &quot;#FFFFE0&quot;,
+    borderColor: &quot;#F7CE39&quot;,
+    color: &quot;#333&quot;,
+    fontSize: &quot;12px&quot;,
+    padding: &quot;5px 10px&quot;,
+    zIndex: 202
+}</pre>
+			</td>
+			<td>样式对象。提示框框的可变样式。</td>
+		</tr>
+	</tbody>
+</table>
+
+<p><strong>参数含义</strong><br />
+<strong>① 参数size</strong><br />
+没什么好说的，提示框框三角的大小。</p>
+
+<p><strong>② 参数align</strong><br />
+没多少好说的，三角在框框的左边、中间还是右边。</p>
+
+<p>在html5Validate中，一般的表单元素尖角都是在中间的，但是，单选框和复选框尖角实在左侧，如下图所示，这个设置目前暂不可变：<br />
+<img alt="尖角位置居左的示意 张鑫旭-鑫空间-鑫生活" src="http://image.zhangxinxu.com/image/blog/201212/2012-12-18_164422.png" style="height:127px; width:213px" title="尖角位置居左的示意" /></p>
+
+<p><strong>③ 参数css</strong><br />
+该选项可以让你修改提示框的UI。</p>
+
+<p>例如，通过如下的设置，我们可以让提示框框的效果长得跟Chrome浏览器近似：</p>
+
+<pre>
+$(&quot;input&quot;).testRemind(&quot;无论输入什么，都不合格！&quot;, {
+    size: 10,
+    css: {
+        padding: &quot;8px 10px&quot;,
+        borderColor: &quot;#aaa&quot;,
+        borderRadius: 8,
+        boxShadow: &quot;2px 2px 4px rgba(0,0,0,.2)&quot;,
+        background: &quot;#fff url(chrome-remind.png) no-repeat 10px 12px&quot;,
+        backgroundColor: &quot;#fff&quot;,
+        fontSize: 16,
+        textIndent: 20
+    }
+}).get(0).focus();
+</pre>
+
+<p>于是，有类似下面效果（截自FireFox 17）：<br />
+<img alt="改造类似Chrome浏览器提示效果的框框 张鑫旭-鑫空间-鑫生活" src="http://image.zhangxinxu.com/image/blog/201212/2012-12-18_174958.png" style="height:139px; width:323px" title="改造类似Chrome浏览器提示效果的框框" /></p>
+
+<p>您可以狠狠地点击这里：<a href="http://www.zhangxinxu.com/study/201212/testremind-chrome-ui.html" target="_blank">testRemind Chrome UI测试demo</a></p>
+
+<p><strong>几乎酱油的可选参数</strong><br />
+在实际使用的时候，testRemind方法的这几个可选参数几乎是酱油的，因为html5Validate方法并未暴露相关参数可以修改弹出框框的UI，这是我故意这样设计的。</p>
+
+<p>一来自己不希望html5Validate与testRemind方法有过多的耦合，因为这会让我觉得复杂，而产生不安；其次，对于一个项目而言，提示框框效果应该是整站统一，样式设置的限制未尝不是一件好事。</p>
+
+<p>不过，此处小标题是&ldquo;几乎酱油&rdquo;，言外之意就是您还是可以通过一定的外部设置，改变提示框框的样式的。本插件JS中暴露了一个名为<code>$.testRemind.css</code>的对象，您可以对其加加减减来控制提示框的UI.</p>
+
+<p>举个板栗，如下代码：</p>
+
+<pre>
+$.testRemind.css = {
+    borderColor: &quot;#a0b3d6&quot;,
+    backgroundColor: &quot;#f0f3f9&quot;	
+};
+$(&quot;#testForm&quot;).html5Validate();</pre>
+
+<p>则，提示框框就会变成下面这幅屌模样：<br />
+<img alt="改变边框色和背景色后的提示框框模样 张鑫旭-鑫空间-鑫生活" src="http://image.zhangxinxu.com/image/blog/201212/2012-12-19_102523.png" style="height:111px; width:276px" title="改变边框色和背景色后的提示框框模样" /></p>
+
+<p>总结为：testRemind方法的CSS有限可选参数<code>options</code>中的css对象，如果没有，使用<code>$.testRemind</code>中的css对象。</p>
+
+<p>注意：提示框出现后，点击提示框以外的页面任意位置，或在表单元素foxus状态下触发键盘，或改变浏览器的尺寸，提示框都会<del>因此</del>隐藏。</p>
+
+<p><strong>$.testRemind.display</strong><br />
+除了<code>$.testRemind.css</code>外，还有一个<code>$.testRemind.display</code>属性，Boolean值(true/false)，用来反映当前是否有弹框显示。关键时候，这个还是很管用的。</p>
+
+<p>//zxx: 下面为广告~~注意不要勿点~~嘻嘻~~</p>
+
+<p><ins><ins><iframe frameborder="0" height="60" id="aswift_0" name="aswift_0" scrolling="no" width="468"></iframe></ins></ins></p>
+
+<h3>八、高阶使用</h3>
+
+<p><code>$().html5Validate()</code>方法是针对表单元素的，已经自动绑定了submit事件，并阻止了默认表单提交。然而，各类交互需求千变万化，自以为是的自动绑定可能满足不了苛刻的丈母娘，此时我们需要另外的处理，这就是这里要说的html5Validate的高阶使用。</p>
+
+<p>html5Validate中有个名为$.html5Validate的对象，其中有一些方法，如验证元素是否为空(<code>$.html5Validate.isEmpty(ele)</code>)，是否合法(<code>$.html5Validate.isRegex(ele, regex, params)</code>)等，因为我比较懒，这几个方法不介绍。这里着重要提的是下面这个方法：</p>
+
+<pre>
+$.html5Validate.isAllpass(elements, options);</pre>
+
+<p>顾名思意：HTML5验证 &ndash; 是否全部通过！</p>
+
+<p><strong>1. 参数elements</strong><br />
+<code>elements</code>参数必需，可以是：<code>form</code>节点，或者jQuery包装<code>form</code>，或者是需要验证的元素们。代码示意如下：</p>
+
+<pre>
+$.html5Validate.isAllpass(document.getElementsByTagName(&quot;form&quot;)[0]);
+$.html5Validate.isAllpass($(&quot;form&quot;));
+$.html5Validate.isAllpass($(&quot;input, textarea, select&quot;));</pre>
+
+<p><strong>2. 可选参数options</strong><br />
+<code>options</code>可选参数目前就一个，就是<code>labelDrive</code>，html5Validate方法中的参数<code>labelDrive</code>实际上是喂给<code>$.html5Validate.isAllpass</code>使用的。</p>
+
+<p><code>$.html5Validate.isAllpass</code>方法与表单没有任何关系，因此，我们可以更加灵活地应用在其他一些特殊场景上，举个简单例子，通过按钮点击事件验证并触发相关操作：</p>
+
+<pre>
+订阅优惠信息
+&lt;input type=&quot;email &quot; class=&quot;email&quot; placeholder=&quot;输入邮箱，如a@b.com&quot; required /&gt;
+&lt;a href=&quot;javascript:&quot; class=&quot;button&quot;&gt;订阅&lt;/a&gt;</pre>
+
+<p>然后，类似下面的验证处理：</p>
+
+<pre>
+$(&quot;.button&quot;).bind(&quot;click&quot;, function() {
+    var email = $(&quot;.email&quot;);
+    if ($.html5Validate.isAllpass(email)) {
+       // 邮箱验证通过，该干嘛干嘛~~
+    }
+});</pre>
+
+<p>您可以狠狠地点击这里：<a href="http://www.zhangxinxu.com/study/201212/$-html5validate-allpass.html" target="_blank">$.html5Validate.isAllpass简单应用demo</a></p>
+
+<p><img alt="isAllpass方法测试demo截图" src="http://image.zhangxinxu.com/image/blog/201212/2012-12-19_121125.png" style="height:151px; width:336px" title="isAllpass方法测试demo截图" /></p>
+
+<h3>九、其他可用的全局方法、对象及扩展</h3>
+
+<p><strong>1. 全半角转换DBC2SBC方法</strong><br />
+方法名称就是<code>DBC2SBC</code>，一个字符串参数，返回新的半角字符串，例如：</p>
+
+<pre>
+DBC2SBC(&quot;１３２０８０３３６２１&quot;); // 结果是&quot;13208033621&quot;</pre>
+
+<p><strong>2. 检测元素是否可见</strong><br />
+包装器方法，名称为<code>$().isVisible()</code>, 返回Boolean值，<code>true/false</code>.</p>
+
+<p>这里的不可见指的是不能被focus的隐藏，包括<code>type=&quot;hidden&quot;</code>隐藏域,&nbsp;<code>display:none</code>以及<code>visibility:hidden</code>, 屏幕外隐藏以及透明度为0等不在其中。</p>
+
+<p><strong>3. Boolean型属性检测</strong><br />
+包装器方法，名称为<code>$().hasProp(prop)</code>, 返回Boolean值，<code>true/false</code>.</p>
+
+<p>所谓Boolean型属性指的是HTML5中<code>required</code>,&nbsp;<code>multiple</code>,&nbsp;<code>novalidate</code>等属性有，值缺省的属性。具体可参见&ldquo;<a href="http://www.zhangxinxu.com/wordpress/?p=2829" target="_blank">HTML5 Boolean属性值的JS获取</a>&rdquo;一文。</p>
+
+<p><strong>4. 全局对象OBJREG及扩展</strong><br />
+<img alt="全局对象OBJREG值完整截图示意 张鑫旭-鑫空间-鑫生活" src="http://image.zhangxinxu.com/image/blog/201212/2012-12-19_144940.png" style="height:418px; width:485px" title="全局对象OBJREG值完整截图示意" /></p>
+
+<p>此对象就是根据表单<code>type</code>类型进行对应验证的<strong>数据源</strong>所在，我们可以在JS源代码或者在外部对其进行扩展。举个例子，假设你们站点的日期只能是xxxx-xx-xx这种形式，则，你可以增加如下正则（此正则示意，实际验证并不完全）：</p>
+
+<pre>
+OBJREG.DATE = &quot;^[1|2]\\d{3}\\-[0|1]?\\d\\-[0-3]?\\d$&quot;</pre>
+
+<p>于是乎，当提交表单含<code>type=&quot;date&quot;</code>的输入框的时候，如果里面的值不符合上面的<code>OBJREG.DATE</code>正则，就会显示<code>OBJREG[&quot;prompt&quot;].date</code>对应的提示文字内容。</p>
+
+<p>您还可以自定义HTML5规范以外的<code>type</code>, 例如插件自带的<code>type=zipcode</code>邮编验证就是自定义的。</p>
+
+<p>类似的，您网站的昵称等也可以自定义，例如<code>type=&quot;nickname&quot;</code>,&nbsp;<code>OBJREG</code>对象如下扩展即可：</p>
+
+<pre>
+昵称
+&lt;input type=&quot;nickname&quot; class=&quot;nickname&quot; required data-min=&quot;6&quot; data-max=&quot;20&quot; /&gt; 6-20个单词字符
+&lt;a href=&quot;javascript:&quot; class=&quot;button&quot;&gt;检测&lt;/a&gt;</pre>
+
+<p>JS部分的设置：</p>
+
+<pre>
+OBJREG.NICKNAME = &quot;^\\w+$&quot;;
+OBJREG[&quot;prompt&quot;].nickname = &quot;只能是字母数字以及下划线&quot;;
+
+$(&quot;.button&quot;).bind(&quot;click&quot;, function() {
+    var nickname = $(&quot;.nickname&quot;);
+    if ($.html5Validate.isAllpass(nickname)) {
+        alert(&quot;验证通过！&quot;);    
+    }
+});</pre>
+
+<p>于是乎，当含非单词字符的时候，就会有下图所示提示：<br />
+<img alt="自定义nickname类型及对应提示截图 张鑫旭-鑫空间-鑫生活" src="http://image.zhangxinxu.com/image/blog/201212/2012-12-19_153348.png" style="height:178px; width:398px" title="自定义nickname类型及对应提示截图" /></p>
+
+<p>您可以狠狠地点击这里：<a href="http://www.zhangxinxu.com/study/201212/html5validate-objreg-extend.html" target="_blank">html5Validate全局对象OBJREG扩展demo</a></p>
+
+<p><strong>OBJREG对象与pattern属性之间关系</strong><br />
+一句话，<code>pattern</code>权重大于<code>OBJREG</code>.</p>
+
+<p>举个例子，有些情况下，数值输入框可以允许输入中文单位，您就可以这样处理：</p>
+
+<pre>
+&lt;input type=&quot;number&quot; pattern=&quot;^\d+&quot; /&gt;</pre>
+
+<p>这样子，插件会使用<code>pattern</code>属性对应的正则，而不是<code>type</code>对应的正则。于是，您输入&rdquo;10人&rdquo;就不会提示你&ldquo;请输入数值&rdquo;。</p>
+
+<p><strong>注意：</strong><code>pattern</code>属性对应的正则中的斜杠(<code>\</code>)等无需转义，但是，如果是<code>OBJREG</code>对象表示，则需要转义(<code>\\</code>)！</p>
+
+<h3>十、各类实际应用</h3>
+
+<p><strong>1. 注册及其验证</strong><br />
+您可以狠狠地点击这里：<a href="http://www.zhangxinxu.com/study/201212/html5validate-example-regist.html" target="_blank">html5Validate下注册以及验证demo</a></p>
+
+<p>这个demo在demo里面算是蛮仿真的，验证码以及验证什么的都是有处理的。</p>
+
+<p><strong>值得说明的</strong><br />
+① 昵称有个模拟Ajax验证的处理，当输入5个合法字符的时候，会提示&ldquo;该昵称已存在&rdquo;。<br />
+<img alt="该昵称已存在提示截图 张鑫旭-鑫空间-鑫生活" src="http://image.zhangxinxu.com/image/blog/201212/2012-12-20_163026.png" style="height:121px; width:327px" title="该昵称已存在提示截图" /></p>
+
+<p>其中，使用了前面提到的<code>$.testRemind.display</code>以及<code>$.html5Validate.isRegex(ele)</code>.</p>
+
+<p>② 确认密码框禁用与不禁用的控制部分有这么一行代码：</p>
+
+<pre>
+if ($.html5Validate.isEmpty(this)) {</pre>
+
+<p><code>$.html5Validate.isEmpty</code>前面曾一笔带过，其用来检测输入框值是否为空，非<code>password</code>类型输入框会过滤前后空格。</p>
+
+<p>③ html5Validate插件并没有密码或手机号码前后一致验证的方法，如果在实际使用中遇到这类需求，您可以在html5Validate验证回调中进行额外验证。<br />
+<img alt="回调与额外验证 张鑫旭-鑫空间-鑫生活" src="http://image.zhangxinxu.com/image/blog/201212/2012-12-19_221712.png" style="height:89px; width:461px" title="回调与额外验证" /></p>
+
+<p><strong>2. 发表点评及验证</strong><br />
+您可以狠狠地点击这里：<a href="http://www.zhangxinxu.com/study/201212/html5validate-example-comment.html" target="_blank">html5Validate发表点评及验证demo</a></p>
+
+<p><img alt="html5Validate插件实例之发表点评验证截图 张鑫旭-鑫空间-鑫生活" src="http://image.zhangxinxu.com/image/blog/201212/2012-12-20_125357.png" style="height:143px; width:334px" title="html5Validate插件实例之发表点评验证截图" /></p>
+
+<p>这个demo的重点就在<strong>星星的处理</strong>上。</p>
+
+<p>星星的本质是单选框组，从差到好共5个单选，默认是显示的，当JS执行到此的时候，单选框组隐藏，默认隐藏的星星们显示；这个交互就是我上面提到的模拟表单！</p>
+
+<p>单选框组的验证只有&rdquo;是否必选&rdquo;这1条，如果必选，则仅仅1个单选<code>required</code>即可，理论上是无论哪个都行。规范与统一期间，我们可以约定同组第一个<code>radio</code>设置<code>required</code>. 再由于这里的radio被模拟，因此，这个有required属性的单选框必须隐藏(<code>display:none</code>或<code>visibility:hidden</code>)，否则，提示文字的位置为指向这个看不见的单选框。</p>
+
+<p>该单选框HTML代码如下：</p>
+
+<pre>
+&lt;input type=&quot;radio&quot; id=&quot;radioImp1&quot; name=&quot;impress&quot; value=&quot;1&quot; required data-target=&quot;starScore&quot;&gt;&lt;label for=&quot;radioImp1&quot;&gt;差&lt;/label&gt;</pre>
+
+<p>然后通过：</p>
+
+<pre>
+$().css(&quot;visibility&quot;, &quot;hidden&quot;);</pre>
+
+<p>将其隐藏不可见，打通任督二脉，以便<code>data-target</code>的乾坤大挪移招数可以发起来！于是，我们就看到了上图中&ldquo;提示框指向星星&rdquo;的画面。</p>
+
+<p>点击星星的操作实际是让对应单选框选中，从这点来看，我们还可以把星星使用<code>label</code>标签表示， 这样，连选中的JS代码都可以省了。呵呵~~</p>
+
+<p>其他都是些常规验证，没有什么好说的。</p>
+
+<h3>十一、结语以及其他杂碎</h3>
+
+<p>IE10向下兼容模式的IE6-IE9, 其HTML5表单属性又有严重的冲突bug（外表看不出来）. 因此，本插件在这些浏览器下有部分的不支持，主要是IE10支持的HTML5&nbsp;<code>type</code>类型，具体可参见前面一篇文章：&ldquo;<a href="http://www.zhangxinxu.com/wordpress/?p=2844" target="_blank">IE10↘IE7-IE9 type=email的完全抛弃</a>&rdquo;。</p>
+
+<p>我个人的建议是忽略之，理由略&hellip;&hellip;如果您实在想支持，<code>email/tel/url/number</code>这几种<code>type</code>后面加一个空格即可！在参数<code>novalidate</code>为<code>false</code>的时候，本插件会自动把后面的空格给<code>remove</code>掉的，并不影响正常的HTML5表单功能。</p>
+
+<p>本插件验证机制多遵循Chrome浏览器，因此，其表单验证都是一个一个提示的，大范围标红这种需求本插件满足不了。</p>
+
+<p><strong>补充：关于即时验证</strong><br />
+我去年这个时候写了篇讨论JS前端验证的文章&ldquo;<a href="http://www.zhangxinxu.com/wordpress/?p=2102" target="_blank">JS前端验证与用户自由思想</a>&rdquo;。我不喜欢跟风，我对即时响应验证是相当不感冒的，推崇结果为导向的验证。这些想法不是凭空YY出来的，而是借鉴与参考了Google以及Chrome浏览器。因此，像这种可以很好推广自己想法的机会，自己是不会让插件支持即时响应验证的。同时即时验证意味着要对各个表单元素绑定事情，这样，岂不反而陷入了&ldquo;过多干预&rdquo;这个缺点，限制了用户的自由。&ldquo;用户自由&rdquo;是未来的趋势，<strong>this plugin designs for future!</strong></p>
+
+<p>虽然插件支持即时验证无望，但是，插件之外是可以简单几行代码支持的，如下：</p>
+
+<pre>
+$.fn.immediValidate = function(passCallback) {
+    return $(this).find(&quot;:input&quot;).each(function() {
+        if (/^submit|image|reset|file|radio|checkbox|button$/.test(this.type)) return;
+        var self = this;
+        $(this).bind(&quot;blur&quot;, function() {
+            setTimeout(function() {
+                if ($.testRemind.display == false &amp;&amp; $.html5Validate.isAllpass($(self))   ) {
+                     $.isFunction(passCallback) &amp;&amp; passCallback.call(self);
+                }
+            }, 100);    
+        });
+    });
+};</pre>
+
+<p>于是，我们只要这样绑定JS就可以了：</p>
+
+<pre>
+$(&quot;form&quot;).html5Validate().immediValidate();</pre>
+
+<p>本地已验证。</p>
+
+<p>虽然html5Validate插件的完成细嚼慢咽，多番积累，但是，不可能面面俱到，因此，如果承蒙您使用了，并且发现了相关问题，欢迎提出来。我会尽快修改并发布的。因为github自己还玩得不熟，版本啊更新什么的都是比较传统的手动方式，所以可能会有JS是最新的，但是文中的更新日期还是落后的情况，希望见谅。</p>
+
+<p>也欢迎提出其他宝贵意见，不甚感谢！</p>

@@ -1,0 +1,113 @@
+Jquery Ajax自定义提交表单Form 无刷新
+	http://minjiechenjava.iteye.com/blog/2008166
+
+	Jquery的$.ajax方法可以实现ajax调用，要设置url,post,参数等。
+
+	如果要提交现有Form需要写很多代码，何不直接将Form的提交直接转移到ajax中呢。
+
+	以前的处理方法
+
+	如Form代码如下：
+
+		<form id="Form1" action="action.aspx" method="post" >
+			名称：<input name="name" type="text" /><br />
+			密码：<input name="password" type="password" /><br />
+			手机：<input name="mobile" type="text" /><br />
+			说明：<input name="memo" type="text" /><br />
+			<input type="submit" value="提 交" />
+		</form>
+
+	当提交后，会跳转到action.aspx页面。并可以通过Request.Params["name"]可以取到值。
+
+	思考
+
+	如果不想刷新页面使用ajax，就又要在$.ajax中指定url,等信息，不好维护。
+
+	在网上查了一下，老早以前老外就有解决方案了。使用ajax直接按照Form信息直接提交。不刷新页面。
+
+	参考资料：http://jquery.malsup.com/form/
+
+	很好用，但我还是愿意自己写个自己用的。
+
+	核心JS代码
+
+	//将form转为AJAX提交
+	function ajaxSubmit(frm, fn) {
+	    var dataPara = getFormJson(frm);
+	    $.ajax({
+	        url: frm.action,
+	        type: frm.method,
+	        data: dataPara,
+	        success: fn
+	    });
+	}
+
+	//将form中的值转换为键值对。
+	//getFormJson方法，可以直接用jQuery的$.fn.serialize()就可以了。不需要自己写。
+
+	function getFormJson(frm) {
+	    var o = {};
+	    var a = $(frm).serializeArray();
+	    $.each(a, function () {
+	        if (o[this.name] !== undefined) {
+	            if (!o[this.name].push) {
+	                o[this.name] = [o[this.name]];
+	            }
+	            o[this.name].push(this.value || '');
+	        } else {
+	            o[this.name] = this.value || '';
+	        }
+	    });
+
+	    return o;
+	}
+
+
+
+
+	ajaxSubmit方法第一个参数，是要提交的form，第二个参数是ajax调用成功后的处理函数。
+
+	将form的action传递给ajax的url，form的method传递给ajax的type，再将格式化后的表单内容传递给data。
+
+	getFormJson方法将form的元素转化为json格式键值对。形如：{name:'aaa',password:'tttt'}，注意将同名的放在一个数组里。
+
+	调用
+
+	$(document).ready(function(){
+	    $('#Form1').bind('submit', function(){
+	        ajaxSubmit(this, function(data){
+	            alert(data);
+	        });
+	        return false;
+	    });
+	});
+
+	在ajaxSubmit方法调用前，可验证数据是否正确，在alert(data)处可加入自己调用返回后处理代码。
+
+	在调用ajaxSubmit方法后，必须添加return false;语句防止Form真实提交
+
+
+评论一：
+
+	$(document).ready(function(){  
+	    $('#Form1').bind('submit', function(){  
+	        ajaxSubmit(this, function(data){  
+	            alert(data);  
+	        });  
+	        return false;  
+	    });  
+	});  
+
+	这种用法还是复杂了点，最好是这样用
+
+	$(document).ready(function(){  
+	    $('#Form1').ajaxSubmit(function(data){  
+	         alert(data);  
+	    });  
+	}); 
+
+	这功能其实就是jQuery ui里的ajaxSubmit功能，你可以参考它们的代码是怎么写的
+
+
+
+

@@ -1,0 +1,123 @@
+
+html页面部分：
+
+<div style="text-align:center;padding:10px;float: center;"> 
+	<form id="form23"method="post" action="<%= request.getContextPath() %>/downloadExcel.jsp"> 
+			<input class="nui-hidden"  name="dataObject" id="dataObject" >
+			<input class="nui-hidden"  name="headers" id="headers">
+			<input class="nui-hidden" name="headersCN" id="headersCN">
+			<input class="nui-hidden"  name="sheetName" id="sheetName">
+			
+            <a class="nui-button" tpye="submit"style="width:60px;margin-right:20px;" iconCls="icon-save" onclick="onExport">导出</a>
+            <a class="nui-button " style="width:60px;" iconCls="icon-ok" onclick="onOK" >确定</a>  
+    </form>  
+</div>
+
+
+<script type="text/javascript">
+	function onExport(){
+		var stuinfo=nui.encode(form1.getData().tsptgyxsjbsj);
+		var ticketinfo=nui.encode(form2.getData().tfyzsfwptfzhcpxx);
+		var info=stuinfo+ticketinfo;
+		info = info.replace("}{",",");
+		
+		var info=nui.decode(info);
+	    var headersCN = "学院,学号,姓名,学制,入学年月,购票区间(家庭),身份证件号";
+	    var headers = "dwmc,xh,xm,xz,rxny,fzcpmdcs,sfzjh";
+	    var sheetName= "Sheet1";
+	   
+	    var infos=[];
+	    infos[0]=info;
+	   
+	    var strInfo = nui.encode(infos);
+	    var a = nui.get("dataObject");
+	    a.setValue(strInfo);
+	    var b = nui.get("headers");
+	    b.setValue(headers);
+	    var c = nui.get("headersCN");
+	    c.setValue(headersCN);
+	    var d = nui.get("sheetName");
+	    d.setValue(sheetName);
+	    
+	    //提交表单数据
+	    document.getElementById("form23").submit();
+	}
+</script>
+
+
+web.xml 配置部分：
+
+<servlet>
+	<servlet-name>downloadExcel</servlet-name>
+	<servlet-class>
+		cn.edu.shnu.common.excel.DownloadServlet
+	</servlet-class>
+</servlet>
+<servlet-mapping>
+	<servlet-name>downloadExcel</servlet-name>
+	<url-pattern>/downloadExcel.jsp</url-pattern>
+</servlet-mapping>
+
+serverlet部分：
+
+DownloadServlet.java文件：
+
+package cn.edu.shnu.common.excel;
+
+import java.io.IOException;
+import java.io.OutputStream;
+import java.net.URLEncoder;
+import java.text.ParseException;
+
+import javax.servlet.ServletException;
+import javax.servlet.http.HttpServlet;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+
+import net.sf.json.JSONArray;
+import org.apache.poi.hssf.usermodel.HSSFWorkbook;
+import cn.edu.shnu.common.excel.ExportExcelInfoWithPOI;
+
+public class DownloadServlet extends HttpServlet {
+
+
+	private static final long serialVersionUID = -1770894132320695148L;
+
+	public void doGet(HttpServletRequest request, HttpServletResponse response)
+			throws ServletException, IOException {
+		//downloadSingle(request,response);
+		doPost(request, response);
+	}
+
+	public void doPost(HttpServletRequest request, HttpServletResponse response)
+			throws ServletException, IOException {
+		try {
+			downloadSingle(request,response);
+		} catch (ParseException e) {
+			e.printStackTrace();
+		}
+	}
+	
+	
+	public void downloadSingle( HttpServletRequest request, HttpServletResponse response)
+					throws ServletException, IOException, ParseException{
+	    response.setContentType("application/x-download");   
+        response.setHeader("Content-disposition","attachment;filename="    
+                          + URLEncoder.encode("download.xls", "UTF-8")); 
+        
+		String data = request.getParameter("dataObject");
+		String headers = request.getParameter("headers");
+		String headersCN = request.getParameter("headersCN");
+		String sheetName = request.getParameter("sheetName");
+        
+        JSONArray json = JSONArray.fromObject(data);
+    
+        HSSFWorkbook wb = ExportExcelInfoWithPOI.ExportToExcel(json, headers, headersCN, sheetName);
+        OutputStream out = response.getOutputStream();
+        wb.write(out);
+        
+        out.flush();
+        out.close();
+  }
+}
+

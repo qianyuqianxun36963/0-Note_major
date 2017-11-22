@@ -1,0 +1,122 @@
+<h1><a href="http://www.cnblogs.com/1016882435AIDA/p/5967358.html" id="cb_post_title_url">使用spring注解@Controller @Service @Repository简化配置</a></h1>
+
+<p><strong>前言：</strong>在web项目中引入spring框架中的配置文件，我们给每一个java bean进行相关配置可以非常安全，便捷的管理我们的bean。那么，问题来了，如果一个项目中所涉及到的java bean十分庞大，而且每一个bean中的配置都是大同小异的，那么这份applicationContext.xml文件恐怕是无能为力了。接下来，我们使用spring的注解便可以很好的解决这一问题。</p>
+
+<h2>1.原始的做法：</h2>
+
+<p>首先：我们浏览一下我们原始的applicationContext.xml中的部分配置</p>
+
+<pre>
+ 1 　　&lt;bean id=&quot;myNewsAction&quot; class=&quot;news.action.NewsAction&quot; scope=&quot;prototype&quot;&gt;
+ 2         &lt;property name=&quot;ns&quot; ref=&quot;myNewsService&quot;&gt;&lt;/property&gt;
+ 3     &lt;/bean&gt;
+ 4     
+ 5     &lt;bean id=&quot;myNewsService&quot; class=&quot;news.service.NewsServiceImpl&quot; scope=&quot;prototype&quot;&gt;
+ 6         &lt;property name=&quot;nd&quot; ref=&quot;myNewsDao&quot;&gt;&lt;/property&gt;
+ 7     &lt;/bean&gt;
+ 8     
+ 9     &lt;bean id=&quot;myNewsDao&quot; class=&quot;news.dao.NewsDaoImpl&quot; scope=&quot;prototype&quot;&gt;
+10         &lt;property name=&quot;sf&quot; ref=&quot;mySessionFactory&quot;&gt;&lt;/property&gt;
+11     &lt;/bean&gt;
+</pre>
+
+<p><strong>解析：</strong>在这个代码段中我们可以看出，我们的控制器也就是我们的action访问的是我们的service层，而service层则是访问的数据层dao。在这种传统的写法中每个类有什么属性要注入非常明显，而今天我们要做的就是要简化这份配置文件。</p>
+
+<h2>2.简化的方法：@Qualifier</h2>
+
+<p><strong>接下来：</strong>如果我们把这份配置文件简化成这样</p>
+
+<pre>
+1     &lt;bean id=&quot;myNewsAction&quot; class=&quot;news.action.NewsAction&quot; scope=&quot;prototype&quot;&gt;&lt;/bean&gt;
+2     
+3     &lt;bean id=&quot;myNewsService&quot; class=&quot;news.service.NewsServiceImpl&quot; scope=&quot;prototype&quot;&gt;&lt;/bean&gt;
+4     
+5     &lt;bean id=&quot;myNewsDao&quot; class=&quot;news.dao.NewsDaoImpl&quot; scope=&quot;prototype&quot;&gt;&lt;/bean&gt;    </pre>
+
+<p><strong>解析：</strong>我们只是绑定了每个bean，但是并没有为其注入属性。其实我们是用到了spring的@Autowired，@Qualifier这两个注解</p>
+
+<pre>
+1     @Autowired
+2     @Qualifier(&quot;mySessionFactory&quot;)
+3     private SessionFactory sf;    </pre>
+
+<p><strong>解析：</strong>在@Qualifier这个注解中我们申明其引用的是哪一个bean，spring便会自动为其注入这个实例，并且属性的set方法也可省略</p>
+
+<h2>3.最简单的方式：@Controller @Service @Repository</h2>
+
+<p>但是：经过上面的一番操作仿佛没有给我省多少事，别急，认真看完本篇博客的人才知道有用的东西在最后。哈哈哈！</p>
+
+<pre>
+ 1 &lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot;?&gt;
+ 2 &lt;beans xmlns=&quot;http://www.springframework.org/schema/beans&quot;
+ 3     xmlns:xsi=&quot;http://www.w3.org/2001/XMLSchema-instance&quot; xmlns:p=&quot;http://www.springframework.org/schema/p&quot;
+ 4     xmlns:aop=&quot;http://www.springframework.org/schema/aop&quot; xmlns:context=&quot;http://www.springframework.org/schema/context&quot;
+ 5     xmlns:jee=&quot;http://www.springframework.org/schema/jee&quot; xmlns:tx=&quot;http://www.springframework.org/schema/tx&quot;
+ 6     xsi:schemaLocation=&quot;    
+ 7             http://www.springframework.org/schema/aop http://www.springframework.org/schema/aop/spring-aop-4.2.xsd  
+ 8             http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-4.2.xsd  
+ 9             http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context-4.2.xsd
+10             http://www.springframework.org/schema/jee http://www.springframework.org/schema/jee/spring-jee-4.2.xsd  
+11             http://www.springframework.org/schema/tx http://www.springframework.org/schema/tx/spring-tx-4.2.xsd&quot;&gt;
+12 
+13     &lt;!-- 基于news这个包自动扫描其中的类 ,也会自动注入解析器--&gt;
+14     &lt;context:component-scan base-package=&quot;news&quot;&gt;&lt;/context:component-scan&gt;
+15 
+16     &lt;!-- 引入外部属性文件 --&gt;
+17     &lt;context:property-placeholder location=&quot;classpath:jdbc.properties&quot; /&gt;
+18 
+19     &lt;bean id=&quot;mySessionFactory&quot;
+20         class=&quot;org.springframework.orm.hibernate5.LocalSessionFactoryBean&quot;&gt;
+21     &lt;/bean&gt;
+22 
+23     &lt;bean id=&quot;myDataSource&quot; class=&quot;com.mchange.v2.c3p0.ComboPooledDataSource&quot;&gt;
+24         
+25     &lt;/bean&gt;
+26         
+27 &lt;/beans&gt;
+28     
+</pre>
+
+<p><strong>解析：</strong>从这份applicationContext.xml文件中我们可以明显的看到我们压根没有给我们的java bean进行相关配置，只是配置了一些基本的数据源。唯一多了一行</p>
+
+<pre>
+&lt;context:component-scan base-package=&quot;news&quot;&gt;&lt;/context:component-scan&gt;通过这个节点的base-package属性可以配置spring需要自动注入的哪个基包。
+
+此时便是spring的@Controller @Service @Repository这三个注解起作用的时候了
+</pre>
+
+<pre>
+1 @Controller(&quot;myNewsAction&quot;)
+2 @Scope(&quot;prototype&quot;)
+3 public class NewsAction extends ActionSupport {
+4     
+5     @Autowired
+6     @Qualifier(&quot;myNewsService&quot;)
+7     private NewsService ns;
+</pre>
+
+<pre>
+1 @Service(&quot;myNewsService&quot;)
+2 @Scope(&quot;prototype&quot;)
+3 public class NewsServiceImpl implements NewsService {
+4 
+5     @Autowired
+6     @Qualifier(&quot;myNewsDao&quot;)
+7     private NewsDao nd;
+</pre>
+
+<pre>
+1 @Repository(&quot;myNewsDao&quot;)
+2 @Scope(&quot;prototype&quot;)    
+3 public class NewsDaoImpl implements NewsDao {
+4     
+5     @Autowired
+6     @Qualifier(&quot;mySessionFactory&quot;)
+7     private SessionFactory sf;
+</pre>
+
+<p><strong>解析：</strong>①，注解@Controller为我们的控制器action类的类注解相当于applicationContext.xml文件中的bean节点，而括号中的值相当于bean节点中的id属性的属性值。同理：@Service为我们业务层的类注解，@Repository为数据层dao的类注解。</p>
+
+<p>②，注解&nbsp;@Scope(&quot;prototype&quot;) 相当于applicationContext.xml文件中bean节点中scope属性，这个非单例模式注解十分重要，主要起到线程安全，防止并发操作时出现异常的作用</p>
+
+<p><strong>小结：</strong>使用spring的类注解和属性注解确实能给我们带来许多便利，关于类属性的注解其实jdk javax.annotation.Resource包中便有@Resource注解。所以，我们当然也可以选择使用jdk的注解，不过要注意的是，千万不要把jdk的注解和spring的注解混用。在软件系统中，由于原生的jdk难免存在一些缺陷，我们在开发过程中往往需要引入各种框架，因此我们的项目便不得不与这些框架耦合在一起。虽然我们一直不希望我们的代码出现耦合，毕竟这只是一种理想状态。总之，轻度耦合一直是我们追求的代码风格。</p>

@@ -1,0 +1,95 @@
+<h1>Mybatis中动态SQL（if,where,foreach 的使用）</h1>
+
+<p>mybatis核心 对sql语句进行灵活操作，通过表达式进行判断，对sql进行灵活拼接、组装。&nbsp;</p>
+
+<h2>1、statement中直接定义使用动态SQL：&nbsp;</h2>
+
+<p>在statement中利用if 和 where 条件组合达到我们的需求，通过一个例子来说明：&nbsp;<br />
+原SQL语句：</p>
+
+<pre>
+<code>&lt;select id=&quot;findUserByUserQuveryVo&quot; parameterType =&quot;UserQueryVo&quot; resultType=&quot;UserCustom&quot;&gt;
+    select * from user
+    where username = #{userCustom.username} and sex = #{userCustom.sex}
+&lt;/select&gt;</code></pre>
+
+<p>现在需求是，如果返回值UserCustom为空或者UserCustom中的属性值为空的话（在这里就是userCustom.username或者userCustom.sex）为空的话我们怎么进行灵活的处理是程序不报异常。做法利用if和where判断进行SQL拼接。</p>
+
+<pre>
+<code>&lt;select id=&quot;findUserByUserQuveryVo&quot; parameterType =&quot;UserQueryVo&quot; resultType=&quot;UserCustom&quot;&gt;
+    select * from user
+&lt;where&gt;
+    &lt;if test=&quot;userCustom != null&quot;&gt;
+        &lt;if test=&quot;userCustom.username != null and userCustom.username != &#39;&#39;&quot;&gt;&lt;!-- 注意and不能大写 --&gt;
+            and username = #{userCustom.username}
+        &lt;/if&gt;
+        &lt;if test=&quot;userCustom.sex != null and userCustom.sex != &#39;&#39;&quot;&gt;
+            and sex = #{userCustom.sex}
+        &lt;/if&gt;
+    &lt;/if&gt;
+&lt;/where&gt;
+&lt;/select&gt;</code></pre>
+
+<p>有时候我们经常使用where 1=1这条语句来处理第一条拼接语句，我们可以使用&lt; where &gt; &lt; where /&gt;来同样实现这一功能。&nbsp;</p>
+
+<h2>2、使用sql片段来处理statement&nbsp;</h2>
+
+<p>和我们写程序一样，有时候会出现一些重复的代码，我们可以用SQL片段来处理。在sql片段中需要注意的是它的位置，我们也可以引用其它mapper文件里面的片段，此时需要我们定义它的位置。&nbsp;<br />
+（1）、sql片段的定义</p>
+
+<pre>
+<code>&lt;sql id=&quot;query_user_where&quot;&gt;
+    &lt;if test=&quot;sex != null and sex != &#39;&#39;&quot;&gt;
+            and sex = #{sex}
+        &lt;/if&gt;
+        &lt;if test=&quot;id != null&quot;&gt;
+            and id = #{id}
+        &lt;/if&gt;
+&lt;/sql&gt;
+
+</code>（2）、sql片段的使用</pre>
+
+<pre>
+<code>&lt;select id=&quot;findUserList&quot; parameterType=&quot;User&quot; resultType=&quot;User&quot;&gt;
+    select * from user
+    &lt;where&gt;
+    &lt;!-- 引用Sql片段 --&gt;
+    &lt;include refid=&quot;query_user_where&quot;&gt;&lt;/include&gt;
+    &lt;!-- 在这里还要引用其它的sql片段 --&gt;
+    &lt;!-- 
+    where 可以自动去掉条件中的第一个and
+    --&gt;
+    &lt;!--    &lt;if test=&quot;sex != null and sex != &#39;&#39;&quot;&gt;
+            and sex = #{sex}
+        &lt;/if&gt;
+        &lt;if test=&quot;id != null&quot;&gt;
+            and id = #{id}
+        &lt;/if&gt; --&gt;
+
+    &lt;/where&gt;
+&lt;/select&gt;</code>
+</pre>
+
+<h2>3、使用foreach进行sql语句拼接&nbsp;</h2>
+
+<p>在向sql传递数组或List，mybatis使用foreach解析，我们可以使用foreach中元素进行sql语句的拼接，请求数据。&nbsp;<br />
+通过一个例子来看：&nbsp;<br />
+需求：SELECT * FROM USER WHERE id=1 OR id=10 OR id=16&nbsp;<br />
+或者：SELECT * FROM USER WHERE id IN(1,10,16)</p>
+
+<pre>
+<code>&lt;if test=&quot;ids != null&quot;&gt;     
+        &lt;foreach collection=&quot;ids&quot; item=&quot;user_id&quot; open=&quot;AND (&quot; close=&quot;)&quot; separator=&quot;or&quot; &gt;
+    每次遍历需要拼接的串
+                id= #{user_id}
+        &lt;/foreach&gt;
+ &lt;/if&gt;
+
+</code>其中，collection:指定输入对象中集合属性，item: 每个遍历生成对象，open：开始遍历时拼接串，close: 结束遍历是拼接的串，separator: 遍历的两个对象中需要拼接的串</pre>
+
+<pre>
+<code>&lt;if test=&quot;ids != null&quot;&gt;     
+    &lt;foreach collection=&quot;ids&quot; item=&quot;user_id&quot; open=&quot;and id IN(&quot; close=&quot;)&quot; separator=&quot;,&quot;&gt;
+                id= #{user_id}
+    &lt;/foreach&gt;
+&lt;/if&gt;</code></pre>

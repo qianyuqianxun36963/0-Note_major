@@ -1,0 +1,226 @@
+<h1>springmvc+Freemarker配置说明详解</h1>
+
+<h2>一、介绍</h2>
+
+<p>Freemarker使用模板技术进行视图的渲染。自从看了Struts标签、Freemarker、JSTL的性能对比后，我毅然决定放弃Struts标签了！效率太差&hellip;&hellip;&nbsp;<br />
+Spring本身支持了对Freemarker的集成。只需要配置一个针对Freemarker的视图解析器即可。</p>
+
+<h2>二、Spring MVC视图解析器</h2>
+
+<p>视图解析器的工作流程大致是这样的：</p>
+
+<ol>
+	<li>Controller的某个方法执行完成以后，返回一个视图（比如：listUser）</li>
+	<li>视图解析器要做的工作就是找到某个对象来完成视图的渲染，或者跳转到其他的逻辑视图。这里的渲染对象通常就是我们的jsp文件或者我们下面用的Freemarker(例如listUser.jsp或者listUser.ftl)。</li>
+	<li>渲染完成以后，将解析结果发送到客户端浏览器</li>
+</ol>
+
+<p>下面介绍一下本文需要用到的解析器（<a href="http://e-freya.iteye.com/blog/384083" target="_blank">更多解析器资料</a>）：</p>
+
+<ul>
+	<li>InternalResourceViewResolver：这是一个最常用的解析器。通常使用它指定渲染对象为jsp页面</li>
+	<li>FreeMarkerViewResolver：这就是Spring与Freemarker整合需要用到的解析器</li>
+</ul>
+
+<h2>三、配置多视图，支持freemarker</h2>
+
+<p>我们通常不希望所有的动态页面请求都使用Freemarker来渲染，那就需要配置多个视图解析器。网上有很多这方面的帖子。我看到很多人的做法是在web.xml中配置两个DispatcherServlet,一个拦截.do，一个拦截.ftl;然后再写两个dispatcherServlet.xml,配置两个视图解析器；jsp页面、ftl模板就各司其职。 其实没有那么复杂。</p>
+
+<h5>1.Web.xml</h5>
+
+<pre>
+<code>&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot;?&gt;
+&lt;web-app version=&quot;2.4&quot; xmlns=&quot;http://java.sun.com/xml/ns/j2ee&quot;
+    xmlns:xsi=&quot;http://www.w3.org/2001/XMLSchema-instance&quot;
+    xsi:schemaLocation=&quot;http://java.sun.com/xml/ns/j2ee 
+    http://java.sun.com/xml/ns/j2ee/web-app_2_4.xsd&quot;&gt;
+    &lt;welcome-file-list&gt;
+        &lt;welcome-file&gt;index.jsp&lt;/welcome-file&gt;
+    &lt;/welcome-file-list&gt;
+
+    &lt;!-- ======================================================== --&gt;
+    &lt;!--                  Spring MVC Config Servlet               --&gt;
+    &lt;!-- ======================================================== --&gt;
+    &lt;!-- JSP DispatcherServlet --&gt;
+    &lt;servlet&gt;
+        &lt;servlet-name&gt;dispatcher&lt;/servlet-name&gt;
+        &lt;servlet-class&gt;org.springframework.web.servlet.DispatcherServlet&lt;/servlet-class&gt;
+        &lt;init-param&gt;
+            &lt;param-name&gt;contextConfigLocation&lt;/param-name&gt;
+            &lt;param-value&gt;/WEB-INF/classes/applicationContext.xml&lt;/param-value&gt;
+        &lt;/init-param&gt;
+        &lt;load-on-startup&gt;1&lt;/load-on-startup&gt;
+    &lt;/servlet&gt;
+
+    &lt;!-- ======================================================== --&gt;
+    &lt;!--                  Spring MVC Config Mapping               --&gt;
+    &lt;!-- ======================================================== --&gt;
+    &lt;servlet-mapping&gt;
+        &lt;servlet-name&gt;dispatcher&lt;/servlet-name&gt;
+        &lt;url-pattern&gt;*.do&lt;/url-pattern&gt;
+    &lt;/servlet-mapping&gt;
+&lt;/web-app&gt;
+</code></pre>
+
+<h5>2.dispatcherServlet.xml</h5>
+
+<pre>
+<code>&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot;?&gt;
+&lt;beans xmlns=&quot;http://www.springframework.org/schema/beans&quot;
+    xmlns:xsi=&quot;http://www.w3.org/2001/XMLSchema-instance&quot; xmlns:aop=&quot;http://www.springframework.org/schema/aop&quot;
+    xmlns:tx=&quot;http://www.springframework.org/schema/tx&quot;
+    xmlns:p=&quot;http://www.springframework.org/schema/p&quot;
+    xmlns:context=&quot;http://www.springframework.org/schema/context&quot;
+    xmlns:mvc=&quot;http://www.springframework.org/schema/mvc&quot;
+    xsi:schemaLocation=&quot;
+  http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-2.5.xsd
+  http://www.springframework.org/schema/tx http://www.springframework.org/schema/tx/spring-tx-2.5.xsd
+  http://www.springframework.org/schema/aop http://www.springframework.org/schema/aop/spring-aop-2.5.xsd
+  http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context-2.5.xsd
+  http://www.springframework.org/schema/mvc  http://www.springframework.org/schema/mvc/spring-mvc-3.0.xsd&quot;&gt;
+
+
+    &lt;!--通用视图解析器--&gt;
+    &lt;bean id=&quot;viewResolverCommon&quot; class=&quot;org.springframework.web.servlet.view.InternalResourceViewResolver&quot;&gt;
+        &lt;property name=&quot;prefix&quot; value=&quot;/WEB-INF/page/&quot;/&gt;  
+        &lt;property name=&quot;suffix&quot; value=&quot;.jsp&quot;/&gt;&lt;!--可为空,方便实现自已的依据扩展名来选择视图解释类的逻辑  --&gt;
+        &lt;property name=&quot;viewClass&quot;&gt;
+            &lt;value&gt;org.springframework.web.servlet.view.InternalResourceView&lt;/value&gt;
+        &lt;/property&gt;
+        <strong>&lt;property name=&quot;order&quot; value=&quot;1&quot;/&gt;</strong>
+    &lt;/bean&gt;
+
+    &lt;!-- 配置freeMarker视图解析器 --&gt;
+    &lt;bean id=&quot;viewResolverFtl&quot; class=&quot;org.springframework.web.servlet.view.freemarker.FreeMarkerViewResolver&quot;&gt;
+        &lt;property name=&quot;viewClass&quot; value=&quot;org.springframework.web.servlet.view.freemarker.FreeMarkerView&quot;/&gt;
+        &lt;property name=&quot;contentType&quot; value=&quot;text/html; charset=utf-8&quot;/&gt;
+        &lt;property name=&quot;cache&quot; value=&quot;true&quot; /&gt;
+        &lt;property name=&quot;suffix&quot; value=&quot;.ftl&quot; /&gt;
+       <strong> &lt;property name=&quot;order&quot; value=&quot;0&quot;/&gt;</strong>
+    &lt;/bean&gt;
+
+    &lt;!-- 配置freeMarker的模板路径 --&gt;
+    &lt;bean id=&quot;freemarkerConfig&quot; class=&quot;org.springframework.web.servlet.view.freemarker.FreeMarkerConfigurer&quot;&gt;
+        &lt;property name=&quot;templateLoaderPath&quot;&gt;
+        &lt;value&gt;/WEB-INF/ftl/&lt;/value&gt;
+        &lt;/property&gt;
+        &lt;property name=&quot;freemarkerVariables&quot;&gt;
+        &lt;map&gt;
+            &lt;entry key=&quot;xml_escape&quot; value-ref=&quot;fmXmlEscape&quot; /&gt;
+        &lt;/map&gt;
+        &lt;/property&gt;
+        &lt;property name=&quot;defaultEncoding&quot;&gt;
+            &lt;value&gt;utf-8&lt;/value&gt;
+        &lt;/property&gt;
+        &lt;property name=&quot;freemarkerSettings&quot;&gt;
+            &lt;props&gt;
+                &lt;prop key=&quot;template_update_delay&quot;&gt;3600&lt;/prop&gt;
+            &lt;/props&gt;
+        &lt;/property&gt;
+    &lt;/bean&gt;
+
+    &lt;bean id=&quot;fmXmlEscape&quot; class=&quot;freemarker.template.utility.XmlEscape&quot;/&gt;
+
+    &lt;!-- 注解支持 --&gt;  
+    &lt;mvc:annotation-driven/&gt;
+
+    &lt;!-- 对包中的所有类进行扫描，以完成Bean创建和自动依赖注入的功能 --&gt;
+    &lt;context:component-scan base-package=&quot;com.hl.usersmanager&quot;&gt;
+        &lt;!-- 允许定义过滤器将基包下的某些类纳入或排除
+        &lt;context:include-filter type=&quot;annotation&quot; expression=&quot;org.springframework.stereotype.Controller&quot;/&gt; --&gt;
+    &lt;/context:component-scan&gt;
+
+&lt;/beans&gt;
+</code></pre>
+
+<h5>3.Controller</h5>
+
+<pre>
+<code>package com.hl.usersmanager.controller;
+
+import java.util.List;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Controller;
+import org.springframework.ui.ModelMap;
+import org.springframework.web.bind.annotation.RequestMapping;
+
+import com.hl.usersmanager.model.Users;
+import com.hl.usersmanager.service.IUserService;
+
+@Controller
+public class UserController {
+//  使用注解实现自动装配 不需要再写get set方法以及在context中配置bean
+    @Autowired
+    private IUserService userService;
+
+    @RequestMapping(value = &quot;findUserByName.do&quot;)
+    public String findUserByName(String name,ModelMap model) {
+        Users users = userService.findUserByName(name);
+        model.addAttribute(&quot;userPhone&quot;,users.getPhone());
+        System.out.println(&quot;userPhone：&quot; + users.getPhone());
+        return &quot;showUser&quot;;
+    }
+
+    @RequestMapping(value = &quot;findAllUsers.do&quot;)
+    public String findAllUsers(ModelMap model) {
+        List&lt;Users&gt; users = userService.findAllUsers();
+        model.addAttribute(&quot;users&quot;,users);
+        return &quot;listUser&quot;;
+    }
+
+    &hellip;&hellip;
+}
+</code></pre>
+
+<p>在视图解析器中有一个<code>&lt;property name=&quot;order&quot; value=&quot;orderValue&quot;/&gt;</code>的配置，这个配置表示解析器的优先级别。我们将<code>FreeMarkerViewResolver</code>的级别设为<code>0</code>,将<code>InternalResourceViewResolver</code>的级别设为<code>1</code>。这样，解析器就会优先使用&nbsp;<code>FreeMarkerViewResolver</code>&nbsp;进行解析，如果找不到相应的模板，就使用<code>InternalResourceViewResolver</code>进行解析，如果还找不到页面，就会产生一个<code>404</code>错误！</p>
+
+<p>在本例中，我们在<code>/WEB-INF/page/</code>下有一个<code>showUser.jsp</code>页面，在<code>/WEB-INF/ftl/</code>下有一个<code>listUser.ftl</code>的模板文件。那么当访问<code>findAllUsers.do</code>的时候，<code>Controller</code>返回一个<code>listUser</code>视图，根据解析器配置，先使用<code>FreeMarkerViewResolver</code>进行解析。它会根据模板路径<code>templateLoaderPath</code>的配置<code>/WEB-INF/ftl/</code>下去找是否有一个<code>listUser</code>并且以后缀配置<code>suffix</code>值<code>.ftl</code>，即<code>listUser.ftl</code>文件，如果找到则使用该模板进行解析。这里我们实现已经创建了这个模板文件，所以user列表成功被显示出来。</p>
+
+<p>当用户访问<code>findUserByName.do</code>的时候，返回<code>showUser</code>视图，毅然先使用<code>FreeMarkerViewResolver</code>进行解析，结果发现在<code>/WEB-INF/ftl/</code>下并没有<code>showUser.ftl</code>这个模板文件，于是使用<code>InternalResourceViewResolver</code>进行解析，于是开始寻找<code>/WEB-INF/page/</code>下是否有<code>showUser.jsp</code>文件。由于我们已经创建了这个文件，于是最终使用<code>showUser.jsp</code>进行渲染。那么如果没有找到<code>showUser.jsp</code>，就会抛出<code>404</code>错误。</p>
+
+<p>这里还要注意的是，如果<code>Controller</code>中返回视图加了后缀<code>jsp</code>或者<code>ftl</code>，在配置中就不要加入<code>suffix</code>配置，否则会找不到页面。</p>
+
+<p>&nbsp;</p>
+
+<p>classic_<a href="http://www.haogongju.net/tag/com" target="_blank" title="com">com</a>patible=true&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ##如果变量为null,转化为空字符串,比如做比较的时候按照空字符做比较&nbsp;<br />
+whitespace_strip<a href="http://www.haogongju.net/tag/ping" target="_blank" title="ping">ping</a>=true&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ##去掉多余的空格,非常有用&nbsp;<br />
+##模版<a href="http://www.haogongju.net/tag/%E6%9B%B4%E6%96%B0" target="_blank" title="更新">更新</a>事件,设置为1秒,正式环境设置为3600秒&nbsp;&nbsp;<br />
+#template_update_delay=3600&nbsp;<br />
+template_update_delay=1&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ##模版更新<a href="http://www.haogongju.net/tag/%E6%97%B6%E9%97%B4" target="_blank" title="时间">时间</a>,这里配置是1秒更新<a href="http://www.haogongju.net/tag/%E4%B8%80%E6%AC%A1" target="_blank" title="一次">一次</a>,正式环境,模版不会改变,<a href="http://www.haogongju.net/tag/%E5%8F%AF%E4%BB%A5" target="_blank" title="可以">可以</a>将这个值设很大,提高效率.就是被这个参数害死了.老是<a href="http://www.haogongju.net/tag/%E4%B8%8D%E6%9B%B4%E6%96%B0" target="_blank" title="不更新">不更新</a>.&nbsp;<br />
+locale=zh_CN&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ##<a href="http://www.haogongju.net/tag/%E4%B8%AD%E5%9B%BD" target="_blank" title="中国">中国</a>&nbsp;<br />
+default_encod<a href="http://www.haogongju.net/tag/in" target="_blank" title="in">in</a>g=utf-8&nbsp;&nbsp; ##编码utf8&nbsp;<br />
+url_escaping_charset=utf-8&nbsp; ##url编码utf8&nbsp;<br />
+date_<a href="http://www.haogongju.net/tag/for" target="_blank" title="for">for</a>mat=yyyy-MM-dd&nbsp;&nbsp; ##显示日期格式&nbsp;<br />
+time_format=HH:mm:Ss&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ##显示时间格式&nbsp;<br />
+datetime_format=yyyy-MM-dd&nbsp; ##显示日期格式&nbsp;<br />
+number_format=\#0.\#\#\#\#\#&nbsp; ##数字显示格式hi.&nbsp;<br />
+&nbsp;</p>
+
+<p>#template_update_delay=1</p>
+
+<p>datetime_format=yyyy-MM-dd HH:mm:ss</p>
+
+<p>date_format=yyyy-MM-dd</p>
+
+<p>time_format=HH:mm:ss</p>
+
+<p>number_format=0.######;</p>
+
+<p>boolean_format=true,false</p>
+
+<p>auto_import=&quot;/common/index.ftl&quot; as ui</p>
+
+<p>whitespace_stripping=true</p>
+
+<p>default_encoding=UTF-8</p>
+
+<p>tag_syntax=auto_detect</p>
+
+<p>url_escaping_charset=UTF-8</p>
+
+<p>&nbsp;</p>
+
+<p>里面大部分都不解释了，就解释一个，</p>
+
+<p>auto_import=&quot;/common/index.ftl&quot; as ui 这个表示每个freemarker的视图页面都会自动引入这个ftl文件。里面定义的就是一些宏，如text文本框，各种form元素</p>

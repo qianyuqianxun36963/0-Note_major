@@ -1,0 +1,298 @@
+<h1>mapper.xml中常用的标签详解</h1>
+
+<h2>一、SQL语句标签：</h2>
+
+<ol start="1">
+	<li>&lt;!--查询语句--&gt;&nbsp;&nbsp;</li>
+	<li>&lt;select&nbsp;id=&quot;selectByPrimaryKey&quot;&nbsp;resultMap=&quot;BaseResultMap&quot;&nbsp;parameterType=&quot;java.lang.String&quot;&nbsp;&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;select&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&lt;/select&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&lt;!--插入语句--&gt;&nbsp;&nbsp;</li>
+	<li>&lt;insert&nbsp;id=&quot;insert&quot;&nbsp;parameterType=&quot;pojo.OrderTable&quot;&nbsp;&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;insert&nbsp;into&nbsp;ordertable&nbsp;(order_id,&nbsp;cid,&nbsp;address,&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;create_date,&nbsp;orderitem_id)&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;values&nbsp;(#{orderId,jdbcType=VARCHAR},&nbsp;#{cid,jdbcType=VARCHAR},&nbsp;#{address,jdbcType=VARCHAR},&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;#{createDate,jdbcType=TIMESTAMP},&nbsp;#{orderitemId,jdbcType=VARCHAR})&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&lt;/insert&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&lt;!--删除语句--&gt;&nbsp;&nbsp;</li>
+	<li>&lt;delete&nbsp;id=&quot;deleteByPrimaryKey&quot;&nbsp;parameterType=&quot;java.lang.String&quot;&nbsp;&gt;&nbsp;&nbsp;</li>
+	<li>delete&nbsp;from&nbsp;ordertable&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;where&nbsp;order_id&nbsp;=&nbsp;#{orderId,jdbcType=VARCHAR}&nbsp;&nbsp;</li>
+	<li>&lt;/delete&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&lt;!--修改语句--&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&lt;update&nbsp;id=&quot;updateByPrimaryKey&quot;&nbsp;parameterType=&quot;pojo.OrderTable&quot;&nbsp;&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;update&nbsp;ordertable&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;set&nbsp;cid&nbsp;=&nbsp;#{cid,jdbcType=VARCHAR},&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;address&nbsp;=&nbsp;#{address,jdbcType=VARCHAR},&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;create_date&nbsp;=&nbsp;#{createDate,jdbcType=TIMESTAMP},&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;orderitem_id&nbsp;=&nbsp;#{orderitemId,jdbcType=VARCHAR}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;where&nbsp;order_id&nbsp;=&nbsp;#{orderId,jdbcType=VARCHAR}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&lt;/update&gt;&nbsp;&nbsp;</li>
+</ol>
+
+<p>需要配置的属性：id=&quot;xxxx&quot; &gt;&gt;&gt; 表示此段sql执行语句的唯一标识，也是接口的方法名称【必须一致才能找到】</p>
+
+<p>&nbsp;</p>
+
+<p>parameterType=&quot;&quot; &gt;&gt;&gt;表示该sql语句中需要传入的参数， 类型要与对应的接口方法的类型一致【可选】</p>
+
+<p>resultMap=&ldquo; &rdquo;&gt;&gt;&gt; 定义出参，调用已定义的&lt;resultMap&gt;映射管理器的id值</p>
+
+<p>resultType=&ldquo; &rdquo;&gt;&gt;&gt;定义出参，匹配普通java类型或自定义的pojo【出参类型若不指定，将为语句类型默认类型，如&lt;insert&gt;语句返回值为int】</p>
+
+<p>p.s： 至于为何&lt;insert&gt;&lt;delete&gt;&lt;update&gt; 语句的返回值类型为什么是int，有过JDBC操作经验的朋友可能会有印象，增删改操作实际上返回的是操作的条数。而Mybatis框架本身是基于JDBC的，所以此处也沿袭这种返回值类型。</p>
+
+<p>传参和取值：mapper.xml 的灵活性还体现在SQL执行语句可以传参，参数类型通过parameterType= &ldquo;&rdquo; 定义</p>
+
+<p>取值方式1：#{value jdbcType = valuetype}：jdbcType 表示该属性的数据类型在数据库中对应的类型，如 #{user jdbcType=varchar} 等价于 String username；</p>
+
+<p>取值方式2：${value } :&nbsp;<strong>这种方式不建议大量使用</strong>，可能会发送sql注入而导致安全性问题。一般该取值方式可用在非经常变化的值上，如orderby ${columnName}；</p>
+
+<p>&nbsp;</p>
+
+<h2>二、sql片段标签</h2>
+
+<p>&lt;sql&gt;：通过该标签可定义能复用的sql语句片段，在执行sql语句标签中直接引用即可。这样既可以提高编码效率，还能有效简化代码，提高可读性</p>
+
+<p>&nbsp; &nbsp; &nbsp;需要配置的属性：id=&quot;&quot; &gt;&gt;&gt;表示需要改sql语句片段的唯一标识</p>
+
+<p>&nbsp; &nbsp; &nbsp;引用：通过&lt;include refid=&quot;&quot; /&gt;标签引用，refid=&quot;&quot; 中的值指向需要引用的&lt;sql&gt;中的id=&ldquo;&rdquo;属性</p>
+
+<ol start="1">
+	<li>&lt;!--定义sql片段--&gt;&nbsp;&nbsp;</li>
+	<li>&lt;sql&nbsp;id=&quot;orderAndItem&quot;&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;o.order_id,o.cid,o.address,o.create_date,o.orderitem_id,i.orderitem_id,i.product_id,i.count&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&lt;/sql&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&lt;select&nbsp;id=&quot;findOrderAndItemsByOid&quot;&nbsp;parameterType=&quot;java.lang.String&quot;&nbsp;resultMap=&quot;BaseResultMap&quot;&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;select&nbsp;&nbsp;</li>
+	<li>&lt;!--引用sql片段--&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;include&nbsp;refid=&quot;orderAndItem&quot;&nbsp;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;from&nbsp;ordertable&nbsp;o&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;join&nbsp;orderitem&nbsp;i&nbsp;on&nbsp;o.orderitem_id&nbsp;=&nbsp;i.orderitem_id&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;where&nbsp;o.order_id&nbsp;=&nbsp;#{orderId}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&lt;/select&gt;&nbsp;&nbsp;</li>
+</ol>
+
+<h2>三、映射管理器</h2>
+
+<p>resultMap：映射管理器，是Mybatis中最强大的工具，使用其可以进行实体类之间的关系，并管理结果和实体类间的映射关系</p>
+
+<p>&nbsp; &nbsp; &nbsp;需要配置的属性：&lt;resultMap id=&quot; &nbsp;&quot; type=&quot; &nbsp;&quot;&gt;&lt;/resutlMap&gt; &nbsp; id=&quot; &quot;&gt;&gt;&gt;表示这个映射管理器的唯一标识，外部通过该值引用； type = &quot; &quot;&gt;&gt;&gt; 表示需要映射的实体类；</p>
+
+<p>&nbsp; &nbsp; &nbsp;需要配置的参数：&lt;id column = &quot; &quot; property= &quot; &quot; /&gt; &nbsp; &nbsp;&lt;id&gt;标签指的是：结果集中结果唯一的列【column】 和 实体属性【property】的映射关系，注意：&lt;id&gt;标签管理的列未必是主键列，需要根据具体需求指定；</p>
+
+<p>&nbsp; &nbsp;&nbsp;&lt;result column=&nbsp;&quot; &quot; property=&quot; &quot; /&gt; &nbsp;&lt;result&gt;标签指的是：结果集中普通列【column】 和 实体属性【property】的映射关系；</p>
+
+<p>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; 需要维护的关系：所谓关系维护是值在主表查询时将其关联子表的结果也查询出来</p>
+
+<p>&nbsp; &nbsp;1）一对一关系&lt;assocation property = &quot; &quot; javaType=&quot; &quot;&gt; &nbsp; property = &ldquo; &rdquo; 被维护实体在宿主实体中的属性名，javaType = &quot; &quot; 被维护实体的类型</p>
+
+<p>Orderitem.java</p>
+
+<ol start="1">
+	<li>package&nbsp;pojo;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>public&nbsp;class&nbsp;Orderitem&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;private&nbsp;String&nbsp;orderitemId;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;private&nbsp;String&nbsp;productId;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;private&nbsp;Integer&nbsp;count;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;private&nbsp;Product&nbsp;product;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+</ol>
+
+<p>从上方代码段可以看出：Product 对象在 Orderitem 实体中以 product 属性存在&nbsp;</p>
+
+<p>Orderitemmapper.xml</p>
+
+<ol start="1">
+	<li>&lt;resultMap&nbsp;id=&quot;BaseResultMap&quot;&nbsp;type=&quot;pojo.Orderitem&quot;&nbsp;&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&lt;id&nbsp;column=&quot;orderitem_id&quot;&nbsp;property=&quot;orderitemId&quot;&nbsp;jdbcType=&quot;VARCHAR&quot;&nbsp;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&lt;result&nbsp;column=&quot;product_id&quot;&nbsp;property=&quot;productId&quot;&nbsp;jdbcType=&quot;VARCHAR&quot;&nbsp;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&lt;result&nbsp;column=&quot;count&quot;&nbsp;property=&quot;count&quot;&nbsp;jdbcType=&quot;INTEGER&quot;&nbsp;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&lt;!--&nbsp;通过association&nbsp;维护&nbsp;一对一关系&nbsp;--&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&lt;association&nbsp;property=&quot;product&quot;&nbsp;javaType=&quot;pojo.Product&quot;&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;id&nbsp;column=&quot;product_id&quot;&nbsp;property=&quot;productId&quot;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;result&nbsp;column=&quot;product_factroy&quot;&nbsp;property=&quot;productFactroy&quot;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;result&nbsp;column=&quot;product_store&quot;&nbsp;property=&quot;productStore&quot;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;result&nbsp;column=&quot;product_descript&quot;&nbsp;property=&quot;productDescript&quot;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&lt;/association&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&lt;/resultMap&gt;&nbsp;&nbsp;</li>
+</ol>
+
+<p>通过xml的配置可以看出，在resultMap映射管理器中，通过&lt;association&gt; 进行了维护，也就是在查询Orderitem对象时，可以把关联的Product对象的信息也查询出来</p>
+
+<p>2）一对多关系的维护&lt;collection property=&quot; &quot; ofType=&quot; &quot;&gt;&nbsp;property = &ldquo; &rdquo; 被维护实体在宿主实体中的属性名 ，ofType=&ldquo; &rdquo;是被维护方在宿主类中集合泛型限定类型</p>
+
+<p>【由于在一对多关系中，多的一放是以List形式存在，因此ofType的值取用Lsit&lt;?&gt; 的泛型对象类型】</p>
+
+<p>OrderTable.java</p>
+
+<ol start="1">
+	<li>public&nbsp;class&nbsp;OrderTable&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;private&nbsp;String&nbsp;orderId;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;private&nbsp;String&nbsp;cid;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;private&nbsp;String&nbsp;address;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;private&nbsp;Date&nbsp;createDate;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;private&nbsp;String&nbsp;orderitemId;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;private&nbsp;List&lt;Orderitem&gt;&nbsp;orderitemList&nbsp;;&nbsp;&nbsp;</li>
+	<li>}&nbsp;&nbsp;</li>
+</ol>
+
+<p>OrderTableMapper.xml;</p>
+
+<ol start="1">
+	<li>&lt;resultMap&nbsp;id=&quot;BaseResultMap&quot;&nbsp;type=&quot;pojo.OrderTable&quot;&nbsp;&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&lt;!--&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;WARNING&nbsp;-&nbsp;@mbggenerated&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;This&nbsp;element&nbsp;is&nbsp;automatically&nbsp;generated&nbsp;by&nbsp;MyBatis&nbsp;Generator,&nbsp;do&nbsp;not&nbsp;modify.&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;This&nbsp;element&nbsp;was&nbsp;generated&nbsp;on&nbsp;Fri&nbsp;May&nbsp;06&nbsp;15:49:42&nbsp;CST&nbsp;2016.&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;--&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&lt;id&nbsp;column=&quot;order_id&quot;&nbsp;property=&quot;orderId&quot;&nbsp;jdbcType=&quot;VARCHAR&quot;&nbsp;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&lt;result&nbsp;column=&quot;cid&quot;&nbsp;property=&quot;cid&quot;&nbsp;jdbcType=&quot;VARCHAR&quot;&nbsp;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&lt;result&nbsp;column=&quot;address&quot;&nbsp;property=&quot;address&quot;&nbsp;jdbcType=&quot;VARCHAR&quot;&nbsp;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&lt;result&nbsp;column=&quot;create_date&quot;&nbsp;property=&quot;createDate&quot;&nbsp;jdbcType=&quot;TIMESTAMP&quot;&nbsp;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&lt;result&nbsp;column=&quot;orderitem_id&quot;&nbsp;property=&quot;orderitemId&quot;&nbsp;jdbcType=&quot;VARCHAR&quot;&nbsp;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;!--维护一对多的关系&nbsp;&nbsp;--&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;collection&nbsp;property=&quot;orderitemList&quot;&nbsp;ofType=&quot;pojo.Orderitem&quot;&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;id&nbsp;column=&quot;orderitem_id&quot;&nbsp;property=&quot;orderitemId&quot;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;result&nbsp;column=&quot;product_id&quot;&nbsp;property=&quot;productId&quot;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;result&nbsp;column=&quot;count&quot;&nbsp;property=&quot;count&quot;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;/collection&gt;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&lt;/resultMap&gt;&nbsp;&nbsp;</li>
+</ol>
+
+<p><br />
+3）在resultMap 中需要注意两点：</p>
+
+<p>3.1）关联关系的维护可以根据实体类之间的实际情况进行嵌套维护</p>
+
+<ol start="1">
+	<li>&lt;resultMap&nbsp;id=&quot;BaseResultMap&quot;&nbsp;type=&quot;pojo.OrderTable&quot;&nbsp;&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;id&nbsp;column=&quot;order_id&quot;&nbsp;property=&quot;orderId&quot;&nbsp;jdbcType=&quot;VARCHAR&quot;&nbsp;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;result&nbsp;column=&quot;cid&quot;&nbsp;property=&quot;cid&quot;&nbsp;jdbcType=&quot;VARCHAR&quot;&nbsp;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;result&nbsp;column=&quot;address&quot;&nbsp;property=&quot;address&quot;&nbsp;jdbcType=&quot;VARCHAR&quot;&nbsp;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;result&nbsp;column=&quot;create_date&quot;&nbsp;property=&quot;createDate&quot;&nbsp;jdbcType=&quot;TIMESTAMP&quot;&nbsp;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;result&nbsp;column=&quot;orderitem_id&quot;&nbsp;property=&quot;orderitemId&quot;&nbsp;jdbcType=&quot;VARCHAR&quot;&nbsp;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;!--维护一对多的关系&nbsp;&nbsp;--&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;collection&nbsp;property=&quot;orderitemList&quot;&nbsp;ofType=&quot;pojo.Orderitem&quot;&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;id&nbsp;column=&quot;orderitem_id&quot;&nbsp;property=&quot;orderitemId&quot;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;result&nbsp;column=&quot;product_id&quot;&nbsp;property=&quot;productId&quot;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;result&nbsp;column=&quot;count&quot;&nbsp;property=&quot;count&quot;/&gt;&nbsp;&nbsp;</li>
+	<li>&lt;span&nbsp;style=&quot;white-space:pre&quot;&gt;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/span&gt;&lt;!--嵌套一对一关系--&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;association&nbsp;property=&quot;customer&quot;&nbsp;javaType=&quot;pojo.Customer&quot;&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;id&nbsp;column=&quot;cid&quot;&nbsp;property=&quot;cid&quot;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;result&nbsp;column=&quot;cname&quot;&nbsp;property=&quot;cname&quot;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/association&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/collection&gt;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&lt;/resultMap&gt;&nbsp;&nbsp;</li>
+</ol>
+
+<p>【读者只用参考上方代码段的写法，实体关系仅为笔者举例没有必然的逻辑联系】<br />
+&nbsp;</p>
+
+<p>3.2）关于出现重复列名的处理：在实际操作过程中，查询到的结果可能会出现相同的列名，这样会对映射到实体属性带来影响甚至出现报错，那么对待这个问题可以通过对列取别名的方式处理</p>
+
+<h2>四：常用的动态语句标签</h2>
+
+<p>通过动态sql标签可以进行条件判断，条件遍历等操作从而满足结果的需要</p>
+
+<p>&nbsp;&lt;where&gt; ： 使用其可以代替sql语句中的where关键字，一般防止在条件查询的最外层</p>
+
+<p>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp;&lt;if &gt;：条件判断标签，配置属性test=&quot; 条件字符串 &quot;，判断是否满足条件，满足则执行，不满足则跳过</p>
+
+<ol start="1">
+	<li>&lt;select&nbsp;id=&quot;findOrderItemDetail&quot;&nbsp;parameterType=&quot;pojo.Orderitem&quot;&nbsp;resultMap=&quot;BaseResultMap&quot;&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;select&nbsp;orderitem.orderitem_id,product.*&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;from&nbsp;orderitem,product&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;where&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;if&nbsp;test=&quot;orderitemId!=null&nbsp;and&nbsp;orderitemId!=&#39;&#39;&quot;&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;and&nbsp;orderitem.orderitem_id&nbsp;=&nbsp;#{orderitemId}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/if&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;if&nbsp;test=&quot;productId!=null&nbsp;and&nbsp;productId!=&#39;&#39;&quot;&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;and&nbsp;orderitem.product_id&nbsp;=&nbsp;#{productId}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/if&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;if&nbsp;test=&quot;count!=null&quot;&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;and&nbsp;orderitem.count&nbsp;=&nbsp;#{count}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/if&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/where&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&lt;/select&gt;&nbsp;&nbsp;</li>
+</ol>
+
+<p>&lt;set&gt;：常用于&lt;update&gt;更新语句中，替代 sql中的&ldquo;set&rdquo;关键字，特别是在联合&lt;if&gt;进行判断是，可以有效方式当某个参数为空或者不合法是错误的更新到数据库中</p>
+
+<ol start="1">
+	<li>&lt;update&nbsp;id=&quot;updateByPrimaryKeySelective&quot;&nbsp;parameterType=&quot;pojo.Orderitem&quot;&nbsp;&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;update&nbsp;orderitem&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&lt;set&nbsp;&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;if&nbsp;test=&quot;productId&nbsp;!=&nbsp;null&quot;&nbsp;&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;product_id&nbsp;=&nbsp;#{productId,jdbcType=VARCHAR},&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/if&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;if&nbsp;test=&quot;count&nbsp;!=&nbsp;null&quot;&nbsp;&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;count&nbsp;=&nbsp;#{count,jdbcType=INTEGER},&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/if&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&lt;/set&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;where&nbsp;orderitem_id&nbsp;=&nbsp;#{orderitemId,jdbcType=VARCHAR}&nbsp;&nbsp;</li>
+	<li>&nbsp;&lt;/update&gt;&nbsp;&nbsp;</li>
+</ol>
+
+<p>&lt;choose&gt;&lt;when&gt;&lt;/when&gt;&lt;otherwise&gt;&lt;/otherwise&gt;&lt;/choose&gt; 标签组：也是一个用于条件判断的标签组，和&lt;if&gt;的不同之处在于条件从&lt;choose&gt;进入，去匹配&lt;when&gt;中的添加，一旦匹配马上结束；若到找不到匹配项，将执行&lt;other&gt;中的语句；可以理解为&lt;if&gt;是 &amp;&amp; 关系 &lt;choose&gt;是 || 关系</p>
+
+<ol start="1">
+	<li>&lt;!--&nbsp;查询学生list，like姓名、或=性别、或=生日、或=班级，使用choose&nbsp;--&gt;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&lt;select&nbsp;id=&quot;getStudentListChooseEntity&quot;&nbsp;parameterType=&quot;StudentEntity&quot;&nbsp;resultMap=&quot;studentResultMap&quot;&gt;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;SELECT&nbsp;*&nbsp;from&nbsp;STUDENT_TBL&nbsp;ST&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;where&gt;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;choose&gt;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;when&nbsp;test=&quot;studentName!=null&nbsp;and&nbsp;studentName!=&#39;&#39;&nbsp;&quot;&gt;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ST.STUDENT_NAME&nbsp;LIKE&nbsp;CONCAT(CONCAT(&#39;%&#39;,&nbsp;#{studentName}),&#39;%&#39;)&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/when&gt;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;when&nbsp;test=&quot;studentSex!=&nbsp;null&nbsp;and&nbsp;studentSex!=&nbsp;&#39;&#39;&nbsp;&quot;&gt;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;AND&nbsp;ST.STUDENT_SEX&nbsp;=&nbsp;#{studentSex}&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/when&gt;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;when&nbsp;test=&quot;studentBirthday!=null&quot;&gt;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;AND&nbsp;ST.STUDENT_BIRTHDAY&nbsp;=&nbsp;#{studentBirthday}&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/when&gt;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;when&nbsp;test=&quot;classEntity!=null&nbsp;and&nbsp;classEntity.classID&nbsp;!=null&nbsp;and&nbsp;classEntity.classID!=&#39;&#39;&nbsp;&quot;&gt;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;AND&nbsp;ST.CLASS_ID&nbsp;=&nbsp;#{classEntity.classID}&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/when&gt;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;otherwise&gt;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/otherwise&gt;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/choose&gt;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;/where&gt;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&lt;/select&gt;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+</ol>
+
+<p>【注：以上代码段转载自：http://blog.csdn.net/zenson_g/article/details/10137665】</p>
+
+<p>&lt;foreach&gt;标签：该标签的作用是遍历集合类型的条件&nbsp;</p>
+
+<p>&nbsp; 属性：collection=&ldquo;array&rdquo; / collection = &ldquo;list&rdquo; &nbsp;-----&gt;是数组类型，还是集合类型</p>
+
+<p>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; item=&ldquo; productId &rdquo;------&gt; 参数名</p>
+
+<p>&nbsp; &nbsp; &nbsp;&nbsp;open=&quot;(&quot; separator=&quot;,&quot; close=&quot;)&quot; &nbsp;------&gt;开始符号，分隔符号，结束符号&nbsp;</p>
+
+<p>&nbsp; &nbsp; &nbsp; index=&ldquo; &rdquo; ----&gt;结束下标位置，不配置该参数时，默认为全部遍历</p>
+
+<ol start="1">
+	<li>&lt;delete&nbsp;id=&quot;deleteByPriKeys&quot;&nbsp;parameterType=&quot;java.lang.String&quot;&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;delete&nbsp;from&nbsp;product&nbsp;where&nbsp;product_Id&nbsp;in&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;foreach&nbsp;collection=&quot;list&quot;&nbsp;item=&quot;productId&quot;&nbsp;open=&quot;(&quot;&nbsp;separator=&quot;,&quot;&nbsp;close=&quot;)&quot;&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;#{productId,jdbcType&nbsp;=&nbsp;VARCHAR}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/foreach&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&lt;/delete&gt;&nbsp;&nbsp;&nbsp;</li>
+</ol>

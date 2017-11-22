@@ -1,0 +1,133 @@
+<h1>JNDI配置数据库</h1>
+
+<p>&nbsp;&nbsp; &nbsp;JNDI(Java&nbsp;Naming&nbsp;and&nbsp;Directory&nbsp;Interface，Java命名和目录接口)</p>
+
+<p>&nbsp;&nbsp; &nbsp;是一组在Java应用中访问命名和目录服务的API。命名服务将名称和对象联系起来，使得我们可以用名称<br />
+&nbsp;&nbsp; &nbsp;访问对象。目录服务是一种命名服务，在这种服务里，对象不但有名称，还有属性。</p>
+
+<p>&nbsp;&nbsp; &nbsp;tomcat配置jndi有全局配置和局部配置。</p>
+
+<h2>第一种：全局配置。</h2>
+
+<p>&nbsp;&nbsp; &nbsp;1）在tomcat的conf文件夹下的context.xml配置文件中加入：&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;</p>
+
+<p>&nbsp; &nbsp; &nbsp; &nbsp; &lt;Resource&nbsp;name=&quot;sqlconn&quot;&nbsp;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;auth=&quot;Container&quot;&nbsp;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;type=&quot;javax.sql.DataSource&quot;&nbsp;driverClassName=&quot;com.microsoft.sqlserver.jdbc.SQLServerDriver&quot;&nbsp;&nbsp;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;url=&quot;jdbc:sqlserver://localhost:1433;databasename=j1201&quot;&nbsp;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;username=&quot;sa&quot;&nbsp;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;password=&quot;sa123&quot;&nbsp;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;maxActive=&quot;20&quot;&nbsp;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;maxIdle=&quot;10&quot;&nbsp;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;maxWait=&quot;10000&quot;/&gt;</p>
+
+<p>&nbsp;&nbsp; &nbsp;2)在项目的web.xml中加入资源引用：</p>
+
+<p>&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&lt;resource-ref&gt;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&lt;description&gt;JNDI&nbsp;DataSource&lt;/description&gt;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&lt;res-ref-name&gt;sqlconn&lt;/res-ref-name&gt;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&lt;res-ref-type&gt;javax.sql.DataSource&lt;/res-ref-type&gt;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&lt;res-auth&gt;Container&lt;/res-auth&gt;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&lt;/resource-ref&gt;</p>
+
+<p>&nbsp;&nbsp; &nbsp;3）jndi测试方法：</p>
+
+<p>&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;public&nbsp;void&nbsp;testJNDI()&nbsp;throws&nbsp;NamingException,&nbsp;SQLException{<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;Context&nbsp;ctx&nbsp;=&nbsp;new&nbsp;InitialContext();<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;DataSource&nbsp;ds&nbsp;=&nbsp;(DataSource)&nbsp;ctx.lookup(&quot;java:comp/env/sqlconn&quot;);<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;Connection&nbsp;conn&nbsp;=&nbsp;ds.getConnection();<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;System.out.println(conn.isClosed());<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;}</p>
+
+<p>&nbsp;&nbsp; &nbsp;4）在jsp中调用加载jndi方式，不可以直接用main方法测试，必须通过启动容器从jsp中调用：</p>
+
+<p>&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;TestPageAccessURL&nbsp;test&nbsp;=&nbsp;new&nbsp;TestPageAccessURL();<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;test.testJNDI();</p>
+
+<h2>第二种：局部配置（不推荐）。</h2>
+
+<p>&nbsp;&nbsp; &nbsp;1）在tomcat的server.xml的&lt;host&gt;标签内，添加：</p>
+
+<p>&nbsp;&nbsp; &nbsp;&lt;Context&nbsp;path=&quot;/slesson3&quot;&nbsp;docBase=&quot;/slesson3&quot;&gt;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&lt;Resource<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;name=&quot;sqlconn&quot;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;type=&quot;javax.sql.DataSource&quot;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;driverClassName=&quot;com.microsoft.sqlserver.jdbc.SQLServerDriver&quot;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;maxIdle=&quot;2&quot;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;maxWait=&quot;5000&quot;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;username=&quot;sa&quot;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;password=&quot;sa123&quot;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;url=&quot;jdbc:sqlserver://localhost:1433;databasename=j1201&quot;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;maxActive=&quot;4&quot;/&gt;<br />
+&nbsp;&nbsp; &nbsp;&lt;/Context&gt;</p>
+
+<p>&nbsp;&nbsp; &nbsp;其他配置同第一种方式。</p>
+
+<h2>第三种：局部配置。</h2>
+
+<p>&nbsp;&nbsp; &nbsp;1）在项目的META-INFO下面新建context.xml。加入：</p>
+
+<p>&nbsp;&nbsp; &nbsp;&lt;?xml&nbsp;version=&quot;1.0&quot;&nbsp;encoding=&quot;UTF-8&quot;?&gt;<br />
+&nbsp;&nbsp; &nbsp;&lt;Context&gt;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&lt;Resource&nbsp;name=&quot;sqlconn&quot;&nbsp;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;auth=&quot;Container&quot;&nbsp;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;type=&quot;javax.sql.DataSource&quot;&nbsp;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;driverClassName=&quot;com.microsoft.sqlserver.jdbc.SQLServerDriver&quot;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;url=&quot;jdbc:sqlserver://localhost:1433;databasename=j1201&quot;&nbsp;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;username=&quot;sa&quot;&nbsp;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;password=&quot;sa123&quot;&nbsp;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;maxActive=&quot;20&quot;&nbsp;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;maxIdle=&quot;10&quot;&nbsp;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;maxWait=&quot;10000&quot;/&gt;<br />
+&nbsp;&nbsp; &nbsp;&lt;/Context&gt;</p>
+
+<p>&nbsp;&nbsp; &nbsp;其他配置同第一种方式。</p>
+
+<h2>总结：</h2>
+
+<p>&nbsp; &nbsp; 如果要配置局部的话，推荐使用第三种方式，这样不依赖tomcat了。但是还是推荐使用第一种方式好，虽然依赖tomat，但是是全局的，而且可以配置多个。对于以后切换使用方便。在项目的web.xml中添加的资源引用可有可无。</p>
+
+<p>&nbsp;</p>
+
+<h1>JNDI配置JMS：</h1>
+
+<h2>配置文件：</h2>
+
+<p>&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;在jetty和jetty-env.xml配置里面都定义名为jms/queueConnectionFactory的resources</p>
+
+<p>&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&lt;New id=&quot;dataSource&quot; class=&quot;org.eclipse.jetty.plus.jndi.Resource&quot;&gt;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&lt;Arg&gt;jms/queueConnectionFactory&lt;/Arg&gt;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&lt;Arg&gt;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&lt;New class=&quot;com.ibm.mq.jms.MQConnectionFactory&quot;&gt;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&lt;Set name=&quot;hostName&quot;&gt;192.168.157.94&lt;/Set&gt;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&lt;Set name=&quot;port&quot;&gt;1414&lt;/Set&gt;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&lt;Set name=&quot;channel&quot;&gt;STORE.CONN&lt;/Set&gt;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&lt;Set name=&quot;transportType&quot;&gt;1&lt;/Set&gt;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&lt;Set name=&quot;CCSID&quot;&gt;437&lt;/Set&gt;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&lt;Set name=&quot;queueManager&quot;&gt;B2CEventQueueMgr&lt;/Set&gt;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&lt;/New&gt;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&lt;/Arg&gt;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&lt;/New&gt;</p>
+
+<p><br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&lt;Resource&nbsp;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;name=&quot;jms/queueConnectionFactory&quot;&nbsp;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;auth=&quot;Container&quot;&nbsp;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;type=&quot;com.ibm.mq.jms.MQConnectionFactory&quot;&nbsp;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;factory=&quot;com.ibm.mq.jms.MQConnectionFactoryFactory&quot;&nbsp;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;description=&quot;JMS Queue Connection Factory for sending messages&quot;&nbsp;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;HOST=&quot;192.168.157.94&quot;&nbsp;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;PORT=&quot;1414&quot;&nbsp;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;CHAN=&quot;STORE.CONN&quot;&nbsp;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;TRAN=&quot;1&quot;&nbsp;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;CCSID=&quot;437&quot;&nbsp;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;QMGR=&quot;B2CEventQueueMgr&quot;&nbsp;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;/&gt;&nbsp;</p>
+
+<h2>在spring中使用：</h2>
+
+<p>&nbsp; &nbsp; &nbsp; &nbsp; &lt;jee:jndi-lookup id=&quot;connectionFactory&quot; jndi-name=&quot;jms/queueConnectionFactory&quot; /&gt;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&lt;jms:listener-container connection-factory=&quot;connectionFactory&quot; concurrency=&quot;30&quot;&gt;<br />
+&nbsp;&nbsp; &nbsp; &nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&lt;jms:listener destination=&quot;${mq.distributeEWProducBDate}&quot; ref=&quot;oldMdmListerner/&gt;&nbsp;<br />
+&nbsp;&nbsp; &nbsp; &nbsp; &nbsp;&nbsp;&nbsp; &nbsp;......<br />
+&nbsp;&nbsp; &nbsp; &nbsp; &nbsp;&lt;/jms:listener-container&gt;</p>

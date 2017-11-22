@@ -1,0 +1,449 @@
+SDO(Service Data Objects(SDO)) 简介
+	链接地址：http://blog.csdn.net/vking_wang/article/details/8447226
+
+	SDO是为了屏蔽数据格式、数据源的差异性而出现的。新公司用到了SDO并自己做了SDO的实现，作为学习，试着翻译这篇篇IBM 2004年的文章
+	原文：http://www.ibm.com/developerworks/java/library/j-sdo
+
+	摘要：
+	如果你觉得J2EE编程模型及其API总是让你在特定技术配置（technology-specific configuration）、编码、调试上花费太多时间，那么这篇文章就对你有用！许多Java程序员疑惑怎样用统一的方式访问异构数据，并对许多打算解决这个问题的编程框架很失望。Bertrand Portier 和Frank Budinsky在这篇文章中介绍了使用SDO的下一代（2004年说的下一代。。现在是否已过时呢:) ）数据编程。
+
+
+Introduction to Service Data Objects
+
+	简单地说，SDO是一个数据应用开发的框架，包括一个架构和API。SDO可以：
+	简化J2EE数据编程模型
+	对SOA架构中的数据进行抽象
+	统一数据应用开发
+	支持并集成XML
+	吸收J2EE模式以及最好的实践
+	本文将会解释SDO的动机、SDO与其他规范的区别；描述组成SDO的组件；最后将通过一个简单的SDO应用作为示例。
+
+Why SDO?
+
+	关于SDO，许多开发者的第一个问题是“为什么要用SDO呢？“，难道J2EE本身还不够大不够复杂吗？同时，Java环境的其他框架已经支持XML了，不是吗？幸运的是，答案会让我们大多数人感到满意：SDO是为了简化J2EE数据编程模型而出现的，从而让J2EE开发者有更多时间关注业务逻辑。
+
+
+	SDO框架为数据应用开发提供了一个统一的框架。有了SDO你就无需了解特定技术的API就能访问和使用数据。你只需要了解一个API：SDO API，它能让你使用来自不同数据源的数据，包括关系数据库、EJB entity组件、XML页、Web services、Java Connector Architecture、JSP页面等等。
+
+
+	注意我们使用了框架一词，这有点类似于Eclipse框架，Eclipse可靠并可扩展的基础能让各种工具集成到一起。SDO与此类似，它提供了一个框架，各个应用有助于这个框架，并且这些应用都与SDO模型一致。
+
+
+	与其他数据集成模型不同，SDO不止于数据抽象。SDO框架也吸收了一些J2EE模型和好的实践，使之易于将好的架构和模型引入你的应用。例如，现今的大多数Web应用不（并且不能）与backend系统实时连接；所以SDO支持不连接的编程模型。同样，现今的应用趋向于非常复杂，包含多个层次。数据应该怎样存储？怎样发送？怎样呈现给GUI的用户？SDO编程模型规定了使用模式，允许这些问题清晰地分离开（allow clean separation of each of these concerns）。
+
+
+	XML在分布式应用中普遍存在。例如XML Schema(XSD)在应用的数据格式中用于定义业务规则；XML本身用于促进互动；Web Services使用基于XML的SOAP作为通信技术。XML是SDO的一个非常重要的驱动因素，并且在框架中得到支持和集成。
+
+数据集成与分发系统方案的比较：
+
+	Comparing technologie正如上文提到的，SDO并不是解决数据集成与分发系统的问题的唯一技术。本节我们将看到SDO与其他编程框架的较量，例如JDO、JAXB、EMF。
+
+
+	SDO 与WDO
+	Web数据对象（WDO）是IBM WebSphere® Application Server 5.1 和IBM WebSphereStudio Application Developer 5.1.2中使用的SDO的名称。如果你使用过WebSphere Studio 5.1.2，你应该了解SDO了，虽然你可能不习惯用WDO来表示它。忘掉WDO吧，现在它被称为SDO了！
+
+	SDO与JDO
+	JDO是Java数据对象（Java Data Objects）的缩写。2003年5月，Java Community Process(JCP)1.0版本将JDO标准化了，现在为2.0版本已经组织了一个JCP专家组。JDO从Java环境去研究数据编程，提供通用API用于访问存储于不同数据源的数据，例如数据库、文件系统、Transaction processing systems。JDO维持着Java对象（graphs）之间的关系，同时允许对数据的并发访问。
+
+
+	JDO和SDO的目标类似，都是简化并统一化Java数据编程，以便开发者更关注业务逻辑而不是底层技术。主要区别在于JDO只研究持久化问题（J2EE数据层或企业信息系统层），而SDO更加一般化，数据能在任何J2EE层流动，例如表示层和业务层之间。
+
+	有趣的是，SDO可以和JDO结合起来使用，将JDO作为SDO的一个可访问的数据源，这是通过Data Transfer Object (DTO)设计模式实现的。同样，SDO也可以和EJB entity组件、Java Connector Architecture结合使用，提供统一的数据访问。
+
+	SDO与EMF
+	EMF是Eclipse 建模框架（Eclipse Modeling Framework）的缩写，以使用Java接口、XML Schema、UML类图的数据模型为基础，EMF产生一个统一的元模型（metamodel）（称之为Ecore），元模型与框架结合能用于创建高质量的模型实现。EMF提供持久化（persistence）、一个非常高效的反射泛型对象操作API（reflectivegeneric object manipulation API）、一个change-notification框架。EMF也包含了一些generic的可重用的类用于构建EMF模型编辑器。
+
+
+	EMF和SDO都涉及数据表示。实际上，本文稍后用到的IBM SDO参考实现，是SDO的一个EMF实现。EMF代码生成甚至被用来创建一部分SDO实现，基于SDO本身的UML模型定义 EMF code generation was even used tocreate some of the SDO implementation, based on a UML model definitionof SDO itself. SDO实现本质上是EMF上的轻量层，并被作为EMF项目的一部分包装起来。
+
+	SDO与JAXB
+	JAXB是Java API for XML Data Binding的缩写，JCP与2003年1月发布了JAXB 1.0版本，JCP专家组已提交了2.0版本的初稿。JAXB关注XML数据绑定，即在内存中用Java对象类表示XML数据。做为Java语言的XML绑定框架，JAXB能使你免于自己解析或创建XML文档。实际上，你不再必须处理XML了，JAXB能帮你处理编组/序列化（Java to XML）以及解组/反序列化（XML to Java）。
+
+	SDO自己定义了一个Java绑定框架，而且不仅仅如此。JAXB仅仅关注Java-to-XML绑定，而SDO绑定的数据种类不仅仅是XML。如前文所述，SDO针对不同数据类型提供了统一的访问，XML只是这些数据类型的一种。SDO同时提供了静态和动态API，JAXB只提供了静态绑定。
+
+
+	注意：本文的示例程序使用了动态SDO，EMF代码生成器也支持数据对象的静态代码生成。
+
+	SDO与ADO.NET
+	ADO曾是ActiveX Data Objects的缩写，但在.NET环境下就不再是这样了。ADO.NET提供了在.NET框架不同层之间的统一数据访问。
+
+
+	ADO.NET和SDO的动机类似，支持XML及应用在多个层次间分发。除了技术上的不同，二者最大的区别是ADO.NET是针对Microsoft .NET平台的专利技术，而SDO是针对Java（J2EE）平台，并被JCP（Java Community Process）标准化。
+
+SDO的组成：
+
+	SDO components
+	本节将对SDO做架构上的总览，将描述组成SDO框架的各个组件，解释他们是如何组合到一起的。我们将要讨论的前三个组件是SOD的“概念”特征，他们在API中没有对应的接口。
+
+	SDO Clients -SDO客户端 
+	SDO Clients使用SDO框架去操作数据，它们不是使用特定技术的API和框架，而是使用SDP编程模型和API。SDO Clients对SDO data graphs起作用，它不需要知道锁操作的数据是持久化的，或是序列化的。
+
+	Data mediator services -数据中介服务 
+	Data mediators services (DMSs) 负责根据数据源来创建data grahp，跟进data graph的修改去更新数据源。SDO1.0版本并不包含DMSs。DMSs的例子有：JDBC MDS、entity EJB DMS、XML DMS等。
+
+	Data Sources -数据源 
+	数据源并不仅限于后端的数据源（例如持久化的数据库），数据源已自己的格式包含数据。只有DMS访问数据源，SDO应用是不访问数据源的。SDO应用只与data graph中的数据对象打交道。
+
+
+	接下来要将的组件都对应SDO编程模型中的Java接口。SDO参考实现提供了对这些接口的基于EMF的实现。
+
+	Data objects -数据对象 
+	数据对象时SDO的基本组件。实际上，SDO的名字中就包含了数据对象。数据对象时结构化数据的SDO表示，数据对象是泛化的，它提供了对DMS构建的结构化数据的一般视图。 例如，使用JDBC DMS必须要知道持久化技术（例如关系数据库）、以及如何配置并访问它，但SDO客户端则无需知道这些。数据对象将“data”保存在属性properties中(more on properties in a moment)，数据对象提供了方便的创建和删除方法（createDataObject()\delete()），并用反射方法获取他们的类型（实例化类、名称、属性、命名空间）。数据对象被data graph连接起来，并包含在data graph中。
+
+
+	 Data graphs -数据图
+	数据图提供了一个数据对象树的容器，它由DMS生成，提供给SDO客户端使用。一旦Data graph被改动，它会被传回DMS从而更新数据源。SDO客户端能遍历数据图，读取并修改其数据对象。由于SDO客户端与DMS及数据源是非连接的，他们只能看到数据图，所以SDO是一个分离式的架构（disconnected architecture）。此外，数据图可以包含来自不同数据源的数据对象。data graph包含一个根数据对象、与根数据对象相关的数据对象、以及一个变更汇总（more on change summaries in a moment）。当它在应用组件间传输（例如在服务调用时，在Web service requester 和provider之间传输 ）给DMS，或者保存到磁盘，data graph会被序列化为XML。SDO规范对这种序列化提供了XML Schema。
+
+
+	Change summaries -变更汇总 
+	如前文，data graph中包含了变更汇总，用于表示对被DMS返回的data graph所做的修改。当data graph最初传给客户端时，change summaries是空的，data graph一旦被修改change summaries就会填充值。DMS在后台利用change summaries将变更更新到数据源，通过提供数据图中的变更属性列表（连同其原始值）、创建和删除的数据对象，change summaries使得DMS能高效地、增量地更新数据源。
+
+	当change summaries的logging被激活时，信息才会添加到数据图中的change summaries。change summaries提供了DMS可以讲logging置为on或off的方法，在示例程序中我们将讨论更多细节。
+
+
+	Properties, types, and sequences -属性、类型和序列 -
+	数据对象将其内容保存在一系列属性中；每个属性有一个类型，要么是基本类型(int)，要么是常用的数据类型(Date)，或者是另一个数据对象的类型(对象引用)。
+
+	每个数据对象都为其属性提供了读写的访问方法（getters andsetters），还提供了一些重载版本的访问方法，允许传入属性名(String)、编号number(int)、或者属性元对象自身 来访问一个属性。String访问方法还提供了XPath-like的语法来访问属性，例如，可以在company数据对象上调用get("department[number=123]")，获取number为123的部门。
+
+	序列Sequences更加高级，它允许在属性-值pair中保持一个顺序。They allow order to be preserved across heterogeneous lists of property-value pairs.
+
+
+SDO and sample installation
+	已经讲了够多的概念和理论，现在是时候动手做些练习了。好消息是现在你已经能使用SDO而且是免费的！本节我们讲解一个SDO IBM参考实现的一个示例程序，SDO的IBM参考实现已经作为EMF的一部分被包装起来了。我们首先描述如何安装EMF2.0.1（其中包含了SDO），接下来战士如何开始一个示例程序。
+
+
+	安装EMF
+	如果你已经安装了EMF2.0.1，或者你指导如何安装，那就跳过本节吧。
+	SDO 1.0 的IBM实现已经包含在EMF2.0.1中，你需要安装EMF2.0.1以便使用SDO。
+	在EMF首页（EMF home page）Quick Nav下面有一堆下载链接，点击v2.x: EMF and SDO下载选项，在安装前最好看一下安装要求，基本上 你需要首先安装Eclipse3.0.1以及JDK1.4。确保你选择EMF2.0.1release版本，建议选择ALL emf-sdo-xsd-SDK-2.0.1.zip，这样就能在一个文件中同时包含源代码、runtime、文档，当然如果你愿意，也可以下载SDO最小包"EMF & SDO RT":emf-sdo-runtime-2.0.1.zip.
+	将zip文件解压到eclipse目录。启动Eclipse，选择Help>Aboutthe Eclipse Platform. 点击Plug-in Details 按钮，应能看到org.eclipse.emf.*，以下6个插件事与SDO相关的：
+	org.eclipse.emf.commonj.sdo
+	org.eclipse.emf.ecore.sdo
+	org.eclipse.emf.ecore.sdo.doc
+	org.eclipse.emf.ecore.sdo.edit
+	org.eclipse.emf.ecore.sdo.editor
+	org.eclipse.emf.ecore.sdo.source
+	只有前两个插件是运行时必须的，如果你选择仅安装runtime插件 那你在上述步骤中就只能看到这两个。
+
+	——Alpha：emf2.5之后的版本 已不再包含SDO。
+
+	安装SDO示例程序
+	下一步就是向你的工作空间中添加SDO示例程序，步骤如下：
+
+	启动Eclipse，创建一个Plug-In项目
+	将项目命名为SDOSample，创建源程序目录src以及输出目录bin
+	点击下一步
+	取消选择"Generate the Java class that controls the plug-in's life cycle"，点击完成
+	然后下载本文的示例（Download），获取j-sdoSample.zip，解压到SDOSample目录（Import... > Zip file）。
+
+	Note: SDOSample is packaged as an Eclipse plug-in project so that youdon't have to set the library dependencies yourself. However, the sampleis just Java code, so it could also be run as a standalone applicationas long as the CLASSPATH includes the EMF and SDO libraries (JAR files).
+
+	注意：SDOSample是一个Eclipse plug-in项目，所以无需手工设置library依赖。但是示例只是Java代码，所以它必须作为独立程序运行，只要CLASSPATH包含了EMF和SDO jar包。
+
+
+	现在环境应该看起来如下图：
+
+	现在我们就准备好开始使用我们的SDO示例了.
+
+	A simple SDO application
+	接下来我们要使用的示例在功能上有限制，不过它能让你更好滴理解SDO。程序包含两个部门，分别对应两个包：dms、client。
+
+	SDO 1.0并未指定标准的DMS API，所以我们在这个示例中设计了我们自己的DMS接口，提供两个方法，如下所示：
+	/** 
+	 * A simple Data Mediator Service (DMS) that builds 
+	 * SDO Data Graphs of Employees and updates 
+	 * a backend data source according to a Data Graph.  
+	 */  
+	public interface EmployeeDMS  
+	{  
+	  /** 
+	   * @param employeeName the name of the employee. 
+	   * @return an SDO Data Graph with Data Objects for 
+	   * that employee's manager, that employee, 
+	   * and that employee's "employees". 
+	   */  
+	  DataGraph get(String employeeName);  
+	  
+	  /** 
+	   * updates backend data source according to dataGraph. 
+	   * @param dataGraph Data Graph used to update data source. 
+	   */  
+	  void update(DataGraph dataGraph);  
+	}  
+	客户端实例化一个DMS，然后调用get()方法获取指定的员工：The Big Boss, Wayne Blanchard, and Terence Shorter；在控制台用友好的方式打印出这些员工的信息，然后更新Terence Shorter和他的雇员的部门信息；最后调用DMS.update()方法，传入Terence Shorter更新后的data graph。
+	注意，由于只是演示，我们并未实现数据源组件，而是通过硬编码 使DMS知道如何通过查询构建data graph。下图展示了DMS使用的雇员架构。
+
+	DMS背后的虚拟公司 有4个雇员，公司架构如下：
+	The Big Boss has no manager and Terence Shorter as hisdirect report.
+	Terence Shorter has The Big Boss as hismanager, and John Datrane and Miles Colvis as his directreports.
+	John Datrane has Terence Shorter as his managerand no direct reports.
+	Miles Colvis has Terence Shorter ashis manager and no direct reports.
+	运行示例
+	右键SDOClient.java，选择Run>Java application，在控制台上应该有类似如下打印：
+
+	********* EMPLOYEE INFORMATION *********  
+	  
+	Name: John Datrane  
+	Number: 4  
+	Title: Mr.  
+	Department: Procurement  
+	Is manager?: no  
+	  
+	DIRECT MANAGER:  
+	  
+	Name: Terence Shorter  
+	Number: 2  
+	Title: Mr.  
+	Department: Financing  
+	Is manager?: yes  
+	  
+	****************************************  
+	  
+	NO INFORMATION AVAILABLE ON EMPLOYEE Wayne Blanchard  
+	  
+	********* EMPLOYEE INFORMATION *********  
+	  
+	Name: Terence Shorter  
+	Number: 2  
+	Title: Mr.  
+	Department: Financing  
+	Is manager?: yes  
+	  
+	DIRECT MANAGER:  
+	  
+	Name: The Big Boss  
+	Number: 1  
+	Title: Mr.  
+	Department: Board  
+	Is manager?: yes  
+	  
+	DIRECT EMPLOYEES:  
+	  
+	Name: Miles Colvis  
+	Number: 3  
+	Title: Mr.  
+	Department: Accounting  
+	Is manager?: no  
+	  
+	Name: John Datrane  
+	Number: 4  
+	Title: Mr.  
+	Department: Procurement  
+	Is manager?: no  
+	  
+	[Total: 2]  
+	****************************************  
+	  
+	DMS updating Terence Shorter  
+	 (changed department from "Financing" to "The new department")  
+	DMS updating Miles Colvis  
+	 (changed department from "Accounting" to "The new department")  
+	DMS updating John Datrane  
+	 (changed department from "Procurement" to "The new department")  
+
+
+
+	现在我们看看各个程序组件式如何工作的。
+
+
+The Client
+	SDO客户端创建了一个DMS实例，通过该DMS实例可以获取各个雇员的Data Graph。当获取到Data Graph后，客户端通过根对象（root object，通过SDO动态API获取）导航并访问data objects，如下：
+	// Get the SDO DataGraph from the DMS.  
+	DataGraph employeeGraph = mediator.get(employeeName);  
+	...  
+	// Get the root object  
+	DataObject root = employeeGraph.getRootObject();  
+	...  
+	// get the employee under the manager  
+	employee = <span style="color:#FF0000;">theManager</span>.getDataObject("employees.0");  
+
+	接下来客户端调用动态SDO访问器或API获取data object中的信息并打印到控制台，如下：
+
+	System.out.println("Name: " + employee.getString("name"));  
+	System.out.println ("Number: " + employee.getInt("number"));  
+	...  
+	System.out.println ("Is manager?: " +   
+	  (employee.getBoolean("manager") ? "yes" : "no") + "\n");  
+
+	我们看到了客户端如何获取信息（读），那他是如何写得呢？客户端如何修改对象？SDO客户端一般用Data Object的写方法，例如客户端修改雇员Terence Shorter的data graph：
+
+	employee.setString("department", newDepartmentName);  
+
+	注意：客户端并未调用logging方法，而由DMS通过在data graph的change summary上调用begingLogging()和endLogging()方法来进行logging。
+
+	get():  employeeGraph.getChangeSummary().beginLogging();
+
+	update():  ....endLogging()
+The Data Graph
+	data graph的数据格式（模型）可看做是DMS与Client间的协议，客户端期望从DMS返回什么、DMS如何去构建、如何从数据源读取并更新数据，都得靠data graph的模型。如果你熟悉XML或Web services，你可以把Data Graph模型当做用来定义数据对象的XML Schema（XSD），Data Graph则相当于XML文档。
+
+	实际上，XML Schema是定义SDO模型的方式之一。
+
+
+	注意，Data Graph及其模型总是序列化为XML，把SDOClient.java中的debug变量置为true，运行时就可在控制台看到data graph的序列化版本，如下：
+	<?xml version="1.0" encoding="UTF-8"?>  
+	<sdo:datagraph xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"  
+	  xmlns:company="http://com.example.company.ecore"  
+	  xmlns:sdo="commonj.sdo"  
+	  xmlns:sdo_1="http://www.eclipse.org/emf/2003/SDO">  
+	  <changeSummary>  
+	    <objectChanges key="#//@eRootObject">  
+	      <value xsi:type="sdo_1:EChangeSummarySetting"  
+	        featureName="department" dataValue="Board"/>  
+	    </objectChanges>  
+	  </changeSummary>  
+	  <company:Employee name="The Big Boss"  
+	    number="1" department="The new department" title="Mr."  
+	    manager="true">  
+	    <employees name="Terence Shorter" number="2"  
+	      department="The new department" title="Mr." manager="true">  
+	      <employees name="Miles Colvis" number="3"  
+	        department="The new department" title="Mr."/>  
+	      <employees name="John Datrane" number="4"  
+	        department="The new department" title="Mr."/>  
+	    </employees>  
+	  </company:Employee>  
+	</sdo:datagraph>  
+
+	本例中，data graph由Employee数据对象、change summary组成；Employee包含属性name, number, department, title, manager, and employees。如果硬编码的数据源中包含某雇员，DMS返回的data graph中就包含雇员的上级（如果有）、雇员本身、雇员的下级（如果有）。
+
+	The DMS: Building a graph  ----initializeEmployeeDataGraphModel()
+	SDO 1.0版本没有指定DMS API，没有指定如何设计并创建data graph 模型。因为当访问一个数据源时有许多场景需要考虑，如何设计一个data graph就不在本文过多阐述了。
+
+
+	本例中，DMS通过动态EMF API定义雇员模型，示例data graph没有类似XSD的模型文档。数据对象时动态生成的，意味着不会产生Employee的Java类。如果使用静态方法，则反之。
+
+	DMS使用不同的数据访问API（例如JDBC、SQL）从不同数据源中获取信息。然而，一旦信息从后台（本例中就是硬编码）获取出来，DMS则不适用SDO API使用EMF API（例如eGet、eSet）来构建数据对象的data graph。这种方法能提高性能，但是不易于在不同SDO实现之间移植。
+
+
+	假如无需太关注性能，那么DMS可以通过SDO API来实现。此时DMS类中缓存的元对象（meta object，例如EClass employeeClass, EAttribute employeeNameFeature）就得是commonj.sdo.Type和commonj.sdo.Property类型，而非EClass /EAttribute /EReference类型。此外，如果完全不用考虑性能，则可使用更方便的基于String的SDO API，例如setBoolean(String path, boolean value)，从而不必缓存元对象。不幸的是，方便的同时 效率一般会更慢。
+
+	下面的SimpleEmployeeDataMediatorImpl.java代码片段展示了如何定义Employee模型。注意这并不是构建SDO对象，而仅仅是构建SDO对象的模型。
+	protected EClass employeeClass;  
+	protected EAttribute employeeNameFeature;  
+	protected EReference <strong>employeeEmployeesFeature</strong>;  
+	...  
+	  
+	employeeClass = ecoreFactory.createEClass();  
+	employeeClass.setName("Employee");  
+	  
+	EAttribute employeeNameFeature = ecoreFactory.createEAttribute();  
+	...  
+	      
+	// employees (that the employee manages)  
+	employeeEmployeesFeature = ecoreFactory.createEReference();  
+	<strong>employeeEmployeesFeature.setContainment(true);</strong>  
+	...  
+	  
+	EPackage employeePackage = ecoreFactory.createEPackage();  
+	employeePackage.getEClassifiers().add(employeeClass);  
+	...  
+
+	注意，在EReference对象上调用了setContainment(true)方法，这样每个雇员都将包含它的employees。如果不调用的话，嵌套的employees就不会包含在data graph中，change summary只会包含root object的修改。
+
+	Modeling SDO  ----initializeEmployeeDataGraphModel()
+	这时你或许会想：“有趣，但返回的是EMF对象而非SDO数据对象啊！有什么古怪？”，很简单，employee EClass 从属于employeePackage EPackage，它有如下调用：
+	// Have the factory for this package build SDO Objects  
+	employeePackage.setEFactoryInstance( new DynamicEDataObjectImpl.FactoryImpl());  
+	运行时factory会创建DynamicEDataObjectImpl类型的对象，它实现了DataObject接口（即SDO数据对象）；factory不会返回默认的DynamicEObjectImpl，这是一个EMF对象。SDO对象和EMF对象的关系：SDO对象是一个实现类额SDO DataObject接口的EMF对象。实际上，这些额外方法的实现是委托给EMF核心方法的。
+
+	Creating SDO instances  ----DataGraph get()
+	既然我们有了数据对象的模型，就能否构建Employee实例并给其属性赋值了。在上一步，我们使用EMF API来提高性能：
+	EObject eObject = EcoreUtil.create(employeeClass);  
+	  
+	// Note: we could cast the object to DataObject,  
+	// but chose to use EObject APIs instead.  
+	eObject.eSet(employeeNameFeature, name);  
+	eObject.eSet(employeeNumberFeature, new Integer(number));  
+
+	然后可以用employees引用将雇员“连接”起来，例如：
+
+	((List)bigBoss.eGet(employeeEmployeesFeature)).add(terence);  
+	一旦我们创建了数据对象，就需要通过调用data graphy的setRootObject()方法将他们附加到data graph上，方法参数是我们想让他称为root的那个数据对象，本例中是Employee The Boss.
+
+	EDataGraph employeeGraph = SDOFactory.eINSTANCE.createEDataGraph();  
+	... ...  
+	employeeGraph.setERootObject(rootObject);  
+
+	返回data graph之前最后要做的 是开始记录change，在data graphy的change summary上调用了beginLogging()，它的作用是在清空所有之前的变更后，监听变更。
+	// Call beginLogging() so that the Change Summary is  
+	// populated when changes are applied to the Data Graph.  
+	// The DMS should call beginLogging() and endLogging(),  
+	// not the client.  
+	employeeGraph.getChangeSummary().beginLogging();  
+
+	正如EmployeeDataMediator接口定义的那样，DMS的另一个任务是基于SDO客户端传回的data graph 更新后端数据源。
+
+	The DMS: Updating source
+	为了更新后端数据源，DMS需要使用SDO的一个强大特征：change summary，data graph的change summary有多种用法，本例中，我们考虑change summary树中引用的所有数据对象，从中获取到新的数据对象。
+	/** 
+	 * Update the DMS's backend data to reflect changes 
+	 * in the data graph. 
+	 * Since this DMS has no actual backend data and therefore 
+	 * has nothing to update, we will just navigate 
+	 * the change summary and report (print) what's changed. 
+	 */  
+	public void update(DataGraph dataGraph)  
+	{  
+	  ChangeSummary changeSummary = dataGraph.getChangeSummary();  
+	   
+	  // Call endLogging to summarize changes.  
+	  // The DMS should call beginLogging() and endLogging(),  
+	  // not the client.  
+	  changeSummary.endLogging();  
+	   
+	  // Use SDO ChangeSummary's getChangedDataObjects() method.  
+	  List changes = changeSummary.getChangedDataObjects();  
+	  for (Iterator iter = changes.iterator(); iter.hasNext();)  
+	  {  
+	    DataObject changedObject = (DataObject)iter.next();  
+	    System.out.print("DMS updating " +  
+	      changedObject.getString("name"));  
+	  
+	    for (Iterator settingIter = changeSummary.getOldValues(  
+	      changedObject).iterator(); settingIter.hasNext();)  
+	    {  
+	      ChangeSummary.Setting changeSetting =  
+	        (ChangeSummary.Setting)settingIter.next();  
+	      Property changedProperty = changeSetting.getProperty();  
+	      Object oldValue = changeSetting.getValue();  
+	      Object newValue = changedObject.get(changedProperty);  
+	  
+	      System.out.print(" (changed: " + changedProperty.getName() +  
+	        " from \"" + oldValue + "\" to \"" + newValue + "\")");  
+	      // If not a simple example, we could update the backend here.  
+	    }  
+	  
+	    System.out.println();  
+	  }  
+	}  
+
+	本例中没有发生对后端数据源的更新，实际方法中应该要更新的。
+	DMS从客户端取得data graph后要做的第一件事，是在data graphy的change summary上调用endLogging()，关闭变更记录。从而提供从beginLogging()之后的所有变更汇总。change summary的格式使DMS能有效地、增量地更新数据源。change summary中的变更包括三类：
+
+	对象修改：包含数据图中的属性被修改了的那些数据对象，以及被修改的属性、属性的初始值。DMS可以利用属性初始值来确认后端数据没有同时被其他人修改；
+	对象创建：包含新增到数据图中的那些数据对象；这些对象代表需要插入到后端数据结构中的新数据；
+	对象删除：包含从数据图中删除的那些数据对象；这些对象代表需要从后端数据结构删除的数据。
+
+	请注意，我们这里使用标准的SDO API来检查data graph的变更，当然也可以使用EMF ChangeDescription API。本例中，对简单属性的更新，性能影响不是太重要；而当更新multiplicity-many属性时，使用EMF API可以大幅提高性能，例如我们从近百名雇员的list中删除一个雇员，change summary只提供了原始值（近百名雇员的list），而EMF change description接口则提供了更精确的信息，例如“删除某个index的雇员”。
+
+	还要注意在本例中，change summary里仅有对象修改，没有创建和删除。如果你从data graph里删除了对象，就需要注意objectsToAttach类型的元素，这实际是EMF Change Description中“对象删除”的名称。按照EMF的变更视角，这些元素是被删除的对象，如果回滚的话，需要再次附加回data graph。总之，objectsToAttach == deleted objects.
+
+
+	Debugging the application
+	如果将示例中的debug变量设为true，就激活了如下语句，就能看到data graph的序列化版本
+	((EDataGraph) dataGraph).getDataGraphResource().save(System.out, null);  
+
+	也可以使用Eclipse debug环境，建议在SDOClient.java第110行打上断点，然后再debug视图中，就能看到内存中的data graph、及其data object，如下图：
+
+
+	同样可以看到change summary，如下图：
+
+
+	这个截图现在看上去很复杂而且没什么用，但是当你调试SDO程序时就会用到，查询数据对象以及change summary的内容。
+
+	Conclusion
+	本文概述了SDO及其功能，提供了使用SDO部分功能的一个示例，Eclipse帮助系统中查看SDO API文档可以获得更多参考。SDO规范仍在进化并提高，例如SDO1.0着重于SDO客户端视角，没有规定DMS API；现在SDO已被JCP标准化，所以请密切留意公告。
+
+	由于SDO非常灵活，在你设计SDO程序时需要做许多决策，这些决策会影响重用性和性能，所以在编码前你需要考虑使用模式、考虑你的程序的特性。

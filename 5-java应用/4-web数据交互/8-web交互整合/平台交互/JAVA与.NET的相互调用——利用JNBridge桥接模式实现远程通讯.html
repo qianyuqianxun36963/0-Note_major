@@ -1,0 +1,223 @@
+JAVA与.NET的相互调用——利用JNBridge桥接模式实现远程通讯
+
+分布式开发的历史
+
+	利用Remote方式调用远程对象实现服务器与客户端之间通讯是一种常用的网络开发方式，在.NET与JAVA开发当中，对Remote远程对象早已有着足够的支持（对Remote远程对象调用有兴趣的朋友欢迎参考一下利用远程对象实现分布式开发）。
+
+	从2003年开始.NET当中就盛传着.NET Remoting远程对象调用的分布式开发，.NET Remoting主要用于管理跨应用程序域的同步和异步RPC 会话。在默认情况下，Remoting可以使用 HTTP 或 TCP 协议进行信息通讯，并使用 XML 编码的 SOAP 或二进制消息格式进行数据交换。.NET Remoting 提供了非常灵活和可扩展的编程框架,并且可以管理对象的状态。在Framewok2.0出台以后，WCF盛世登场，它是综合了.NET Remoting远程对象，TCP/IP套接字，Web服务，MSMQ，P2P点对点等各类型通信方式的产物，WCF使远程通信进入另一个台阶。
+
+	而在JAVA方面，对远程通信也有强大的支持,它定义了的RPC（Remote Procedure Call Protocol）协议是—项远程过程调用协议，它可以通过网络从远程计算机请求的服务获得计算结果，它无需了解底层网络技术的协议就可以使用如TCP或UDP等通信方式，为程序之间传递信息数据。在网络通信模型中，RPC跨越了传输层和应用层。RPC使系统更容易地实现分布式式开发。但RPC通讯却并未实现面向对象的开发原则，到而RMI(Remote Method Invocation)远程方法调用是一种计算机之间利用远程对象互相调用实现通讯的一种机制。它以面向对象的开发方式，利用RPC协议，使服务器与客户端的对象能够实现远程调用。
+
+	但在.NET Remoting与RMI通信中同时存在一个弊端，那就是对开发语言的限制，无论是使用哪一种通讯方式，服务器与客户端都必须支持同一种开发语言。通讯过程中不能跨越开发语言的限制，这是一个人令人懊恼的消息。因为在大型的开发项目当中，往往会集合着不同语言开发进行不同模块的开发。而使用Remote进行分布式开发，可以提高通信的效率但却又受到限制。对此，各大开发公司做出了积极的贡献，开发出如J-Integra(又名Ja.NET)，IIOP.NET(Internet Inter-Orb Protocol),JNBridge等集成开发工具，对.NET与JAVA之间实现Remote远程对象的相互调用作出足够的支持。下面在下为大家对“JNBridge实现.NET与JAVA的相互操作”作出详细的介绍。
+
+JNBridge概述
+
+	JNBridge是一种领先的JAVA与.NET互操作的的产品,凭借JNBridge技术，Java和.NET代码无需交叉编译器就可以实现对象共享。所有Java代码运行在JVM上，而.NET代码则运行在CLR上。在该方案下，JVM和CLR可以运行在不同的机器上，也可以运行在一台机器的不同进程上，甚至还能运行在相同的进程的不同应用程序域上。经历多年的发展，JNBridge已经发布了JNBridgePro 5.0，JNBridgePro 5.0有着更强大的功能。
+
+	支持java和.NET之间的跨平台事务；
+	支持Microsoft Visual Studio和Eclipse插件；
+	兼容Windows 7；
+	跨平台交易一体化主要是对用户透明；
+	'回滚'- 任何一方的终止都将导致双方的行动被回滚；
+	JNBridge支持.NET To Java ，Java To .NET两种服务方式，并可以行用TCP、HTTP、SOAP等多个协议进行双方通讯，下面就以 “JAVA调用.NET” 实现一个简单开发例子，介绍一下JNBridge的功能。
+
+JNBridge配置
+
+	首先可以在JNBridge的官方网站http://www.jnbridge.com/downloads.htm 下载程序，安装JNBridgePro 5.0后，启动JNBProxy v5.1.exe，选择Create new Java->.NET Project，新建一个项目后，点击Project->Java Options对系统进行配置。首先设置好本机的java.exe应用程序和jvm.dll程序集的路径，然后设置jnbcore.jar和bcel.jar的路径（在5.1版本中，这两个文件存在于“/JNBridge/JNBridgePro v5.1/jnbcore/”），最后可以选择HTTP或TCP通讯方式（在此例子当中在下选择TCP通讯，系统默认接口为8085你也可以选择自定义的接口）。点击“OK”按钮，配置完成时，系统将自动生成一个 "/JNBridge/JNBridgePro v5.1/jnbcore/jnbcore_tcp.properties" 文件记录TCP配置信息。
+
+.NET服务端开发
+
+	假如阁下使用的是Visual Studio 2008或者Visual Studio 2010版本，系统将会感知JNBridge的存在，在新建项目时，可以直接新建一个DotNetJavaProxies项目。在此在下想展示一下JNBridge的转换性能，所以直接新一个解决方案。添加一个Model项目，加入Person类，为Person加入Serializable特性，注意要去除不必要的引用，因为对Framework的引用在转换时将变为对应的包。
+
+		using System;
+
+		namespace Model
+		{
+		[Serializable]
+		publicclass Person
+		{
+		publicint ID
+		{
+		get;
+		set;
+		}
+
+		publicstring Name
+		{
+		get;
+		set;
+		}
+
+		publicint Age
+		{
+		set;
+		get;
+		}
+		}
+		}
+
+	添加一个Manager项目，加入PersonManager类，在测试时，只是把虚拟数据放在DataSource.sour文件中。
+
+		using System;
+		using Model;
+		using System.IO;
+		using System.Runtime.Serialization.Formatters.Binary;
+		using System.Collections.Generic;
+
+		namespace Manager
+		{
+		publicclass PersonManager
+		{
+		/// 虚拟数据源
+		private List<Person> DataSource()
+		{
+		FileStream fileStream =new FileStream("./DataSource.sour", FileMode.Open, FileAccess.ReadWrite);
+		BinaryFormatter formatter =new BinaryFormatter();
+		List<Person> personList=(List<Person>)formatter.Deserialize((fileStream));
+
+		return personList;
+		}
+
+		//获取所有的Person
+		public List<Person> GetList()
+		{
+		List<Person> personList = DataSource();
+		return personList;
+		}
+
+		//根据输入ID获取对应的Person
+		public Person GetPersonByID(int id)
+		{
+		foreach (Person person in DataSource())
+		{
+		if (person.ID == id)
+		return person;
+		}
+		returnnull;
+		}
+		}
+		}
+
+	添加一个ConsoleApplication作为启动项目，在项目中添加对JNBShare.dll的引用（文件路径 “\JNBridge\JNBridgePro v5.1\4.0-targeted”），然后添加配置文件
+
+		config文件
+
+		<?xml version="1.0" encoding="utf-8" ?>
+		<configuration>
+		<configSections>
+		<sectionGroup name="jnbridge">
+		<section name="dotNetToJavaConfig"
+		type="System.Configuration.SingleTagSectionHandler"/>
+		<section name="javaToDotNetConfig"
+		type="System.Configuration.SingleTagSectionHandler"/>
+		<section name="tcpNoDelay"
+		type="System.Configuration.SingleTagSectionHandler"/>
+		<section name="javaSideDeclarations"
+		type="System.Configuration.NameValueSectionHandler"/>
+		<section name="assemblyList"
+		type="com.jnbridge.jnbcore.AssemblyListHandler, JNBShare"/>
+		</sectionGroup>
+		</configSections>
+		<jnbridge>
+		<dotNetToJavaConfig scheme="jtcp" host="localhost" port="8085"/>
+		<!--注意通讯接口必须与JNBridge中配置的接口一致-->
+		<javaToDotNetConfig scheme="jtcp" port="8086"/>
+
+		<!-- 注册共用程序集 -->
+		<assemblyList>
+		<assembly file=".\Model.dll"/>
+		<assembly file=".\Manager.dll"/>
+		</assemblyList>
+		</jnbridge>
+		</configuration>
+
+	最后启动服务
+
+		using System;
+		using com.jnbridge.jnbcore;
+
+		namespace NET_Service
+		{
+		class Program
+		{
+		staticvoid Main(string[] args)
+		{
+		Console.WriteLine(".NET Start!");
+		//启动.NET端服务，注意必须添加对JNBShare的引用，才可使用com.jnbridge.jnbcore.DotNetSide
+		DotNetSide.startDotNetSide();
+		Console.ReadKey();
+		//关闭.NET端服务
+		DotNetSide.stopDotNetSide();
+		}
+		}
+		}
+
+
+
+	生成转换层代码
+
+	打开JNBridge,选择工具栏 "Add class from assembly files"，分别加入Model.dll,Manager.dll及mscorlib.dll（此程序集存在于“C:\Windows\Microsoft.NET\Framework\v4.0.30319\”，里面包含System，System.Collections，System.IO等等重要的命名空间）
+
+	图1:
+
+	在选择必要的类以后，按下“Project->Build"，系统就会对应选择把.NET里面的类生成对class放入Proxy.jar代理包。 
+
+Java端开发
+
+	新建一个Java项目，引用刚生成的代理包Proxy.jar，还有jnbcore.jar、bcel-5.1-jnbridge.jar（在5.1版本中，这两个文件存在于“/JNBridge/JNBridgePro v5.1/jnbcore/”），把JNBridge的TCP配置文件jnbcore_tcp.properties复制到bin文件夹内，开发一个测试端。值得注意的是在生成Proxy.jar代码包的时候，必须对System.Collections.Generic，System.String等等这些常用类的空间添加引用，否则，在Java里面就无法调用.NET里面的System.Collections.Generic.List等这些常用类。由于在Java里面对像List这些常用的类具有类名之间的冲突，所以在Proxy里面会对System.Collections.Generic.List这些类命名为System.Collections.Generic.List_1。
+	代码
+
+		package com.jnbridge.javaclient;
+
+		import com.jnbridge.jnbcore.*;
+
+		import System.Collections.Generic.*;   
+		//引用Proxy.jar包内System.Collection.Generice.*空间里面的代理类
+
+		import Manager.*;
+		import Model.*;
+
+		publicclass Test {
+
+		    /**
+		     * @param args
+		     */
+		    publicstaticvoid main(String[] args) {
+		        // TODO Auto-generated method stub
+		try{
+		        //注册JNBridge的TCP配置文件jnbcore_tcp.properties
+		        DotNetSide.init("E:\\Java Projects\\JNBridge JAVA\\JAVA Client\\bin\\jnbcore_tcp.properties");
+		        
+		        PersonManager personManager=new PersonManager();
+		        //注意此List_1是Proxy.jar包内System.Collections.Generic.List的代理类，而并非JDK内自带的List类
+		        List__1 personList=personManager.GetList();
+		        if(personList.Get_Count()!=0){
+		            //注意此Get_Count()方法是Proxy.jar包内System.Collections.Generic.List代理类的GetCount()方法
+		for(int n=0;n<personList.Get_Count();n++){
+		                Person person=(Person)personList.Get_Item(n);
+		                  System.out.println("Id:"+person.Get_ID()+" Age:"+person.Get_Age()+" Name:"+person.Get_Name());  
+		            }
+		        }
+		        }catch(Exception ex){
+		            ex.printStackTrace();
+		        }
+		    }
+		}
+
+	完成JAVA端后，先启动.NET服务端，再启动JAVA端，JAVA就会调用到.NET端的数据，屏幕将显示出测试结果：
+
+	Id:0 Age:29 Name:Leslie
+	Id:1 Age:23 Name:Rose
+	Id:2 Age:22 Name:Jack
+
+	在JNBridge官网上有着许多的开发例子，在此不多介绍。对不同开发类型的转换需要调用不同的工具包，各位可以直接参考官网上的教材。
+
+	 
+
+	Java与.NET的混合开发模式
+
+	在众多的大型系统开发中，开发工具往往不限制于同一种开发语言，而是会使用多种开发语言的混合型开发。像在开发底层与业务层的过程中，由于.NET只限制工作于Windows系统，而JAVA可以在Windows、Unix、Linux中灵活运用而更受到欢迎。但在开发UI表现层里，很明显像Swing、Applet等开发工具受到的限制更多，而WPF、Siverlight、WinForms等开发工具因为具有成熟的控件与华丽的页面而倍受欢迎。所以使用JAVA来开发底层、业务层与Linux系统的UI层，同时使用.NET来开发Windows系统的UI层的例子很常见。在此开发过程中，利用JNBridge工具生成Proxy代理可以大大降低开发的难度，提高开发效率，使.NET平台与JAVA平台之间实现无缝连接。
+
+	图2:
+
+	综上所述，JNBridge可视为JAVA平台与.NET平台之间通讯的桥梁，上述的例子利用JNBridge现实JAVA与.NET的无缝连接，可以使.NET的客户端无需感知JAVA底层的存在，.NET的UI端直接调用Proxy代理就可以与JAVA端实现通讯，这不失为JAVA与.NET之间互相调用的一种好手段。

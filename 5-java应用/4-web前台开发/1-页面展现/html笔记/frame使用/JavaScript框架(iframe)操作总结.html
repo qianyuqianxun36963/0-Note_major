@@ -1,0 +1,106 @@
+JavaScript框架(iframe)操作总结
+
+	框架编程概述
+	一个 HTML页面可以有一个或多个子框架，这些子框架以<iframe>来标记，用来显示一个独立的HTML页面。这里所讲的框架编程包括框架的自我控制以及框架之间的互相访问，例如从一个框架中引用另一个框架中的JavaScript变量、调用其他框架内的函数、控制另一个框架中表单的行为等。
+	框架间的互相引用
+	一个页面中的所有框架以集合的形式作为window对象的属性提供，例如：window.frames就表示该页面内所有框架的集合，这和表单对象、链接对象、图片对象等是类似的，不同的是，这些集合是document的属性。因此，要引用一个子框架，可以使用如下语法：
+	复制代码 代码如下:
+	window.frames["frameName"];
+	window.frames.frameName
+	window.frames[index]
+
+	其中，window字样也可以用self代替或省略，假设frameName为页面中第一个框架，则以下的写法是等价的：
+	复制代码 代码如下:
+	self.frames["frameName"]
+	self.frames[0]
+	frames[0]
+	frameName
+
+	每个框架都对应一个HTML页面，所以这个框架也是一个独立的浏览器窗口，它具有窗口的所有性质，所谓对框架的引用也就是对window对象的引用。有了这个window对象，就可以很方便地对其中的页面进行操作，例如使用window.document对象向页面写入数据、使用 window.location属性来改变框架内的页面等。
+	下面分别介绍不同层次框架间的互相引用：
+	1．父框架到子框架的引用
+	知道了上述原理，从父框架引用子框架变的非常容易，即：
+	复制代码 代码如下:
+	window.frames["frameName"];
+
+	这样就引用了页面内名为frameName的子框架。如果要引用子框架内的子框架，根据引用的框架实际就是window对象的性质，可以这样实现：
+	复制代码 代码如下:
+	window.frames["frameName"].frames["frameName2"];
+
+	这样就引用到了二级子框架，以此类推，可以实现多层框架的引用。
+	2．子框架到父框架的引用
+	每个window对象都有一个parent属性，表示它的父框架。如果该框架已经是顶层框架，则window.parent还表示该框架本身。
+	3．兄弟框架间的引用
+	如果两个框架同为一个框架的子框架，它们称为兄弟框架，可以通过父框架来实现互相引用，例如一个页面包括2个子框架：
+	复制代码 代码如下:
+	<frameset rows="50%,50%">
+	    <frame src="1.html" name="frame1" />
+	    <frame src="2.html" name="frame2" />
+	</frameset>
+
+	在frame1中可以使用如下语句来引用frame2：
+	复制代码 代码如下:
+	self.parent.frames["frame2"];
+	4．不同层次框架间的互相引用
+	框架的层次是针对顶层框架而言的。当层次不同时，只要知道自己所在的层次以及另一个框架所在的层次和名字，利用框架引用的window对象性质，可以很容易地实现互相访问，例如：
+	复制代码 代码如下:
+	self.parent.frames["childName"].frames["targetFrameName"];
+	5．对顶层框架的引用
+	和parent属性类似，window对象还有一个top属性。它表示对顶层框架的引用，这可以用来判断一个框架自身是否为顶层框架，例如：
+	复制代码 代码如下:
+	//判断本框架是否为顶层框架
+	if(self==top){
+	    //dosomething
+	}
+	改变框架的载入页面
+	对框架的引用就是对window对象的引用，利用window对象的location属性，可以改变框架的导航，例如：
+	复制代码 代码如下:
+	window.frames[0].location="1.html";
+
+	这就将页面中第一个框架的页面重定向到1.html，利用这个性质，甚至可以使用一条链接来更新多个框架。
+	复制代码 代码如下:
+	<frameset rows="50%,50%">
+	    <frame src="1.html" name="frame1" />
+	    <frame src="2.html" name="frame2" />
+	</frameset><!--somecode-->
+	<a href="frame1.location='3.html;frame2.location='4.html'" onclick="">link</a>
+	<!--somecode-->
+	引用其他框架内的JavaScript变量和函数
+
+	在介绍引用其他框架内JavaScript变量和函数的技术之前，先来看以下代码：
+	复制代码 代码如下:
+	function hello(){
+	    alert("hello,ajax!");
+	}
+	window.hello();
+
+	如果运行了这段代码，会弹出“hello,ajax!”的窗口，这正是执行hello()函数的结果。那为什么hello()变成了window对象的方法呢？因为在一个页面内定义的所有全局变量和全局函数都是作为window对象的成员。例如：
+	var a=1;
+	alert(window.a);[/code]
+	就会弹出对话框显示为1。同样的原理，在不同框架之间共享变量和函数，就是要通过window对象来调用。
+	例如：一个商品浏览页面由两个子框架组成，左侧表示商品分类的链接；当用户单击分类链接时，右侧显示相应的商品列表；用户可以单击商品旁的【购买】链接将商品加入购物车。
+	在这个例子中，可以利用左侧导航页面来存储用户希望购买的商品，因为当用户单击导航链接时，变化的是另外一个页面，即商品展示页面，而导航页面本身是不变的，因此其中的JavaScript变量不会丢失，可以用来存储全局数据。其实现原理如下：
+	假设左侧页面为link.html，右侧页面为show.html，页面结构如下：
+	复制代码 代码如下:
+
+	<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN">
+	<html>
+	<head>
+	<title> New Document </title>
+	</head>
+	<frameset cols="20%,80%">
+	    <frame src="link.html" name="link" />
+	    <frame src="show.html" name="show" />
+	</frameset>
+	</html>
+	在show.html中展示的商品旁边可以加入这样一条语句：
+	<a href="void(0)" onclick="self.parent.link.addToOrders(32068)">加入购物车</a>
+	其中link表示导航框架，在link.html页面中定义了arrOrders数组来存储商品的id，函数addToOrders()用来响应商品旁边【购买】链接的单击事件，它接收的参数id表示商品的id，例子中是一个id为32068的商品：
+	复制代码 代码如下:
+	var arrOrders=new Array();
+	function addToOrders(id){
+	    arrOrders.push(id);
+	}
+
+	这样，在结帐页面或是购物车浏览页面就可以用arrOrders来获取所有准备购买的商品。
+	框架可以使一个页面划分为功能独立的多个模块，每个模块之间彼此独立，但又可以通过window对象的引用来建立联系，是Web开发中的一个重要机制。在 Ajax开发中，还可以利用隐藏框架实现各种技巧，在后面介绍Ajax实例编程时可以发现，无刷新上传文件以及解决Ajax的前进后退问题都会用到这种技术。

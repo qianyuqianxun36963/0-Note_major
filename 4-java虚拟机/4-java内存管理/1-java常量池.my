@@ -1,0 +1,220 @@
+<h1><a href="http://www.cnblogs.com/dreamroute/p/5946272.html" id="cb_post_title_url">触摸java常量池</a></h1>
+
+<p>转：http://www.cnblogs.com/iyangyuan/p/4631696.html</p>
+
+<p>&nbsp;java常量池是一个经久不衰的话题，也是面试官的最爱，题目花样百出，小菜早就对常量池有所耳闻，这次好好总结一下。</p>
+
+<p>理论</p>
+
+<p>&nbsp; &nbsp; &nbsp;小菜先拙劣的表达一下jvm虚拟内存分布：</p>
+
+<p><img alt="jvm虚拟内存分布" src="http://images0.cnblogs.com/blog2015/471788/201507/082300018463120.png" style="width:400px" /></p>
+
+<p>&nbsp;</p>
+
+<p><strong>&nbsp; &nbsp; &nbsp;程序计数器</strong>是jvm执行程序的流水线，存放一些跳转指令，这个太高深，小菜不懂。</p>
+
+<p><strong>&nbsp; &nbsp; &nbsp;本地方法栈</strong>是jvm调用操作系统方法所使用的栈。</p>
+
+<p><strong>&nbsp; &nbsp; &nbsp;虚拟机栈</strong>是jvm执行java代码所使用的栈。</p>
+
+<p><strong>&nbsp; &nbsp; &nbsp;方法区</strong>存放了一些常量、静态变量、类信息等，可以理解成class文件在内存中的存放位置。</p>
+
+<p><strong>&nbsp; &nbsp; &nbsp;虚拟机堆</strong>是jvm执行java代码所使用的堆。</p>
+
+<p>&nbsp; &nbsp; &nbsp;Java中的常量池，实际上分为两种形态：<strong>静态常量池</strong>和<strong>运行时常量池</strong>。</p>
+
+<p>&nbsp; &nbsp; &nbsp;所谓<strong>静态常量池</strong>，即*.class文件中的常量池，class文件中的常量池不仅仅包含字符串(数字)字面量，还包含类、方法的信息，占用class文件绝大部分空间。</p>
+
+<p>&nbsp; &nbsp; &nbsp;而<strong>运行时常量池</strong>，则是jvm虚拟机在完成类装载操作后，将class文件中的常量池载入到内存中，并保存在<strong>方法区</strong>中，我们常说的常量池，就是指方法区中的运行时常量池。</p>
+
+<p>&nbsp; &nbsp; &nbsp;接下来我们引用一些网络上流行的常量池例子，然后借以讲解。</p>
+
+<pre>
+ 1 String s1 = &quot;Hello&quot;;
+ 2 String s2 = &quot;Hello&quot;;
+ 3 String s3 = &quot;Hel&quot; + &quot;lo&quot;;
+ 4 String s4 = &quot;Hel&quot; + new String(&quot;lo&quot;);
+ 5 String s5 = new String(&quot;Hello&quot;);
+ 6 String s6 = s5.intern();
+ 7 String s7 = &quot;H&quot;;
+ 8 String s8 = &quot;ello&quot;;
+ 9 String s9 = s7 + s8;
+10           
+11 System.out.println(s1 == s2);  // true
+12 System.out.println(s1 == s3);  // true
+13 System.out.println(s1 == s4);  // false
+14 System.out.println(s1 == s9);  // false
+15 System.out.println(s4 == s5);  // false
+16 System.out.println(s1 == s6);  // true
+</pre>
+
+<p>&nbsp; &nbsp; &nbsp;首先说明一点，在java 中，直接使用==操作符，比较的是两个字符串的引用地址，并不是比较内容，比较内容请用String.equals()。</p>
+
+<p>&nbsp; &nbsp; &nbsp;s1 == s2这个非常好理解，s1、s2在赋值时，均使用的字符串字面量，说白话点，就是直接把字符串写死，在编译期间，这种字面量会直接放入class文件的常量池中，从而实现复用，载入运行时常量池后，s1、s2指向的是同一个内存地址，所以相等。</p>
+
+<p>&nbsp; &nbsp; &nbsp;s1 == s3这个地方有个坑，s3虽然是动态拼接出来的字符串，但是所有参与拼接的部分都是已知的字面量，在编译期间，这种拼接会被优化，编译器直接帮你拼好，因此String s3 = &quot;Hel&quot; + &quot;lo&quot;;在class文件中被优化成String s3 = &quot;Hello&quot;;，所以s1 == s3成立。</p>
+
+<p>&nbsp; &nbsp; &nbsp;s1 == s4当然不相等，s4虽然也是拼接出来的，但new String(&quot;lo&quot;)这部分不是已知字面量，是一个不可预料的部分，编译器不会优化，必须等到运行时才可以确定结果，结合<strong>字符串不变</strong>定理，鬼知道s4被分配到哪去了，所以地址肯定不同。配上一张简图理清思路：</p>
+
+<p><img alt="java字符串不变" src="http://images0.cnblogs.com/blog2015/471788/201507/082306277835446.jpg" />&nbsp; &nbsp; &nbsp;s1 == s9也不相等，道理差不多，虽然s7、s8在赋值的时候使用的字符串字面量，但是拼接成s9的时候，s7、s8作为两个变量，都是不可预料的，编译器毕竟是编译器，不可能当解释器用，所以不做优化，等到运行时，s7、s8拼接成的新字符串，在堆中地址不确定，不可能与方法区常量池中的s1地址相同。<br />
+<img alt="jvm常量池，堆，栈内存分布" src="http://images0.cnblogs.com/blog2015/471788/201507/082307486111786.png" style="width:600px" /></p>
+
+<p>&nbsp; &nbsp; &nbsp;s4 == s5已经不用解释了，绝对不相等，二者都在堆中，但地址不同。</p>
+
+<p>&nbsp; &nbsp; &nbsp;s1 == s6这两个相等完全归功于intern方法，s5在堆中，内容为Hello ，intern方法会尝试将Hello字符串添加到常量池中，并返回其在常量池中的地址，因为常量池中已经有了Hello字符串，所以intern方法直接返回地址；而s1在编译期就已经指向常量池了，因此s1和s6指向同一地址，相等。</p>
+
+<p>&nbsp; &nbsp; &nbsp;至此，我们可以得出三个非常重要的结论：</p>
+
+<p><strong>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 必须要关注编译期的行为，才能更好的理解常量池。</strong></p>
+
+<p><strong>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 运行时常量池中的常量，基本来源于各个class文件中的常量池。</strong></p>
+
+<p><strong>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 程序运行时，除非手动向常量池中添加常量(比如调用intern方法)，否则jvm不会自动添加常量到常量池。</strong></p>
+
+<p>&nbsp; &nbsp; &nbsp;以上所讲仅涉及字符串常量池，实际上还有整型常量池、浮点型常量池等等，但都大同小异，只不过数值类型的常量池不可以手动添加常量，程序启动时常量池中的常量就已经确定了，比如整型常量池中的常量范围：-128~127，只有这个范围的数字可以用到常量池。</p>
+
+<p>实践</p>
+
+<p>&nbsp; &nbsp; &nbsp;说了这么多理论，接下来让我们触摸一下真正的常量池。</p>
+
+<p>&nbsp; &nbsp; &nbsp;前文提到过，class文件中存在一个静态常量池，这个常量池是由编译器生成的，用来存储java源文件中的字面量(本文仅仅关注字面量)，假设我们有如下java代码：</p>
+
+<pre>
+1 String s = &quot;hi&quot;;
+</pre>
+
+<p>&nbsp; &nbsp; &nbsp;为了方便起见，就这么简单，没错！将代码编译成class文件后，用winhex打开二进制格式的class文件。如图：</p>
+
+<p>&nbsp;<img alt="二进制格式的class文件" src="http://images0.cnblogs.com/blog2015/471788/201507/082317394713776.png" style="width:600px" /></p>
+
+<p>&nbsp;</p>
+
+<p>&nbsp; &nbsp; &nbsp;简单讲解一下class文件的结构，开头的4个字节是class文件魔数，用来标识这是一个class文件，说白话点就是文件头，既：CA FE BA BE。</p>
+
+<p>&nbsp; &nbsp; &nbsp;紧接着4个字节是java的版本号，这里的版本号是34，因为笔者是用jdk8编译的，版本号的高低和jdk版本的高低相对应，高版本可以兼容低版本，但低版本无法执行高版本。所以，如果哪天读者想知道别人的class文件是用什么jdk版本编译的，就可以看这4个字节。</p>
+
+<p>&nbsp; &nbsp; &nbsp;接下来就是常量池入口，入口处用2个字节标识常量池常量数量，本例中数值为00 1A，翻译成十进制是26，也就是有25个常量，其中第0个常量是特殊值，所以只有25个常量。</p>
+
+<p>&nbsp; &nbsp; &nbsp;常量池中存放了各种类型的常量，他们都有自己的类型，并且都有自己的存储规范，本文只关注字符串常量，字符串常量以01开头(1个字节)，接着用2个字节记录字符串长度，然后就是字符串实际内容。本例中为：01 00 02 68 69。</p>
+
+<p>&nbsp; &nbsp; &nbsp;接下来再说说运行时常量池，由于运行时常量池在方法区中，我们可以通过jvm参数：-XX:PermSize、-XX:MaxPermSize来设置方法区大小，从而间接限制常量池大小。</p>
+
+<p>&nbsp; &nbsp; &nbsp;假设jvm启动参数为：-XX:PermSize＝2M -XX:MaxPermSize＝2M，然后运行如下代码：</p>
+
+<pre>
+1 //保持引用，防止自动垃圾回收
+2 List&lt;String&gt; list = new ArrayList&lt;String&gt;();
+3         
+4 int i = 0;
+5         
+6 while(true){
+7     //通过intern方法向常量池中手动添加常量
+8     list.add(String.valueOf(i++).intern());
+9 }
+</pre>
+
+<p>&nbsp; &nbsp; &nbsp;程序立刻会抛出：Exception in thread &quot;main&quot; java.lang.outOfMemoryError: PermGen space异常。PermGen space正是方法区，足以说明常量池在方法区中。</p>
+
+<p>&nbsp; &nbsp; &nbsp;在jdk8中，移除了方法区，转而用Metaspace区域替代，所以我们需要使用新的jvm参数：-XX:MaxMetaspaceSize=2M，依然运行如上代码，抛出：java.lang.OutOfMemoryError: Metaspace异常。同理说明运行时常量池是划分在Metaspace区域中。具体关于Metaspace区域的知识，请读者自行搜索。</p>
+
+<p>&nbsp; &nbsp; &nbsp;本文所有代码均在jdk7、jdk8下测试通过，其他版本jdk可能会略有差异，请读者自行探索。</p>
+
+<h2>常见的几种情形</h2>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif">这里我们主要关心栈，堆和常量池，对于栈和常量池中的对象可以共享，对于堆中的对象不可以共享。栈中的数据大小和生命周期是可以确定的，当没有引用指向数据时，这个数据就会消失。堆中的对象的由垃圾回收器负责回收，因此大小和生命周期不需要确定，具有很大的灵活性。</span></span></p>
+
+<h3><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif">对于字符串</span></span></h3>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif">其对象的引用都是存储在栈中的，如果是编译期已经创建好(直接用双引号定义的)的就存储在常量池中，如果是运行期（new出来的）才能确定的就存储在堆中。对于equals相等的字符串，在常量池中永远只有一份，在堆中有多份。<br />
+如以下代码：</span></span></p>
+
+<div class="dp-highlighter" id="" style="-webkit-text-stroke-width:0px; margin-left:9px; padding:1px; text-align:left; width:766.297px">
+<ol start="1" style="margin-left:0px; margin-right:0px">
+	<li><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">String&nbsp;s1&nbsp;=&nbsp;&quot;china&quot;;&nbsp;&nbsp;</span></span></li>
+	<li><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">String&nbsp;s2&nbsp;=&nbsp;&quot;china&quot;;&nbsp;&nbsp;</span></span></li>
+	<li><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">String&nbsp;s3&nbsp;=&nbsp;&quot;china&quot;;&nbsp;&nbsp;</span></span></li>
+	<li><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">String&nbsp;ss1&nbsp;=&nbsp;<strong>new</strong>&nbsp;String(&quot;china&quot;);&nbsp;&nbsp;</span></span></li>
+	<li><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">String&nbsp;ss2&nbsp;=&nbsp;<strong>new</strong>&nbsp;String(&quot;china&quot;);&nbsp;&nbsp;</span></span></li>
+	<li><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">String&nbsp;ss3&nbsp;=&nbsp;<strong>new</strong>&nbsp;String(&quot;china&quot;);&nbsp;&nbsp;</span></span></li>
+</ol>
+</div>
+
+<p><br />
+<span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><img alt="" src="http://dl.iteye.com/upload/attachment/331454/3588b3c6-f37b-3d63-a48f-59134ea691d2.png" style="border:0px" /><br />
+&nbsp;</span></span></p>
+
+<p style="margin-left:0cm; margin-right:0cm"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:small">这里解释一下黄色这3个箭头，对于通过new产生一个字符串（假设为&rdquo;china&rdquo;）时，会先去常量池中查找是否已经有了&rdquo;china&rdquo;对象，如果没有则在常量池中创建一个此字符串对象，然后堆中再创建一个常量池中此&rdquo;china&rdquo;对象的拷贝对象。这也就是有道面试题：String s = new String(&ldquo;xyz&rdquo;);产生几个对象？一个或两个，如果常量池中原来没有&rdquo;xyz&rdquo;,就是两个。</span></span></span></p>
+
+<h3><br />
+<br />
+<span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif">对于基础类型的变量和常量</span></span></h3>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif">变量和引用存储在栈中，常量存储在常量池中。</span></span><br />
+<span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif">如以下代码：</span></span></p>
+
+<div class="dp-highlighter" id="" style="-webkit-text-stroke-width:0px; margin-left:9px; padding:1px; text-align:left; width:766.297px">
+<ol start="1" style="margin-left:0px; margin-right:0px">
+	<li><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace"><strong>int</strong>&nbsp;i1&nbsp;=&nbsp;9;&nbsp;&nbsp;</span></span></li>
+	<li><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace"><strong>int</strong>&nbsp;i2&nbsp;=&nbsp;9;&nbsp;&nbsp;</span></span></li>
+	<li><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace"><strong>int</strong>&nbsp;i3&nbsp;=&nbsp;9;&nbsp;&nbsp;&nbsp;</span></span></li>
+	<li><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace"><strong>public</strong>&nbsp;<strong>static</strong>&nbsp;<strong>final</strong>&nbsp;<strong>int</strong>&nbsp;INT1&nbsp;=&nbsp;9;&nbsp;&nbsp;</span></span></li>
+	<li><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace"><strong>public</strong>&nbsp;<strong>static</strong>&nbsp;<strong>final</strong>&nbsp;<strong>int</strong>&nbsp;INT2&nbsp;=&nbsp;9;&nbsp;&nbsp;</span></span></li>
+	<li><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace"><strong>public</strong>&nbsp;<strong>static</strong>&nbsp;<strong>final</strong>&nbsp;<strong>int</strong>&nbsp;INT3&nbsp;=&nbsp;9;&nbsp;&nbsp;</span></span></li>
+</ol>
+</div>
+
+<p><br />
+<br />
+<span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><img alt="" src="http://dl.iteye.com/upload/attachment/229942/3968b51b-0a56-3ad6-a54e-b2b19e671526.png" style="border:0px" /></span></span><br />
+&nbsp;</p>
+
+<h3><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif">对于成员变量和局部变量</span></span></h3>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif">成员变量：就是方法外部，类的内部定义的变量；<br />
+局部变量：就是方法或语句块内部定义的变量。局部变量必须初始化。</span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif">形式参数：是局部变量，局部变量的数据存在于栈内存中。栈内存中的局部变量随着方法的消失而消失。<br />
+成员变量：存储在堆中的对象里面，由垃圾回收器负责回收。</span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif">如以下代码：</span></span></p>
+
+<div class="dp-highlighter" id="" style="-webkit-text-stroke-width:0px; margin-left:9px; padding:1px; text-align:left; width:766.297px">
+<p>class&nbsp;BirthDate&nbsp;{&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;private&nbsp;int&nbsp;day;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;private&nbsp;int&nbsp;month;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;private&nbsp;int&nbsp;year;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;BirthDate(int&nbsp;d,&nbsp;int&nbsp;m,&nbsp;int&nbsp;y)&nbsp;{&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;day&nbsp;=&nbsp;d;&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;month&nbsp;=&nbsp;m;&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;year&nbsp;=&nbsp;y;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;省略get,set方法&hellip;&hellip;&hellip;&nbsp;&nbsp;<br />
+}&nbsp;&nbsp;<br />
+&nbsp;&nbsp;<br />
+public&nbsp;class&nbsp;Test{&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;static&nbsp;void&nbsp;main(String&nbsp;args[]){&nbsp;&nbsp;<br />
+int&nbsp;date&nbsp;=&nbsp;9;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Test&nbsp;test&nbsp;=&nbsp;new&nbsp;Test();&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;test.change(date);&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;BirthDate&nbsp;d1=&nbsp;new&nbsp;BirthDate(7,7,1970);&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;void&nbsp;change1(int&nbsp;i){&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;i&nbsp;=&nbsp;1234;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;<br />
+}<br />
+<br />
+<span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><img alt="" src="http://dl.iteye.com/upload/attachment/229944/5d8dee1f-ceb9-3705-8924-161dd7599f73.png" style="border:0px" /></span></p>
+
+<p><span style="font-family:Helvetica,Tahoma,Arial,sans-serif">对于以上这段代码，date为局部变量，i,d,m,y都是形参为局部变量，day，month，year为成员变量。下面分析一下代码执行时候的变化：<br />
+1. main方法开始执行：int date = 9;<br />
+<strong>date局部变量，基础类型，引用和值都存在栈中。</strong><br />
+2. Test test = new Test();<br />
+test为对象引用，存在栈中，对象(new Test())存在堆中。<br />
+3. test.change(date);<br />
+i为局部变量，引用和值存在栈中。当方法change执行完成后，i就会从栈中消失。<br />
+4. BirthDate d1= new BirthDate(7,7,1970);&nbsp;&nbsp;<br />
+d1为对象引用，存在栈中，对象(new BirthDate())存在堆中，其中d，m，y为局部变量存储在栈中，且它们的类型为基础类型，因此它们的数据也存储在栈中。day,month,year为成员变量，它们存储在堆中(new BirthDate()里面)。当BirthDate构造方法执行完之后，d,m,y将从栈中消失。<br />
+5.main方法执行完之后，date变量，test，d1引用将从栈中消失，new Test(),new BirthDate()将等待垃圾回收。</span></p>
+</div>

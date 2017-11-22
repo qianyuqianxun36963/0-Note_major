@@ -1,0 +1,110 @@
+<h1>java修改注册表之Registry</h1>
+
+<p>Windows Registry API Native Interface <a href="http://www.trustice.com/java/jnireg/index.shtml">下载地址</a> 下 registry-3.1.3.zip(包含源代码)。解开 registry-3.1.3.zip，在 bin 目录中可以看到两个文件 ICE_JNIRegistry.dll 和registry.jar，动态库就是本地代码实现。</p>
+
+<p>import com.ice.jni.registry.*;<br />
+import java.text.SimpleDateFormat;<br />
+<br />
+public class RegeditTool {<br />
+&nbsp; &nbsp; static SimpleDateFormat shortDateFormat = new SimpleDateFormat(&quot;yyyy-MM-dd&quot;);<br />
+&nbsp;</p>
+
+<h2>把信息存储到注册表HKEY_LOCAL_MACHINE下的某个节点的某一变量中，有则修改，无则创建</h2>
+
+<p><br />
+&nbsp; &nbsp; public static boolean setValue(String folder, String subKeyNode,<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; String subKeyName, String subKeyValue) {<br />
+&nbsp; &nbsp; &nbsp; &nbsp; try {<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; RegistryKey software = Registry.HKEY_LOCAL_MACHINE<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; .openSubKey(folder);<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; RegistryKey subKey = software.createSubKey(subKeyNode, &quot;&quot;);<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; subKey<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; .setValue(new RegStringValue(subKey, subKeyName,<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; subKeyValue));<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; subKey.closeKey();<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; return true;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; } catch (NoSuchKeyException e) {<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; e.printStackTrace();<br />
+&nbsp; &nbsp; &nbsp; &nbsp; } catch (NoSuchValueException e) {<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; e.printStackTrace();<br />
+&nbsp; &nbsp; &nbsp; &nbsp; } catch (RegistryException e) {<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; e.printStackTrace();<br />
+&nbsp; &nbsp; &nbsp; &nbsp; }<br />
+&nbsp; &nbsp; &nbsp; &nbsp; return false;<br />
+&nbsp; &nbsp; }</p>
+
+<h2>删除注册表中某节点下的某个变量</h2>
+
+<p><br />
+&nbsp; &nbsp; public static boolean deleteValue(String folder, String subKeyNode,<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; String subKeyName) {<br />
+&nbsp; &nbsp; &nbsp; &nbsp;&nbsp;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; try {<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; RegistryKey software = Registry.HKEY_LOCAL_MACHINE<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; .openSubKey(folder);<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; RegistryKey subKey = software.createSubKey(subKeyNode, &quot;&quot;);<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; subKey.deleteValue(subKeyName);<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; subKey.closeKey();<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; return true;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; } catch (NoSuchKeyException e) {<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; System.out.println(&quot;NOsuchKey_delete&quot;);<br />
+&nbsp; &nbsp; &nbsp; &nbsp; } catch (NoSuchValueException e) {<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; System.out.println(&quot;NOsuchValue_delete&quot;);<br />
+&nbsp; &nbsp; &nbsp; &nbsp; } catch (RegistryException e) {<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; e.printStackTrace();<br />
+&nbsp; &nbsp; &nbsp; &nbsp; }<br />
+&nbsp; &nbsp; &nbsp; &nbsp; return false;<br />
+&nbsp; &nbsp; }</p>
+
+<h2>删除注册表中某节点下的某节点</h2>
+
+<p><br />
+&nbsp; &nbsp; public static boolean deleteSubKey(String folder, String</p>
+
+<p>subKeyNode) {<br />
+&nbsp; &nbsp; &nbsp; &nbsp; try {<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; RegistryKey software = Registry.HKEY_LOCAL_MACHINE<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; .openSubKey(folder);<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; software.deleteSubKey(subKeyNode);<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; software.closeKey();<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; return true;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; } catch (NoSuchKeyException e) {<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; e.printStackTrace();<br />
+&nbsp; &nbsp; &nbsp; &nbsp; } catch (RegistryException e) {<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; e.printStackTrace();<br />
+&nbsp; &nbsp; &nbsp; &nbsp; }<br />
+&nbsp; &nbsp; &nbsp; &nbsp; return false;<br />
+&nbsp; &nbsp; }<br />
+&nbsp; &nbsp;</p>
+
+<h2>打开注册表项并读出相应的变量名的值</h2>
+
+<p><br />
+&nbsp; &nbsp; public static String getValue(String folder, String subKeyNode,<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; String subKeyName) {<br />
+&nbsp; &nbsp; &nbsp; &nbsp; String value = &quot;&quot;;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; try {<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; RegistryKey software = Registry.HKEY_LOCAL_MACHINE<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; .openSubKey(folder);<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; RegistryKey subKey = software.openSubKey(subKeyNode);<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; value = subKey.getStringValue(subKeyName);<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; subKey.closeKey();<br />
+&nbsp; &nbsp; &nbsp; &nbsp; } catch (NoSuchKeyException e) {<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; value = &quot;NoSuchKey&quot;;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; // e.printStackTrace();<br />
+&nbsp; &nbsp; &nbsp; &nbsp; } catch (NoSuchValueException e) {<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; value = &quot;NoSuchValue&quot;;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; // e.printStackTrace();<br />
+&nbsp; &nbsp; &nbsp; &nbsp; } catch (RegistryException e) {<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; e.printStackTrace();<br />
+&nbsp; &nbsp; &nbsp; &nbsp; }<br />
+&nbsp; &nbsp; &nbsp; &nbsp; return value;<br />
+&nbsp; &nbsp; }<br />
+&nbsp; &nbsp; // 测试<br />
+&nbsp; &nbsp; public static void main(String[] args) {<br />
+&nbsp; &nbsp; &nbsp; &nbsp; setValue(&quot;SOFTWARE&quot;, &quot;Microsoft\\Windows\\CurrentVersion\\Run&quot;,</p>
+
+<p>&quot;test&quot;,<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &quot;C:\\1.exe&quot;);<br />
+&nbsp; &nbsp; }<br />
+}</p>

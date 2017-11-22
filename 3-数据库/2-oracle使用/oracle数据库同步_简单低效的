@@ -1,0 +1,86 @@
+oracle数据库同步
+
+在两台oracle数据库之间测试成功，下面就总结一下吧：
+
+需求：
+
+现有两台oracle数据库服务器A和B(A,B可以是在同一内网，也可以是在互联网上的两台独立机器)。A和B里有都有testable表，结构一样，现需要当A库中的testable表变化时，B库里的testable也相应变化数据 
+
+我的解决方案：
+
+在A中建立到B库的链接，然后对要同步的表做一个同义synonym，最后建一个触发器，就可以完成了。当然，你所用的当前的用户要有相应的权限去执行这些操作。
+
+当从A向B同步数据时，应该在A上做所有的设置:
+
+1,为保证连接到另一台远程服务器的数据库，你需要建立一个DB Link，但是，这里要注意语法格式，using +"connect string"，这个connect string应该是存在于oracle服务器的TNSNAMES.ORA文件里，监听程序将从这里获取远方服务器
+
+的ip地址等信息,我定义了一个'251'的connect string如下:
+
+
+251 = 
+(DESCRIPTION =
+
+(ADDRESS_LIST =
+
+(ADDRESS = (PROTOCOL = TCP)(HOST = 192.168.0.251)(PORT = 1521))
+
+)
+
+(CONNECT_DATA =
+
+(SERVICE_NAME = mychoice)
+
+)
+
+)
+ 
+把它存到你的TNSNAMES.ORA文件里。 
+2,然后就可以定义DB Link了：
+
+
+create public database link TEST2.US.ORACLE.COM 
+connect to 用户名
+
+identified by "密码"
+
+using '251';
+ 
+
+3,建立synonym(同义) 
+
+create or replace synonym TEST01
+
+for MYCHOICE.TESTABLE@TEST2.US.ORACLE.COM;
+ 
+
+建立完了以后，你可以通过:
+
+select * from test01 
+
+上面的语句相当于在B服务器上执行：
+
+select * from testable　
+
+４，封建触发器：
+
+当A中的testable表变化时（这里只考虑插入操作），就会触发向远程的B库的testable也插入相应的数据：
+
+
+create or replace trigger rtest 
+after insert on testable
+
+for each row
+
+begin 
+
+insert into test01 (something) values (:new.something);
+
+end;
+ 
+
+ok,现在我们可以测试一下，你在Ａ库中往testable表中插入一条记录，看看Ｂ库中是不是也相应的增加了
+
+
+
+
+摘录于此  ，写的好

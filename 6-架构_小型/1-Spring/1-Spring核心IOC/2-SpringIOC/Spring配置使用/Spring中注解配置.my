@@ -1,0 +1,214 @@
+<h1>spring注解注入:&lt;context:component-scan&gt;详解</h1>
+
+<p>spring从2.5版本开始支持注解注入，注解注入可以省去很多的xml配置工作。由于注解是写入java代码中的，所以注解注入会失去一定的灵活性，我们要根据需要来选择是否启用注解注入。</p>
+
+<p>我们首先看一个注解注入的实际例子，然后再详细介绍context:component-scan的使用。</p>
+
+<p>如果你已经在用spring mvc的注解配置，那么你一定已经在使用注解注入了，本文不会涉及到spring mvc，我们用一个简单的例子来说明问题。</p>
+
+<h2>1、程序示例</h2>
+
+<p>本例中我们会定义如下类：</p>
+
+<ol>
+	<li>PersonService类，给上层提供Person相关操作</li>
+	<li>PersonDao类，给PersonService类提供DAO方法</li>
+	<li>Person类，定义Person相关属性，是一个POJO</li>
+	<li>App类，入口类，调用注解注入的PersonService类</li>
+</ol>
+
+<h3>PersonService类：</h3>
+
+<pre>
+package cn.outofmemory.spring;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
+@Service
+public class PersonService {
+
+	@Autowired
+	private PersonDao personDao;
+	
+	public Person getPerson(int id) {
+		return personDao.selectPersonById(id);
+	}
+}</pre>
+
+<p>在Service类上使用了@Service注解修饰，在它的私有字段PersonDao上面有@Autowired注解修饰。@Service告诉spring容器，这是一个Service类，默认情况会自动加载它到spring容器里。而@Autowired注解告诉spring，这个字段是需要自动注入的。</p>
+
+<h3>PersonDao类：</h3>
+
+<pre>
+package cn.outofmemory.spring;
+
+import org.springframework.context.annotation.Scope;
+import org.springframework.stereotype.Repository;
+
+@Scope(&quot;singleton&quot;)
+@Repository
+public class PersonDao {
+
+	public Person selectPersonById(int id) {
+		Person p = new Person();
+		p.setId(id);
+		p.setName(&quot;Person name&quot;);
+		return p;
+	}
+}</pre>
+
+<p>在PersonDao类上面有两个注解，分别为@Scope和@Repository，前者指定此spring bean的scope是单例，你也可以根据需要将此bean指定为prototype，@Repository注解指定此类是一个容器类，是DA层类的实现。这个类我们只是简单的定义了一个selectPersonById方法，该方法的实现也是一个假的实现，只是声明了一个Person的新实例，然后设置了属性，返回他，在实际应用中DA层的类肯定是要从数据库或者其他存储中取数据的。</p>
+
+<h3>Person类：</h3>
+
+<pre>
+package cn.outofmemory.spring;
+
+public class Person {
+	private int id;
+	private String name;
+	public int getId() {
+		return id;
+	}
+	public void setId(int id) {
+		this.id = id;
+	}
+	public String getName() {
+		return name;
+	}
+	public void setName(String name) {
+		this.name = name;
+	}
+}
+</pre>
+
+<p>Person类是一个POJO。</p>
+
+<h3>App类：</h3>
+
+<pre>
+package cn.outofmemory.spring;
+
+import org.springframework.context.ApplicationContext;
+import org.springframework.context.support.ClassPathXmlApplicationContext;
+/**
+&nbsp;* Hello spring! from outofmemory.cn
+&nbsp;*
+&nbsp;*/
+public class App&nbsp;
+{
+&nbsp; &nbsp; public static void main( String[] args )
+&nbsp; &nbsp; {
+&nbsp; &nbsp; &nbsp; &nbsp; ApplicationContext appContext = new ClassPathXmlApplicationContext(&quot;/spring.xml&quot;);
+&nbsp; &nbsp; &nbsp; &nbsp; PersonService service = appContext.getBean(PersonService.class);
+&nbsp; &nbsp; &nbsp; &nbsp; Person p = service.getPerson(1);
+&nbsp; &nbsp; &nbsp; &nbsp; System.out.println(p.getName());
+&nbsp; &nbsp; }
+}
+</pre>
+
+<p>在App类的main方法中，我们初始化了ApplicationContext，然后从中得到我们注解注入的PersonService类，然后调用此对象的getPerson方法，并输出返回结果的name属性。</p>
+
+<h2>2、注解注入相关的配置文件</h2>
+
+<p>注解注入也必须在spring的配置文件中做配置，我们看下spring.xml文件的内容：</p>
+
+<pre>
+&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot;?&gt;
+&lt;beans xmlns=&quot;http://www.springframework.org/schema/beans&quot;
+&nbsp; &nbsp; &nbsp; &nbsp;xmlns:xsi=&quot;http://www.w3.org/2001/XMLSchema-instance&quot;
+&nbsp; &nbsp; &nbsp; &nbsp;xmlns:context=&quot;http://www.springframework.org/schema/context&quot;
+&nbsp; &nbsp; &nbsp; &nbsp;xsi:schemaLocation=&quot;http://www.springframework.org/schema/beans
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;http://www.springframework.org/schema/beans/spring-beans.xsd
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;http://www.springframework.org/schema/context
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;http://www.springframework.org/schema/context/spring-context-3.0.xsd&quot;&gt;
+	&lt;context:component-scan base-package=&quot;cn.outofmemory.spring&quot; use-default-filters=&quot;false&quot;&gt;
+		&lt;context:include-filter type=&quot;regex&quot; expression=&quot;cn\.outofmemory\.spring\.[^.]+(Dao|Service)&quot;/&gt;
+	 &lt;/context:component-scan&gt;
+&lt;/beans&gt;</pre>
+
+<p>这个配置文件中必须声明xmlns:context 这个xml命名空间，在schemaLocation中需要指定schema：</p>
+
+<pre>
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;http://www.springframework.org/schema/context
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;http://www.springframework.org/schema/context/spring-context-3.0.xsd</pre>
+
+<p>这个文件中beans根节点下只有一个context:component-scan节点，此节点有两个属性base-package属性告诉spring要扫描的包，use-default-filters=&quot;false&quot;表示不要使用默认的过滤器，此处的默认过滤器，会扫描包含Service,Component,Repository,Controller注解修饰的类，而此处我们处于示例的目的，故意将use-default-filters属性设置成了false。</p>
+
+<h2>3、filter标签的type</h2>
+
+<p>context:component-scan节点允许有两个子节点&lt;context:include-filter&gt;和&lt;context:exclude-filter&gt;。filter标签的type和表达式说明如下：</p>
+
+<table border="1" cellpadding="2" cellspacing="0" style="width:674px">
+	<tbody>
+		<tr>
+			<td><strong>Filter Type</strong></td>
+			<td><strong>Examples Expression</strong></td>
+			<td><strong>Description</strong></td>
+		</tr>
+		<tr>
+			<td>annotation</td>
+			<td>org.example.SomeAnnotation</td>
+			<td>符合SomeAnnoation的target class</td>
+		</tr>
+		<tr>
+			<td>assignable</td>
+			<td>org.example.SomeClass</td>
+			<td>指定class或interface的全名</td>
+		</tr>
+		<tr>
+			<td>aspectj</td>
+			<td>org.example..*Service+</td>
+			<td>AspectJ語法</td>
+		</tr>
+		<tr>
+			<td>regex</td>
+			<td>org\.example\.Default.*</td>
+			<td>Regelar Expression</td>
+		</tr>
+		<tr>
+			<td>custom</td>
+			<td>org.example.MyTypeFilter</td>
+			<td>Spring3新增自訂Type，實作org.springframework.core.type.TypeFilter</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>在我们的示例中，将filter的type设置成了正则表达式，regex，注意在正则里面.表示所有字符，而\.才表示真正的.字符。我们的正则表示以Dao或者Service结束的类。</p>
+
+<p>我们也可以使用annotaion来限定，如下：</p>
+
+<pre>
+&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot;?&gt;
+&lt;beans xmlns=&quot;http://www.springframework.org/schema/beans&quot;
+&nbsp; &nbsp; &nbsp; &nbsp;xmlns:xsi=&quot;http://www.w3.org/2001/XMLSchema-instance&quot;
+&nbsp; &nbsp; &nbsp; &nbsp;xmlns:context=&quot;http://www.springframework.org/schema/context&quot;
+&nbsp; &nbsp; &nbsp; &nbsp;xsi:schemaLocation=&quot;http://www.springframework.org/schema/beans
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;http://www.springframework.org/schema/beans/spring-beans.xsd
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;http://www.springframework.org/schema/context
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;http://www.springframework.org/schema/context/spring-context-3.0.xsd&quot;&gt;
+	&lt;context:component-scan base-package=&quot;cn.outofmemory.spring&quot; use-default-filters=&quot;false&quot;&gt;
+		&lt;context:include-filter type=&quot;annotation&quot; expression=&quot;org.springframework.stereotype.Repository&quot;/&gt;&nbsp;
+		&lt;context:include-filter type=&quot;annotation&quot; expression=&quot;org.springframework.stereotype.Service&quot;/&gt;&nbsp;
+	 &lt;/context:component-scan&gt;
+&lt;/beans&gt;</pre>
+
+<p>这里我们指定的include-filter的type是annotation，expression则是注解类的全名。</p>
+
+<p>另外context:conponent-scan节点还有&lt;context:exclude-filter&gt;可以用来指定要排除的类，其用法和include-filter一致。</p>
+
+<h2>4、运行结果</h2>
+
+<p>最后我们要看下输出的结果了，运行App类，输出：</p>
+
+<pre>
+2014-5-18 21:14:18 org.springframework.context.support.AbstractApplicationContext prepareRefresh
+信息: Refreshing org.springframework.context.support.ClassPathXmlApplicationContext@1cac6db: startup date [Sun May 18 21:14:18 CST 2014]; root of context hierarchy
+2014-5-18 21:14:18 org.springframework.beans.factory.xml.XmlBeanDefinitionReader loadBeanDefinitions
+信息: Loading XML bean definitions from class path resource [spring.xml]
+2014-5-18 21:14:18 org.springframework.beans.factory.support.DefaultListableBeanFactory preInstantiateSingletons
+信息: Pre-instantiating singletons in org.springframework.beans.factory.support.DefaultListableBeanFactory@1fcf790: defining beans [personDao,personService,org.springframework.context.annotation.internalConfigurationAnnotationProcessor,org.springframework.context.annotation.internalAutowiredAnnotationProcessor,org.springframework.context.annotation.internalRequiredAnnotationProcessor,org.springframework.context.annotation.internalCommonAnnotationProcessor]; root of factory hierarchy
+Person name</pre>
+
+<p>前几行都是spring输出的一些调试信息，最后一行是我们自己程序的输出。</p>

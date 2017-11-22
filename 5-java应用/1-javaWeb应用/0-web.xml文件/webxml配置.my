@@ -1,0 +1,163 @@
+<h1>web.xml中常用元素的解读</h1>
+
+<p>前言</p>
+
+<p>针对一个项目而言，通常会有几类XML文件需要书写。</p>
+
+<ul>
+	<li>web.xml</li>
+	<li>spring-context.xml</li>
+	<li>spring-mvc.xml</li>
+	<li>other.xml</li>
+	<li>...</li>
+</ul>
+
+<p>不管有多少配置文件，可以肯定的一点，这些配置文件，都是在web.xml中被指定的。<br />
+后续慢慢阐述。</p>
+
+<h1>web.xml</h1>
+
+<p>web.xml可以理解为一个Java Web<strong>项目入口</strong>。在web.xml中通常会有如下几种类型的节点存在，按照<strong>加载顺序</strong>排列。</p>
+
+<h2>Listener</h2>
+
+<p>此为监听器，在上面3个中是最先加载的，表示监听某个动作是否发生，发生后要进行什么动作。</p>
+
+<blockquote>
+<p>监听--就是在进行某种各个范围(application,session,request)中有相关值的设置、修改、替换的时候，这些操作都会触发事件，而Java中事件的代理机制，事件处理是利用listener机制，所以为了在事件触发的时候能够使自己能够采取相应的措施，就需要----&gt;继承这样的listener，在listener中覆写相应的方法，覆写相应的事件处理方法，在对应的方法中处理对应的事件，也就是进行了监听<br />
+参考链接:<a href="http://www.jianshu.com/p/d38818f643e4">安卓中监听者模式</a><br />
+在Java Web中，监听对象通常有3个:</p>
+</blockquote>
+
+<ul>
+	<li>ServletContext(Spring中关于ServletContext对类签名如下:</li>
+</ul>
+
+<pre>
+public class ContextLoaderListener extends ContextLoader implements ServletContextListener { ..... } </pre>
+
+<ul>
+	<li>Request</li>
+	<li>Session</li>
+</ul>
+
+<p>Spring的监听器需要设置<strong>context-param</strong>来指定Spring配置文件的路径。</p>
+
+<pre>
+    &lt;!-- 1. Spring自动扫描 --&gt;
+    &lt;listener&gt;
+        &lt;listener-class&gt;org.springframework.web.context.ContextLoaderListener&lt;/listener-class&gt;
+    &lt;/listener&gt;
+    &lt;context-param&gt;
+        &lt;param-name&gt;contextConfigLocation&lt;/param-name&gt;
+        &lt;param-value&gt;
+          classpath*:spring/application-*.xml
+          classpath*:spring/webservice.xml
+        &lt;/param-value&gt;
+    &lt;/context-param&gt;
+</pre>
+
+<h2>Filter</h2>
+
+<p>此为过滤器，为第二个加载的。任何一个被指定的路径，都需要经过这个过滤器过滤。通常使用到Filter有:</p>
+
+<ul>
+	<li>编码转换过滤器</li>
+	<li>安全处理XSS、SQL注入拦截过滤器</li>
+	<li>为支持而创建的Put过滤器</li>
+	<li>数据连接池Druid过滤器</li>
+	<li>。。。</li>
+</ul>
+
+<pre>
+&lt;filter&gt;
+        &lt;filter-name&gt;encodingFilter&lt;/filter-name&gt;
+        &lt;filter-class&gt;org.springframework.web.filter.CharacterEncodingFilter&lt;/filter-class&gt;
+        &lt;async-supported&gt;true&lt;/async-supported&gt;
+        &lt;init-param&gt;
+            &lt;param-name&gt;encoding&lt;/param-name&gt;
+            &lt;param-value&gt;UTF-8&lt;/param-value&gt;
+        &lt;/init-param&gt;
+        &lt;init-param&gt;
+            &lt;param-name&gt;forceEncoding&lt;/param-name&gt;
+            &lt;param-value&gt;true&lt;/param-value&gt;
+        &lt;/init-param&gt;
+    &lt;/filter&gt;
+    &lt;filter-mapping&gt;
+        &lt;filter-name&gt;encodingFilter&lt;/filter-name&gt;
+        &lt;url-pattern&gt;/*&lt;/url-pattern&gt;
+    &lt;/filter-mapping&gt;
+</pre>
+
+<h2>Servlet</h2>
+
+<p>Servlet是三类中最后加载的，通常就是作为控制层存在，在SSM中属于SpringMVC中进行管理的。</p>
+
+<pre>
+    &lt;!-- 2. SpringMVC配置 --&gt;
+    &lt;!-- Spring MVC servlet --&gt;
+    &lt;servlet&gt;
+        &lt;servlet-name&gt;SpringMVC&lt;/servlet-name&gt;
+        &lt;servlet-class&gt;org.springframework.web.servlet.DispatcherServlet&lt;/servlet-class&gt;
+        &lt;init-param&gt;
+            &lt;param-name&gt;contextConfigLocation&lt;/param-name&gt;
+            &lt;param-value&gt;classpath:spring/spring-mvc.xml&lt;/param-value&gt;
+        &lt;/init-param&gt;
+        &lt;load-on-startup&gt;1&lt;/load-on-startup&gt;
+        &lt;async-supported&gt;true&lt;/async-supported&gt;
+    &lt;/servlet&gt;
+    &lt;servlet-mapping&gt;
+        &lt;servlet-name&gt;SpringMVC&lt;/servlet-name&gt;
+        &lt;!-- 此处可以可以配置成 *.do ，对应struts的后缀习惯 --&gt;
+        &lt;url-pattern&gt;/&lt;/url-pattern&gt;
+    &lt;/servlet-mapping&gt;</pre>
+
+<p>&nbsp;</p>
+
+<h2>context-param</h2>
+
+<p>上下文参数</p>
+
+<ol start="1">
+	<li>&lt;context-param&gt;&nbsp;&nbsp;</li>
+	<li>&lt;param-name&gt;contextConfigLocation&lt;/param-name&gt;&nbsp;&nbsp;</li>
+	<li>&lt;param-value&gt;contextConfigLocationValue&gt;&lt;/param-value&gt;&nbsp;&nbsp;</li>
+	<li>&lt;/context-param&gt;&nbsp;&nbsp;</li>
+</ol>
+
+<blockquote>
+<p>作用：该元素用来声明应用范围(整个WEB项目)内的上下文初始化参数。</p>
+
+<p>param-name 设定上下文的参数名称。必须是唯一名称</p>
+
+<p>param-value 设定的参数名称的值</p>
+</blockquote>
+
+<ul>
+	<li>初始化过程：</li>
+</ul>
+
+<ol>
+	<li>在启动Web项目时，容器(比如Tomcat)会读web.xml配置文件中的两个节点&lt;listener&gt;和&lt;contex-param&gt;。</li>
+	<li>接着容器会创建一个ServletContext(上下文),应用范围内即整个WEB项目都能使用这个上下文。</li>
+	<li>接着容器会将读取到&lt;context-param&gt;转化为键值对,并交给ServletContext。</li>
+	<li>容器创建&lt;listener&gt;&lt;/listener&gt;中的类实例,即创建监听（备注：listener定义的类可以是自定义的类但必须需要继承ServletContextListener）。</li>
+	<li>在监听的类中会有一个contextInitialized(ServletContextEvent event)初始化方法，在这个方法中可以通过event.getServletContext().getInitParameter(&quot;contextConfigLocation&quot;) 来得到context-param 设定的值。在这个类中还必须有一个contextDestroyed(ServletContextEvent event) 销毁方法.用于关闭应用前释放资源，比如说数据库连接的关闭。</li>
+	<li>得到这个context-param的值之后,你就可以做一些操作了.注意,这个时候你的WEB项目还没有完全启动完成.这个动作会比所有的Servlet都要早。</li>
+</ol>
+
+<blockquote>
+<p><strong>由上面的初始化过程可知容器对于web.xml的加载过程是context-param &gt;&gt; listener&nbsp; &gt;&gt;&nbsp;fileter&nbsp; &gt;&gt; servlet</strong></p>
+</blockquote>
+
+<ul>
+	<li>&nbsp;如何使用</li>
+</ul>
+
+<ol>
+	<li>页面中
+	<p>${initParam.contextConfigLocation}</p>
+	</li>
+	<li>Servlet中<br />
+	String paramValue=getServletContext().getInitParameter(&quot;contextConfigLocation&quot;)</li>
+</ol>
