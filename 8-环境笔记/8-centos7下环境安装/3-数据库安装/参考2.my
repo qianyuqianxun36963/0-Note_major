@@ -1,0 +1,188 @@
+<h1>mysql5.7的安装与配置(centos7环境)</h1>
+
+<h3>第一步：下载mysql</h3>
+
+<pre>
+<code>[root@MiWiFi-R3-srv ~]# wget http://mirrors.sohu.com/mysql/MySQL-5.7/mysql-5.7.17-linux-glibc2.5-x86_64.tar.gz
+
+</code>1:检查是否本地已经安装了mysql</pre>
+
+<pre>
+<code>rpm -qa | grep mysql</code></pre>
+
+<p>&nbsp;</p>
+
+<ul>
+</ul>
+
+<p>2 : 卸载以前的mysql</p>
+
+<pre>
+<code>rpm -e 已经存在的MySQL全名
+
+</code>第二步：解压文件</pre>
+
+<pre>
+<code>[root@MiWiFi-R3-srv ~]# tar -zxvf mysql-5.7.17-linux-glibc2.5-x86_64.tar.gz -C /usr/local/
+
+</code><strong>文件名修改为mysql：</strong><span style="font-family:sans-serif,Arial,Verdana,&quot;Trebuchet MS&quot;">　　</span></pre>
+
+<pre>
+<code>[root@MiWiFi-R3-srv local]# mv mysql-5.7.17-linux-glibc2.5-x86_64/ mysql
+
+</code>第三步：配置启动文件</pre>
+
+<p>然后去到mysql的support-files目录下,复制my.cnf到 /etc/my.cnf(mysqld启动时自动读取)</p>
+
+<pre>
+<code>[root@MiWiFi-R3-srv local]# cd mysql/support-files/
+[root@MiWiFi-R3-srv support-files]# cp my-default.cnf /etc/my.cnf
+cp: overwrite &lsquo;/etc/my.cnf&rsquo;? yes </code></pre>
+
+<blockquote>
+<p>注意：如果你在安装时Linux虚拟机时同时安装了默认的mysql，此时操作以上步骤，终端将会提示你文件已存在是否覆盖，输入yes覆盖即可。</p>
+</blockquote>
+
+<h4>2、配置数据库编码</h4>
+
+<pre>
+<code>[root@MiWiFi-R3-srv support-files]# vim /etc/my.cnf</code></pre>
+
+<p><strong>添加以下内容:</strong></p>
+
+<pre>
+<code>[mysql]
+default-character-set=utf8
+
+[mysqld]
+default-storage-engine=INNODB
+character_set_server=utf8</code></pre>
+
+<h4>3、复制mysql.server到/etc/init.d/目录下(目的想实现开机自动执行效果)</h4>
+
+<pre>
+<code>[root@MiWiFi-R3-srv support-files]# cp mysql.server /etc/init.d/mysql</code></pre>
+
+<h4>4、修改/etc/init.d/mysql参数</h4>
+
+<pre>
+<code>[root@MiWiFi-R3-srv support-files]# vim /etc/init.d/mysql</code></pre>
+
+<p><strong>修改以下内容:</strong></p>
+
+<pre>
+<code>basedir=/usr/local/mysql
+datadir=/usr/local/mysql/data</code></pre>
+
+<h4>5、出于安全便利，创建一个操作数据库的专门用户</h4>
+
+<p><strong>建立一个mysql的组:</strong></p>
+
+<pre>
+<code>[root@MiWiFi-R3-srv support-files]# groupadd mysql</code></pre>
+
+<p><strong>建立mysql用户，并且把用户放到mysql组:</strong></p>
+
+<pre>
+<code>[root@MiWiFi-R3-srv support-files]# useradd -r -g mysql mysql</code></pre>
+
+<p><strong>给mysql用户设置一个密码:</strong></p>
+
+<pre>
+<code>[root@MiWiFi-R3-srv support-files]# passwd mysql</code></pre>
+
+<p><strong>给目录/usr/local/mysql 更改拥有者:</strong></p>
+
+<pre>
+<code>[root@MiWiFi-R3-srv support-files]# chown -R mysql:mysql /usr/local/mysql/</code></pre>
+
+<h3>第四步：初始化 mysql 的数据库</h3>
+
+<pre>
+<code>[root@MiWiFi-R3-srv support-files]# cd /usr/local/mysql/bin/
+[root@MiWiFi-R3-srv bin]# ./mysqld --initialize --user=mysql --basedir=/usr/local/mysql --datadir=/usr/local/mysql/data</code></pre>
+
+<p>初始化后会生成一个临时密码 root@localhost:：<em>*</em>(最好先记录这个临时密码)</p>
+
+<h4>2.给数据库加密</h4>
+
+<pre>
+<code>[root@MiWiFi-R3-srv bin]# ./mysql_ssl_rsa_setup --datadir=/usr/local/mysql/data</code></pre>
+
+<h4>3.启动mysql</h4>
+
+<pre>
+<code>[root@MiWiFi-R3-srv bin]# ./mysqld_safe --user=mysql &amp;</code></pre>
+
+<h4>4.检查mysql是否启动</h4>
+
+<pre>
+<code>[root@MiWiFi-R3-srv bin]# ps -ef|grep mysql</code></pre>
+
+<p><strong>发现有进程便代表启动成功。</strong></p>
+
+<h2>进入客户端</h2>
+
+<h4>1.登录:</h4>
+
+<pre>
+<code> [root@MiWiFi-R3-srv bin]# ./mysql -uroot -p</code></pre>
+
+<pre>
+<code>Enter password:这里输入之前的临时密码</code></pre>
+
+<h4>2.修改密码</h4>
+
+<pre>
+<code>mysql&gt; set password=password(&#39;新密码&#39;);</code></pre>
+
+<h2>设置远程访问</h2>
+
+<h3>1:打开mysql的默认端口3306:</h3>
+
+<pre>
+<code>firewall-cmd --zone=public --add-port=3306/tcp --permanent
+success
+firewall-cmd --reload
+success</code></pre>
+
+<h3>2:设置mysql的远程访问</h3>
+
+<p><strong>设置远程访问账号:grant all privileges on&nbsp;<em>.</em>&nbsp;to 远程访问用户名@&rsquo;%&rsquo; identified by &lsquo;用户密码&rsquo;;</strong></p>
+
+<pre>
+<code>mysql&gt; grant all privileges on *.* to root@&#39;%&#39; identified by &#39;root&#39;;</code></pre>
+
+<p><strong>刷新:</strong></p>
+
+<pre>
+<code>mysql&gt; flush privileges;</code></pre>
+
+<h2>设置开机自启动</h2>
+
+<h3>1、添加服务mysql</h3>
+
+<pre>
+<code>chkconfig --add mysql</code></pre>
+
+<h3>2、设置mysql服务为自启动</h3>
+
+<pre>
+<code>chkconfig mysql on
+
+</code><span style="font-family:sans-serif,Arial,Verdana,&quot;Trebuchet MS&quot;">配置环境变量</span></pre>
+
+<pre>
+<code>vim /etc/profile</code></pre>
+
+<p><strong>最后一行添加:</strong></p>
+
+<pre>
+<code>export PATH=$JAVA_HOME/bin:/usr/local/mysql/bin:$PATH</code></pre>
+
+<p><strong>使修改生效:</strong></p>
+
+<pre>
+<code>source /etc/profile</code></pre>
+
+<p>至此,mysql5.7的安装就完成了!!!</p>

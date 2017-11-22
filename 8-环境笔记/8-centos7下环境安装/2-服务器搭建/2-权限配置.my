@@ -1,0 +1,163 @@
+<h1>tomcat8 安装遇到的问题</h1>
+
+<h2>可以进入tomcat但是不能进管理页面</h2>
+
+<h3>错误提示如下：</h3>
+
+<p><strong>403 Access Denied</strong></p>
+
+<p>You are not authorized to view this page.</p>
+
+<p>By default the Manager is only accessible from a browser running on the same machine as Tomcat. If you wish to modify this restriction, you&#39;ll need to edit the Manager&#39;s&nbsp;<tt>context.xml</tt>&nbsp;file.</p>
+
+<p>If you have already configured the Manager application to allow access and you have used your browsers back button, used a saved book-mark or similar then you may have triggered the cross-site request forgery (CSRF) protection that has been enabled for the HTML interface of the Manager application. You will need to reset this protection by returning to the&nbsp;<a href="http://210.28.216.101:8080/manager/html">main Manager page</a>. Once you return to this page, you will be able to continue using the Manager application&#39;s HTML interface normally. If you continue to see this access denied message, check that you have the necessary permissions to access this application.</p>
+
+<p>If you have not changed any configuration files, please examine the file&nbsp;<tt>conf/tomcat-users.xml</tt>&nbsp;in your installation. That file must contain the credentials to let you use this webapp.</p>
+
+<p>For example, to add the&nbsp;<tt>manager-gui</tt>&nbsp;role to a user named&nbsp;<tt>tomcat</tt>&nbsp;with a password of&nbsp;<tt>s3cret</tt>, add the following to the config file listed above.</p>
+
+<pre>
+&lt;role rolename=&quot;manager-gui&quot;/&gt;
+&lt;user username=&quot;tomcat&quot; password=&quot;s3cret&quot; roles=&quot;manager-gui&quot;/&gt;
+</pre>
+
+<p>Note that for Tomcat 7 onwards, the roles required to use the manager application were changed from the single&nbsp;<tt>manager</tt>&nbsp;role to the following four roles. You will need to assign the role(s) required for the functionality you wish to access.</p>
+
+<ul>
+	<li><tt>manager-gui</tt>&nbsp;- allows access to the HTML GUI and the status pages</li>
+	<li><tt>manager-script</tt>&nbsp;- allows access to the text interface and the status pages</li>
+	<li><tt>manager-jmx</tt>&nbsp;- allows access to the JMX proxy and the status pages</li>
+	<li><tt>manager-status</tt>&nbsp;- allows access to the status pages only</li>
+</ul>
+
+<p>The HTML interface is protected against CSRF but the text and JMX interfaces are not. To maintain the CSRF protection:</p>
+
+<ul>
+	<li>Users with the&nbsp;<tt>manager-gui</tt>&nbsp;role should not be granted either the&nbsp;<tt>manager-script</tt>&nbsp;or&nbsp;<tt>manager-jmx</tt>&nbsp;roles.</li>
+	<li>If the text or jmx interfaces are accessed through a browser (e.g. for testing since these interfaces are intended for tools not humans) then the browser must be closed afterwards to terminate the session.</li>
+</ul>
+
+<p>For more information - please see the&nbsp;<a href="http://210.28.216.101:8080/docs/manager-howto.html">Manager App HOW-TO</a>.</p>
+
+<p>&nbsp;</p>
+
+<h2>实际配置时使用到的：</h2>
+
+<h3>添加授权用户：</h3>
+
+<p>$TOMCAT_HOME/conf/tomcat-users.xml&nbsp; （添加允许进入的用户名和密码）</p>
+
+<p>&lt;tomcat-users xmlns=&quot;http://tomcat.apache.org/xml&quot;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; xmlns:xsi=&quot;http://www.w3.org/2001/XMLSchema-instance&quot;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; xsi:schemaLocation=&quot;http://tomcat.apache.org/xml tomcat-users.xsd&quot;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; version=&quot;1.0&quot;&gt;<br />
+&nbsp; &lt;role rolename=&quot;manager-gui&quot;/&gt;<br />
+&nbsp; &lt;role rolename=&quot;manager-script&quot;/&gt;<br />
+&nbsp; &lt;role rolename=&quot;manager-jmx&quot;/&gt;<br />
+&nbsp; &lt;role rolename=&quot;manager-status&quot;/&gt;<br />
+&nbsp; &lt;user username=&quot;wangyajun&quot; password=&quot;wangyajun&quot; roles=&quot;manager-gui,manager-script,manager-jmx,manager-status&quot;/&gt;<br />
+&nbsp; &lt;user username=&quot;lumingqi&quot; &nbsp;password=&quot;lumingqi&quot; &nbsp;roles=&quot;manager-gui,manager-script,manager-jmx,manager-status&quot;/&gt;<br />
+&lt;/tomcat-users&gt;<br />
+&nbsp;</p>
+
+<h3>修改环境文件：</h3>
+
+<p>$TOMCAT_HOME/webapps/manager/META-INF/context.xml （添加可以访问的主机路径。）</p>
+
+<pre>
+<code>&lt;Context privileged=&quot;true&quot; antiResourceLocking=&quot;false&quot; &gt;
+    &lt;Valve className=&quot;org.apache.catalina.valves.RemoteAddrValve&quot; allow=&quot;^.*$&quot; /&gt;
+&lt;/Context&gt;</code></pre>
+
+<p><code>或者</code></p>
+
+<pre>
+<code>&lt;Context antiResourceLocking=&quot;false&quot; privileged=&quot;true&quot; &gt;
+    &lt;!--
+    &lt;Valve className=&quot;org.apache.catalina.valves.RemoteAddrValve&quot;
+         allow=&quot;127\.\d+\.\d+\.\d+|::1|0:0:0:0:0:0:0:1&quot; /&gt;
+    --&gt;
+&lt;/Context&gt;</code></pre>
+
+<h2>网上说法</h2>
+
+<h3>一、这是因为两个地方可能有问题</h3>
+
+<p>第一个地方：</p>
+
+<p>$TOMCAT_HOME/webapps/manager/META-INF/context.xml文件中</p>
+
+<p>&lt;Context antiResourceLocking=&quot;false&quot; privileged=&quot;true&quot; &gt;<br />
+&nbsp; &lt;Valve className=&quot;org.apache.catalina.valves.RemoteAddrValve&quot;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; allow=&quot;127\.\d+\.\d+\.\d+|::1|0:0:0:0:0:0:0:1&quot; /&gt;<br />
+&lt;/Context&gt;</p>
+
+<p>配置有问题，因为只允许本机访问所以其他人无法访问，只需加入本机ip即可</p>
+
+<p>&lt;Context antiResourceLocking=&quot;false&quot; privileged=&quot;true&quot; &gt;<br />
+&nbsp; &lt;Valve className=&quot;org.apache.catalina.valves.RemoteAddrValve&quot;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; allow=&quot;127\.\d+\.\d+\.\d+|::1|0:0:0:0:0:0:0:1|10.0.1.143&quot; /&gt;<br />
+&lt;/Context&gt;</p>
+
+<p>第二个地方：</p>
+
+<p>$TOMCAT_HOME/conf/tomcat-users.xml</p>
+
+<p>&lt;role rolename=&quot;manager-gui&quot;/&gt;<br />
+&lt;role rolename=&quot;manager-script&quot;/&gt;<br />
+&lt;role rolename=&quot;admin-gui&quot;/&gt;<br />
+&lt;role rolename=&quot;admin-script&quot;/&gt;<br />
+&lt;role rolename=&quot;tomcat-gui&quot;/&gt;<br />
+&lt;user username=&quot;tomcat&quot; password=&quot;GFJuwldhzjEYE&quot; roles=&quot;manager-script,admin-script,admin-gui,tomcat,manager-gui&quot;/&gt;<br />
+&lt;/tomcat-users&gt;</p>
+
+<h3>二、answer1</h3>
+
+<p>Each deployed webapp has a&nbsp;<code>context.xml</code>&nbsp;file that lives in</p>
+
+<pre>
+<code>$CATALINA_BASE/conf/[enginename]/[hostname]
+
+(conf/Catalina/localhost by default)
+</code></pre>
+
+<p>and has the same name as the webapp (<code>manager.xml</code>&nbsp;in this case). If no file is present, default values are used.</p>
+
+<p>So, you need to create a file&nbsp;<code>conf/Catalina/localhost/manager.xml</code>&nbsp;and specify the rule you want to allow remote access. For example, the following content of&nbsp;<code>manager.xml</code>&nbsp;will allow access from all machines:</p>
+
+<pre>
+<code>&lt;Context privileged=&quot;true&quot; antiResourceLocking=&quot;false&quot; 
+         docBase=&quot;${catalina.home}/webapps/manager&quot;&gt;
+    &lt;Valve className=&quot;org.apache.catalina.valves.RemoteAddrValve&quot; allow=&quot;^.*$&quot; /&gt;
+&lt;/Context&gt;
+</code></pre>
+
+<p>Note that the allow attribute of the&nbsp;<code>Valve</code>&nbsp;element is a regular expression that matches the IP address of the connecting host. Other&nbsp;<code>Valve</code>&nbsp;classes cater for other rules (e.g.&nbsp;<code>RemoteHostValve</code>for matching host names).</p>
+
+<p>Once the changes above have been made, you should be presented with an authentication dialog when accessing the manager URL. If you enter the details you have supplied in&nbsp;<code>tomcat-users.xml</code>you should have access to the Manager.</p>
+
+<h3>三、answer2</h3>
+
+<p>For Tomcat v8.5.4 and above, the file&nbsp;<code>&lt;tomcat&gt;/webapps/manager/META-INF/context.xml</code>&nbsp;has been adjusted:</p>
+
+<pre>
+<code>&lt;Context antiResourceLocking=&quot;false&quot; privileged=&quot;true&quot; &gt;
+    &lt;Valve className=&quot;org.apache.catalina.valves.RemoteAddrValve&quot;
+         allow=&quot;127\.\d+\.\d+\.\d+|::1|0:0:0:0:0:0:0:1&quot; /&gt;
+&lt;/Context&gt;
+</code></pre>
+
+<p>Change this file to comment the&nbsp;<code>Valve</code>:</p>
+
+<pre>
+<code>&lt;Context antiResourceLocking=&quot;false&quot; privileged=&quot;true&quot; &gt;
+    &lt;!--
+    &lt;Valve className=&quot;org.apache.catalina.valves.RemoteAddrValve&quot;
+         allow=&quot;127\.\d+\.\d+\.\d+|::1|0:0:0:0:0:0:0:1&quot; /&gt;
+    --&gt;
+&lt;/Context&gt;
+</code></pre>
+
+<p>After that, refresh your browser (not need to restart Tomcat), you can see the manager page.</p>
+
+<p>&nbsp;</p>
