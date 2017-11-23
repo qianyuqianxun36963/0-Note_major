@@ -1,0 +1,191 @@
+<p><strong>第一步：获取mysql YUM源</strong></p>
+
+<p>进入mysql官网获取RPM包下载地址</p>
+
+<p><a href="https://dev.mysql.com/downloads/repo/yum/">https://dev.mysql.com/downloads/repo/yum/</a></p>
+
+<p>&nbsp;</p>
+
+<p><img alt="" src="http://images2015.cnblogs.com/blog/812323/201707/812323-20170703223302534-1634260227.png" style="height:333px; width:600px" /></p>
+
+<p>&nbsp;</p>
+
+<p>点击 下载</p>
+
+<p><img alt="" src="http://images2015.cnblogs.com/blog/812323/201707/812323-20170703223317159-1093514181.png" style="height:450px; width:600px" /></p>
+
+<p>&nbsp;</p>
+
+<p>右击 复制链接地址&nbsp;<a href="https://dev.mysql.com/get/mysql57-community-release-el7-11.noarch.rpm">https://dev.mysql.com/get/mysql57-community-release-el7-11.noarch.rpm</a></p>
+
+<p>&nbsp;</p>
+
+<p>得到这个 &nbsp;这个就是Yum仓库的rpm包 其实就是一个下载地址</p>
+
+<p>&nbsp;</p>
+
+<p><strong>第二步：下载和安装mysql源</strong></p>
+
+<p>先下载 mysql源安装包</p>
+
+<p>[root@localhost ~]# wget https://dev.mysql.com/get/mysql57-community-release-el7-11.noarch.rpm</p>
+
+<p>-bash: wget: 未找到命令</p>
+
+<p>我们先安装下wget&nbsp;</p>
+
+<p>yum -y install wget</p>
+
+<p>然后执行&nbsp;wget&nbsp;<a href="https://dev.mysql.com/get/mysql57-community-release-el7-11.noarch.rpm">https://dev.mysql.com/get/mysql57-community-release-el7-11.noarch.rpm</a></p>
+
+<p>&nbsp;</p>
+
+<p>安装mysql源</p>
+
+<p>yum -y localinstall mysql57-community-release-el7-11.noarch.rpm&nbsp;</p>
+
+<p>&nbsp;</p>
+
+<p><strong>第三步：在线安装Mysql</strong></p>
+
+<p>yum -y install mysql-community-server</p>
+
+<p>下载的东西比较多 要稍微等会；</p>
+
+<p>&nbsp;</p>
+
+<p><strong>第四步：启动Mysql服务</strong></p>
+
+<p>systemctl start mysqld</p>
+
+<p>&nbsp;</p>
+
+<p><strong>第五步：设置开机启动</strong></p>
+
+<p>[root@localhost ~]# systemctl enable mysqld</p>
+
+<p>[root@localhost ~]# systemctl daemon-reload</p>
+
+<p>&nbsp;</p>
+
+<p><strong>第六步：修改root本地登录密码</strong></p>
+
+<p>mysql安装完成之后，在/var/log/mysqld.log文件中给root生成了一个临时的默认密码。</p>
+
+<p>[root@localhost ~]# vi /var/log/mysqld.log</p>
+
+<p><img alt="" src="http://images2015.cnblogs.com/blog/812323/201707/812323-20170703223338878-454043388.png" /></p>
+
+<p>这里的临时密码 eMV.R#mWe3ha</p>
+
+<p>&nbsp;</p>
+
+<p>[root@localhost ~]# &nbsp;mysql -u root -p</p>
+
+<p>Enter password:&nbsp;</p>
+
+<p>输入临时密码 进入mysql命令行；</p>
+
+<p>mysql&gt; ALTER USER &#39;root&#39;@&#39;localhost&#39; IDENTIFIED BY &#39;ZhipengWang2012@&#39;;</p>
+
+<p>Query OK, 0 rows affected (0.00 sec)</p>
+
+<p>修改密码为&nbsp;ZhipengWang2012@ &nbsp; &nbsp;(备注 mysql5.7默认密码策略要求密码必须是大小写字母数字特殊字母的组合，至少8位)&nbsp;</p>
+
+<p>&nbsp;</p>
+
+<p><strong>第七步：设置允许远程登录</strong></p>
+
+<p>Mysql默认不允许远程登录，我们需要设置下，并且防火墙开放3306端口；</p>
+
+<p>mysql&gt; GRANT ALL PRIVILEGES ON *.* TO &#39;root&#39;@&#39;%&#39; IDENTIFIED BY &#39;ZhipengWang2012@&#39; WITH GRANT OPTION;</p>
+
+<p>Query OK, 0 rows affected, 1 warning (0.01 sec)</p>
+
+<p>mysql&gt; exit;</p>
+
+<p>Bye</p>
+
+<p>退出下；</p>
+
+<p>[root@localhost ~]# firewall-cmd --zone=public --add-port=3306/tcp --permanent</p>
+
+<p>success</p>
+
+<p>[root@localhost ~]# firewall-cmd --reload</p>
+
+<p>success</p>
+
+<p>[root@localhost ~]#&nbsp;</p>
+
+<p>开放3306端口</p>
+
+<p>&nbsp;</p>
+
+<p><strong>第八步：配置默认编码为utf8</strong></p>
+
+<p>修改/etc/my.cnf配置文件，在[mysqld]下添加编码配置，如下所示：</p>
+
+<p>[mysqld]</p>
+
+<p>character_set_server=utf8</p>
+
+<p>init_connect=&#39;SET NAMES utf8&#39;</p>
+
+<p>&nbsp;</p>
+
+<p>[root@localhost ~]# vi /etc/my.cnf</p>
+
+<p><img alt="" src="http://images2015.cnblogs.com/blog/812323/201707/812323-20170703223353847-841905189.png" /></p>
+
+<p>编辑保存完 重启mysql服务；</p>
+
+<p>[root@localhost ~]# systemctl restart mysqld</p>
+
+<p>[root@localhost ~]#&nbsp;</p>
+
+<p>查看下编码：</p>
+
+<p>mysql&gt; show variables like &#39;%character%&#39;;</p>
+
+<p>+--------------------------+----------------------------+</p>
+
+<p>| Variable_name &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;| Value &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;|</p>
+
+<p>+--------------------------+----------------------------+</p>
+
+<p>| character_set_client &nbsp; &nbsp; | utf8 &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; |</p>
+
+<p>| character_set_connection | utf8 &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; |</p>
+
+<p>| character_set_database &nbsp; | utf8 &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; |</p>
+
+<p>| character_set_filesystem | binary &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; |</p>
+
+<p>| character_set_results &nbsp; &nbsp;| utf8 &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; |</p>
+
+<p>| character_set_server &nbsp; &nbsp; | utf8 &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; |</p>
+
+<p>| character_set_system &nbsp; &nbsp; | utf8 &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; |</p>
+
+<p>| character_sets_dir &nbsp; &nbsp; &nbsp; | /usr/share/mysql/charsets/ |</p>
+
+<p>+--------------------------+----------------------------+</p>
+
+<p>8 rows in set (0.00 sec)</p>
+
+<p>&nbsp;</p>
+
+<p><strong>第九步：测试</strong></p>
+
+<p>我们用本机的sqlyog远程连接下虚拟机里的mysql</p>
+
+<p><img alt="" src="http://images2015.cnblogs.com/blog/812323/201707/812323-20170703223410894-1305204344.png" /></p>
+
+<p>&nbsp;</p>
+
+<p>&nbsp;<img alt="" src="http://images2015.cnblogs.com/blog/812323/201707/812323-20170703223418378-419041886.png" /></p>
+
+<p>&nbsp;</p>
+
+<p>&nbsp;OK 至此 Mysql安装配置完毕；</p>
