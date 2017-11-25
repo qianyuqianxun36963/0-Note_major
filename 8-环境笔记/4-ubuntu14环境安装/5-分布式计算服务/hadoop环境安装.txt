@@ -1,0 +1,118 @@
+
+
+ssh-keygen -t rsa
+
+就选择默认的保存路径：Enter file in which to save the key /root/.ssh/id_rsa
+ssh-keygen -t rsa
+Generating public/private rsa key pair.
+Enter file in which to save the key (/root/.ssh/id_rsa): 
+
+Enter passphrase (empty for no passphrase): 
+Enter same passphrase again: 
+Your identification has been saved in /root/.ssh/id_rsa.
+Your public key has been saved in /root/.ssh/id_rsa.pub.
+The key fingerprint is:
+e4:d1:8e:b8:4b:2b:8b:a5:dc:c8:0d:07:ba:25:8a:cb root@ubuntu
+The key's randomart image is:
++--[ RSA 2048]----+
+|                 |
+|         .       |
+|        o .      |
+|       + +       |
+|  .   . S .      |
+| . .   .         |
+|o o o o          |
+|+* X.. o         |
+|=E* +oo          |
++-----------------+
+
+
+
+cp /home/master007/Desktop/share/5-分布式软件/hadoop-1.0.4-bin.tar.gz /usr/master/d_data/softs/hadoop-1.0.4-bin.tar.gz
+
+cp /home/master007/Desktop/share/5-分布式软件/hadoop-1.0.4-bin.tar.gz /usr/master/a_run/d_service/hadoop/hadoop-1.0.4-bin.tar.gz
+
+tar -zxvf hadoop-1.0.4-bin.tar.gz 
+
+将hadoop路径加入path
+
+vi ～/.bashrc
+在文件末尾添加如下内容并保存。
+export HADOOP_HOME=/usr/master/a_run/d_service/hadoop/hadoop-1.0.4
+export HADOOP_PREFIX=/usr/master/a_run/d_service/hadoop/hadoop-1.0.4
+export PATH=$HADOOP_HOME/bin:$PATH
+
+执行如下命令，使得我们设置的path能够马上生效。
+source ~/.bashrc
+
+配置hadoop-env.sh
+修改/usr/master/a_run/d_service/hadoop/hadoop-1.0.4/conf/hadoop-env.sh
+在该文件最后一行添加
+export JAVA_HOME=/usr/master/a_run/a_envir/java/jdk1.8
+
+6. 
+		<?xml version="1.0"?>配置伪分布模式
+	6.1 修改core-site.xml文件，内容如下
+		<?xml-stylesheet type="text/xsl" href="configuration.xsl"?>
+		<configuration>
+			<property>
+				<name>fs.default.name</name>
+				<value>hdfs://localhost:9000</value>
+			</property>
+		</configuration>
+
+	6.2 修改mapred-site.xml文件，内容如下
+		<?xml version="1.0"?>
+		<?xml-stylesheet type="text/xsl" href="configuration.xsl"?>
+		<configuration>
+			<property>
+				<name>mapred.job.tracker</name>
+				<value>localhost:9001</value>
+			</property>
+		</configuration>
+		
+	6.3 修改hdfs-site.xml文件，内容如下
+		<?xml version="1.0"?>
+		<?xml-stylesheet type="text/xsl" href="configuration.xsl"?>
+		<configuration>
+			<property>
+				<name>dfs.replication</name>
+				<value>1</value>
+			</property>
+		<configuration>
+
+
+将localhost添加到hadoop conf目录下面的masters文件中
+echo "localhost" >> masters
+masters 是 hadoop安装目录下的一个文件。
+
+将localhost添加到hadoop conf目录下面的slaves文件中
+echo "localhost" >> slaves
+slaves 也是 hadoop安装目录下的一个文件。
+
+格式化HDFS
+~/hadoop/hadoop-1.0.4/bin/hadoop namenode -format
+
+启动hadoop
+~/hadoop/hadoop-1.0.4/bin/start-all.sh
+
+在HDFS中添加文件和目录
+hadoop fs -mkdir /user/[你的用户名]/wordcount/input
+上面的命令本质上是递归创建的,但在有的版本上是不支持的,那么需要你依次执行如下命令
+hadoop fs -mkdir /user
+hadoop fs -mkdir /user/[你的用户名]
+hadoop fs -mkdir /user/[你的用户名]/wordcount
+hadoop fs -mkdir /user/[你的用户名]/wordcount/input
+
+在当前目录下面创建若干个文本文件，每个文件里面添加若干个英文单词，比如
+[ghostfire@turing]$ cat input1.txt
+no zuo no die
+you can you up
+[ghostfire@turing]$ cat input2.txt
+you can you up
+no zuo no die
+将文本文件从本地目录上传到HDFS中
+hadoop fs -put ./input1.txt /user/[你的用户名]/wordcount/input
+hadoop fs -put ./input2.txt /user/[你的用户名]/wordcount/input
+查看文件上传是否成功
+hadoop fs -lsr /

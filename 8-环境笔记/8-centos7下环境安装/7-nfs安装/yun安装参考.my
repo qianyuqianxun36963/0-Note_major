@@ -1,0 +1,254 @@
+<h1>CentOS 7 安装配置 NFS</h1>
+
+<h2><strong>环境</strong></h2>
+
+<p>nps 192.168.1.97</p>
+
+<p>client 192.168.1.98</p>
+
+<h2><strong>一、yum 安装</strong></h2>
+
+<p><strong>&raquo;</strong><strong>yum -y install nfs-utils rpcbind</strong></p>
+
+<p><strong>NFS 的套件结构：</strong></p>
+
+<ul>
+	<li>/etc/exports ：这个档案就是 NFS 的主要设定档了！不过，系统并没有预设值，所以这个档案&lsquo;&nbsp;不一定会存在&rsquo;，您可能必须要使用 vi 主动的建立起这个档案喔！我们等一下要谈的设定也仅只是这个档案而已呐！</li>
+	<li>/usr/sbin/exportfs ：这个是维护 NFS 分享资源的指令，我们可以利用这个指令重新分享 /etc/exports 变更的目录资源、将 NFS Server 分享的目录卸载或重新分享等等，这个指令是 NFS 系统里面相当重要的一个喔！至于指令的用法我们在底下会再介绍。</li>
+	<li>/usr/sbin/showmount ：这是另一个重要的 NFS 指令。exportfs 是用在 NFS Server 端，而 showmount 则主要用在 Client 端。这个 showmount 可以用来察看 NFS 分享出来的目录资源喔！</li>
+	<li>/var/lib/nfs/*tab ：在 NFS 伺服器的登录档都放置到 /var/lib/nfs/ 目录里面，在该目录下有两个比较重要的登录档， 一个是 etab ，主要记录了 NFS 所分享出来的目录的完整权限设定值；另一个 xtab 则记录曾经连结到此 NFS 主机的相关用户端资料。</li>
+</ul>
+
+<p><strong>&raquo;</strong><strong>nfs 的主配置文件 /etc/expots</strong>，默认为空</p>
+
+<pre>
+[root@linux ~]# vi /etc/exports
+/opt/test         192.168.1.0/24(rw,no_root_squash,no_all_squash,sync,anonuid=501,anongid=501)   localhost(rw)   *.ev.ncku.edu.tw(ro,sync)
+# [分享目录]      [第一部主机(权限)]                                                               [可用主机名]       [可用万用字元]</pre>
+
+<p>使配置生效&nbsp;<strong>&raquo;</strong>exportfs -r　<strong><strong>　</strong></strong></p>
+
+<p>&nbsp;</p>
+
+<p><strong><strong>　　例：同一目录针对不同范围开放不同权限</strong></strong></p>
+
+<pre>
+[root@linux ~]# vi /etc/exports
+</pre>
+
+<pre>
+/opt/test         192.168.1.0/24(rw,no_root_squash,no_all_squash,sync,anonuid=501,anongid=501)   localhost(rw)   *.ev.ncku.edu.tw(ro,sync)</pre>
+
+<pre>
+/home/public 192.168.0.0/24(rw) *(ro) # 继续累加在后面，注意，我有将主机与网域分为两段 (用空白隔开) 喔！</pre>
+
+<p><em>　　上面的例子说的是:当我的 IP 是在 192.168.0.0/24 这个网段的时候，那么当我在 Client 端挂载了 Server 端的 /home/public 后，针对这个被我挂载的目录我就具有可以读写的权限～ 至于如果我不是在这个网段之内，那么这个目录的　资料我就仅能读取而已，亦即为唯读的属性啦</em></p>
+
+<h2><strong>二、权限说明</strong></h2>
+
+<p>注：至于权限方面 (就是小括号内的参数) 常见的参数则有：</p>
+
+<p>/opt/test&nbsp;为共享目录</p>
+
+<p>192.168.1.0/24&nbsp;&nbsp;可以为一个网段，一个IP，也可以是域名，域名支持通配符 如: *.qq.com</p>
+
+<p>rw：read-write，可读写；</p>
+
+<p>ro：read-only，只读；</p>
+
+<p>sync：文件同时写入硬盘和内存；</p>
+
+<p>async：文件暂存于内存，而不是直接写入内存；</p>
+
+<p>no_root_squash：NFS客户端连接服务端时如果使用的是root的话，那么对服务端分享的目录来说，也拥有root权限。显然开启这项是不安全的。</p>
+
+<p>root_squash：NFS客户端连接服务端时如果使用的是root的话，那么对服务端分享的目录来说，拥有匿名用户权限，通常他将使用nobody或nfsnobody身份；</p>
+
+<p>all_squash：不论NFS客户端连接服务端时使用什么用户，对服务端分享的目录来说都是拥有匿名用户权限；</p>
+
+<p>anonuid：匿名用户的UID值，可以在此处自行设定。</p>
+
+<p>anongid：匿名用户的GID值。</p>
+
+<h2><strong>三、启动 nfs</strong></h2>
+
+<p>NFS 的启动还需要 portmap 的协助才行啊！ 所以赶紧来启动吧！</p>
+
+<pre>
+[root@linux ~]# <strong>/etc/init.d/</strong><strong>portmap start</strong>
+# 如果 portmap 本来就已经在执行了，那就不需要启动啊！
+
+[root@linux ~]# <strong>/etc/init.d/</strong><strong>nfs start</strong>
+# 有时候可能会出现如下的警告讯息：
+exportfs: /etc/exports [3]: No &#39;sync&#39; or &#39;async&#39; option specified 
+for export &quot;192.168.0.100:/home/test&quot;.
+  Assuming default behaviour (&#39;sync&#39;).
+# 上面的警告讯息仅是在告知因为我们没有指定 sync 或 async 的参数，
+# 则 NFS 将预设会使用 sync 的资讯而已。你可以不理他，也可以加入 /etc/exports。
+
+[root@linux ~]#<strong> vi /etc/exports
+</strong>/tmp          *(rw,no_root_squash,sync)
+/home/public  192.168.0.0/24(rw,sync)    *(ro,sync)
+/home/test    192.168.0.100(rw,sync)
+/home/linux   *.linux.org(rw,all_squash,anonuid=40,anongid=40,sync)
+
+[root@linux ~]# <strong>/etc/init.d/nfs restart</strong>
+</pre>
+
+<p><strong>service rpcbind start</strong></p>
+
+<p><strong>service nfs start</strong></p>
+
+<p><strong>chkconfig rpcbind on</strong></p>
+
+<p><strong>chkconfig nfs on</strong></p>
+
+<p>启动之后，请赶快到 /var/log/messages 里面看看有没有被正确的启动呢？</p>
+
+<pre>
+[root@linux ~]# vi /var/log/messages
+Sep 22 00:01:37 linux nfs: Starting NFS services:  succeeded
+Sep 22 00:01:37 linux nfs: rpc.rquotad startup succeeded
+Sep 22 00:01:37 linux nfsd[1050]: nfssvc_versbits: +2 +3 +4
+Sep 22 00:01:37 linux nfs: rpc.nfsd startup succeeded
+Sep 22 00:01:37 linux nfs: rpc.mountd startup succeeded
+Sep 22 00:01:37 linux rpcidmapd: rpc.idmapd -SIGHUP succeeded
+</pre>
+
+<p>在确认没有问题之后，接下来我们来瞧一瞧那么 NFS 到底开了哪些端口？</p>
+
+<pre>
+[root@linux ~]# <strong>netstat -</strong><strong>ultn</strong>
+Active Internet connections (only servers)
+Proto Recv-Q Send-Q Local Address  Foreign Address State   PID/Program name
+tcp        0      0 0.0.0.0:2049   0.0.0.0:*       LISTEN  -
+tcp        0      0 0.0.0.0:803    0.0.0.0:*       LISTEN  1047/rpc.rquotad
+tcp        0      0 0.0.0.0:111    0.0.0.0:*       LISTEN  32503/portmap
+tcp        0      0 0.0.0.0:819    0.0.0.0:*       LISTEN  1064/rpc.mountd
+udp        0      0 0.0.0.0:2049   0.0.0.0:*               -
+udp        0      0 0.0.0.0:800    0.0.0.0:*               1047/rpc.rquotad
+udp        0      0 0.0.0.0:816    0.0.0.0:*               1064/rpc.mountd
+udp        0      0 0.0.0.0:111    0.0.0.0:*               32503/portmap
+</pre>
+
+<ul>
+	<li>portmap 启动的 port 在 111；</li>
+	<li>NFS 启动的 port 在 2049；</li>
+	<li>其他 rpc.daemons 启动的 port 则是随机产生的，因此需向 port 111 注册。</li>
+</ul>
+
+<p>那我怎么知道每个 RPC 服务的注册状况？没关系，你可以使用 rpcinfo 来处理的。</p>
+
+<pre>
+[root@linux ~]# rpcinfo [-p] [IP|hostname]
+参数：
+-p ：显示出所有的 port 与 porgram 的资讯；
+
+范例一：显示出目前这部主机的 RPC 状态
+[root@linux ~]# <strong>rpcinfo -</strong><strong>p localhost</strong>
+   program vers proto   port
+    100000    2   tcp    111  portmapper
+    100000    2   udp    111  portmapper
+    100011    1   udp    800  rquotad
+    100011    2   udp    800  rquotad
+    100011    1   tcp    803  rquotad
+    100011    2   tcp    803  rquotad
+    100003    2   udp   2049  nfs
+    100003    3   udp   2049  nfs
+    100003    2   tcp   2049  nfs
+    100003    3   tcp   2049  nfs
+    100005    1   udp    816  mountd
+    100005    1   tcp    819  mountd
+    100005    2   udp    816  mountd
+    100005    2   tcp    819  mountd
+    100005    3   udp    816  mountd
+    100005    3   tcp    819  mountd
+#         NFS版本       埠口  服务名称
+</pre>
+
+<p>　　如果你的 rpcinfo 无法输出，那就表示注册的资料有问题啦！可能需要重新启动 portmap 与 nfs 喔！</p>
+
+<p><strong>NFS 的连线观察</strong></p>
+
+<p>在你的 NFS 伺服器设定妥当之后，我们可以先自我测试一下是否可以连线喔！ 就是利用 showmount 这个指令来查阅！</p>
+
+<pre>
+[root@linux ~]# showmount [-ae] [hostname|IP]
+参数：
+-a ：显示目前主机与用户端的 NFS 连线分享的状态；
+-e ：显示某部主机的 /etc/exports 所分享的目录资料。
+
+范例一：请显示出刚刚我们所设定好的相关 exports 资讯
+[root@linux ~]# <strong>showmount -</strong><strong>e localhost</strong>
+Export list for localhost:
+/tmp         *
+/home/linux  *.linux.org
+/home/public (everyone)
+/home/test   192.168.0.100
+</pre>
+
+<p>　　很简单吧！所以，当您要扫瞄某一部主机他提供的 NFS 分享的目录时，就使用 showmount -e IP (或hostname) 即可！非常的方便吧！这也是 NFS client 端最常用的指令喔！</p>
+
+<p>如果有其他用户端挂载了你的 NFS 档案系统时， 那么该用户端与档案系统资讯就会被记录到 /var/lib/nfs/xtab 里头去的！</p>
+
+<pre>
+[root@linux ~]# tail /var/lib/nfs/etab
+/home/public    *(ro,sync,wdelay,hide,nocrossmnt,secure,root_squash,no_all_squash,
+subtree_check,secure_locks,mapping=identity,anonuid=-2,anongid=-2)
+# 上面是同一行，可以看出除了 ro, sync, root_squash 等等，
+# 其实还有 anonuid 及 anongid 等等的设定！
+
+/tmp    *(rw,sync,wdelay,hide,nocrossmnt,secure,no_root_squash,no_all_squash,subtr
+ee_check,secure_locks,mapping=identity,anonuid=-2,anongid=-2)
+# 同样的，在 /tmp 也有很多的权限相关的参数喔！
+</pre>
+
+<p>如果你想要重新处理 /etc/exports 档案，当重新设定完 /etc/exports 后需不需要重新启动 nfs ？ 不需要啦！如果重新启动 nfs 的话，要得要向 RPC 注册！很麻烦～ 这个时候我们可以透过 exportfs 这个指令来帮忙喔！</p>
+
+<pre>
+[root@linux ~]# exportfs [-aruv]
+参数：
+-a ：全部挂载(或卸载) /etc/exports 档案内的设定
+-r ：重新挂载 /etc/exports 里面的设定，此外，亦同步更新 /etc/exports
+     及 /var/lib/nfs/xtab 的内容！
+-u ：卸载某一目录
+-v ：在 export 的时候，将分享的目录显示到荧幕上！
+
+范例一：重新挂载一次 /etc/exports 的设定
+[root@linux ~]# exportfs -arv
+exporting 192.168.0.100:/home/test
+exporting 192.168.0.0/24:/home/public
+exporting *.linux.org:/home/linux
+exporting *:/home/public
+exporting *:/tmp
+
+范例二：全部都卸载
+[root@linux ~]# exportfs -auv
+</pre>
+
+<p>　　要熟悉一下这个指令的用法喔！这样一来，就可以直接重新 exportfs 我们的记录在 /etc/exports 的目录资料啰！</p>
+
+<p>&nbsp;</p>
+
+<h2><strong>四、客户端挂载：</strong></h2>
+
+<p><strong>mount -t nfs 192.168.1.97:/opt/test /mnt</strong></p>
+
+<p>#查看可挂载</p>
+
+<p><strong>showmount -e 192.168.1.97&nbsp;</strong>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;</p>
+
+<p>Export list for 192.168.1.97:</p>
+
+<p>/opt/test&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; 192.168.1.0/24</p>
+
+<p>&nbsp;</p>
+
+<p>无提示 既为成功</p>
+
+<p>客户端在挂载的时候遇到的一个问题如下，可能是网络不太稳定，NFS默认是用UDP协议，换成TCP协议即可：</p>
+
+<p>mount -t nfs 192.168.1.97:/opt/test /mnt -o proto=tcp -o nolock</p>
+
+<p>作者:&nbsp;<a href="http://www.cnblogs.com/liuyansheng/" target="_blank">东邪西毒</a>&nbsp;<br />
+本文版权归作者和博客园共有，欢迎转载，但未经作者同意必须保留此段声明，且在文章页面明显位置给出原文链接，负责保留追究法律责任的权利。</p>
