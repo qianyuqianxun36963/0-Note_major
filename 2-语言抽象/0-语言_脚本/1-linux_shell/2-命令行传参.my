@@ -1,0 +1,191 @@
+<h1>bash shell命令行选项与传入参数处理</h1>
+
+<p>本文介绍了bash shell命令行参数与命令行选项的操作方法，有关shell 命令行参数的实例教程，有需要的朋友参考下。<br />
+在编写shell程序时经常需要处理命令行参数，本文描述在bash下的命令行处理方式。<br />
+选项与参数：<br />
+如下命令行：&nbsp;<br />
+<br />
+./test.sh -f config.conf -v --prefix=/home</p>
+
+<p><br />
+-f为选项，它需要一个参数，即config.conf, -v 也是一个选项，但它不需要参数。<br />
+--prefix我们称之为一个长选项，即选项本身多于一个字符，它也需要一个参数，用等号连接，当然等号不是必须的，/home可以直接写在--prefix后面，即--prefix/home,更多的限制后面具体会讲到。<br />
+在bash中，可以用以下三种方式来处理命令行参数，每种方式都有自己的应用场景。<br />
+* 手工处理方式<br />
+* getopts<br />
+* getopt<br />
+依次讨论这三种处理方式。<br />
+1，手工处理方式<br />
+在手工处理方式中，首先要知道几个变量，还是以上面的命令行为例：</p>
+
+<p>*&nbsp;&nbsp;&nbsp; $0 ： ./test.sh,即命令本身，相当于c/c++中的argv[0]<br />
+*&nbsp;&nbsp;&nbsp; $1 ： -f,第一个参数.<br />
+*&nbsp;&nbsp;&nbsp; $2 ： config.conf<br />
+*&nbsp;&nbsp;&nbsp; $3, $4 ... ：类推。<br />
+*&nbsp;&nbsp;&nbsp; $#&nbsp; 参数的个数，不包括命令本身，上例中$#为4.<br />
+*&nbsp;&nbsp;&nbsp; $@ ：参数本身的列表，也不包括命令本身，如上例为 -f config.conf -v --prefix=/home<br />
+*&nbsp;&nbsp;&nbsp; $* ：和$@相同，但&quot;$*&quot; 和 &quot;$@&quot;(加引号)并不同，&quot;$*&quot;将所有的参数解释成一个字符串，而&quot;$@&quot;是一个参数数组。</p>
+
+<p>码如下:</p>
+
+<p><br />
+#!/bin/bash<br />
+for arg in &quot;$*&quot;<br />
+do<br />
+&nbsp;&nbsp; echo $arg<br />
+done<br />
+for arg in &quot;$@&quot;<br />
+do<br />
+&nbsp;echo $arg<br />
+done</p>
+
+<p><br />
+执行./test.sh -f config.conf -n 10 会打印：<br />
+-f config.conf -n 10&nbsp;&nbsp;&nbsp; #这是&quot;$*&quot;的输出<br />
+-f&nbsp;&nbsp; #以下为$@的输出<br />
+config.conf<br />
+-n<br />
+10<br />
+所以，手工处理的方式即对这些变量的处理。因为手工处理高度依赖于你在命令行上所传参数的位置，所以一般都只用来处理较简单的参数。<br />
+（脚本学堂 www.jb51.net 编辑整理）<br />
+例如：<br />
+./test.sh 10<br />
+而很少使用./test -n 10这种带选项的方式。 典型用法为：<br />
+&nbsp;</p>
+
+<p><u>复制代码</u>代码如下:</p>
+
+<p><br />
+#!/bin/bash<br />
+if [ x$1 != x ]<br />
+then<br />
+&nbsp;&nbsp;&nbsp; #...有参数<br />
+else<br />
+then<br />
+&nbsp;&nbsp;&nbsp; #...没有参数<br />
+fi</p>
+
+<p><br />
+为什么要使用 x$1 != x 这种方式来比较呢？想像一下这种方式比较：<br />
+if [ -n $1 ]&nbsp; #$1不为空<br />
+但如果用户不传参数的时候，$1为空，这时 就会变成 [ -n ] ,所以需要加一个辅助字符串来进行比较。<br />
+手工处理方式能满足大多数的简单需求，配合shift使用也能构造出强大的功能，但在要处理复杂选项的时候建议用下面的两种方法。<br />
+<br />
+2. getopts/getopt<br />
+处理命令行参数是一个相似而又复杂的事情，为此，c提供了getopt/getopt_long等函数，<br />
+c++的boost提供了options库，在shell中，处理此事的是getopts和getopt.<br />
+getopts和getopt功能相似但又不完全相同，其中getopt是独立的可执行文件，而getopts是由bash内置的。<br />
+先来看看参数传递的典型用法:</p>
+
+<p><u>复制代码</u>代码如下:</p>
+
+<p><br />
+&nbsp;&nbsp;&nbsp; * ./test.sh -a -b -c&nbsp; ： 短选项，各选项不需参数<br />
+&nbsp;&nbsp;&nbsp; * ./test.sh -abc&nbsp;&nbsp; ： 短选项，和上一种方法的效果一样，只是将所有的选项写在一起。<br />
+&nbsp;&nbsp;&nbsp; * ./test.sh -a args -b -c ：短选项，其中-a需要参数，而-b -c不需参数。<br />
+&nbsp;&nbsp;&nbsp; * ./test.sh --a-long=args --b-long ：长选项</p>
+
+<p><br />
+先来看getopts,它不支持长选项。<br />
+使用getopts非常简单：<br />
+&nbsp;</p>
+
+<p><u>复制代码</u>代码如下:</p>
+
+<p><br />
+#test.sh<br />
+#!/bin/bash<br />
+while getopts &quot;a:bc&quot; arg #选项后面的冒号表示该选项需要参数<br />
+do<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; case $arg in<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; a)<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; echo &quot;a&#39;s arg:$optarg&quot; #参数存在$optarg中<br />
+<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; b)<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; echo &quot;b&quot;<br />
+<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; c)<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; echo &quot;c&quot;<br />
+<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ?)&nbsp; #当有不认识的选项的时候arg为?<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; echo &quot;unkonw argument&quot;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; exit 1<br />
+<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; esac<br />
+done</p>
+
+<p><br />
+现在就可以使用：<br />
+./test.sh -a arg -b -c&nbsp;<br />
+或<br />
+./test.sh -a arg -bc<br />
+来加载了。<br />
+应该说绝大多数脚本使用该函数就可以了，如果需要支持长选项以及可选参数，那么就需要使用getopt.<br />
+getopt自带的一个例子：</p>
+
+<p><u>复制代码</u>代码如下:</p>
+
+<p><br />
+#!/bin/bash<br />
+# a small example program for using the new getopt(1) program.<br />
+# this program will only work with bash(1)<br />
+# an similar program using the tcsh(1) script language can be found<br />
+# as parse.tcsh<br />
+# example input and output (from the bash prompt):<br />
+# ./parse.bash -a par1 &#39;another arg&#39; --c-long &#39;wow!*\?&#39; -cmore -b &quot; very long &quot;<br />
+# option a<br />
+# option c, no argument<br />
+# option c, argument `more&#39;<br />
+# option b, argument ` very long &#39;<br />
+# remaining arguments:<br />
+# --&gt; `par1&#39;<br />
+# --&gt; `another arg&#39;<br />
+# --&gt; `wow!*\?&#39;<br />
+# note that we use `&quot;$@&quot;&#39; to let each command-line parameter expand to a<br />
+# separate word. the quotes around `$@&#39; are essential!<br />
+# we need temp as the `eval set --&#39; would nuke the return value of getopt.<br />
+#-o表示短选项，两个冒号表示该选项有一个可选参数，可选参数必须紧贴选项<br />
+#如-carg 而不能是-c arg<br />
+#--long表示长选项<br />
+#&quot;$@&quot;在上面解释过<br />
+# -n:出错时的信息<br />
+# -- ：举一个例子比较好理解：<br />
+#我们要创建一个名字为 &quot;-f&quot;的目录你会怎么办？<br />
+# mkdir -f #不成功，因为-f会被mkdir当作选项来解析，这时就可以使用<br />
+# mkdir -- -f 这样-f就不会被作为选项。<br />
+temp=`getopt -o ab:c:: --long a-long,b-long:,c-long:: \<br />
+&nbsp;&nbsp;&nbsp;&nbsp; -n &#39;example.bash&#39; -- &quot;$@&quot;`<br />
+if [ $? != 0 ] ; then echo &quot;terminating...&quot; &gt;&amp;2 ; exit 1 ; fi<br />
+# note the quotes around `$temp&#39;: they are essential!<br />
+#set 会重新排列参数的顺序，也就是改变$1,$2...$n的值，这些值在getopt中重新排列过了<br />
+eval set -- &quot;$temp&quot;<br />
+#经过getopt的处理，下面处理具体选项。<br />
+while true ; do<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; case &quot;$1&quot; in<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; -a|--a-long) echo &quot;option a&quot; ; shift ;;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; -b|--b-long) echo &quot;option b, argument \`$2&#39;&quot; ; shift 2 ;;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; -c|--c-long)<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; # c has an optional argument. as we are in quoted mode,<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; # an empty parameter will be generated if its optional<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; # argument is not found.<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; case &quot;$2&quot; in<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; &quot;&quot;) echo &quot;option c, no argument&quot;; shift 2 ;;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; *)&nbsp; echo &quot;option c, argument \`$2&#39;&quot; ; shift 2 ;;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; esac ;;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; --) shift ; break ;;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; *) echo &quot;internal error!&quot; ; exit 1 ;;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; esac<br />
+done<br />
+echo &quot;remaining arguments:&quot;<br />
+for arg do<br />
+&nbsp;&nbsp; echo &#39;--&gt; &#39;&quot;\`$arg&#39;&quot; ;<br />
+done</p>
+
+<p><br />
+比如使用<br />
+./test -a&nbsp; -b arg arg1 -c&nbsp;<br />
+你可以看到,命令行中多了个arg1参数，在经过getopt和set之后，命令行会变为：<br />
+-a -b arg -c -- arg1<br />
+$1指向-a,$2指向-b,$3指向arg,$4指向-c,$5指向--,而多出的arg1则被放到了最后。<br />
+3，总结<br />
+一般小脚本手工处理也就够了，getopts能处理绝大多数的情况，getopt较复杂，功能也更强大。</p>
