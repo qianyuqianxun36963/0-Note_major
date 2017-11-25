@@ -1,0 +1,290 @@
+<h1>虚拟机上nfs配置过程</h1>
+
+<h2>环境配置-两台虚拟机：</h2>
+
+<table>
+	<tbody>
+		<tr>
+			<td>master</td>
+			<td style="width:100px">ubuntu_master</td>
+		</tr>
+		<tr>
+			<td>file</td>
+			<td>ubuntu_file</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>ip配置：</p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>master</td>
+			<td>192.168.217.168</td>
+		</tr>
+		<tr>
+			<td>file</td>
+			<td>192.168.217.208</td>
+		</tr>
+	</tbody>
+</table>
+
+<h2>NFS服务点的安装配置</h2>
+
+<h3>文件服务器(ubuntu)上安装：</h3>
+
+<p>1、安装nfs-server</p>
+
+<pre>
+# apt-get install nfs-kernel-server</pre>
+
+<p>2、建立nfs专用文件夹</p>
+
+<pre>
+# mkdir/usr/all/nfs/share</pre>
+
+<p>3、配置nfs</p>
+
+<pre>
+# vi /etc/exports
+/usr/all/nfs/share *(async,insecure,no_root_squash,no_subtree_check,rw)</pre>
+
+<p>/usr/all/nfs/share：与nfs服务客户端共享的目录，这个路径必须和你前面设置的文件的路径一致！</p>
+
+<p>*：允许所有的网段访问，也可以使用具体的IP<br />
+rw：挂接此目录的客户端对该共享目录具有读写权限<br />
+async：资料同步写入内存和硬盘<br />
+no_root_squash：root用户具有对根目录的完全管理访问权限。<br />
+no_subtree_check：不检查父目录的权限。</p>
+
+<p>4、重启rpcbind 服务</p>
+
+<p>nfs是一个RPC程序，使用它前，需要映射好端口，通过rpcbind 设定。</p>
+
+<pre>
+# /etc/init.d/rpcbind restart</pre>
+
+<p>5、重启nfs服务</p>
+
+<pre>
+# /etc/init.d/nfs-kernel-server restart </pre>
+
+<h3>6、挂载指令</h3>
+
+<pre>
+# mount -t nfs 192.168.0.128:/data/disk1 /nfsdir</pre>
+
+<h2>NFS挂载点的安装配置</h2>
+
+<h3>主机服务器(ubuntu)上安装：</h3>
+
+<p>Ubuntu默认并不安装nfs客户端，所以首先要安装：</p>
+
+<p>apt-get install nfs-common</p>
+
+<p><img alt="Ubuntu 14.04中挂载其它NFS服务器的文件系统" src="http://www.linuxidc.com/upload/2014_04/14042019314110.png" /></p>
+
+<p>安装完成后新建一个目录用于挂载：</p>
+
+<p>mkdir /usr/all/nfs/share</p>
+
+<p><img alt="Ubuntu 14.04中挂载其它NFS服务器的文件系统" src="http://www.linuxidc.com/upload/2014_04/14042019312850.png" /></p>
+
+<p>假设服务器的IP地址为192.168.217.218，使用showmount查看服务器上已被共享的目录：</p>
+
+<p>showmount -e 192.168.217.218&nbsp;</p>
+
+<p><img alt="Ubuntu 14.04中挂载其它NFS服务器的文件系统" src="http://www.linuxidc.com/upload/2014_04/14042019321141.png" /></p>
+
+<p>然后即可用mount命令挂载，假设服务器上的目录为/nfs，则使用以下命令：</p>
+
+<p>mount -t nfs 192.168.217.218:/usr/all/nfs/share /usr/all/nfs/share</p>
+
+<p><img alt="Ubuntu 14.04中挂载其它NFS服务器的文件系统" src="http://www.linuxidc.com/upload/2014_04/14042019324985.png" /></p>
+
+<p>即可将服务器中的/usr/all/nfs/share目录挂载到本地的/usr/all/nfs/share目录。</p>
+
+<h3>CentOS7:</h3>
+
+<p>1.创建挂载目录（如果已存在请跳过）</p>
+
+<p>mkdir /mnt/nfs_data</p>
+
+<p>2.安装nfs-utils</p>
+
+<p>yum install nfs-utils</p>
+
+<p>3.mount挂载</p>
+
+<p>mount -t nfs 210.28.216.100:/mnt/nfs_data /mnt/nfs_data&nbsp;&nbsp;</p>
+
+<p>4.解除挂载</p>
+
+<p>umount /mnt/nfs_data</p>
+
+<p>5.开机自动挂载</p>
+
+<p>vi&nbsp;/etc/rc.local&nbsp;<br />
+添加一行<br />
+sudo mount -t nfs 210.28.216.100:/mnt/nfs_data&nbsp;/mnt/nfs_data</p>
+
+<h2>附录：问题处理&nbsp;</h2>
+
+<p>如果出现mount.nfs:access denied by server while mounting问题，可通过以下几种途径尝试解决：<br />
+1.修改需挂载的nfs目录权限<br />
+chmod 755 /home/dhcc/nfs<br />
+2.如果端口号大于1024，则需要将 insecure 选项加入到配置文件（/etc/exports）:<br />
+vim /etc/exports&nbsp;<br />
+文件最后加入一行<br />
+/home/dhcc/nfs *(insecure,rw,sync,no_root_squash)&nbsp;&nbsp;<br />
+3.修改/etc/sysconfig/nfs文件<br />
+# Turn off v2 and v3 protocol support&nbsp;<br />
+#&nbsp; RPCNFSDARGS=&quot;-N 2 -N 3&quot;&nbsp;<br />
+# Turn off v4 protocol support&nbsp;<br />
+#RPCNFSDARGS=&quot;-N 4&quot;&nbsp; &nbsp; /*把这句话的#号去掉*/<br />
+&nbsp;NFS分为三个版本，即NFS-2 NFS-3 NFS-4，该配置文件默认关闭了这三个的NFS版本，我们只需要打开NFS-4即可。</p>
+
+<h2>附录：NFS常用参数</h2>
+
+<p>ro 只读访问<br />
+rw 读写访问sync 所有数据在请求时写入共享<br />
+async nfs在写入数据前可以响应请求<br />
+secure nfs通过1024以下的安全TCP/IP端口发送<br />
+insecure nfs通过1024以上的端口发送<br />
+wdelay 如果多个用户要写入nfs目录，则归组写入(默认)<br />
+no_wdelay 如果多个用户要写入nfs目录，则立即写入，当使用async时，无需此设置。<br />
+hide 在nfs共享目录中不共享其子目录<br />
+no_hide 共享nfs目录的子目录<br />
+subtree_check 如果共享/usr/bin之类的子目录时，强制nfs检查父目录的权限(默认)<br />
+no_subtree_check 和上面相对，不检查父目录权限<br />
+all_squash 共享文件的UID和GID映射匿名用户anonymous，适合公用目录。<br />
+no_all_squash 保留共享文件的UID和GID(默认)<br />
+root_squash root用户的所有请求映射成如anonymous用户一样的权限(默认)<br />
+no_root_squas root用户具有根目录的完全管理访问权限<br />
+anonuid=xxx 指定nfs服务器/etc/passwd文件中匿名用户的UID<br />
+anongid=xxx 指定nfs服务器/etc/passwd文件中匿名用户的GID</p>
+
+<h2>附录：NFS服务主要配置文件</h2>
+
+<pre>
+<code>NFS服务的主要配置文件为 /etc/exports.
+/etc/exports文件内容格式：
+    &lt;输出目录&gt; 客户端（选项:访问权限,用户映射,其他]
+        输出目录是指NFS系统中所定义的共享给客户端使用的文件系统
+        客户端是定义网络中可以访问这个NFS共享目录的IP地址或网段或域名等
+            客户端常用的指定方式
+                指定ip地址的主机：192.168.100.1
+                指定一个子网：192.168.100.0/24 也可以写成:192.168.100.0/255.255.255.0
+                指定域名的主机：david.bsmart.cn
+                指定域中的所有主机：*.bsmart.cn
+                所有主机：*
+        选项用来设置输出目录的访问权限、用户映射等。
+            NFS主要有3类选项：
+                设置输出目录只读：ro
+                设置输出目录读写：rw
+            用户映射选项
+                all_squash：将远程访问的所有普通用户及所属组都映射为匿名用户或用户组（nfsnobody）；
+                no_all_squash：与all_squash取反（默认设置）；
+                root_squash：将root用户及所属组都映射为匿名用户或用户组（默认设置）；
+                no_root_squash：与rootsquash取反；
+                anonuid=xxx：将远程访问的所有用户都映射为匿名用户，并指定该用户为本地用户（UID=xxx）；
+                anongid=xxx：将远程访问的所有用户组都映射为匿名用户组账户，并指定该匿名用户组账户为本地用户组账户（GID=xxx）；
+            其它选项
+                secure：限制客户端只能从小于1024的tcp/ip端口连接nfs服务器（默认设置）；
+                insecure：允许客户端从大于1024的tcp/ip端口连接服务器；
+                sync：将数据同步写入内存缓冲区与磁盘中，效率低，但可以保证数据的一致性；
+                async：将数据先保存在内存缓冲区中，必要时才写入磁盘；
+                wdelay：检查是否有相关的写操作，如果有则将这些写操作一起执行，这样可以提高效率（默认设置）；
+                no_wdelay：若有写操作则立即执行，应与sync配合使用；
+                subtree：若输��目录是一个子目录，则nfs服务器将检查其父目录的权限(默认设置)；
+                no_subtree：即使输出目录是一个子目录，nfs服务器也不检查其父目录的权限，这样可以提高效率；</code></pre>
+
+<h2>附录：启动成功查看</h2>
+
+<h3><strong>一、看看有没有被正确的启动</strong></h3>
+
+<p>启动之后，请赶快到 /var/log/messages 里面看看有没有被正确的启动呢？</p>
+
+<p><strong>vi /var/log/messages</strong></p>
+
+<p>Sep 22 00:01:37 linux nfs: Starting NFS services:&nbsp; succeeded<br />
+Sep 22 00:01:37 linux nfs: rpc.rquotad startup succeeded<br />
+Sep 22 00:01:37 linux nfsd[1050]: nfssvc_versbits: +2 +3 +4<br />
+Sep 22 00:01:37 linux nfs: rpc.nfsd startup succeeded<br />
+Sep 22 00:01:37 linux nfs: rpc.mountd startup succeeded<br />
+Sep 22 00:01:37 linux rpcidmapd: rpc.idmapd -SIGHUP succeeded</p>
+
+<h3><strong>二、瞧一瞧NFS 到底开了哪些端口</strong></h3>
+
+<p>在确认没有问题之后，接下来我们来瞧一瞧那么 NFS 到底开了哪些端口？</p>
+
+<p><strong>netstat -ultn</strong></p>
+
+<p>Active Internet connections (only servers)<br />
+Proto Recv-Q Send-Q Local Address&nbsp; Foreign Address State&nbsp;&nbsp; PID/Program name<br />
+tcp&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 0&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 0 0.0.0.0:2049&nbsp;&nbsp; 0.0.0.0:*&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; LISTEN&nbsp; -<br />
+tcp&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 0&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 0 0.0.0.0:803&nbsp;&nbsp;&nbsp; 0.0.0.0:*&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; LISTEN&nbsp; 1047/rpc.rquotad<br />
+tcp&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 0&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 0 0.0.0.0:111&nbsp;&nbsp;&nbsp; 0.0.0.0:*&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; LISTEN&nbsp; 32503/portmap<br />
+tcp&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 0&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 0 0.0.0.0:819&nbsp;&nbsp;&nbsp; 0.0.0.0:*&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; LISTEN&nbsp; 1064/rpc.mountd<br />
+udp&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 0&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 0 0.0.0.0:2049&nbsp;&nbsp; 0.0.0.0:*&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; -<br />
+udp&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 0&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 0 0.0.0.0:800&nbsp;&nbsp;&nbsp; 0.0.0.0:*&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 1047/rpc.rquotad<br />
+udp&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 0&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 0 0.0.0.0:816&nbsp;&nbsp;&nbsp; 0.0.0.0:*&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 1064/rpc.mountd<br />
+udp&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 0&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 0 0.0.0.0:111&nbsp;&nbsp;&nbsp; 0.0.0.0:*&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 32503/portmap</p>
+
+<ul>
+	<li>portmap 启动的 port 在 111；</li>
+	<li>NFS 启动的 port 在 2049；</li>
+	<li>其他 rpc.daemons 启动的 port 则是随机产生的，因此需向 port 111 注册。</li>
+</ul>
+
+<h3><strong>三、RPC 服务的注册状况</strong></h3>
+
+<p>那我怎么知道每个 RPC 服务的注册状况？没关系，你可以使用 rpcinfo 来处理的。</p>
+
+<p><strong>rpcinfo -</strong><strong>p localhost</strong></p>
+
+<pre>
+rpcinfo [-p] [IP|hostname]
+参数：
+-p ：显示出所有的 port 与 porgram 的资讯；
+
+范例一：显示出目前这部主机的 RPC 状态
+<strong>rpcinfo -</strong><strong>p localhost</strong>
+   program vers proto   port
+    100000    2   tcp    111  portmapper
+    100000    2   udp    111  portmapper
+    100011    1   udp    800  rquotad
+    100011    2   udp    800  rquotad
+    100011    1   tcp    803  rquotad
+    100011    2   tcp    803  rquotad
+    100003    2   udp   2049  nfs
+    100003    3   udp   2049  nfs
+    100003    2   tcp   2049  nfs
+    100003    3   tcp   2049  nfs
+    100005    1   udp    816  mountd
+    100005    1   tcp    819  mountd
+    100005    2   udp    816  mountd
+    100005    2   tcp    819  mountd
+    100005    3   udp    816  mountd
+    100005    3   tcp    819  mountd
+#         NFS版本       埠口  服务名称
+</pre>
+
+<p>　　如果你的 rpcinfo 无法输出，那就表示注册的资料有问题啦！可能需要重新启动 portmap 与 nfs 喔！</p>
+
+<h3><strong>四、NFS 的连线观察</strong></h3>
+
+<p><strong>showmount -</strong><strong>e localhost</strong></p>
+
+<p>在你的 NFS 伺服器设定妥当之后，我们可以先自我测试一下是否可以连线喔！ 就是利用 showmount 这个指令来查阅！</p>
+
+<pre>
+<strong>showmount [-ae] [hostname|IP]</strong>
+参数：
+-a ：显示目前主机与用户端的 NFS 连线分享的状态；
+-e ：显示某部主机的 /etc/exports 所分享的目录资料。
+
+范例一：请显示出刚刚我们所设定好的相关 exports 资讯
+[root@linux ~]# <strong>showmount -</strong><strong>e localhost</strong>
+Export list for localhost:</pre>
