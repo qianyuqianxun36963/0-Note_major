@@ -1,0 +1,1954 @@
+<h1>Hadoop+Hive环境搭建</h1>
+
+<p>本文包括Hadoop及Hive的一些基础知识以及配置安装方法，通过学习参考Hive及Hadoop相关书籍、文献以及技术博客，并结合实践所得。</p>
+
+<p>目 &nbsp; 录<br />
+<a href="http://nunknown.com/study/282/#1">1 准备工作</a><br />
+<a href="http://nunknown.com/study/282/#1.1">1.1 软件准备</a><br />
+<a href="http://nunknown.com/study/282/#1.2">1.2 集群准备</a><br />
+<a href="http://nunknown.com/study/282/#1.3">1.3 安装JDK</a><br />
+<a href="http://nunknown.com/study/282/#1.4">1.4 HADOOP用户准备</a><br />
+<a href="http://nunknown.com/study/282/#1.5">1.5 SSH无密码登录配置</a><br />
+<a href="http://nunknown.com/study/282/#1.6">1.6 常用命令</a><br />
+<a href="http://nunknown.com/study/282/#2">2 配置HADOOP</a><br />
+<a href="http://nunknown.com/study/282/#2.1">2.1 解压HADOOP</a><br />
+<a href="http://nunknown.com/study/282/#2.2">2.2 配置HADOOP</a><br />
+<a href="http://nunknown.com/study/282/#2.3">2.3 分发HADOOP</a><br />
+<a href="http://nunknown.com/study/282/#2.4">2.4 格式化HADOOP</a><br />
+<a href="http://nunknown.com/study/282/#2.5">2.5 验证HADOOP</a><br />
+<a href="http://nunknown.com/study/282/#3">3 HIVE配置</a><br />
+<a href="http://nunknown.com/study/282/#3.1">3.1 解压HIVE</a><br />
+<a href="http://nunknown.com/study/282/#3.2">3.2 METASTORE</a><br />
+<a href="http://nunknown.com/study/282/#3.3">3.3 配置HIVE</a><br />
+<a href="http://nunknown.com/study/282/#4">4 MORE ABOUT HIVE</a><br />
+<a href="http://nunknown.com/study/282/#4.1">4.1 组成模块</a><br />
+<a href="http://nunknown.com/study/282/#4.2">4.2 数据类型</a><br />
+<a href="http://nunknown.com/study/282/#4.3">4.3 数据模型</a><br />
+<a href="http://nunknown.com/study/282/#4.4">4.4 HiveQL</a><br />
+<a href="http://nunknown.com/study/282/#4.5">4.5 元数据解析</a><br />
+<a href="http://nunknown.com/study/282/#4.6">4.6 执行流程</a><br />
+<a href="http://nunknown.com/study/282/#5">5 参考资料</a></p>
+
+<p>&nbsp;</p>
+
+<h2>1 准备工作</h2>
+
+<h3>1.1 软件准备</h3>
+
+<p>Hive需要Hadoop的支持，在安装Hive之前需要正确安装Hadoop。目前Hive的最新版本为0.13.1，这个版本可在Hadoop 0.20.x, 0.23.x.y, 1.x.y, 2.x.y下使用。本文采用Hadoop 1.x中最新版本1.2.1。Hadoop使用环境中必须由JDK，本文下载JDK 7较新版本。同时,Hive将采用MySQL作为元数据库。</p>
+
+<p>软件清单如下：</p>
+
+<table style="width:847px">
+	<tbody>
+		<tr>
+			<td>&nbsp;</td>
+			<td>版本</td>
+			<td>下载地址</td>
+		</tr>
+		<tr>
+			<td>Hive</td>
+			<td><a href="http://apache.fayea.com/apache-mirror/hive/hive-0.13.1/apache-hive-0.13.1-bin.tar.gz">apache-hive-0.13.1-bin.tar.gz</a></td>
+			<td>http://apache.fayea.com/apache-mirror/hive/hive-0.13.1/apache-hive-0.13.1-bin.tar.gz</td>
+		</tr>
+		<tr>
+			<td>Hadoop</td>
+			<td><a href="http://mirror.bit.edu.cn/apache/hadoop/common/hadoop-1.2.1/hadoop-1.2.1.tar.gz">hadoop-1.2.1.tar.gz</a></td>
+			<td>http://mirror.bit.edu.cn/apache/hadoop/common/hadoop-1.2.1/hadoop-1.2.1.tar.gz</td>
+		</tr>
+		<tr>
+			<td>JDK</td>
+			<td><a href="http://download.oracle.com/otn-pub/java/jdk/7u65-b17/jdk-7u65-linux-x64.rpm">jdk-7u65-linux-x64.rpm</a></td>
+			<td>http://www.oracle.com/technetwork/java/javase/downloads/jdk7-downloads-1880260.html</td>
+		</tr>
+		<tr>
+			<td>MySQL</td>
+			<td>MySQL-client-5.5.36-1.linux2.6.x86_64MySQL-server-5.5.36-1.linux2.6.x86_64</td>
+			<td>http://dev.mysql.com/downloads/mysql/</td>
+		</tr>
+		<tr>
+			<td>MySQL connector</td>
+			<td>mysql-connector-java-5.1.22-bin</td>
+			<td>&nbsp;</td>
+		</tr>
+	</tbody>
+</table>
+
+<h3>1.2 集群准备</h3>
+
+<p>Hadoop集群中，数据存储在分布式文件系统中（一般为HDFS），并将MapReduce计算移到集群中各台机器上。</p>
+
+<p>HDFS集群有两类节点，并以管理者-工作者模式运行，即一个namenode（管理者），多个datanode（工作者）。namenode管理文件系统的命名空间，维护文件系统及整棵树内所有的文件和目录，同时记录每个文件中各个块所在的数据节点信息，但并不永久保存块的位置信息，这些信息会在系统启动时由数据节点重建。datanode是文件系统的工作节点，可根据需要存储并检索数据块（受客户端或namenode调度），并定期向namenode发送它们所存储的块的列表。</p>
+
+<p>MapReduce作业（job）有两类节点控制其执行流程：一个jobtracker 和一系列tasktracker。其中， jobtracker通过调度tasktracker上运行的任务来协调所有运行在系统上的作业。tasktracker在运行任务的同时将运行进度报告发给jobtracker，jobtracker由此记录每项作业任务的整体进度。</p>
+
+<p>对于小集群，在一个master机器上运行namenode和jobtracker通常没问题。但如果HDFS集群和文件数比较庞大，namenode需要使用更多内存，则namenode和jobtracker最好放在不同机器中。</p>
+
+<p>此次搭建的小集群仅供小实验使用。只采用两个节点：一个master（namenode &amp; jobtracker），一个作为slave（datanode &amp; tasktracker），其主机名命名与作用吻合，命为master和slave。 如有更多节点，则可将主机名命为master、slave1、slave2、slave3&hellip;&hellip;</p>
+
+<table style="width:730px">
+	<tbody>
+		<tr>
+			<td>节点命名</td>
+			<td>IP</td>
+			<td>操作系统</td>
+		</tr>
+		<tr>
+			<td>master</td>
+			<td>192.168.1.115</td>
+			<td>Linux CentOS 64位</td>
+		</tr>
+		<tr>
+			<td>slave</td>
+			<td>192.168.1.116</td>
+			<td>Linux CentOS 64位</td>
+		</tr>
+	</tbody>
+</table>
+
+<h4>1、修改主机名</h4>
+
+<p>查看主机名：</p>
+
+<table cellpadding="0" cellspacing="0">
+	<tbody>
+		<tr>
+			<td>
+			<p>1</p>
+			</td>
+			<td>
+			<p>hostname&nbsp;$name</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>其中$name的值为该机的主机名称。</p>
+
+<table cellpadding="0" cellspacing="0">
+	<tbody>
+		<tr>
+			<td>
+			<p>1</p>
+			</td>
+			<td>
+			<p>vim&nbsp;/etc/sysconfig/network</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>修改文件里HOSTNAME的值并保存</p>
+
+<p>备注：如是虚拟机可固定IP地址以防外部网络环境变化造成麻烦。另外请关闭操作系统的防火墙。</p>
+
+<p>添加上每台主机名字和地址的映射</p>
+
+<table cellpadding="0" cellspacing="0">
+	<tbody>
+		<tr>
+			<td>
+			<p>1<br />
+			2<br />
+			3</p>
+			</td>
+			<td>
+			<p>vi&nbsp;etc/hosts<br />
+			192.168.1.115 master<br />
+			192.168.1.116 slave</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<h4>2、验证连接</h4>
+
+<table cellpadding="0" cellspacing="0">
+	<tbody>
+		<tr>
+			<td>
+			<p>1</p>
+			</td>
+			<td>
+			<p>reboot&nbsp;-h&nbsp;now</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>重启电脑</p>
+
+<p>检查ping连接</p>
+
+<p>在master中</p>
+
+<table cellpadding="0" cellspacing="0">
+	<tbody>
+		<tr>
+			<td>
+			<p>1</p>
+			</td>
+			<td>
+			<p>ping&nbsp;slave</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<h3>1.3 安装JDK</h3>
+
+<h4>1、查看操作系统中是否已安装下载JDK</h4>
+
+<table cellpadding="0" cellspacing="0">
+	<tbody>
+		<tr>
+			<td>
+			<p>1</p>
+			</td>
+			<td>
+			<p>java&nbsp;-version</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<h4>2、安装JDK</h4>
+
+<p>在命令行中输入以下命令，或者双击rpm包</p>
+
+<table cellpadding="0" cellspacing="0">
+	<tbody>
+		<tr>
+			<td>
+			<p>1</p>
+			</td>
+			<td>
+			<p>rpm&nbsp;-ivh&nbsp;jdk-7u51-linux-x64.rpm</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<h4>3、修改系统配置环境变量~/.bash_profile文件</h4>
+
+<table cellpadding="0" cellspacing="0">
+	<tbody>
+		<tr>
+			<td>
+			<p>1</p>
+			</td>
+			<td>
+			<p>vim&nbsp;~/.bash_profile</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>在文件的最后面加入以下行:</p>
+
+<table cellpadding="0" cellspacing="0">
+	<tbody>
+		<tr>
+			<td>
+			<p>1<br />
+			2<br />
+			3<br />
+			4<br />
+			5</p>
+			</td>
+			<td>
+			<p>#set java environment<br />
+			JAVA_HOME=/usr/java/jdk1.7.0_65<br />
+			PATH=$JAVA_HOME/bin:$PATH<br />
+			CLASSPATH=$CLASSPATH:.:$JAVA_HOME/lib<br />
+			export&nbsp;JAVA_HOME CLASSPATH PATH</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>重新加载.bash_profile文件使生效</p>
+
+<table cellpadding="0" cellspacing="0">
+	<tbody>
+		<tr>
+			<td>
+			<p>1</p>
+			</td>
+			<td>
+			<p>source&nbsp;~/.bash_profile</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>备注：一般而言，配置环境变量时，如果所有用户都会使用，则可在/etc/profile里配置；如果个人使用，就在自己的用户目录下的.bash_profile里配置。采用后者方法更为安全，它可以把使用这些环境变量的权限控制到用户级别。JAVA_HOME 设置为JAVA的安装路径。</p>
+
+<h4>4、检验java是否安装成功</h4>
+
+<table cellpadding="0" cellspacing="0">
+	<tbody>
+		<tr>
+			<td>
+			<p>1</p>
+			</td>
+			<td>
+			<p>java&nbsp;-version</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>如果输出java version &ldquo;1.7.0_65&Prime;等一系列信息，则表示安装成功。</p>
+
+<h3>1.4 Hadoop用户准备</h3>
+
+<p>Hadoop最好不要使用root安装（不推荐各个机器之间使用root访问）。且最好在所有的Hadoop节点上建立相同的目录（即建立相同的用户）。在所有节点中新增用户名hadoop。</p>
+
+<p>在节点中使用root账户登录系统：</p>
+
+<table cellpadding="0" cellspacing="0">
+	<tbody>
+		<tr>
+			<td>
+			<p>1</p>
+			</td>
+			<td>
+			<p>su&nbsp;root</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<h4>1、添加用户</h4>
+
+<table cellpadding="0" cellspacing="0">
+	<tbody>
+		<tr>
+			<td>
+			<p>1</p>
+			</td>
+			<td>
+			<p>useradd hadoop</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<h4>2、密码修改</h4>
+
+<table cellpadding="0" cellspacing="0">
+	<tbody>
+		<tr>
+			<td>
+			<p>1</p>
+			</td>
+			<td>
+			<p>passwd&nbsp;hadoop</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<h4>3、授权给hadoop用户</h4>
+
+<table cellpadding="0" cellspacing="0">
+	<tbody>
+		<tr>
+			<td>
+			<p>1</p>
+			</td>
+			<td>
+			<p>chown&nbsp;-R&nbsp;hadoop:hadoop&nbsp;/hadoop</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>提示输入新密码和重复输入新密码，退出root用户，用hadoop用户登录</p>
+
+<h3>1.5 SSH无密码登录配置</h3>
+
+<p>在Hadoop中，namenode是通过SSH（Secure Shell）来启动和停止各个DataNode上的各种守护进程的，这就须要在节点之间执行指令的时候是不须要输入密码的形式，故我们须要配置SSH运用无密码公钥认证的形式。</p>
+
+<p>其配置方法是通过为hadoop上的用户hadoop生成其密钥对，询问其保存路径时直接回车采用默认路径，当提示要为生成的密钥输入pass phrase的时候，直接回车，也就是将其设定为空密码。生成的密钥对id_rsa，id_rsa.pub，默认存储在/home/hadoop/.ssh目录下，然后将id_rsa.pub的内容复制到每个机器(也包括本机)的/home/hadoop/.ssh/authorized_keys文件中。</p>
+
+<p>首先退出root用户</p>
+
+<h4>1、生成公钥</h4>
+
+<p>在master机器上，执行</p>
+
+<table cellpadding="0" cellspacing="0">
+	<tbody>
+		<tr>
+			<td>
+			<p>1</p>
+			</td>
+			<td>
+			<p>ssh-keygen&nbsp;-t&nbsp;dsa</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>然后三个回车下去，此时会在~/.ssh目录下生成一对密钥</p>
+
+<h4>2、复制公钥</h4>
+
+<p>首先把master上的公钥追加到authorized_keys文件</p>
+
+<table cellpadding="0" cellspacing="0">
+	<tbody>
+		<tr>
+			<td>
+			<p>1</p>
+			</td>
+			<td>
+			<p>cat&nbsp;id_dsa.pub&nbsp;&amp;gt;&amp;gt; authorized_keys</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>查看authorized_keys文件的权限，如果不是600，修改为600.</p>
+
+<table cellpadding="0" cellspacing="0">
+	<tbody>
+		<tr>
+			<td>
+			<p>1</p>
+			</td>
+			<td>
+			<p>chmod&nbsp;600&nbsp;authorized_keys</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>然后把master的公钥文件拷贝到slaves上</p>
+
+<table cellpadding="0" cellspacing="0">
+	<tbody>
+		<tr>
+			<td>
+			<p>1</p>
+			</td>
+			<td>
+			<p>scp&nbsp;id_dsa.pub slave:~/.ssh/master.pub</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<h4>3、修改权限</h4>
+
+<p>登录到slave上</p>
+
+<table cellpadding="0" cellspacing="0">
+	<tbody>
+		<tr>
+			<td>
+			<p>1<br />
+			2</p>
+			</td>
+			<td>
+			<p>cd&nbsp;~/.ssh<br />
+			cat&nbsp;master.pub&nbsp;&amp;gt;&amp;gt;authorized_keys</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>查看authorized_keys文件的权限，如果不是600，修改为600.</p>
+
+<h4>4、测试</h4>
+
+<p>回到master服务器上</p>
+
+<table cellpadding="0" cellspacing="0">
+	<tbody>
+		<tr>
+			<td>
+			<p>1</p>
+			</td>
+			<td>
+			<p>ssh&nbsp;slave</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>测试在master上是否不用输入密码便可以登录到该slave上</p>
+
+<h3>1.6 常用命令</h3>
+
+<p>因集群搭建主要在Linux下进行，可能会使用到的命令如下：</p>
+
+<table style="width:761px">
+	<tbody>
+		<tr>
+			<td>常用命令</td>
+			<td>例子</td>
+			<td>解释</td>
+		</tr>
+		<tr>
+			<td>解压缩命令</td>
+			<td>$tar zxvf filename.tar.gz</td>
+			<td>将FileName.tar.gz解压</td>
+		</tr>
+		<tr>
+			<td>远程复制命令</td>
+			<td>$scp &ndash;r file_source file_target</td>
+			<td>将file_source文件夹复制到file_target</td>
+		</tr>
+		<tr>
+			<td>权限设置命令</td>
+			<td>$chmod 777 file</td>
+			<td>将file的权限改为777</td>
+		</tr>
+		<tr>
+			<td>合并文件命令</td>
+			<td>$cat file1 file2 &gt; file</td>
+			<td>将file1与file2合并为file</td>
+		</tr>
+		<tr>
+			<td>&hellip;&hellip;</td>
+			<td>&hellip;&hellip;</td>
+			<td>&hellip;&hellip;</td>
+		</tr>
+	</tbody>
+</table>
+
+<h2>2 配置Hadoop</h2>
+
+<h3>2.1 解压Hadoop</h3>
+
+<p>集群中所有的机器上都要安装hadoop，可先在master上安装，然后复制到其他节点中。</p>
+
+<p>登录master</p>
+
+<p>将hadoop安装包拷贝到home/hadoop/下并解压</p>
+
+<table cellpadding="0" cellspacing="0">
+	<tbody>
+		<tr>
+			<td>
+			<p>1</p>
+			</td>
+			<td>
+			<p>tar&nbsp;-xzvf&nbsp;/home/hadoop/hadoop-1.2.1.tar.gz</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<h3>2.2 配置Hadoop</h3>
+
+<p>控制Hadoop安装的配置文件较多，最重要的几个文件如下表（这几个文件都在hadoop/conf中）</p>
+
+<table cellpadding="0" cellspacing="0">
+	<tbody>
+		<tr>
+			<td>
+			<p>1</p>
+			</td>
+			<td>
+			<p>cd&nbsp;~/hadoop-1.2.1/conf</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<table style="width:774px">
+	<tbody>
+		<tr>
+			<td>文件名称</td>
+			<td>描述</td>
+		</tr>
+		<tr>
+			<td>hadoop-env.sh</td>
+			<td>记录脚本要用的环境变量以运行Hadoop</td>
+		</tr>
+		<tr>
+			<td>core-site.xml</td>
+			<td>Hadoop Core的配置项，例如HDFS和MapReduce常用的I/O设置等</td>
+		</tr>
+		<tr>
+			<td>hdfs-site.xml</td>
+			<td>Hadoop守护进程的配置项，包括namenode、辅助namenode和datanode</td>
+		</tr>
+		<tr>
+			<td>mapred-site.xml</td>
+			<td>MapReduce守护进程的配置项，包括jobtracker和tasktracker</td>
+		</tr>
+		<tr>
+			<td>masters</td>
+			<td>运行辅助namenode的机器列表</td>
+		</tr>
+		<tr>
+			<td>slaves</td>
+			<td>运行datanode和tasktracker的机器列表</td>
+		</tr>
+		<tr>
+			<td>hadoop-metrics.properties</td>
+			<td>控制metrics在Hadoop上如何发布的属性</td>
+		</tr>
+		<tr>
+			<td>log4j.properties</td>
+			<td>系统日志文件、namenode审计日志、tasktracker子进程的任务日志的属性。</td>
+		</tr>
+	</tbody>
+</table>
+
+<h4>1. hadoop-env.sh</h4>
+
+<p>修改其中的的行：</p>
+
+<table cellpadding="0" cellspacing="0">
+	<tbody>
+		<tr>
+			<td>
+			<p>1</p>
+			</td>
+			<td>
+			<p>export&nbsp;JAVA_HOME=/usr/java/jdk1.7.0_65</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>JAVA_HOME修改为本地的JAVA_HOME路径。</p>
+
+<h4>2. core-site.xml</h4>
+
+<p>这里配置的是HDFS master（即namenode）的地址和端口号。</p>
+
+<p>&lt;configuration&gt;</p>
+
+<p>&lt;property&gt;</p>
+
+<p>&lt;name&gt;fs.default.name&lt;/name&gt;//指定HDFS的namenode和默认文件系统</p>
+
+<p>&lt;value&gt;hdfs://master:9000&lt;/value&gt;</p>
+
+<p>&lt;description&gt;change your own hostname&lt;/description&gt;</p>
+
+<p>&lt;/property&gt;</p>
+
+<p>&lt;property&gt;</p>
+
+<p>&lt;name&gt;hadoop.tmp.dir&lt;/name&gt;//如没有配置hadoop.tmp.dir参数，此时系统默认的临时目录为：/tmp/hadoo-hadoop。而这个目录在每次重启后都会被删掉，必须重新执行format才行，否则会出错。</p>
+
+<p>&lt;value&gt;/home/hadoop/hadoop-1.2.1/tmp&lt;/value&gt;</p>
+
+<p>&lt;/property&gt;</p>
+
+<p>&lt;/configuration&gt;</p>
+
+<h4>3. hdfs-site.xml</h4>
+
+<p>修改Hadoop中HDFS的配置，配置的备份方式默认为3</p>
+
+<p>&lt;configuration&gt;</p>
+
+<p>&lt;property&gt;</p>
+
+<p>&lt;name&gt;dfs.replication&lt;/name&gt; //数据副本数量</p>
+
+<p>&lt;value&gt;1&lt;/value&gt;</p>
+
+<p>&lt;/property&gt;</p>
+
+<p>&lt;/configuration&gt;</p>
+
+<h4>4. mapred-site.xml</h4>
+
+<p>修改Hadoop中MapReduce的配置文件，配置的是jobtracker的地址和端口。</p>
+
+<p>&lt;configuration&gt;</p>
+
+<p>&lt;property&gt;</p>
+
+<p>&lt;name&gt;mapred.job.tracker&lt;/name&gt;</p>
+
+<p>&lt;value&gt;master:9001&lt;/value&gt;</p>
+
+<p>&lt;description&gt;change your own hostname&lt;/description&gt;</p>
+
+<p>&lt;/property&gt;</p>
+
+<p>&lt;/configuration&gt;</p>
+
+<h4>5. masters</h4>
+
+<p>修改配置文件masters，命令</p>
+
+<table cellpadding="0" cellspacing="0">
+	<tbody>
+		<tr>
+			<td>
+			<p>1</p>
+			</td>
+			<td>
+			<p>vim&nbsp;masters</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>删除原有行，添加一行master（代表master服务器），保存退出。</p>
+
+<h4>6. slaves</h4>
+
+<p>修改配置文件slaves，命令</p>
+
+<table cellpadding="0" cellspacing="0">
+	<tbody>
+		<tr>
+			<td>
+			<p>1</p>
+			</td>
+			<td>
+			<p>vim&nbsp;slaves</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>删除原有的所有行，然后把所有的slave服务器的名称添加到文件里，一个slave服务器名占一行，保存退出。</p>
+
+<h4>7. log4j.properties</h4>
+
+<p>HDFS的日志能够记录所有的文件系统访问请求。在默认配置下在，在log4j.properties属性文件中的日志阙值被设为ARN，可将WARN替换成INFO来启动日志审计特性，使每个HDFS事件均在namenode的日志文件中生成记录。</p>
+
+<table cellpadding="0" cellspacing="0">
+	<tbody>
+		<tr>
+			<td>
+			<p>1</p>
+			</td>
+			<td>
+			<p>log4j.logger.org.apache.hadoop.hdfs.server.namenode.FSNamesystem.audit=WARN</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<h3>2.3 分发Hadoop</h3>
+
+<p>通过scp命令把hadoop目录拷贝到其他所有slave上去，命令</p>
+
+<table cellpadding="0" cellspacing="0">
+	<tbody>
+		<tr>
+			<td>
+			<p>1</p>
+			</td>
+			<td>
+			<p>scp&nbsp;-r&nbsp;/home/hadoop/hadoop-1.2.1/&nbsp;slave:/home/hadoop/</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>设置Hadoop环境变量，在所有机器上编辑~/.bash_profile文件</p>
+
+<table cellpadding="0" cellspacing="0">
+	<tbody>
+		<tr>
+			<td>
+			<p>1</p>
+			</td>
+			<td>
+			<p>vi&nbsp;~/.bash_profile</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>末尾添加如下行:</p>
+
+<table cellpadding="0" cellspacing="0">
+	<tbody>
+		<tr>
+			<td>
+			<p>1<br />
+			2<br />
+			3<br />
+			4</p>
+			</td>
+			<td>
+			<p>#set Hadoop environment<br />
+			export&nbsp;HADOOP_HOME=/home/hadoop/hadoop-1.2.1<br />
+			export&nbsp;PATH=$PATH:$HADOOP_HOME/bin<br />
+			export&nbsp;CLASSPATH=.:$HADOOP_HOME/lib:$CLASSPATH</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>保存退出后使设置生效</p>
+
+<table cellpadding="0" cellspacing="0">
+	<tbody>
+		<tr>
+			<td>
+			<p>1</p>
+			</td>
+			<td>
+			<p>source&nbsp;/etc/profile</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>备注：HADOOP_HOME是HADOOP安装路径，请依据自己的情况修改。</p>
+
+<h3>2.4 格式化Hadoop</h3>
+
+<table cellpadding="0" cellspacing="0">
+	<tbody>
+		<tr>
+			<td>
+			<p>1</p>
+			</td>
+			<td>
+			<p>hadoop namenode &ndash;format</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>如过程中出现错误：Name or service not known</p>
+
+<p>原因：/etc/sysconfig/network和/etc/hosts文件中的主机名不对应造成的，修改后重新格式化</p>
+
+<p>继续在命令行中输入</p>
+
+<table cellpadding="0" cellspacing="0">
+	<tbody>
+		<tr>
+			<td>
+			<p>1</p>
+			</td>
+			<td>
+			<p>start-all</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>来启动Hadoop集群</p>
+
+<table cellpadding="0" cellspacing="0">
+	<tbody>
+		<tr>
+			<td>
+			<p>1<br />
+			2<br />
+			3<br />
+			4<br />
+			5</p>
+			</td>
+			<td>
+			<p>starting namenode, logging to&nbsp;/home/hadoop/hadoop-1.2.1/libexec/../logs/hadoop-hadoop-namenode-master.out<br />
+			slave: starting datanode, logging to&nbsp;/home/hadoop/hadoop-1.2.1/libexec/../logs/hadoop-hadoop-datanode-slave.out<br />
+			master: starting secondarynamenode, logging to&nbsp;/home/hadoop/hadoop-1.2.1/libexec/../logs/hadoop-hadoop-secondarynamenode-master.out<br />
+			starting jobtracker, logging to&nbsp;/home/hadoop/hadoop-1.2.1/libexec/../logs/hadoop-hadoop-jobtracker-master.out<br />
+			slave: starting tasktracker, logging to&nbsp;/home/hadoop/hadoop-1.2.1/libexec/../logs/hadoop-hadoop-tasktracker-slave.out</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>通过日志看出，Hadoop首先启动namenode，接着启动datanode&hellip;&hellip;，然后启动secondarynamenode；再启动jobtracker，然后启动tasktracker&hellip;&hellip;hadoop成功启动后，在 Master 中的 tmp 文件夹中生成了 dfs 文件夹，在Slave中的 tmp 文件夹中均生成了 dfs 文件夹和 mapred 文件夹。</p>
+
+<p>1. 验证方法一：用&rdquo;jps&rdquo;命令</p>
+
+<p>在Master、Slave上用 java自带的小工具jps查看进程。</p>
+
+<p>如果系统提示&ldquo;-bash: jps: command not found&rdquo;，则表示JAVA的环境变量没有配置好，依1.3检查。</p>
+
+<p>master的列表中应有&ldquo;namenode&rdquo;和&ldquo;jobtracker&rdquo;，slave的列表中应有&rdquo;datanode&rdquo;和&rdquo;tasktracker&rdquo;，如果没有，可检查日志文件。</p>
+
+<p>2、验证方式二：用&rdquo;hadoop dfsadmin -report&rdquo;</p>
+
+<p>用这个命令可以查看Hadoop集群的状态。包括可以快速定位出哪些节点down掉、HDFS的容量、使用了多少，以及每个节点的硬盘使用情况。</p>
+
+<p>3、验证方式三：http页面端口监听</p>
+
+<p>在浏览器中输入<a href="http://master:50030/" target="_blank">master:50030</a>以及<a href="http://master:50070/" target="_blank">master:50070</a>可查看HDFS和MapReduce状态。备注：请注意&ldquo;master:&rdquo;，是作为namenode的主机名，如果是在本地搭建的伪分布式，这里可能是&ldquo;localhost:50030&rdquo;。</p>
+
+<h2>3 Hive配置</h2>
+
+<p>Hive是基于Hadoop构建的一套数据仓库分析系统，它提供了丰富的SQL查询方式来分析存储在Hadoop 分布式文件系统中的数据。其在Hadoop的架构体系中承担了一个SQL解析的过程，它提供了对外的入口来获取用户的指令然后对指令进行分析，解析出一个MapReduce程序组成可执行计划，并按照该计划生成对应的MapReduce任务提交给Hadoop集群处理，获取最终的结果。元数据&mdash;&mdash;如表模式&mdash;&mdash;存储在名为metastore的数据库中。</p>
+
+<h3>3.1 解压Hive</h3>
+
+<p>安装Hive的过程同安装Hadoop的过程相似，也是先下载压缩包并解压。同样，可先在master上安装，然后分发到其他节点中。 登录master 将Hive安装包拷贝到home/hadoop/下并解压</p>
+
+<p>登录master</p>
+
+<p>将Hive安装包拷贝到home/hadoop/下并解压</p>
+
+<table cellpadding="0" cellspacing="0">
+	<tbody>
+		<tr>
+			<td>
+			<p>1</p>
+			</td>
+			<td>
+			<p>tar&nbsp;&ndash;xzvf&nbsp;/home/hadoop/apache-hive-0.13.1-bin.tar.gz</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>设置环境变量，Hive使用环境变量HADOOP_HOME来制定Hadoop的所有相关JAR和配置文件。</p>
+
+<table cellpadding="0" cellspacing="0">
+	<tbody>
+		<tr>
+			<td>
+			<p>1<br />
+			2<br />
+			3</p>
+			</td>
+			<td>
+			<p>#set Hive environment<br />
+			export&nbsp;HIVE_HOME=/home/hadoop/apache-hive-0.13.1-bin<br />
+			export&nbsp;PATH=$PATH:$HIVE_HOME/bin</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>备注：HIVE_HOME的路径设置为HIVE的安装路径，请依据自己的情况修改。</p>
+
+<h3>3.2 Metastore</h3>
+
+<p>metastore是Hive元数据集中存放地。它包括两部分：服务和后台数据存储。有三种方式配置metastore：内嵌metastore、本地metastore以及远程metastore。</p>
+
+<p>（1）默认情况下，metastore服务和hive服务运行在同一个JVM中，它包含一个内嵌的以本地磁盘作为存储的Derby数据库实例（也就是内嵌metastore）。但是，只使用一个内嵌Derby数据库每次只能访问一个磁盘上的数据库文件。</p>
+
+<p>（2）如果要支持多会话需要使用一个独立的数据库，即本地metastore。任何JDBC兼容的数据库都可以通过一些配置属性来用matastore使用。</p>
+
+<p>（3）还有一种matastore配置成为远程matastore，这种配置下，一个或多个matastore服务器和Hive服务运行在不同进程内，通过这种方式可将数据库层完全置于防火墙后，从而更好得管理。</p>
+
+<p>Hive没有将matastore保存在HDFS上，而是保存在关系数据库中是为了当Hive需要访问matastore的时候，可低延迟的快速的访问到需要的元数据信息（HDFS的访问延迟一般都比较大）。但当HiveSQL之后生成的matastore任务在运行的时候如果需要访问元数据信息时，并不会直接访问matastore。当生成的物理计划序列化到plan.xml的时候，就已将相应的元数据信息保存到了plan.xml中。而plan.xml文件之后会被放入Hadoop的分布式缓存中，所以MapReduce任务就可以从分布式缓存中获得需要的元数据信息。 本文采用MySQL作为Hive的metastore。</p>
+
+<p>登录master</p>
+
+<h4>1、安装MySQL（<a href="http://nunknown.com/?p=27" target="_blank" title="CentOS下MySQL安装（.rpm）">方法参考</a>）</h4>
+
+<p>在安装server的过程中会提示</p>
+
+<table cellpadding="0" cellspacing="0">
+	<tbody>
+		<tr>
+			<td>
+			<p>1<br />
+			2<br />
+			3<br />
+			4<br />
+			5<br />
+			6<br />
+			7<br />
+			8</p>
+			</td>
+			<td>
+			<p>PLEASE REMEMBER TO SET A PASSWORD FOR THE MySQL root USER&nbsp;!<br />
+			To&nbsp;do&nbsp;so, start the server,&nbsp;then&nbsp;issue the following commands:<br />
+			<br />
+			/usr/bin/mysqladmin&nbsp;-u&nbsp;root password&nbsp;&#39;new-password&#39;<br />
+			/usr/bin/mysqladmin&nbsp;-u&nbsp;root&nbsp;-h&nbsp;master password&nbsp;&#39;new-password&#39;<br />
+			<br />
+			Alternatively you can run:<br />
+			/usr/bin/mysql_secure_installation</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<h4>2、设置root用户名及密码</h4>
+
+<p>根据提示，待安装完成后在命令行中输入设置用户名（root）和密码（hadoop）</p>
+
+<table cellpadding="0" cellspacing="0">
+	<tbody>
+		<tr>
+			<td>
+			<p>1<br />
+			2</p>
+			</td>
+			<td>
+			<p>/usr/bin/mysqladmin&nbsp;-u&nbsp;root password hadoop<br />
+			/usr/bin/mysqladmin&nbsp;-u&nbsp;root&nbsp;-h&nbsp;master password hadoop</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>在master用户下，用户名root，用户hadoop即可登录</p>
+
+<table cellpadding="0" cellspacing="0">
+	<tbody>
+		<tr>
+			<td>
+			<p>1</p>
+			</td>
+			<td>
+			<p>[hadoop@master ~]$ mysql&nbsp;-uroot&nbsp;-hmaster&nbsp;-phadoop</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>如果可以登录成功，则表示MySQL数据库已经安装成功</p>
+
+<h4>3、创建用户hive@master（密码hive）并分配权限</h4>
+
+<table cellpadding="0" cellspacing="0">
+	<tbody>
+		<tr>
+			<td>
+			<p>1<br />
+			2<br />
+			3</p>
+			</td>
+			<td>
+			<p>CREATE USER&nbsp;&#39;hive&#39;&nbsp;IDENTIFIED BY&nbsp;&#39;hive&#39;;<br />
+			GRANT ALL PRIVILEGES ON&nbsp;*.*&nbsp;TO&nbsp;&#39;hive&#39;@&#39;master&#39;&nbsp;WITH GRANT OPTION;<br />
+			flush privileges;</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<h4>4、用户名hive登录</h4>
+
+<table cellpadding="0" cellspacing="0">
+	<tbody>
+		<tr>
+			<td>
+			<p>1<br />
+			2</p>
+			</td>
+			<td>
+			<p>mysql&nbsp;-h&nbsp;master&nbsp;-uhive<br />
+			set&nbsp;password = password(&#39;hive&#39;);</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<h4>5、建立 Hive 专用的元数据库</h4>
+
+<table cellpadding="0" cellspacing="0">
+	<tbody>
+		<tr>
+			<td>
+			<p>1</p>
+			</td>
+			<td>
+			<p>create database hive;</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<h4>6、其他可能会用到的命令</h4>
+
+<p>（1）查看MYSQL数据库中所有用户</p>
+
+<table cellpadding="0" cellspacing="0">
+	<tbody>
+		<tr>
+			<td>
+			<p>1</p>
+			</td>
+			<td>
+			<p>SELECT DISTINCT CONCAT(&#39;User: &#39;&#39;&#39;,user,&#39;&#39;&#39;@&#39;&#39;&#39;,host,&#39;&#39;&#39;;&#39;)&nbsp;AS query FROM mysql.user;</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>（2）查看用户是否设置了密码</p>
+
+<table cellpadding="0" cellspacing="0">
+	<tbody>
+		<tr>
+			<td>
+			<p>1</p>
+			</td>
+			<td>
+			<p>mysql&amp;gt;;&nbsp;select&nbsp;user,host,password from mysql.user;</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<h3>3.3 配置Hive</h3>
+
+<p>Hive使用和Hadoop类似的XML配置文件进行设置，配置文件为hive/conf/hive-site.xml。几个较为重要的metastore配置属性见下表：</p>
+
+<table style="width:100%">
+	<tbody>
+		<tr>
+			<td>hive.metastore.warehouse.dir</td>
+			<td>相对于fs.default.name的目录，托管表存储在这里</td>
+		</tr>
+		<tr>
+			<td>javax.jdo.option.ConnectionURL</td>
+			<td>metastore数据库的JDBC URL</td>
+		</tr>
+		<tr>
+			<td>javax.jdo.option.ConnectionDriverName</td>
+			<td>JDBC驱动器的类名</td>
+		</tr>
+		<tr>
+			<td>javax.jdo.option.ConnectionUserName</td>
+			<td>JDBC用户名</td>
+		</tr>
+		<tr>
+			<td>javax.jdo.option.ConnectionConnectionPassword</td>
+			<td>JDBC密码</td>
+		</tr>
+	</tbody>
+</table>
+
+<h4>1、修改配置文件</h4>
+
+<p>进入到hive的配置文件目录下，找到hive-default.xml.template，另存为hive-site.xml并修改参数</p>
+
+<table cellpadding="0" cellspacing="0">
+	<tbody>
+		<tr>
+			<td>
+			<p>1<br />
+			2</p>
+			</td>
+			<td>
+			<p>cd&nbsp;hive-0.9.0-shark-0.8.0-bin/conf<br />
+			vi&nbsp;hive-site.xml</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>Hive 系统会加载两个配置文件一个默认配置文件&ldquo;hive-default.xml&rdquo;，另一个就是用户自定义文件&ldquo;hive-site.xml&rdquo;。当&ldquo;hive-site.xml&rdquo;中的配置参数的值与&ldquo;hive-default.xml&rdquo;文件中不一致时，以用户自定义的为准。所以可将不需要的参数都删除掉，只留下下面所示的内容。</p>
+
+<p>&lt;?xml version=&rdquo;1.0&Prime;?&gt;</p>
+
+<p>&lt;?xml-stylesheet type=&rdquo;text/xsl&rdquo; href=&rdquo;configuration.xsl&rdquo;?&gt;</p>
+
+<p>&lt;configuration&gt;</p>
+
+<p>&lt;property&gt;</p>
+
+<p>&lt;name&gt;javax.jdo.option.ConnectionURL&lt;/name&gt;</p>
+
+<p>&lt;value&gt;jdbc:mysql://master:3306/hive?characterEncoding=UTF-8&lt;/value&gt;</p>
+
+<p>&lt;/property&gt;</p>
+
+<p>&lt;property&gt;</p>
+
+<p>&lt;name&gt;javax.jdo.option.ConnectionDriverName&lt;/name&gt;</p>
+
+<p>&lt;value&gt;com.mysql.jdbc.Driver&lt;/value&gt;</p>
+
+<p>&lt;/property&gt;</p>
+
+<p>&lt;property&gt;</p>
+
+<p>&lt;name&gt;javax.jdo.option.ConnectionUserName&lt;/name&gt;</p>
+
+<p>&lt;value&gt;hive&lt;/value&gt;</p>
+
+<p>&lt;/property&gt;</p>
+
+<p>&lt;property&gt;</p>
+
+<p>&lt;name&gt;javax.jdo.option.ConnectionPassword&lt;/name&gt;</p>
+
+<p>&lt;value&gt;hive&lt;/value&gt;</p>
+
+<p>&lt;/property&gt;</p>
+
+<p>&lt;/configuration&gt;</p>
+
+<p>其中，MySQL的端口号3306为默认端口号，具体可在MySQL的配置文件my.cnf中查看。</p>
+
+<h4>2、拷贝JDBC驱动包</h4>
+
+<p>把MySQL的JDBC驱动包复制到Hive的lib目录下（mysql-connector-java）</p>
+
+<h4>3、分发HIVE</h4>
+
+<p>完成后，拷贝Hive目录到其他所有slave节点上，并且安装目录跟master上一致：</p>
+
+<table cellpadding="0" cellspacing="0">
+	<tbody>
+		<tr>
+			<td>
+			<p>1</p>
+			</td>
+			<td>
+			<p>scp&nbsp;-r&nbsp;/home/hadoop/hadoop-1.2.1/&nbsp;slave:/home/hadoop/</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<h4>4、测试HIVE</h4>
+
+<p>拷贝完成后，尝试测试下hive集群是否搭建完成，在启动hive之前，首先启动hadoop集群，然后再进入到hive安装目录下，执行命令：</p>
+
+<table cellpadding="0" cellspacing="0">
+	<tbody>
+		<tr>
+			<td>
+			<p>1</p>
+			</td>
+			<td>
+			<p>bin/hive</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>如果可以正确显示hive的命令行则表示安装成功。</p>
+
+<p>如提示：Cannot find hadoop installation: $HADOOP_HOME must be set or hadoop must be in the path</p>
+
+<p>请检查$HADOOP_HOME是否有打印信息</p>
+
+<table cellpadding="0" cellspacing="0">
+	<tbody>
+		<tr>
+			<td>
+			<p>1</p>
+			</td>
+			<td>
+			<p>echo&nbsp;$HADOOP_HOME</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>如无打印信息，请检查~/.bash_profile中信息是否完整，并重新加载</p>
+
+<table cellpadding="0" cellspacing="0">
+	<tbody>
+		<tr>
+			<td>
+			<p>1</p>
+			</td>
+			<td>
+			<p>source&nbsp;~/.bash_profile</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>若出现以下警告</p>
+
+<table cellpadding="0" cellspacing="0">
+	<tbody>
+		<tr>
+			<td>
+			<p>1</p>
+			</td>
+			<td>
+			<p>WARN conf.HiveConf: DEPRECATED: Configuration property hive.metastore.local no longer has any effect. Make sure to provide a valid value&nbsp;for&nbsp;hive.metastore.uris&nbsp;if&nbsp;you are connecting to a remote megastore.</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>请检查hive-site.xml中是否使用添加了</p>
+
+<p>&lt;property&gt;</p>
+
+<p>&lt;name&gt;hive.metastore.local&lt;/name&gt;</p>
+
+<p>&lt;value&gt;true&lt;/value&gt;</p>
+
+<p>&lt;/property&gt;</p>
+
+<p>在0.10 、0.11或者之后的HIVE版本 hive.metastore.local 属性不再使用，请删去。</p>
+
+<h4>5、测试：在Hive上建立数据表</h4>
+
+<table cellpadding="0" cellspacing="0">
+	<tbody>
+		<tr>
+			<td>
+			<p>1</p>
+			</td>
+			<td>
+			<p>hive&amp;gt;&nbsp;CREATE&nbsp;TABLE&nbsp;xp(id&nbsp;INT,name string)&nbsp;ROW&nbsp;FORMAT DELIMITED&nbsp;FIELDS&nbsp;TERMINATED&nbsp;BY&nbsp;&#39;\t&#39;; 2)</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<h4>6、从 MySQL 数据库上查看元数据信息</h4>
+
+<p>用户Hive登录MySQL</p>
+
+<p>使用 hive 数据库</p>
+
+<table cellpadding="0" cellspacing="0">
+	<tbody>
+		<tr>
+			<td>
+			<p>1</p>
+			</td>
+			<td>
+			<p>use hive;</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>显示 hive 数据库中的数据表</p>
+
+<table cellpadding="0" cellspacing="0">
+	<tbody>
+		<tr>
+			<td>
+			<p>1</p>
+			</td>
+			<td>
+			<p>show tables;</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>查看 hive 的元数据信息</p>
+
+<table cellpadding="0" cellspacing="0">
+	<tbody>
+		<tr>
+			<td>
+			<p>1</p>
+			</td>
+			<td>
+			<p>select&nbsp;*&nbsp;from TBLS;</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>备注：TBLS表中保存了所有hive表的基本信息</p>
+
+<p>查看是否存在刚才建的那张表，如成功则Hive集成MySQL作为元数据库已完成配置。</p>
+
+<h2>4 more about Hive</h2>
+
+<h3>4.1&nbsp;组成模块</h3>
+
+<p>下图显示了Hive主要&ldquo;模块&rdquo;以及Hive是如何与Hadoop交互工作的。图片来自Programming Hive。</p>
+
+<p><img alt="Hive模块图" src="http://nunknown.com/wp-content/uploads/2014/07/Hive%E6%A8%A1%E5%9D%97%E5%9B%BE.png" style="height:421px; width:386px" /></p>
+
+<p>&nbsp;</p>
+
+<p>Hive发行版中附带的模块有CLI，一个成为Hive网页界面（HWI）的简单网页界面，以及JDBC、ODBC和一个Thrift服务器这几个模块进行编程访问。CLI也就是命令行界面，是和Hive交互的最常用方式。也是前文启动Hive采用的方式，不过CLI的设计使其不通过编程的方式访问。Thrift允许客户端使用包括JAVA、C++和其他多种语言，通过编程的方式访问Hive。</p>
+
+<p>所有的命令和查询都会进入到Driver（驱动模块）中，通过该模块对输入进行解析编译，对需求的计算进行优化，然后按照指定的步骤执行。Hive通过和jobtracker通信来初始化MapReduce任务（job），在大型集群中，通常会有网关机专门用于部署像Hive这样的工具，在这些网关机上可远程和管理节点上的jobtracker通信来执行任务（job）。通常要处理的数据文件是存储在HDFS中的，而HDFS由namenode管理。metastore如前文所述是一个独立的关系型数据库，用以保存Hive表模式和其他系统元数据。</p>
+
+<h3>4.2 数据类型</h3>
+
+<p>Hive支持基本数据类型（Primitive Data Types）和集合数据类型（Collection Data Types Hive）。基本数据类型包括数值型、布尔型、字符串型等。复杂数据类型包括数组、映射和结构。Hive这些基本数据类型基本对应于Java中的类型，具体类型如下表所示：</p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>类型</td>
+			<td>描述</td>
+		</tr>
+		<tr>
+			<td>TINYINT</td>
+			<td>1字节有符号整数，对应于Java的byte</td>
+		</tr>
+		<tr>
+			<td>SMALLINT</td>
+			<td>2字节有符号整数，对应于Java的short</td>
+		</tr>
+		<tr>
+			<td>INT</td>
+			<td>4字节有符号整数，对应于Java的int</td>
+		</tr>
+		<tr>
+			<td>BIGINT</td>
+			<td>8字节有符号整数，对应于Java的long</td>
+		</tr>
+		<tr>
+			<td>BOOLEAN</td>
+			<td>布尔型，true/false</td>
+		</tr>
+		<tr>
+			<td>FLOAT</td>
+			<td>单精度浮点数</td>
+		</tr>
+		<tr>
+			<td>DOUBLE</td>
+			<td>双精度浮点数</td>
+		</tr>
+		<tr>
+			<td>STRING</td>
+			<td>存储文本的数据类型，类似于其他数据库的VACHAR</td>
+		</tr>
+		<tr>
+			<td>TIMESTAMP</td>
+			<td>UTC 时间，可用INT、FLOAT或STRING表示</td>
+		</tr>
+		<tr>
+			<td>BINARY</td>
+			<td>字节数组，与RDBMS中的 VARBINARY类型相似。可用以记录任何字节，防止Hive将他们认做numbers或strings等</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>复合数据类型如下表：</p>
+
+<table style="width:656px">
+	<tbody>
+		<tr>
+			<td>类型</td>
+			<td>描述</td>
+		</tr>
+		<tr>
+			<td>ARRAY</td>
+			<td>一组有序字段，字段类型必须相同</td>
+		</tr>
+		<tr>
+			<td>MAP</td>
+			<td>一组无序的键-值对，键额类型必须为原子的，值可为任何类型。同一个映射的键的类型必须相同，值的类型也必须相同</td>
+		</tr>
+		<tr>
+			<td>STRUCT</td>
+			<td>一组命名的字段，字段的类型可不同</td>
+		</tr>
+	</tbody>
+</table>
+
+<h3>4.3 数据模型</h3>
+
+<p>Hive的数据模型包括database、table、partition和bucket。</p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>数据模型</td>
+			<td>描述</td>
+		</tr>
+		<tr>
+			<td>数据库（database）</td>
+			<td>相当于关系数据库里的命名空间（namespace），它的作用是将用户和数据库的应用隔离到不同的数据库或模式中。</td>
+		</tr>
+		<tr>
+			<td>表（table）</td>
+			<td>逻辑上由存储的数据和描述表格中的数据形式的相关元数据组成。表存储的数据一般存放在分布式文件系统里，如HDFS，但也可以是其他任何Hadoop文件系统中。元数据存储在关系数据库里。在Hive中创建表时，默认情况下Hive负责管理数据，也就是将Hive数据移入它的&ldquo;仓库目录&rdquo;（warehouse directory），也可创建外部表（external table），让Hive到仓库目录以外的位置访问数据。</td>
+		</tr>
+		<tr>
+			<td>分区（partition）</td>
+			<td>Hive把表组织成&ldquo;分区&rdquo;，这是一种根据&ldquo;分区列&rdquo;（如日期）的值对表的数据进行粗略划分的机制。使用分区可以加快数据分片（slice）的查询速度。</td>
+		</tr>
+		<tr>
+			<td>桶（bucket）</td>
+			<td>表和分区可以进一步分为&ldquo;桶&rdquo;，它会为数据提供额外的结构以获得更高效的查询处理。例如，可以根据用户ID来划分桶，这则是对数据源数据文件本身来拆分数据。使用桶的表会将源数据文件按一定规律拆分成多个文件，要使用bucket，</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>&nbsp;</p>
+
+<h3>4.4 HiveQL</h3>
+
+<p>是一种类SQL的Hive查询语句（Hive query language）。它与大部分的SQL语法兼容，但是并不完全支持SQL标准，它最接近于MySQL的SQL，但也有明显差别。如不支持行级插入、更新以及删除，也不支持事务。各种关于创建、更新、删除databases、tables、views、functions和indexes的语句以及各种数据操作方法这里不详细描述。</p>
+
+<p>Hive&nbsp;DDL示例语句：</p>
+
+<table cellpadding="0" cellspacing="0">
+	<tbody>
+		<tr>
+			<td>
+			<p>1<br />
+			2<br />
+			3<br />
+			4<br />
+			5<br />
+			6<br />
+			7</p>
+			</td>
+			<td>
+			<p>CREATE&nbsp;[EXTERNAL]&nbsp;TABLE&nbsp;[IF&nbsp;NOT&nbsp;EXISTS]&nbsp;TABLE_NAME&nbsp;(col_name data_type,&nbsp;...)<br />
+			<br />
+			[PARTITIONED&nbsp;BY&nbsp;(col_name data_type,&nbsp;...)]<br />
+			<br />
+			[&nbsp;[ROW&nbsp;FORMAT row_format]&nbsp;[STORED&nbsp;AS&nbsp;file_format]&nbsp;|&nbsp;[&nbsp;WITH&nbsp;SERDEPROPERTIES&nbsp;(...)&nbsp;]&nbsp;]<br />
+			<br />
+			[LOCATION hdfs_path]</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>关于HiveQL的查询，以下简单摘录：</p>
+
+<ol>
+	<li>SELECT&hellip;FROM语句</li>
+</ol>
+
+<p>对于一个给定的记录，SELECT指定了要保存额列以及输出函数需要调用的一个或多个列。FROM子句标识了从哪个表、视图或嵌套查询中选择记录。</p>
+
+<p>如查询employees中所有员工的name和salary信息：</p>
+
+<table cellpadding="0" cellspacing="0">
+	<tbody>
+		<tr>
+			<td>
+			<p>1</p>
+			</td>
+			<td>
+			<p>SELECT&nbsp;name,&nbsp;salary&nbsp;FROM&nbsp;employees;</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<ol start="2">
+	<li>WHERE语句</li>
+</ol>
+
+<p>SELECT语句用于选取字段，WHERE语句用于过滤条件，两者结合使用可找到符合过滤条件的记录。WHERE语句使用谓词表达式，当谓词表达式计算结果为true时，相应的行将被保留并输出。</p>
+
+<p>如查询employees中所有来自美国加利福利亚州的员工信息：</p>
+
+<table cellpadding="0" cellspacing="0">
+	<tbody>
+		<tr>
+			<td>
+			<p>1<br />
+			2<br />
+			3</p>
+			</td>
+			<td>
+			<p>SELECT&nbsp;*&nbsp;FROM&nbsp;employees<br />
+			<br />
+			WHERE&nbsp;country&nbsp;=&nbsp;&#39;US&#39;&nbsp;AND&nbsp;state&nbsp;=&nbsp;&#39;CA&#39;;</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<ol start="3">
+	<li>GROUP BY</li>
+</ol>
+
+<p>GROUP BY语句通常会和聚合函数一起使用，按照一个或多个列对结果进行分组，然后对每个组执行聚合操作。</p>
+
+<p>如按照股票代码为APPL的年份对股票记录进行分组，然后计算每年的平均收盘价。</p>
+
+<table cellpadding="0" cellspacing="0">
+	<tbody>
+		<tr>
+			<td>
+			<p>1<br />
+			2<br />
+			3<br />
+			4<br />
+			5</p>
+			</td>
+			<td>
+			<p>SELECT&nbsp;YEAR(ymd),&nbsp;avg(price_close)&nbsp;FROM&nbsp;stocks<br />
+			<br />
+			WHERE&nbsp;exchange&nbsp;=&nbsp;&#39;NASDAQ&#39;&nbsp;AND&nbsp;symbol&nbsp;=&nbsp;&#39;AAPL&#39;<br />
+			<br />
+			GROUP&nbsp;BY&nbsp;YEAR(ymd);</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<ol start="4">
+	<li>JOIN语句</li>
+</ol>
+
+<p>Hive支持通常的SQL JOIN语句，但只支持等值连接。包括内连接、外连接、左外连接、右外连接、完全外连接、左半开连接、笛卡尔积、map端连接等。</p>
+
+<table cellpadding="0" cellspacing="0">
+	<tbody>
+		<tr>
+			<td>
+			<p>1<br />
+			2<br />
+			3<br />
+			4<br />
+			5</p>
+			</td>
+			<td>
+			<p>SELECT&nbsp;a.ymd,&nbsp;a.price_close,&nbsp;b.price_close<br />
+			<br />
+			FROM&nbsp;stocks a&nbsp;JOIN&nbsp;stocks b&nbsp;ON&nbsp;a.ymd&nbsp;=&nbsp;b.ymd<br />
+			<br />
+			WHERE&nbsp;a.symbol&nbsp;=&nbsp;&#39;AAPL&#39;&nbsp;AND&nbsp;b.symbol&nbsp;=&nbsp;&#39;IBM&#39;;</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<ol start="5">
+	<li>ORDER BY和SORT BY</li>
+</ol>
+
+<p>Hive中的ORDER BY语句和其他SQL中的定义是一样的，其会对查询结果集执行一个全局排序。换言之，所有数据都通过一个reduce进行处理，对于大数据集这会花费大量时间。Hive增加了一个SORT BY，其只会在每个reduce中对数据进行排序，即局部排序。这样保证每个reduce的输出都是有序的，可以提高之后全局排序的效率。</p>
+
+<p>ORDER BY</p>
+
+<table cellpadding="0" cellspacing="0">
+	<tbody>
+		<tr>
+			<td>
+			<p>1<br />
+			2<br />
+			3</p>
+			</td>
+			<td>
+			<p>SELECT&nbsp;s.ymd,&nbsp;s.symbol,&nbsp;s.price_close&nbsp;FROM&nbsp;stocks s<br />
+			<br />
+			ORDER&nbsp;BY&nbsp;s.ymd&nbsp;ASC,&nbsp;s.symbol&nbsp;DESC;</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>SORT BY</p>
+
+<table cellpadding="0" cellspacing="0">
+	<tbody>
+		<tr>
+			<td>
+			<p>1<br />
+			2<br />
+			3</p>
+			</td>
+			<td>
+			<p>SELECT&nbsp;s.ymd,&nbsp;s.symbol,&nbsp;s.price_close&nbsp;FROM&nbsp;stocks s<br />
+			<br />
+			SORT&nbsp;BY&nbsp;s.ymd&nbsp;ASC,&nbsp;s.symbol&nbsp;DESC;</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<ol start="6">
+	<li>含有SORT BY的DISTRIBUTE BY</li>
+</ol>
+
+<p>DISTRIBUTE BY控制map的输出在reduce中如何划分的。MapReduce job中传输的所有数据都是按照键-值对的方式进行组织，因此Hive在将用户的查询语句转换成MapReduce job时，其必须在内部使用此功能。</p>
+
+<ol start="7">
+	<li>CLUSTER BY</li>
+</ol>
+
+<p>CLUSTER BY除了具有DISTRIBUTE BY的功能外还兼具SORT BY的功能。常常认为CLUSTER BY = DISTRIBUTE BY + SORT BY。但是排序只能是倒序排序，不能指定排序规则为asc 或者desc。</p>
+
+<ol start="8">
+	<li>抽样查询</li>
+</ol>
+
+<p>对于较大的数据集而只需要使用一个具有代表性结果的查询结果时，可以通过Hive对表进行分桶抽样。</p>
+
+<p>如，可使用rand()函数进行抽样，函数会返回一个随机值。</p>
+
+<table cellpadding="0" cellspacing="0">
+	<tbody>
+		<tr>
+			<td>
+			<p>1</p>
+			</td>
+			<td>
+			<p>SELECT&nbsp;*&nbsp;FROM&nbsp;numbers&nbsp;TABLESAMPLE(BUCKET&nbsp;3&nbsp;OUT&nbsp;OF&nbsp;10&nbsp;ON&nbsp;rand())&nbsp;s; &nbsp;</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<ol start="9">
+	<li>UNION ALL</li>
+</ol>
+
+<p>UNION ALL可以将2个或多个表进行合并，每个UNION子查询都必须具有相同的列，而且对应的每个字段的字段类型必须一致。Hive也可用于同一个源表的数据合并。</p>
+
+<p>如将日志数据进行合并：</p>
+
+<table cellpadding="0" cellspacing="0">
+	<tbody>
+		<tr>
+			<td>
+			<p>1<br />
+			2<br />
+			3<br />
+			4<br />
+			5<br />
+			6<br />
+			7<br />
+			8<br />
+			9<br />
+			10<br />
+			11<br />
+			12<br />
+			13<br />
+			14<br />
+			15<br />
+			16<br />
+			17<br />
+			18<br />
+			19<br />
+			20<br />
+			21</p>
+			</td>
+			<td>
+			<p>SELECT&nbsp;log.ymd,&nbsp;log.level,&nbsp;log.message<br />
+			<br />
+			FROM&nbsp;(<br />
+			<br />
+			SELECT&nbsp;l1.ymd,&nbsp;l1.level,<br />
+			<br />
+			l1.message,&nbsp;&#39;Log1&#39;&nbsp;AS&nbsp;SOURCE<br />
+			<br />
+			FROM&nbsp;log1&nbsp;l1<br />
+			<br />
+			UNION&nbsp;ALL<br />
+			<br />
+			SELECT&nbsp;l2.ymd,&nbsp;l2.level,<br />
+			<br />
+			l2.message,&nbsp;&#39;Log2&#39;&nbsp;AS&nbsp;SOURCE<br />
+			<br />
+			FROM&nbsp;log1&nbsp;l2<br />
+			<br />
+			)&nbsp;log<br />
+			<br />
+			SORT&nbsp;BY&nbsp;log.ymd&nbsp;ASC;</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<h3>4.5 元数据解析</h3>
+
+<p>在3.3中，通过在MySQL中输入show table的语句，可以看到Hive元数据表，除了TBLS存储表的基本信息，其他表的说明见下表:</p>
+
+<table style="width:100%">
+	<tbody>
+		<tr>
+			<td>BUCKETING_COLS</td>
+			<td>Hive表CLUSTERED BY字段信息(字段名，字段序号)</td>
+		</tr>
+		<tr>
+			<td>CDS</td>
+			<td>&nbsp;</td>
+		</tr>
+		<tr>
+			<td>COLUMNS_V2</td>
+			<td>存放表格的字段信息</td>
+		</tr>
+		<tr>
+			<td>DATABASE_PARAMS</td>
+			<td>&nbsp;</td>
+		</tr>
+		<tr>
+			<td>DBS</td>
+			<td>存放hive所有数据库信息</td>
+		</tr>
+		<tr>
+			<td>FUNCS</td>
+			<td>&nbsp;</td>
+		</tr>
+		<tr>
+			<td>FUNC_RU</td>
+			<td>&nbsp;</td>
+		</tr>
+		<tr>
+			<td>GLOBAL_PRIVS</td>
+			<td>&nbsp;</td>
+		</tr>
+		<tr>
+			<td>PARTITIONS</td>
+			<td>Hive表分区信息(创建时间，具体的分区)</td>
+		</tr>
+		<tr>
+			<td>PARTITION_KEYS</td>
+			<td>Hive分区表分区键(名称，类型，comment，序号)</td>
+		</tr>
+		<tr>
+			<td>PARTITION_KEY_VALS</td>
+			<td>Hive表分区名(键值，序号)</td>
+		</tr>
+		<tr>
+			<td>PARTITION_PARAMS</td>
+			<td>&nbsp;</td>
+		</tr>
+		<tr>
+			<td>PART_COL_STATS</td>
+			<td>&nbsp;</td>
+		</tr>
+		<tr>
+			<td>ROLES</td>
+			<td>&nbsp;</td>
+		</tr>
+		<tr>
+			<td>SDS</td>
+			<td>所有hive表、表分区所对应的hdfs数据目录和数据格式。</td>
+		</tr>
+		<tr>
+			<td>SD_PARAMS</td>
+			<td>&nbsp;</td>
+		</tr>
+		<tr>
+			<td>SEQUENCE_TABLE</td>
+			<td>SEQUENCE_TABLE表保存了hive对象的下一个可用ID，如&rsquo;org.apache.hadoop.hive.metastore.model.MTable&rsquo;, 21，则下一个新创建的hive表其TBL_ID就是21，同时SEQUENCE_TABLE表中271786被更新为26(这里每次都是+5)。同样，COLUMN，PARTITION等都有相应的记录</td>
+		</tr>
+		<tr>
+			<td>SERDES</td>
+			<td>Hive表序列化反序列化使用的类库信息</td>
+		</tr>
+		<tr>
+			<td>SERDE_PARAMS</td>
+			<td>序列化反序列化信息，如行分隔符、列分隔符、NULL的表示字符等</td>
+		</tr>
+		<tr>
+			<td>SKEWED_COL_NAMES</td>
+			<td>&nbsp;</td>
+		</tr>
+		<tr>
+			<td>SKEWED_COL_VALUE_LOC_MAP</td>
+			<td>&nbsp;</td>
+		</tr>
+		<tr>
+			<td>SKEWED_STRING_LIST</td>
+			<td>&nbsp;</td>
+		</tr>
+		<tr>
+			<td>SKEWED_STRING_LIST_VALUES</td>
+			<td>&nbsp;</td>
+		</tr>
+		<tr>
+			<td>SKEWED_VALUES</td>
+			<td>&nbsp;</td>
+		</tr>
+		<tr>
+			<td>SORT_COLS</td>
+			<td>Hive表SORTED BY字段信息(字段名，sort类型，字段序号)</td>
+		</tr>
+		<tr>
+			<td>TABLE_PARAMS</td>
+			<td>表级属性，如是否外部表，表注释等</td>
+		</tr>
+		<tr>
+			<td>TAB_COL_STATS</td>
+			<td>&nbsp;</td>
+		</tr>
+		<tr>
+			<td>TBLS</td>
+			<td>所有hive表的基本信息</td>
+		</tr>
+		<tr>
+			<td>VERSION</td>
+			<td>&nbsp;</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>除了上面几张表外，还有两张表分别为：NUCLEUS_TABLES和SEQUENCE_TABLE。</p>
+
+<p>其中，NUCLEUS_TABLES表中保存了元数据表和hive中class类的对应关系，SEQUENCE_TABLE表保存了hive对象的下一个可用ID。</p>
+
+<p>通过这些信息，可以看出Hive创建表的过程。 1、解析用户提交hive语句，对其进行解析，分解为表、字段、分区等hive对象 2、根据解析到的信息构建对应的表、字段、分区等对象，从SEQUENCE_TABLE中获取构建对象的最新ID，与构建对象信息（名称，类型等）一同通过DAO方法写入到元数据表中去，成功后将SEQUENCE_TABLE中对应的最新。</p>
+
+<h3>4.6 执行流程</h3>
+
+<p>如前所述，Hive是将HiveQL解析后生成了MapReduce的程序。换言之，客户端执行Hive 命令，输入 HiveQL语句后，Hive将HiveQL语句生成多个 MR的job，然后将这些 job 提交给 Hadoop 进行执行，完成后，再把结果放入到 HDFS或者本地的临时文件中。</p>
+
+<p>这一过程的实现可使用EXPALIN命令查看，如：</p>
+
+<table cellpadding="0" cellspacing="0">
+	<tbody>
+		<tr>
+			<td>
+			<p>1</p>
+			</td>
+			<td>
+			<p>hive&amp;gt; EXPLAIN SELECT SUM(number)&nbsp;FROM onecol;</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>这一执行流程主要涉及到的有语法解析器，语义分析器，逻辑计划生成器，计划优化器，物理计划生成器，物理计划执行器。</p>
+
+<p>1、语法解析器</p>
+
+<p>Hive利用antlr生成的HiveLexer.java和HiveParser.java类，将HiveQL转换成ASTNode类型的语法树。</p>
+
+<p>2、语义分析器</p>
+
+<p>根据语法解析器生成的语法树（ASTNode），SemanticAnalyzerFactory会根据ASTNode的token类型生成不同的SemanticAnalyzer。ExplainSemanticAnalyzer、LoadSemanticAnalyzer、ExportSemanticAnalyzer、DDLSemanticAnalyzer、FunctionSemanticAnalyzer、SemanticAnalyzer6个子类。语义分析完成后，会将语句中的相应信息放入到org.apache.hadoop.hive.ql.plan包中 *Desc 类中，这些类记录了相应语句的基本信息。</p>
+
+<p>然后会对语义分析完了的信息进行验证，比如表是否存在，字段是否存在，这时需要查询元数据，同时将表的相关信息放到desc对象中。</p>
+
+<p>3、逻辑计划生成器</p>
+
+<p>根据语义分析后的相关信息，将生成出逻辑操作树，抽象类为Operator 。子类有：ExtractOperator、FilterOperator、ForwardOperator、GroupbyOperator、LateralViewJoinOperator、LimitOperator、MapOperator、ScriptOperator、SelectOperator、TableScanOperator、TerminalOperator-Base Class、FileSinkOperator、ReduceSinkOperator、UDTFOperator、UnionOperator。</p>
+
+<p>4、逻辑计划优化器</p>
+
+<p>Hive会根据一定的rule来对生成的逻辑操作树进行优化，在优化操作中会涉及到5个主要的对象，包括：Node、GraphWalker、Dispatcher、Rule和Processor。其中Node就代表DAG图中的结点。</p>
+
+<p>5、物理计划生成器</p>
+
+<p>通过genMapRedTasks，递归访问逻辑操作树，将裸机操作数转换为一系列序列化的Map/Reduce工作。并将生成的计划输出到一个xml文件中。</p>
+
+<p>6、物理计划执行器</p>
+
+<p>调用execute()方法完成相应的物理计划执行工作。主要有FetchTask、ConditionalTask、CopyTask、DDLTask、ExplainTask、MapRedTask、MoveTask。</p>
+
+<h2>5 参考资料</h2>
+
+<p>[1]&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Edward Capriolo, Dean Wampler, Jason Rutherglen,.Programming Hive[M].O&rsquo;Reilly Media[M].2012</p>
+
+<p>[2]&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Edward Capriolo等.曹坤译.Hive编程指南[M].北京:人民邮电出版社,2013</p>
+
+<p>[3]&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Tom White. 周敏奇等译.Hadoop权威指南(第2版)[M]. 北京:清华大学出版社,2011</p>
+
+<p>[4]&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Thusoo A, Sarma J Sen, Jain N, et al. Hive &ndash; a petabyte scale data warehouse using Hadoop[J]. 2010 IEEE 26th International Conference on Data Engineering (ICDE 2010), Ieee, 2010: 996&ndash;1005.</p>
+
+<p>[5]&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<a href="http://www.cnblogs.com/lanxuezaipiao/p/3525554.html">http://www.cnblogs.com/lanxuezaipiao/p/3525554.html</a></p>
+
+<p>[6]&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<a href="http://hugh-wangp.iteye.com/blog/1564681">http://hugh-wangp.iteye.com/blog/1564681</a></p>
+
+<p>[7]&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<a href="http://blog.csdn.net/lxpbs8851/article/details/11723681">http://blog.csdn.net/lxpbs8851/article/details/11723681</a></p>
+
+<p>[8]&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<a href="http://www.cnblogs.com/justff/p/3453678.html">http://www.cnblogs.com/justff/p/3453678.html</a></p>
+
+<p>[9]&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<a href="http://www.cnblogs.com/linjiqin/archive/2013/03/04/2943025.html">http://www.cnblogs.com/linjiqin/archive/2013/03/04/2943025.html</a></p>
+
+<p>[10]&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<a href="http://www.open-open.com/lib/view/open1385360757791.html">http://www.open-open.com/lib/view/open1385360757791.html</a></p>
+
+<p>[11]&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<a href="http://yiyunyaya.blog.163.com/blog/static/165449636201343011383453/">http://yiyunyaya.blog.163.com/blog/static/165449636201343011383453/</a></p>
+
+<p>[12]&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<a href="http://blog.csdn.net/hit_kongquan/article/details/6698894">http://blog.csdn.net/hit_kongquan/article/details/6698894</a></p>
+
+<p>[13]&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<a href="http://hugh-wangp.iteye.com/blog/1564681">http://hugh-wangp.iteye.com/blog/1564681</a></p>
+
+<p>[14]&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<a href="http://bupt04406.iteye.com/blog/1096504">http://bupt04406.iteye.com/blog/1096504</a></p>
+
+<p>[15]&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<a href="http://metooxi.iteye.com/blog/1447621">http://metooxi.iteye.com/blog/1447621</a></p>
