@@ -1,0 +1,399 @@
+<h1>jenkins+maven+svn实现简单的一键发布</h1>
+
+<p>原创&nbsp;2016年09月20日 19:08:50</p>
+
+<ul>
+	<li>标签：</li>
+	<li><a href="http://so.csdn.net/so/search/s.do?q=jenkins&amp;t=blog" target="_blank">jenkins</a>&nbsp;/</li>
+	<li><a href="http://so.csdn.net/so/search/s.do?q=maven&amp;t=blog" target="_blank">maven</a>&nbsp;/</li>
+	<li><a href="http://so.csdn.net/so/search/s.do?q=svn&amp;t=blog" target="_blank">svn</a></li>
+</ul>
+
+<ul>
+	<li>20631</li>
+</ul>
+
+<h2><a name="t0"></a><strong>前言</strong></h2>
+
+<p><strong>&nbsp; &nbsp; &nbsp;在安装之前，我想说明一下本文的目的，jenkins的一款持续集成工具，</strong></p>
+
+<p><strong>&nbsp; &nbsp; &nbsp;它可以做的事情很多，其中一个主要的功能就是简化部署流程</strong></p>
+
+<p><strong>&nbsp; &nbsp;</strong></p>
+
+<p><strong>&nbsp; &nbsp; &nbsp;回想一下我们的发布流程：</strong></p>
+
+<p><strong>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; 1.本地把项目打包</strong></p>
+
+<p><strong>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; 2.通过FTP等工具，传输到服务器</strong></p>
+
+<p><strong>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; 3.关闭tomcat，把打包的项目放到webapp目录下</strong></p>
+
+<p><strong>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; 4.启动tomcat</strong></p>
+
+<p>&nbsp;</p>
+
+<p><strong>&nbsp; &nbsp; &nbsp;如果每次都这么搞的话，不仅慢，而且容易出错。</strong></p>
+
+<p><strong>&nbsp; &nbsp;</strong></p>
+
+<p><strong>&nbsp; &nbsp; &nbsp;有了jenkins以后，发布流程可以是这样：</strong></p>
+
+<p><strong>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; 1.用户在jenkins上点击某个按钮进行发布</strong></p>
+
+<p><strong>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; 2.jenkins收到发布命令</strong></p>
+
+<p><strong><strong>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp;&nbsp;</strong>3.jenkins从SVN上把源代码download下来</strong></p>
+
+<p><strong><strong>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp;&nbsp;</strong>4.jenkins根据你设置的mvn命令进行打包</strong></p>
+
+<p><strong><strong>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp;&nbsp;</strong>5.jenkins把你打包的好的war工程传输到tomcat的webapps目录下</strong></p>
+
+<p><strong><strong>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp;&nbsp;</strong>6.tomcat启动</strong></p>
+
+<p>&nbsp;</p>
+
+<p><strong><strong>&nbsp; &nbsp; &nbsp;</strong>对于程序员而言，只要做两件事：</strong></p>
+
+<p><strong><strong>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp;&nbsp;</strong>1.在jenkins上配置某个项目的部署流程</strong></p>
+
+<p><strong><strong>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp;&nbsp;</strong>2.在jenkins上点击某个项目的部署按钮，进行一键部署</strong></p>
+
+<h2><a name="t1"></a><strong>&nbsp; &nbsp; &nbsp;</strong></h2>
+
+<h2><a name="t2"></a><strong>&nbsp; &nbsp; &nbsp;</strong>实际上，配置往往只做一次，其余的时候，你只要一键部署就可以了</h2>
+
+<p>&nbsp;</p>
+
+<h2><a name="t3"></a><strong>一、安装jenkins</strong></h2>
+
+<p>&nbsp;</p>
+
+<p><strong>&nbsp; &nbsp; &nbsp; &nbsp;1.下载JENKINS</strong></p>
+
+<p>&nbsp;</p>
+
+<p><strong>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; 首先去jenkins官网下载jenkins，官网有两个下载的选择：</strong></p>
+
+<p>&nbsp;</p>
+
+<p><img alt="" src="http://blog.csdn.net/pein_zero/article/details/52597615" /></p>
+
+<p><strong><strong><strong>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;&nbsp;</strong></strong>如果是公司使用，建议选择左边的。</strong></p>
+
+<p><strong><strong>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;&nbsp;</strong>如果是个人使用，可以使用右边的</strong></p>
+
+<p>&nbsp;</p>
+
+<p><strong><strong><strong>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;&nbsp;</strong></strong>如果要下载安装版本，点击下拉箭头，windows是exe，linux是rpm包</strong></p>
+
+<p><strong><strong>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;&nbsp;</strong></strong>如果要下载war包，直接点击，不要点下拉箭头，我下载的是war包</p>
+
+<p>&nbsp;</p>
+
+<p><strong>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;&nbsp;<img alt="" src="http://img.blog.csdn.net/20160920210004970?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQv/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70/gravity/Center" /></strong></p>
+
+<p>&nbsp;</p>
+
+<p>&nbsp;</p>
+
+<p><strong><strong>&nbsp; &nbsp; &nbsp; &nbsp;</strong>2.设置JENKINS_HOME</strong></p>
+
+<p><strong><strong><strong>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;&nbsp;</strong></strong>下载完成以后，最好先设置JENKINS_HOME；</strong></p>
+
+<p><strong><strong>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;&nbsp;</strong>否则，对于windows系统，会默认装在C盘</strong></p>
+
+<p><strong><strong>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;&nbsp;</strong>linux系统不清楚默认在哪里</strong></p>
+
+<p><strong><strong>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;&nbsp;</strong>但是你设置了以后，就会在你想要的位置，生成jenkins的东西</strong></p>
+
+<p><strong><strong><strong>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;&nbsp;</strong></strong>关于设置HOME，跟设置JAVA_HOME一样，windows就不说了，linux的话，也是跟JAVA一样，修改/etc/profie文件即可</strong></p>
+
+<p>&nbsp;</p>
+
+<p><strong><strong><strong>&nbsp; &nbsp; &nbsp; &nbsp;</strong>3.启动JENKINS</strong></strong></p>
+
+<p><strong><strong><strong>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;&nbsp;</strong></strong>使用war包的同学跟其它工程一样，放到tomcat下，启动tomcat即可。</strong></p>
+
+<p><strong><strong><strong>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;&nbsp;</strong></strong>使用安装包的同学，windows下，在服务中启动，跟mysql、oralce服务的启动是一样的，linux的同学自行研究</strong></p>
+
+<p>&nbsp;</p>
+
+<p><strong><strong><strong>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; 启动tomcat时</strong></strong>会报错：</strong></p>
+
+<p><strong><strong>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;&nbsp;</strong><img alt="" src="http://img.blog.csdn.net/20160920213439438?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQv/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70/gravity/Center" /></strong></p>
+
+<p><strong><img alt="" src="http://blog.csdn.net/pein_zero/article/details/52597615" /></strong></p>
+
+<p><strong><strong>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;&nbsp;</strong></strong>这是因为jenkins不知道从什么时候开始，把http访问改成了https，但war包的配置文件却没有改，</p>
+
+<p><strong><strong>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;&nbsp;</strong></strong><strong>不过这不影响你启动和访问，</strong><strong>在后面的操作中，我们会改</strong></p>
+
+<p><br />
+<strong><strong>&nbsp; &nbsp; &nbsp; &nbsp;</strong>4</strong><strong>.访问JENKINS</strong></p>
+
+<p>&nbsp;</p>
+
+<p><strong><strong><strong>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;</strong></strong>在浏览器中输入http://127.0.0.1:8080/jenkins，就进入到jenkins了，具体ip和端口，根据你实际的环境来</strong></p>
+
+<p><strong><strong><strong>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;&nbsp;</strong></strong></strong></p>
+
+<p><strong><strong>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;</strong>首先是输入初始密码，这个有提示，跟着提示找到文件，找到密码，输入即可</strong></p>
+
+<p><strong><strong><strong>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;</strong></strong>其次就是进入插件选择页面：</strong></p>
+
+<p><strong><strong>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;&nbsp;</strong><img alt="" src="http://img.blog.csdn.net/20160920221035282?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQv/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70/gravity/Center" /></strong></p>
+
+<p><strong><img alt="" src="http://blog.csdn.net/pein_zero/article/details/52597615" /></strong></p>
+
+<p><strong><strong><strong>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;&nbsp;</strong></strong>我选择了Skip Plugin Installations，我跳过了插件的初始化，事实上，我并不想跳过。</strong></p>
+
+<p><strong><strong><strong>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;&nbsp;</strong></strong>如果不跳过，jenkins是有一个让你安装推荐插件的选项的。</strong></p>
+
+<p><strong><strong><strong>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;&nbsp;</strong></strong></strong></p>
+
+<p><strong><strong>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;&nbsp;</strong>但是因为启动的那个异常，jenkins把获取插件的地址从http改成了https，而war包没有改</strong></p>
+
+<p><strong><strong>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;&nbsp;</strong></strong>导致你点击&ldquo;推荐插件下载&rdquo;的按钮时，根本没用。</p>
+
+<p><strong><strong>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;&nbsp;</strong></strong></p>
+
+<p><strong><strong>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;&nbsp;</strong>所以只能跳过了，后面我们可以自己装插件</strong></p>
+
+<p><strong><strong>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;&nbsp;</strong></strong></p>
+
+<p><strong><strong>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;&nbsp;</strong>接下来就是创建一个admin用户，注意，创建完之后，之前的admin帐号会消失，初始密码的文件也不复存在了</strong></p>
+
+<p><strong><strong>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;&nbsp;</strong></strong>所以，你这里输入的用户名，可以就是 admin</p>
+
+<p>&nbsp;</p>
+
+<p><strong><strong>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;&nbsp;</strong></strong>创建完成以后，就完成了Jenkins的安装和启动</p>
+
+<p>&nbsp;</p>
+
+<p><strong>二、安装插件</strong></p>
+
+<p>&nbsp;</p>
+
+<p><strong><strong>&nbsp; &nbsp; &nbsp; &nbsp;</strong>1. 修改连接地址</strong></p>
+
+<p>&nbsp;</p>
+
+<p><strong><strong>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;&nbsp;</strong></strong>左侧点击系统管理，右侧选择管理插件，</p>
+
+<p><img alt="" src="http://blog.csdn.net/pein_zero/article/details/52597615" /></p>
+
+<p><strong>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;&nbsp;</strong><img alt="" src="http://img.blog.csdn.net/20160920221335571?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQv/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70/gravity/Center" /></p>
+
+<p>&nbsp;</p>
+
+<p><strong>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;&nbsp;&nbsp;</strong></p>
+
+<p><strong>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;&nbsp;</strong>选择&ldquo;高级&ldquo;面板：</p>
+
+<p><img alt="" src="http://blog.csdn.net/pein_zero/article/details/52597615" /></p>
+
+<p><strong>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;&nbsp;</strong><img alt="" src="http://img.blog.csdn.net/20160920221447128?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQv/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70/gravity/Center" /></p>
+
+<p><strong>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;&nbsp;&nbsp;</strong></p>
+
+<p>&nbsp;</p>
+
+<p><strong>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;&nbsp;</strong>拉下来，把http，改成https，点击&ldquo;提交&rdquo;，再点击&ldquo;立即获取&rdquo;<strong>&nbsp;</strong></p>
+
+<p><img alt="" src="http://blog.csdn.net/pein_zero/article/details/52597615" /></p>
+
+<p><strong>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;&nbsp;<img alt="" src="http://img.blog.csdn.net/20160920222845197?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQv/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70/gravity/Center" /></strong></p>
+
+<p>&nbsp;</p>
+
+<p>&nbsp;</p>
+
+<p><strong>&nbsp; &nbsp; &nbsp; &nbsp;</strong>2.安装MAVEN插件</p>
+
+<p><strong>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;&nbsp;</strong>为什么要安装maven插件？你点一下新建，是不是下面这个图</p>
+
+<p><strong>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;&nbsp;<img alt="" src="http://img.blog.csdn.net/20160920222939213?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQv/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70/gravity/Center" /></strong></p>
+
+<p><strong><img alt="" src="http://blog.csdn.net/pein_zero/article/details/52597615" /></strong></p>
+
+<p><strong><strong>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;&nbsp;</strong>如果之前你用过别人的jenkins的话，旧版的这里是有个创建maven 2/3项目，这么一个选项的，新版这里也是能选择创建maven项目的</strong></p>
+
+<p><strong><strong>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;&nbsp;</strong>你没有，是因为你没有安装maven插件，所以要安装maven插件，这样才能构建maven项目</strong></p>
+
+<p>&nbsp;</p>
+
+<p><strong><strong>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;&nbsp;</strong>还是，系统管理&mdash;&mdash;插件管理&mdash;&mdash;可选插件</strong></p>
+
+<p><strong><strong>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;&nbsp;</strong>这个时候，你应该是可以看到可选插件列表了，因为之前的操作，我们已经正确的修改了站点的url</strong></p>
+
+<p>&nbsp;</p>
+
+<p><strong><strong>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;&nbsp;</strong>在过滤中，输入maven，找到maven integration plugins：</strong></p>
+
+<p><strong>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;&nbsp; </strong> <img alt="" src="http://img.blog.csdn.net/20160920223239589?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQv/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70/gravity/Center" /></p>
+
+<p><img alt="" src="http://blog.csdn.net/pein_zero/article/details/52597615" /></p>
+
+<p><strong>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;&nbsp;</strong>勾选，安装，等待一些时间以后，你会发现安装出错了</p>
+
+<p><strong>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;&nbsp;</strong><img alt="" src="http://img.blog.csdn.net/20160920223527711?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQv/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70/gravity/Center" /></p>
+
+<p><strong>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;&nbsp;</strong>不要紧，看详细信息</p>
+
+<p><img alt="" src="http://blog.csdn.net/pein_zero/article/details/52597615" /><strong>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;&nbsp;</strong><img alt="" src="http://img.blog.csdn.net/20160920223618852?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQv/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70/gravity/Center" /></p>
+
+<p><strong>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;&nbsp;</strong>大致的意思就是，文件的签名验证不正确，不管它，注意看这个红色的路径。找到这个文件，打开它</p>
+
+<p><strong>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;&nbsp;<img alt="" src="http://img.blog.csdn.net/20160920223836262?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQv/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70/gravity/Center" /></strong></p>
+
+<p><strong><img alt="" src="http://blog.csdn.net/pein_zero/article/details/52597615" /></strong></p>
+
+<p><strong>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;&nbsp; </strong>把这个路径复制下来，放到浏览器，就可以把这个插件下载下来。</p>
+
+<p><strong>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;&nbsp; </strong>我的建议是，在本地建一个jenkins的关于maven插件的目录，把跟maven相关的插件都放到这个目录下</p>
+
+<p><strong>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;&nbsp; <img alt="" src="http://img.blog.csdn.net/20160920224049686?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQv/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70/gravity/Center" /></strong><strong>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;&nbsp; </strong></p>
+
+<p><strong>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;&nbsp; </strong>其它几个插件也一一找到对应的文件，找到url，下载</p>
+
+<p><strong>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;&nbsp; </strong>然后手动上传插件。上传插件的在：系统管理&mdash;&mdash;管理插件&mdash;&mdash;高级，你可以看到上传插件的地方</p>
+
+<p><strong>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;&nbsp; </strong><img alt="" src="http://img.blog.csdn.net/20160920224209361?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQv/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70/gravity/Center" /></p>
+
+<p><strong>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;&nbsp; </strong>注意，上传的顺序，要跟报错的顺序一样，因为这些插件都是有依赖的先后顺序的</p>
+
+<p><strong>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;&nbsp; 不过即使顺序错了也没关系，系统会提示你的：</strong></p>
+
+<p><strong><strong>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;&nbsp; </strong><img alt="" src="http://img.blog.csdn.net/20160920224445067?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQv/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70/gravity/Center" /></strong></p>
+
+<p><strong>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;&nbsp; </strong>安装完毕以后，你就可以创建maven项目了</p>
+
+<p><strong>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;&nbsp; </strong><img alt="" src="http://img.blog.csdn.net/20160920225014487?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQv/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70/gravity/Center" /></p>
+
+<p><strong><strong>&nbsp; &nbsp; &nbsp; &nbsp;</strong>3. 安装SVN插件</strong></p>
+
+<p><strong>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;&nbsp; </strong>安装SVN插件的方式跟安装Maven插件的方式是一样的，SVN插件的名字叫做：Subversion Plug-in</p>
+
+<p><strong>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;&nbsp; 安装完SVN后，你在新建项目的时候，源码管理这里就多出一个Subversion的选项</strong></p>
+
+<p><strong>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;&nbsp; </strong><img alt="" src="http://img.blog.csdn.net/20160920225525128?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQv/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70/gravity/Center" /></p>
+
+<p><strong><strong>&nbsp; &nbsp; &nbsp; &nbsp;</strong>4. 安装Deploy插件</strong></p>
+
+<p><strong>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;&nbsp; </strong>安装Deploy插件的方式跟安装Maven插件的方式还是一样的，Deploy插件的名字叫做：Deploy to container Plugin<br />
+<strong>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;&nbsp; 安装完SVN后，你在新建项目的时候，构建后操作这里，下拉选项里会多出一项Deploy war/ear to a container</strong></p>
+
+<p><strong>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;&nbsp; </strong><img alt="" src="http://img.blog.csdn.net/20160920230038228?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQv/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70/gravity/Center" /></p>
+
+<p>&nbsp;</p>
+
+<p><br />
+<strong>三、创建构建项目</strong></p>
+
+<p>&nbsp;</p>
+
+<p><strong><strong><strong>&nbsp; &nbsp; &nbsp; &nbsp;</strong>1</strong><strong>. 配置JDK和MAVEN</strong></strong></p>
+
+<p><strong><strong>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;&nbsp;</strong>在创建项目之前，先要配置JDK和Maven</strong></p>
+
+<p><strong><strong>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;&nbsp;</strong>点击，系统管理&mdash;&mdash;Global Tool Configuration</strong><strong>&nbsp;&nbsp;</strong></p>
+
+<p><strong><strong>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;&nbsp;</strong><img alt="" src="http://img.blog.csdn.net/20160920230337294?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQv/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70/gravity/Center" /></strong></p>
+
+<p><strong><strong><strong>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;&nbsp; </strong>仿照下面的图配置就可以</strong></strong></p>
+
+<p><strong>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;&nbsp;<img alt="" src="http://img.blog.csdn.net/20160920230635870?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQv/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70/gravity/Center" /></strong><br />
+<strong><strong>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;&nbsp; </strong> <img alt="" src="http://img.blog.csdn.net/20160920230639642?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQv/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70/gravity/Center" />&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;&nbsp;&nbsp;</strong></p>
+
+<p><strong>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;&nbsp;</strong>仿照我上面的方式，写入你自己的配置就可以</p>
+
+<p>&nbsp;</p>
+
+<p><strong><strong>&nbsp; &nbsp; &nbsp; &nbsp;</strong>2</strong><strong>. 创建构建项目</strong></p>
+
+<p><strong>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;&nbsp; </strong>废话不多说了，仿照我下面的配置就可以了<strong>&nbsp;&nbsp;</strong></p>
+
+<p><strong><strong>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;&nbsp;</strong><img alt="" src="http://img.blog.csdn.net/20160920231842922?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQv/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70/gravity/Center" /></strong></p>
+
+<p><strong>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;&nbsp;</strong><img alt="" src="http://img.blog.csdn.net/20160920231946818?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQv/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70/gravity/Center" /></p>
+
+<p><strong><img alt="" src="http://blog.csdn.net/pein_zero/article/details/52597615" /></strong></p>
+
+<p><strong><img alt="" src="http://blog.csdn.net/pein_zero/article/details/52597615" /></strong></p>
+
+<p><strong>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;&nbsp; 这里说明下，</strong><strong> &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;&nbsp;</strong></p>
+
+<p><strong><strong>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;&nbsp; </strong>第一个是SVN的地址，</strong></p>
+
+<p><strong><strong>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;&nbsp; 第二个是</strong>Credentials，其实就是你的SVN帐号和密码，</strong><strong>一开始这里肯定是没有的，需要你点击add添加</strong></p>
+
+<p><strong><strong>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;&nbsp;</strong><img alt="" src="http://img.blog.csdn.net/20160920232424152?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQv/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70/gravity/Center" /></strong></p>
+
+<p><strong><img alt="" src="http://blog.csdn.net/pein_zero/article/details/52597615" /></strong></p>
+
+<p><strong>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;&nbsp; </strong>把你的SVN帐号和密码加进去就好了</p>
+
+<p><strong>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;&nbsp;</strong><img alt="" src="http://img.blog.csdn.net/20160920232502449?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQv/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70/gravity/Center" /></p>
+
+<p><strong><strong>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;&nbsp;</strong><img alt="" src="http://img.blog.csdn.net/20160920232541200?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQv/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70/gravity/Center" /></strong></p>
+
+<p><strong><strong>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;&nbsp;&nbsp;<img alt="" src="http://img.blog.csdn.net/20160920232608295?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQv/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70/gravity/Center" /></strong></strong></p>
+
+<p><strong><strong>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;&nbsp;</strong><img alt="" src="http://img.blog.csdn.net/20160920232644550?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQv/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70/gravity/Center" /></strong></p>
+
+<p><strong><strong>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;&nbsp;</strong><img alt="" src="http://img.blog.csdn.net/20160920232718815?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQv/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70/gravity/Center" /></strong></p>
+
+<p><strong><strong>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;&nbsp;</strong><img alt="" src="http://img.blog.csdn.net/20160920232752657?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQv/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70/gravity/Center" /></strong></p>
+
+<p><strong><strong>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;&nbsp;这里需要说明下，构建后操作，把通过maven命令打好的war包，copy到</strong>tomcat中，</strong></p>
+
+<p><strong><strong>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;&nbsp;这要求tomcat</strong>开启热部署，说白了就是在tomcat的conf目录下的tomcat-users.xml中加入tomcat的用户密码</strong></p>
+
+<p><strong><strong>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;&nbsp;</strong><br />
+<strong>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;&nbsp;</strong><img alt="" src="http://img.blog.csdn.net/20160920233115537?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQv/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70/gravity/Center" /></strong></p>
+
+<p><strong><strong><strong>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;&nbsp;</strong></strong>上面面这段话，你可以完全照抄，当然用户名和密码根据你自己的需要来配置</strong></p>
+
+<p><strong><strong>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;&nbsp;</strong>这里设置的用户名和密码，必须和你填入上面Deploy to cotainer板块中的Manager user name和password一致</strong></p>
+
+<p><strong><strong>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;&nbsp;另外，关于</strong>Deploy插件，虽然写着只支持到tomcat7.x，但实际上，8.x的tomcat它照样可以支持</strong></p>
+
+<p>&nbsp;</p>
+
+<p><strong>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;&nbsp;</strong><br />
+<strong>&nbsp; &nbsp; &nbsp; &nbsp;</strong><strong>3</strong><strong>. 开始构建</strong> &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;&nbsp;<br />
+<strong>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;&nbsp;</strong><strong>至此，一个构建项目创建完毕，赶紧点一下构建按钮试试吧：</strong></p>
+
+<p><strong><strong><strong>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;<img alt="" src="http://img.blog.csdn.net/20160920233518308?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQv/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70/gravity/Center" /></strong></strong></strong></p>
+
+<p><strong>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;&nbsp;</strong><img alt="" src="http://img.blog.csdn.net/20160920233531262?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQv/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70/gravity/Center" /></p>
+
+<p><strong>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;&nbsp;</strong></p>
+
+<p>&nbsp;</p>
+
+<p>&nbsp;</p>
+
+<p><strong>变更：上面的方式，最后的部署采用的是tomcat的热部署，这种方式有一个极大的弊端，就是发布多次之后，内存会持续上涨。</strong></p>
+
+<p><strong>所以这并不是一种好的方式。</strong></p>
+
+<p><strong>一种更加好的方式是使用脚本，将tomcat关闭，然后把webapps下的旧的部署应用删除，再把新的war包放过来，然后启动</strong></p>
+
+<p>&nbsp;</p>
+
+<p><strong>所以，我们这里需要用到另外一个插件：PostBuildScript：</strong></p>
+
+<p><strong><img alt="" src="http://img.blog.csdn.net/20161019152214912?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQv/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70/gravity/Center" /></strong></p>
+
+<p><strong>只要把你自己写好的shell脚本放进来就可以了。</strong></p>
+
+<p><strong>当然这里需要你对shell编程有一些了解</strong></p>
+
+<p>&nbsp;</p>
+
+<p><strong>关于这个deploy.sh的实现，大家可以参考这篇文章：http://www.linuxidc.com/Linux/2016-01/127258.htm</strong></p>
+
+<p>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;&nbsp;</p>
