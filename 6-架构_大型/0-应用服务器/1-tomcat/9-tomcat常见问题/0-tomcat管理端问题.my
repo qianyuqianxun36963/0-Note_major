@@ -1,0 +1,179 @@
+<h1>Tomcat8.5 不能进入Manager App</h1>
+
+<p><strong>有时候需要进入Tomcat管理界面（比如Jenkins用Tomcat热部署的时候），但点击如下图中的Manager App 出现错误</strong></p>
+
+<p><strong><img alt="" src="http://img.blog.csdn.net/20170228101343055?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQvd2FuZ2ZlaTA5MDQzMDY=/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70/gravity/Center" /></strong></p>
+
+<p><strong>错误提示：</strong></p>
+
+<p>&nbsp;</p>
+
+<p>You are not authorized to view this page.</p>
+
+<p>By default the Host Manager is only accessible from a browser running on the same machine as Tomcat. If you wish to modify this restriction, you&#39;ll need to edit the Host Manager&#39;s&nbsp;<tt>context.xml</tt>&nbsp;file.</p>
+
+<p>If you have already configured the Host Manager application to allow access and you have used your browsers back button, used a saved book-mark or similar then you may have triggered the cross-site request forgery (CSRF) protection that has been enabled for the HTML interface of the Host Manager application. You will need to reset this protection by returning to the&nbsp;<a href="http://192.168.0.58:8080/host-manager/html" target="_blank">main Host Manager page</a>. Once you return to this page, you will be able to continue using the Host Manager application&#39;s HTML interface normally. If you continue to see this access denied message, check that you have the necessary permissions to access this application.</p>
+
+<p>If you have not changed any configuration files, please examine the file&nbsp;<tt>conf/tomcat-users.xml</tt>&nbsp;in your installation. That file must contain the credentials to let you use this webapp.</p>
+
+<p>For example, to add the&nbsp;<tt>admin-gui</tt>&nbsp;role to a user named&nbsp;<tt>tomcat</tt>&nbsp;with a password of&nbsp;<tt>s3cret</tt>, add the following to the config file listed above.</p>
+
+<pre>
+&lt;role rolename=&quot;admin-gui&quot;/&gt;
+&lt;user username=&quot;tomcat&quot; password=&quot;s3cret&quot; roles=&quot;admin-gui&quot;/&gt;
+</pre>
+
+<p>Note that for Tomcat 7 onwards, the roles required to use the host manager application were changed from the single&nbsp;<tt>admin</tt>&nbsp;role to the following two roles. You will need to assign the role(s) required for the functionality you wish to access.</p>
+
+<ul>
+	<li><tt>admin-gui</tt>&nbsp;- allows access to the HTML GUI</li>
+	<li><tt>admin-script</tt>&nbsp;- allows access to the text interface</li>
+</ul>
+
+<p>The HTML interface is protected against CSRF but the text interface is not. To maintain the CSRF protection:</p>
+
+<ul>
+	<li>Users with the&nbsp;<tt>admin-gui</tt>&nbsp;role should not be granted the&nbsp;<tt>admin-script</tt>&nbsp;role.</li>
+	<li>If the text interface is accessed through a browser (e.g. for testing since this interface is intended for tools not humans) then the browser must be closed afterwards to terminate the session.</li>
+</ul>
+
+<p><strong>解决需要两步：</strong></p>
+
+<p><strong>1. 添加 Context</strong></p>
+
+<p>&nbsp;&nbsp;&nbsp;&nbsp;<a href="http://stackoverflow.com/questions/36703856/access-tomcat-manager-app-from-different-host" target="_blank">http://stackoverflow.com/questions/36703856/access-tomcat-manager-app-from-different-host</a></p>
+
+<p>&nbsp;&nbsp;&nbsp; 在 $tomcathome/conf/Catalina/localhost/下创建&nbsp;manager.xml ，&nbsp;填入如下内容：</p>
+
+<blockquote>
+<ol start="1">
+	<li>&lt;Context&nbsp;privileged=&quot;true&quot;&nbsp;antiResourceLocking=&quot;false&quot;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;docBase=&quot;${catalina.home}/webapps/manager&quot;&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;Valve&nbsp;className=&quot;org.apache.catalina.valves.RemoteAddrValve&quot;&nbsp;allow=&quot;^.*$&quot;&nbsp;/&gt;&nbsp;&nbsp;</li>
+	<li>&lt;/Context&gt;&nbsp;&nbsp;</li>
+</ol>
+</blockquote>
+
+<p><strong>2.&nbsp; 添加用户：</strong></p>
+
+<p>&nbsp;&nbsp;&nbsp; $tomcathome/conf/tomcat-users.xml 中的 &lt;tomcat-users&gt;&lt;/tomcat-users&gt; 标签内添加如下代码：</p>
+
+<blockquote>
+<ol start="1">
+	<li>&lt;role&nbsp;rolename=&quot;manager-gui&quot;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&lt;role&nbsp;rolename=&quot;manager-script&quot;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;role&nbsp;rolename=&quot;manager-jmx&quot;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;role&nbsp;rolename=&quot;manager-status&quot;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;role&nbsp;rolename=&quot;admin-gui&quot;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;role&nbsp;rolename=&quot;admin-script&quot;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;user&nbsp;username=&quot;admin&quot;&nbsp;password=&quot;admin&quot;&nbsp;roles=&quot;manager-gui,manager-script,manager-jmx,manager-status,admin-gui,admin-script&quot;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&lt;user&nbsp;username=&quot;deploy&quot;&nbsp;password=&quot;deploy&quot;&nbsp;roles=&quot;manager-script&quot;/&gt;&nbsp;&nbsp;</li>
+</ol>
+</blockquote>
+
+<p>####################################################################</p>
+
+<p>附上自动化的SH文件：</p>
+
+<blockquote>
+<p>#!/bin/sh &nbsp;<br />
+&nbsp;&nbsp;<br />
+#function kill pids &nbsp;<br />
+killpids(){ &nbsp;<br />
+&nbsp; pids=($(ps -ef | grep $1 | awk &#39;{print $2}&#39;)) &nbsp;<br />
+&nbsp; for pid in ${pids[@]}; do &nbsp;<br />
+&nbsp; &nbsp; echo &quot;关闭进程: pid ${pid}&quot; &nbsp;<br />
+&nbsp; &nbsp; kill -9 ${pid} &nbsp;<br />
+&nbsp; done &nbsp;<br />
+} &nbsp;<br />
+&nbsp;&nbsp;<br />
+#function uninstall rpms &nbsp;<br />
+rmrpms(){ &nbsp;<br />
+&nbsp; oldRpms=($(rpm -qa|grep $1)) &nbsp;<br />
+&nbsp; for oldRpm in ${oldRpms[@]}; do &nbsp;<br />
+&nbsp; &nbsp; echo &quot;旧版$1: ${oldRpm}&quot; &nbsp;<br />
+&nbsp; &nbsp; echo &quot;删除...&quot; &nbsp;<br />
+&nbsp; &nbsp; yum -y remove $1 ${oldRpm} &nbsp;<br />
+&nbsp; done &nbsp;<br />
+} &nbsp;<br />
+&nbsp;&nbsp;<br />
+############################################################################################## &nbsp;<br />
+&nbsp;&nbsp;<br />
+killpids tomcat &nbsp;<br />
+&nbsp;&nbsp;<br />
+#搜索可能的安装目录 &nbsp;<br />
+echo &quot;Directory list:&quot; &nbsp;<br />
+paths=($(find / -maxdepth 5 -type d -name &#39;*tomcat*&#39;)) &nbsp;<br />
+if [ ${#paths[@]} -lt 1 ];then &nbsp;<br />
+&nbsp; echo &quot;Could not find your tomcat directory!&quot; &nbsp;<br />
+&nbsp; exit &nbsp;<br />
+fi &nbsp;<br />
+&nbsp;&nbsp;<br />
+for((i=0; i&lt;${#paths[@]}; i++));do &nbsp;<br />
+&nbsp; if [[ ! ${paths[i]} =~ &quot;tmp&quot; ]] &nbsp;<br />
+&nbsp; &nbsp; then &nbsp;<br />
+&nbsp; &nbsp; &nbsp; echo &quot;$i. ${paths[i]}&quot; &nbsp;<br />
+&nbsp; fi &nbsp;<br />
+done &nbsp;<br />
+echo -n &quot;Which one is the root directory of tomcat? &quot; &nbsp;<br />
+&nbsp;&nbsp;<br />
+#读取根目录 &nbsp;<br />
+while(true) &nbsp;<br />
+&nbsp; do &nbsp;<br />
+&nbsp; &nbsp; read sn &nbsp;<br />
+&nbsp; &nbsp; if [[ $sn -ge 0 &amp;&amp; $sn -lt ${#paths[@]} ]] &nbsp;<br />
+&nbsp; &nbsp; &nbsp; then &nbsp;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; path=${paths[sn]} &nbsp;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; echo $path &nbsp;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; break &nbsp;<br />
+&nbsp; &nbsp; &nbsp; else &nbsp;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; echo &quot;$sn is not expected&quot; &nbsp;<br />
+&nbsp; &nbsp; fi &nbsp;<br />
+&nbsp; done &nbsp;<br />
+&nbsp;&nbsp;<br />
+#添加Context &nbsp;<br />
+rm -rf $path/conf/Catalina/localhost/manager.xml &nbsp;<br />
+touch $path/conf/Catalina/localhost/manager.xml &nbsp;<br />
+echo &#39;&lt;!-- ---------- ManagerContext ------------ --&gt;&#39; &gt;&gt; $path/conf/Catalina/localhost/manager.xml &nbsp;<br />
+IFSBAK=$IFS &nbsp; &nbsp; #备份原来的值 &nbsp;<br />
+IFS=# &nbsp;<br />
+tomcatContext=&quot; &nbsp;<br />
+#&lt;Context privileged=\&quot;true\&quot; antiResourceLocking=\&quot;false\&quot; &nbsp; &nbsp;&nbsp;<br />
+# &nbsp; &nbsp; &nbsp; &nbsp; docBase=\&quot;\$\{catalina.home\}/webapps/manager\&quot;&gt; &nbsp; &nbsp;<br />
+# &nbsp; &nbsp;&lt;Valve className=\&quot;org.apache.catalina.valves.RemoteAddrValve\&quot; allow=\&quot;\^\.\*\$\&quot; /&gt; &nbsp; &nbsp;<br />
+#&lt;/Context&gt; &nbsp;<br />
+&quot; &nbsp;<br />
+#循环写入文件 &nbsp;<br />
+for line in $tomcatContext; &nbsp;<br />
+do &nbsp;<br />
+&nbsp; sed -i &quot;/ManagerContext/i\ $line&quot; $path/conf/Catalina/localhost/manager.xml &nbsp;<br />
+done &nbsp;<br />
+IFS=$IFSBAK &nbsp; &nbsp; #还原 &nbsp;<br />
+sed -i &#39;/ManagerContext/d&#39; $path/conf/Catalina/localhost/manager.xml &nbsp;<br />
+&nbsp;&nbsp;<br />
+#添加用户 &nbsp;<br />
+#先删除 &nbsp;<br />
+sed -i &#39;/rolename=/d&#39; $path/conf/tomcat-users.xml &nbsp;<br />
+sed -i &#39;/username=/d&#39; $path/conf/tomcat-users.xml &nbsp;<br />
+IFSBAK=$IFS &nbsp; &nbsp; #备份原来的值 &nbsp;<br />
+IFS=# &nbsp;<br />
+tomcatUser=&quot; &nbsp;<br />
+# &nbsp; &lt;role rolename=&quot;manager-gui&quot; /&gt; &nbsp; &nbsp;<br />
+# &nbsp; &nbsp; &lt;role rolename=&quot;manager-script&quot; /&gt; &nbsp; &nbsp;<br />
+# &nbsp; &nbsp; &nbsp; &lt;role rolename=&quot;manager-jmx&quot; /&gt; &nbsp; &nbsp;<br />
+# &nbsp; &nbsp; &nbsp; &nbsp; &lt;role rolename=&quot;manager-status&quot; /&gt; &nbsp; &nbsp;<br />
+# &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &lt;role rolename=&quot;admin-gui&quot; /&gt; &nbsp; &nbsp;<br />
+# &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &lt;role rolename=&quot;admin-script&quot; /&gt; &nbsp; &nbsp;<br />
+# &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &lt;user username=&quot;admin&quot; password=&quot;admin&quot; roles=&quot;manager-gui,manager-script,manager-jmx,manager-status,admin-gui,admin-script&quot; /&gt; &nbsp; &nbsp;<br />
+# &nbsp; &nbsp; &nbsp;&nbsp;<br />
+# &nbsp; &lt;user username=&quot;deploy&quot; password=&quot;deploy&quot; roles=&quot;manager-script&quot; /&gt; &nbsp;&nbsp;<br />
+# &nbsp;<br />
+&quot; &nbsp;<br />
+#循环写入文件 &nbsp;<br />
+for line in $tomcatUser; &nbsp;<br />
+do &nbsp;<br />
+&nbsp; sed -i &quot;/&lt;\/tomcat-users&gt;/i\ $line&quot; $path/conf/tomcat-users.xml &nbsp;<br />
+done &nbsp;<br />
+IFS=$IFSBAK &nbsp; &nbsp; #还原 &nbsp;</p>
+</blockquote>
