@@ -268,4 +268,126 @@
 
 <p><span style="font-size:7.5pt"><span style="font-family:宋体">到这里集群已经初步搭建好了。</span></span></p>
 
+<p>&nbsp;</p>
+
+<p><strong><span style="font-size:20.0pt"><span style="font-family:宋体">配置认证密码</span></span></strong></p>
+
+<p><strong>1.通过配置文件进行配置</strong><br />
+yum方式安装的redis配置文件通常在/etc/redis.conf中，打开配置文件找到</p>
+
+<ol start="1">
+	<li>#requirepass&nbsp;foobared&nbsp;&nbsp;</li>
+</ol>
+
+<p>去掉行前的注释，并修改密码为所需的密码,保存文件</p>
+
+<ol start="1">
+	<li>requirepass&nbsp;myRedis&nbsp;&nbsp;</li>
+</ol>
+
+<p>重启redis</p>
+
+<ol start="1">
+	<li>sudo&nbsp;service&nbsp;redis&nbsp;restart&nbsp;&nbsp;</li>
+	<li>#或者&nbsp;&nbsp;</li>
+	<li>sudo&nbsp;service&nbsp;redis&nbsp;stop&nbsp;&nbsp;</li>
+	<li>sudo&nbsp;redis-server&nbsp;/etc/redis.conf&nbsp;&nbsp;</li>
+</ol>
+
+<p>这个时候尝试登录redis，发现可以登上，但是执行具体命令是提示操作不允许</p>
+
+<ol start="1">
+	<li>redis-cli&nbsp;-h&nbsp;127.0.0.1&nbsp;-p&nbsp;6379&nbsp;&nbsp;</li>
+	<li>redis&nbsp;127.0.0.1:6379&gt;&nbsp;&nbsp;</li>
+	<li>redis&nbsp;127.0.0.1:6379&gt;&nbsp;keys&nbsp;*&nbsp;&nbsp;</li>
+	<li>(error)&nbsp;ERR&nbsp;operation&nbsp;not&nbsp;permitted&nbsp;&nbsp;</li>
+	<li>redis&nbsp;127.0.0.1:6379&gt;&nbsp;select&nbsp;1&nbsp;&nbsp;</li>
+	<li>(error)&nbsp;ERR&nbsp;operation&nbsp;not&nbsp;permitted&nbsp;&nbsp;</li>
+	<li>redis&nbsp;127.0.0.1:6379[1]&gt;&nbsp;&nbsp;&nbsp;</li>
+</ol>
+
+<p>尝试用密码登录并执行具体的命令看到可以成功执行</p>
+
+<ol start="1">
+	<li>redis-cli&nbsp;-h&nbsp;127.0.0.1&nbsp;-p&nbsp;6379&nbsp;-a&nbsp;myRedis&nbsp;&nbsp;</li>
+	<li>redis&nbsp;127.0.0.1:6379&gt;&nbsp;keys&nbsp;*&nbsp;&nbsp;</li>
+	<li>1)&nbsp;&quot;myset&quot;&nbsp;&nbsp;</li>
+	<li>2)&nbsp;&quot;mysortset&quot;&nbsp;&nbsp;</li>
+	<li>redis&nbsp;127.0.0.1:6379&gt;&nbsp;select&nbsp;1&nbsp;&nbsp;</li>
+	<li>OK&nbsp;&nbsp;</li>
+	<li>redis&nbsp;127.0.0.1:6379[1]&gt;&nbsp;config&nbsp;get&nbsp;requirepass&nbsp;&nbsp;</li>
+	<li>1)&nbsp;&quot;requirepass&quot;&nbsp;&nbsp;</li>
+	<li>2)&nbsp;&quot;myRedis&quot;&nbsp;&nbsp;</li>
+</ol>
+
+<p><br />
+2.通过命令行进行配置</p>
+
+<ol start="1">
+	<li>redis&nbsp;127.0.0.1:6379[1]&gt;&nbsp;config&nbsp;set&nbsp;requirepass&nbsp;my_redis&nbsp;&nbsp;</li>
+	<li>OK&nbsp;&nbsp;</li>
+	<li>redis&nbsp;127.0.0.1:6379[1]&gt;&nbsp;config&nbsp;get&nbsp;requirepass&nbsp;&nbsp;</li>
+	<li>1)&nbsp;&quot;requirepass&quot;&nbsp;&nbsp;</li>
+	<li>2)&nbsp;&quot;my_redis&quot;&nbsp;&nbsp;</li>
+</ol>
+
+<p>无需重启redis<br />
+使用第一步中配置文件中配置的老密码登录redis，会发现原来的密码已不可用，操作被拒绝</p>
+
+<ol start="1">
+	<li>redis-cli&nbsp;-h&nbsp;127.0.0.1&nbsp;-p&nbsp;6379&nbsp;-a&nbsp;myRedis&nbsp;&nbsp;</li>
+	<li>redis&nbsp;127.0.0.1:6379&gt;&nbsp;config&nbsp;get&nbsp;requirepass&nbsp;&nbsp;</li>
+	<li>(error)&nbsp;ERR&nbsp;operation&nbsp;not&nbsp;permitted&nbsp;&nbsp;</li>
+</ol>
+
+<p>使用修改后的密码登录redis，可以执行相应操作</p>
+
+<ol start="1">
+	<li>redis-cli&nbsp;-h&nbsp;127.0.0.1&nbsp;-p&nbsp;6379&nbsp;-a&nbsp;my_redis&nbsp;&nbsp;</li>
+	<li>redis&nbsp;127.0.0.1:6379&gt;&nbsp;config&nbsp;get&nbsp;requirepass&nbsp;&nbsp;</li>
+	<li>1)&nbsp;&quot;requirepass&quot;&nbsp;&nbsp;</li>
+	<li>2)&nbsp;&quot;my_redis&nbsp;&nbsp;</li>
+</ol>
+
+<p>尝试重启一下redis，用新配置的密码登录redis执行操作，发现新的密码失效，redis重新使用了配置文件中的密码</p>
+
+<ol start="1">
+	<li>sudo&nbsp;service&nbsp;redis&nbsp;restart&nbsp;&nbsp;</li>
+	<li>Stopping&nbsp;redis-server:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;[&nbsp;&nbsp;OK&nbsp;&nbsp;]&nbsp;&nbsp;</li>
+	<li>Starting&nbsp;redis-server:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;[&nbsp;&nbsp;OK&nbsp;&nbsp;]&nbsp;&nbsp;</li>
+	<li>redis-cli&nbsp;-h&nbsp;127.0.0.1&nbsp;-p&nbsp;6379&nbsp;-a&nbsp;my_redis&nbsp;&nbsp;</li>
+	<li>redis&nbsp;127.0.0.1:6379&gt;&nbsp;config&nbsp;get&nbsp;requirepass&nbsp;&nbsp;</li>
+	<li>(error)&nbsp;ERR&nbsp;operation&nbsp;not&nbsp;permitted&nbsp;&nbsp;</li>
+	<li>redis-cli&nbsp;-h&nbsp;127.0.0.1&nbsp;-p&nbsp;6379&nbsp;-a&nbsp;myRedis&nbsp;&nbsp;</li>
+	<li>redis&nbsp;127.0.0.1:6379&gt;&nbsp;config&nbsp;get&nbsp;requirepass&nbsp;&nbsp;</li>
+	<li>1)&nbsp;&quot;requirepass&quot;&nbsp;&nbsp;</li>
+	<li>2)&nbsp;&quot;myRedis&quot;&nbsp;&nbsp;</li>
+</ol>
+
+<p><br />
+除了在登录时通过 -a 参数制定密码外，还可以登录时不指定密码，而在执行操作前进行认证。</p>
+
+<ol start="1">
+	<li>redis-cli&nbsp;-h&nbsp;127.0.0.1&nbsp;-p&nbsp;6379&nbsp;&nbsp;</li>
+	<li>redis&nbsp;127.0.0.1:6379&gt;&nbsp;config&nbsp;get&nbsp;requirepass&nbsp;&nbsp;</li>
+	<li>(error)&nbsp;ERR&nbsp;operation&nbsp;not&nbsp;permitted&nbsp;&nbsp;</li>
+	<li>redis&nbsp;127.0.0.1:6379&gt;&nbsp;auth&nbsp;myRedis&nbsp;&nbsp;</li>
+	<li>OK&nbsp;&nbsp;</li>
+	<li>redis&nbsp;127.0.0.1:6379&gt;&nbsp;config&nbsp;get&nbsp;requirepass&nbsp;&nbsp;</li>
+	<li>1)&nbsp;&quot;requirepass&quot;&nbsp;&nbsp;</li>
+	<li>2)&nbsp;&quot;myRedis&quot;&nbsp;&nbsp;</li>
+</ol>
+
+<p><br />
+3.master配置了密码，slave如何配置</p>
+
+<p>若master配置了密码则slave也要配置相应的密码参数否则无法进行正常复制的。<br />
+slave中配置文件内找到如下行，移除注释，修改密码即可</p>
+
+<ol start="1">
+	<li>#masterauth&nbsp;&nbsp;mstpassword&nbsp;&nbsp;</li>
+</ol>
+
+<h2><strong><span style="font-size:20.0pt"><span style="font-family:宋体">遇到的问题</span></span></strong></h2>
+
 <p style="margin-left:0cm; margin-right:0cm">&nbsp;</p>
