@@ -1,0 +1,193 @@
+<h1>我们为什么要进行模块化开发？</h1>
+
+<p>在多人使用Maven协作开发项目时，尤其是稍微上点规模的项目，每个RD的工作都细分到具体功能和模块，<strong>有些模块甚至还要单独部署</strong>。</p>
+
+<p>我们假设有这样一个商城项目，包括以下几个模块：</p>
+
+<ul>
+	<li>商城前台（shop）</li>
+	<li>管理后台（admin）</li>
+	<li>数据库交互模块（dao）</li>
+	<li>通用业务模块（service）</li>
+	<li>接口模块（api）</li>
+	<li>通用工具（util）</li>
+</ul>
+
+<p>其中shop和admin需要单独部署，dao、service、util你可能想要一些经验丰富的人来维护，如果使用一个应用来管理的话，所有的功能和模块都会耦合在一起，所有人都可以随意修改代码，这显然不是我们所期望的。</p>
+
+<p><strong>而且使用一个应用来管理的话，任何一个点的代码有变更，整个项目就需要重新build，使用模块化开发的另一个好处是如果dao的代码被修改，只需要重新build dao模块就可以了。web模块可以build成war，dao、service、util等可以build成jar，只需要配置好依赖关系，就可以实现模块间的解耦合。这样的设计才是遵循&ldquo;高内聚，低耦合&rdquo;设计原则的。</strong></p>
+
+<h1>我们如何进行模块化开发呢？</h1>
+
+<p>我们使用上面的例子进行演示，先进行合理的优化，我们希望dao和service作为通用的底层工具来使用，把它们合并成一个核心模块（core），build成core.jar，简单的Maven模块化项目结构如下：</p>
+
+<pre>
+<code>---------- mall         //顶级项目
+   |------ pom.xml      //packaging = pom
+   |------ mall-util    //通用工具
+   |  |--- pom.xml      //packaging = jar
+   |------ mall-core    //核心模块
+   |  |--- pom.xml      //packaging = jar
+   |------ mall-web-api //接口模块
+   |  |--- pom.xml      //packaging = war
+   |------ mall-web-admin//管理后台
+   |  |--- pom.xml      //packaging = war
+   |------ mall-web-shop//商城前台
+   |  |--- pom.xml      //packaging = war
+</code></pre>
+
+<p>这些模块中api、admin、shop均是可以单独部署的web应用，相互之间没有依赖关系，但都依赖于core模块，而core模块依赖于util模块。接下来我们按照上述确定的结构来搭建项目结构。</p>
+
+<h2>使用IDEA来创建Maven多模块项目</h2>
+
+<h3>一、创建一个普通Maven项目</h3>
+
+<ol>
+	<li>New Project</li>
+</ol>
+
+<p><img alt="image" src="http://wx3.sinaimg.cn/mw690/6242bcf8gy1fcgjwuda8aj20c5047mx4.jpg" title="" /></p>
+
+<ol>
+	<li>填写基本信息，这里使用ipr作为项目描述文件</li>
+</ol>
+
+<p><img alt="image" src="http://wx1.sinaimg.cn/mw690/6242bcf8gy1fcgjwuyyi0j20k10jadi9.jpg" title="" /></p>
+
+<ol>
+	<li>普通Maven项目不需要使用Maven模板搭建</li>
+</ol>
+
+<p><img alt="image" src="http://wx3.sinaimg.cn/mw690/6242bcf8gy1fcgjwvnm1wj20jz04ojs9.jpg" title="" /></p>
+
+<h3>二、给Maven项目添加模块</h3>
+
+<ol>
+	<li>New Module</li>
+</ol>
+
+<p><img alt="image" src="http://wx4.sinaimg.cn/mw690/6242bcf8gy1fcgjwtwkr1j20jw06ygms.jpg" title="" /></p>
+
+<ol>
+	<li>填写基本信息，jar项目同样不需要使用Maven模板搭建</li>
+</ol>
+
+<p><img alt="image" src="http://wx2.sinaimg.cn/mw690/6242bcf8gy1fcgjwufhcxj20j106k3zh.jpg" title="" /></p>
+
+<ol>
+	<li>这个时候就可以看到，我们所添加的module已经被引入到parent的pom文件里了</li>
+</ol>
+
+<pre>
+<code>&lt;groupId&gt;com.mall&lt;/groupId&gt;
+&lt;artifactId&gt;mall&lt;/artifactId&gt;
+&lt;packaging&gt;pom&lt;/packaging&gt; //打包方式为pom
+&lt;version&gt;1.0-SNAPSHOT&lt;/version&gt;
+
+&lt;modules&gt;
+    &lt;module&gt;mall-util&lt;/module&gt;
+&lt;/modules&gt;</code></pre>
+
+<ul>
+	<li>1</li>
+	<li>2</li>
+	<li>3</li>
+	<li>4</li>
+	<li>5</li>
+	<li>6</li>
+	<li>7</li>
+	<li>8</li>
+</ul>
+
+<ol>
+	<li>变更util模块的构建方式为jar</li>
+</ol>
+
+<pre>
+<code>&lt;parent&gt;
+    &lt;artifactId&gt;mall&lt;/artifactId&gt;
+    &lt;groupId&gt;com.mall&lt;/groupId&gt;
+    &lt;version&gt;1.0-SNAPSHOT&lt;/version&gt;
+&lt;/parent&gt;
+
+&lt;packaging&gt;jar&lt;/packaging&gt; //打包方式为jar
+&lt;artifactId&gt;mall-util&lt;/artifactId&gt;</code></pre>
+
+<h3>三、给Maven项目添加web模块</h3>
+
+<ol>
+	<li>创建一个module，并选中&ldquo;Create from archetype&rdquo;选项，同时maven模板选择webapp</li>
+</ol>
+
+<p><img alt="image" src="http://wx1.sinaimg.cn/mw690/6242bcf8gy1fcgkacag8bj20j309zq4f.jpg" title="" /></p>
+
+<ol>
+	<li>接下来耐心的等待maven帮你创建好module，模块信息已经被添加</li>
+</ol>
+
+<pre>
+<code>&lt;modules&gt;
+    &lt;module&gt;mall-util&lt;/module&gt;
+    &lt;module&gt;mall-web-admin&lt;/module&gt;
+&lt;/modules&gt;</code></pre>
+
+<p>目录结构如下：</p>
+
+<p><img alt="image" src="http://wx4.sinaimg.cn/mw690/6242bcf8gy1fcgkgrm1pkj20d608h74c.jpg" title="" /></p>
+
+<p>pom：</p>
+
+<pre>
+<code>&lt;parent&gt;
+    &lt;artifactId&gt;mall&lt;/artifactId&gt;
+    &lt;groupId&gt;com.mall&lt;/groupId&gt;
+    &lt;version&gt;1.0-SNAPSHOT&lt;/version&gt;
+&lt;/parent&gt;
+&lt;modelVersion&gt;4.0.0&lt;/modelVersion&gt;
+&lt;artifactId&gt;mall-web-admin&lt;/artifactId&gt;
+&lt;packaging&gt;war&lt;/packaging&gt;
+&lt;name&gt;mall-web-admin&lt;/name&gt;
+&lt;url&gt;https://github.com/beiyoufx&lt;/url&gt;
+&lt;dependencies&gt;
+    &lt;dependency&gt;
+        &lt;groupId&gt;junit&lt;/groupId&gt;
+        &lt;artifactId&gt;junit&lt;/artifactId&gt;
+        &lt;version&gt;3.8.1&lt;/version&gt;
+        &lt;scope&gt;test&lt;/scope&gt;
+    &lt;/dependency&gt;
+&lt;/dependencies&gt;
+&lt;build&gt;
+    &lt;finalName&gt;mall-web-admin&lt;/finalName&gt;
+&lt;/build&gt;</code></pre>
+
+<h3>四、添加模块间的依赖关系</h3>
+
+<ol>
+	<li>增加core与util的依赖</li>
+</ol>
+
+<p><img alt="image" src="http://wx2.sinaimg.cn/mw690/6242bcf8gy1fcgl0mljnyj20d00eagm2.jpg" title="" /></p>
+
+<ol>
+	<li>增加admin与core的依赖关系</li>
+</ol>
+
+<p><img alt="image" src="http://wx3.sinaimg.cn/mw690/6242bcf8gy1fcgl0mpjh2j20dd0dxwex.jpg" title="" /></p>
+
+<p>admin与core、util的依赖链</p>
+
+<p><img alt="image" src="http://wx3.sinaimg.cn/mw690/6242bcf8gy1fcgl0nfhn9j20ev046q2s.jpg" title="" /></p>
+
+<h2>多模块项目的构建与发布</h2>
+
+<h3>打包</h3>
+
+<p><img alt="image" src="http://wx2.sinaimg.cn/mw690/6242bcf8gy1fcgl4u171fj20h10gt0tb.jpg" title="" /></p>
+
+<p>所有在root项目中进行的构建都会传递到模块中，例如root中的package会打包整个项目，当文件有变动时会进行重新聚合，其他命令同理。模块中的package只会打包当前模块。</p>
+
+<p>使用<code>source:jar</code>命令会将源码打包。</p>
+
+<h3>发布</h3>
+
+<p>web模块可以单独部署也可聚合部署。</p>
