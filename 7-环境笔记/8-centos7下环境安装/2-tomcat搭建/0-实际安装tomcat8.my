@@ -36,6 +36,10 @@ export PATH=$TOMCAT_HOME/bin:$PATH</p>
 
 <h2>添加授权用户</h2>
 
+<p>这里有点问题，就是tomcat似乎要求不能随便添加用户，如果自己添加用户不成功，就用tomcat这个用户名。</p>
+
+<p>本例中，使用用户名&#39;wangyajun&#39;,密码&#39;wangyajun&#39;不成功，但是使用用户名&#39;tomcat&#39;，密码&#39;tomcat&#39;就成功了。</p>
+
 <p>$TOMCAT_HOME/conf/tomcat-users.xml&nbsp; （添加允许进入的用户名和密码）</p>
 
 <p>&lt;tomcat-users xmlns=&quot;http://tomcat.apache.org/xml&quot;<br />
@@ -46,8 +50,7 @@ export PATH=$TOMCAT_HOME/bin:$PATH</p>
 &nbsp; &lt;role rolename=&quot;manager-script&quot;/&gt;<br />
 &nbsp; &lt;role rolename=&quot;manager-jmx&quot;/&gt;<br />
 &nbsp; &lt;role rolename=&quot;manager-status&quot;/&gt;<br />
-&nbsp; &lt;user username=&quot;wangyajun&quot; password=&quot;wangyajun&quot; roles=&quot;manager-gui,manager-script,manager-jmx,manager-status&quot;/&gt;<br />
-&nbsp; &lt;user username=&quot;lumingqi&quot; &nbsp;password=&quot;lumingqi&quot; &nbsp;roles=&quot;manager-gui,manager-script,manager-jmx,manager-status&quot;/&gt;<br />
+&nbsp; &lt;user username=&quot;tomcat&quot; password=&quot;tomcat&quot; roles=&quot;manager-gui,manager-script,manager-jmx,manager-status&quot;/&gt;<br />
 &lt;/tomcat-users&gt;<br />
 &nbsp;</p>
 
@@ -89,5 +92,55 @@ firewall-cmd --reload</code></p>
 <p>cd usr/local/tomcat8/logs</p>
 
 <p>tail -f catalina.out</p>
+
+<h2>常遇到的错误</h2>
+
+<h3>问题一：配置用户后不能登录管理页面</h3>
+
+<p>tomcat-users.xml 配置不生效原因，我是新增自定义用户没成果，用tomcat用户，成功。</p>
+
+<p>安装玩tomcat，或者解压玩tomcat后，在tomcat的目录下有个conf文件夹，在这个文件夹下面有一个tomcat-<br />
+users.xml的文件，这个文件里面的配置信息是当我们进入http://localhost:8080 页面后，有些功能需要登录才能<br />
+进行访问。今天我解压好了一个tomcat，环境变量也配置好了，启动服务也没问题，就是登录不进去Manager App，大<br />
+概花了我一个下午的时间才解决这个问题。<br />
+首先tomcat-users.xml这个文件就是tomcat提供给我们进行登录用户的配置，但是一开始我配置了很多次也不成功<br />
+，在网上也查了很多方法没用，接下来我将说明一下如何配置这个用户。<br />
+&nbsp; 1、首先你确定在conf目录下的server.xml文件有<br />
+&nbsp; &lt;GlobalNamingResources&gt;<br />
+&nbsp; &nbsp; &lt;!-- Editable user database that can also be used by<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp;UserDatabaseRealm to authenticate users<br />
+&nbsp; &nbsp; --&gt;<br />
+&nbsp; &nbsp; &lt;Resource auth=&quot;Container&quot; description=&quot;User database that can be updated and saved&quot;&nbsp;<br />
+factory=&quot;org.apache.catalina.users.MemoryUserDatabaseFactory&quot; name=&quot;UserDatabase&quot;&nbsp;<br />
+pathname=&quot;conf/tomcat-users.xml&quot; type=&quot;org.apache.catalina.UserDatabase&quot;/&gt;<br />
+&nbsp; &lt;/GlobalNamingResources&gt;<br />
+这样一段代码，让tomcat启动服务后能加载到conf/tomcat-users.xml，这个文件。<br />
+&nbsp; 2、新解压的tomcat下的tomcat-users.xml，中的user全部都是被注释掉的<br />
+&lt;tomcat-users&gt;<br />
+&lt;!--<br />
+&nbsp; &lt;role rolename=&quot;tomcat&quot;/&gt;<br />
+&nbsp; &lt;role rolename=&quot;role1&quot;/&gt;<br />
+&nbsp; &lt;user username=&quot;tomcat&quot; password=&quot;&lt;must-be-changed&gt;&quot; roles=&quot;tomcat&quot;/&gt;<br />
+&nbsp; &lt;user username=&quot;both&quot; password=&quot;&lt;must-be-changed&gt;&quot; roles=&quot;tomcat,role1&quot;/&gt;<br />
+&nbsp; &lt;user username=&quot;role1&quot; password=&quot;&lt;must-be-changed&gt;&quot; roles=&quot;role1&quot;/&gt;<br />
+--&gt;<br />
+&lt;/tomcat-users&gt;<br />
+我们需要把那个注释去掉才能是的user生效，有很多人在这个地方犯错，注释不去掉，那都是没用的。<br />
+&nbsp; 3、注意在配置username的时候，不要取重复的名字，因为这样很可能让你的配置不起效果。<br />
+&nbsp; 4、使用tomcat7.X版本的朋友们注意了，这也是今天下午被坑的原因，tomcat7.X的user配置是有一定的规定的，<br />
+<strong>tomcat用户不能随意更改，你改成其他的很有可能不会生效</strong>，本人亲测（我也是），原来各种网上百度，找了很多种的配置方法就是没效果，<br />
+<br />
+结果我将user配置改成如下结果终于登录进去了。<br />
+&lt;?xml version=&#39;1.0&#39; encoding=&#39;utf-8&#39;?&gt;<br />
+&lt;tomcat-users&gt;<br />
+&lt;role rolename=&quot;tomcat&quot;/&gt;<br />
+&lt;role rolename=&quot;role1&quot;/&gt;<br />
+&lt;role rolename=&quot;manager-gui&quot;/&gt;<br />
+&lt;role rolename=&quot;admin-gui&quot;/&gt;<br />
+<strong>&lt;user username=&quot;tomcat&quot; password=&quot;tomcat&quot; roles=&quot;tomcat,manager-gui,admin-gui&quot;/&gt;</strong><br />
+&lt;user username=&quot;both&quot; password=&quot;tomcat&quot; roles=&quot;tomcat,role1&quot;/&gt;<br />
+&lt;user username=&quot;role1&quot; password=&quot;tomcat&quot; roles=&quot;role1&quot;/&gt;<br />
+&lt;/tomcat-users&gt;<br />
+&nbsp; 5、最后需要注意的是，修改了配置文件需要重新启动服务器，好让服务器重新加载修改后的配置文件。</p>
 
 <p>&nbsp;</p>
