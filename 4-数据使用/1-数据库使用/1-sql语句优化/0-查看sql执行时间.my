@@ -1,0 +1,50 @@
+<h1><a href="http://www.cnblogs.com/happySmily/p/5943311.html" id="cb_post_title_url">查看mysql语句运行时间</a></h1>
+
+<p>为了验证select 1 与 select 1 from tableName 与 select * from tableName的执行效率，需要测试一下各自执行的时间。于是总结一下，查看mysql语句运行时间的方法。</p>
+
+<p>方法一： show profiles。</p>
+
+<p><strong>注意：这里的命令不要在客户端执行，在cmd里面执行。不然会多很多额外语句，找不到自己执行的sql。</strong></p>
+
+<p>1.&nbsp;Show profiles是5.0.37之后添加的，要想使用此功能，要确保版本在5.0.37之后。</p>
+
+<p><strong>&nbsp; &nbsp; &nbsp;Query Profiler</strong>是MYSQL自带的一种query诊断分析工具，通过它可以分析出一条SQL语句的性能瓶颈在什么地方。通常我们是使用的explain,以及slow query log都无法做到精确分析，</p>
+
+<p>&nbsp; &nbsp; &nbsp;但是Query Profiler却可以定位出一条SQL语句执行的各种资源消耗情况，比如CPU，IO等，以及该SQL执行所耗费的时间等。</p>
+
+<p>&nbsp; &nbsp; &nbsp;查看数据库版本方法：show variables like &quot;%version%&quot;; &nbsp;或者 &nbsp;select version();</p>
+
+<p>2.确定支持show profile 后，查看profile是否开启，数据库默认是不开启的。变量profiling是用户变量，每次都得重新启用。</p>
+
+<p>&nbsp; &nbsp;查看方法： show variables like &quot;%pro%&quot;;</p>
+
+<p>&nbsp; &nbsp;设置开启方法： set profiling = 1;</p>
+
+<p>再次查看show variables like &quot;%pro%&quot;;&nbsp;已经是开启的状态了。</p>
+
+<p>3.可以开始执行一些想要分析的sql语句了，执行完后，show profiles; 可查看所有sql的总的执行时间。</p>
+
+<p>show profile for query 1 即可查看第1个sql语句的执行的各个操作的耗时详情。</p>
+
+<p>show profile cpu, block io, memory,swaps,context switches,source for query 6;可以查看出一条SQL语句执行的各种资源消耗情况，比如CPU，IO等</p>
+
+<p>show profile all for query 6 查看第6条语句的所有的执行信息。</p>
+
+<p>测试完毕后，关闭参数：</p>
+
+<pre>
+mysql&gt; set profiling=0</pre>
+
+<p>&nbsp;</p>
+
+<p>方法二： timestampdiff来查看执行时间。</p>
+
+<p><strong>这种方法有一点要注意，就是三条sql语句要尽量连一起执行，不然误差太大，根本不准</strong></p>
+
+<pre>
+set @d=now();
+select * from comment;
+select timestampdiff(second,@d,now());
+</pre>
+
+<p><strong>如果是用命令行来执行的话，有一点要注意，就是在select timestampdiff(second,@d,now());后面，一定要多copy一个空行，不然最后一个sql要你自己按回车执行，这样就不准了。</strong></p>

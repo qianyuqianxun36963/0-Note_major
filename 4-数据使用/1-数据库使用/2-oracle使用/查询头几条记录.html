@@ -1,0 +1,128 @@
+查询头几条记录
+
+select 列名1 ...列名n from
+(
+select 列名1 ...列名n 
+   from 表名 order by 列名1
+)
+where rownum <=N(抽出记录数)
+order by rownum asc
+
+如：select id,name from (select id,name from student order by name) where rownum<=10 order by rownum asc
+
+1. 最佳选择：利用分析函数
+
+       row_number() over ( partition by col1 order by col2 )                               
+
+比如想取出100-150条记录,按照tname排序
+     select tname,tabtype from (                               
+
+     select tname,tabtype,row_number() over ( order by tname ) rn from tab                
+
+) where rn between 100 and 150;
+
+2. 使用rownum 虚列
+
+select tname,tabtype from (                    
+
+      select tname,tabtype,rownum rn from tab where rownum <= 150                  
+
+) where rn >= 100;
+
+
+
+
+Oracle查前几条记录方法
+Oralce的示例：
+
+1. 最佳选择：利用分析函数
+
+       row_number() over ( partition by col1 order by col2 )
+                               比如想取出100-150条记录,按照tname排序
+
+               select tname,tabtype from (
+                               select tname,tabtype,row_number() over ( order by tname ) rn from tab
+                ) where rn between 100 and 150;
+
+2. 使用rownum 虚列
+
+         select tname,tabtype from (
+                    select tname,tabtype,rownum rn from tab where rownum <= 150
+                  ) where rn >= 100;
+
+注释：使用虚列时不能基于整个记录集合来进行排序,假如指定了order by子句,排序的是选出来的记录集的排序 create table mynumber(id int,name varchar(10));
+         insert into mynumber values(1,'no1');
+         insert into mynumber values(2,'no2');
+         insert into mynumber values(3,'no3');
+        insert into mynumber values(4,'no4');
+        insert into mynumber values(5,'no5');
+        insert into mynumber values(5,'no6');
+        insert into mynumber values(6,'no7');
+        insert into mynumber values(7,'no8');
+        insert into mynumber values(8,'no9');
+        insert into mynumber values(9,'no10');
+        insert into mynumber values(9,'no11');
+        insert into mynumber values(9,'no12');
+        insert into mynumber values(10,'no13');
+        insert into mynumber values(10,'no14');
+        insert into mynumber values(10,'no15');
+        insert into mynumber values(11,'no16');
+        insert into mynumber values(12,'no17');
+        insert into mynumber values(13,'no18');
+
+     select id,name,RANK() over ( order by id ) case1,
+            DENSE_RANK() over ( order by id ) case2,
+            row_number() over ( order by id ) case3 from mynumber;
+
+   
+
+(1) 取前10条不同id记录，假如最后1条记录的ID依然有相同的，那么取出来
+
+   select id,name from mynumber where id in 
+         (select id from (select distinct id 
+          from mynumber) tt where rownum<=10);
+
+           select * from (select id,name,RANK() 
+           over ( order by id ) case1,DENSE_RANK() 
+           over ( order by id ) case2,row_number() 
+            over ( order by id ) case3 from mynumber)
+            tt where case1<=10;
+          select * from (select id,name,RANK() over 
+          ( order by id ) case1,DENSE_RANK() over 
+          ( order by id ) case2,row_number() over 
+          ( order by id ) case3 from mynumber) 
+           tt where case1 between 5 and 10;
+
+   (2)取前10条记录，假如第10条记录的ID 还有相同的，那么取出来
+
+   select * from mynumber where id in
+           (select id from mynumber where rownum <=10);
+
+            select * from (select id,name,RANK() 
+            over ( order by id ) case1,DENSE_RANK() 
+            over ( order by id ) case2,row_number() 
+            over ( order by id ) case3 from mynumber) 
+            tt where case2<=10;
+            select * from (select id,name,RANK() 
+             over ( order by id ) case1,DENSE_RANK() 
+            over ( order by id ) case2,row_number() 
+            over ( order by id ) case3 from mynumber) 
+            tt where case2 between 5 and 10;
+
+(3)取前10条记录
+
+    select id,name from mynumber 
+        where rownum <=10;
+         select id,name from 
+        (select id,name,rownum rn from 
+          mynumber where rownum <= 10 ) where rn >= 5
+        select * from (select id,name,RANK() 
+        over ( order by id ) case1,DENSE_RANK() 
+         over ( order by id ) case2,row_number() 
+        over ( order by id ) case3 from mynumber) 
+        tt where case3<=10;
+        select * from (select id,name,RANK() 
+        over ( order by id ) case1,DENSE_RANK() 
+        over ( order by id ) case2,row_number() 
+        over ( order by id ) case3 from mynumber) 
+         tt where case3 between 5 and 10;
