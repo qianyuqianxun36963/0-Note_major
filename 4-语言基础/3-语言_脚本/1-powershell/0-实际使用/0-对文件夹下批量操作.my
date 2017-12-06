@@ -1,0 +1,182 @@
+<h1>对文件夹下内容批量处理</h1>
+
+<h2>svn批量提交新加的文件</h2>
+
+<p>linux下参考命令：svn st | grep &#39;^\?&#39; | tr &#39;^\?&#39; &#39; &#39; | sed &#39;s/[ ]*//&#39; | sed &#39;s/[ ]/\\ /g&#39; | xargs svn add</p>
+
+<p>&nbsp;</p>
+
+<p>svn st | findstr ?</p>
+
+<p>&nbsp;</p>
+
+<h2>网上相关资源</h2>
+
+<h3>Powershell过滤管道结果&nbsp;</h3>
+
+<ul>
+	<li><a href="http://www.pstips.net/powershell-filtering-pipeline-results.html#筛选管道结果中的对象" title="筛选管道结果中的对象"><em>1</em>筛选管道结果中的对象</a></li>
+	<li><a href="http://www.pstips.net/powershell-filtering-pipeline-results.html#选择对象的属性" title="选择对象的属性"><em>2</em>选择对象的属性</a></li>
+	<li><a href="http://www.pstips.net/powershell-filtering-pipeline-results.html#限制对象的数量" title="限制对象的数量"><em>3</em>限制对象的数量</a></li>
+	<li><a href="http://www.pstips.net/powershell-filtering-pipeline-results.html#逐个处理所有管道结果" title="逐个处理所有管道结果"><em>4</em>逐个处理所有管道结果</a></li>
+	<li><a href="http://www.pstips.net/powershell-filtering-pipeline-results.html#删除重复对象" title="删除重复对象"><em>5</em>删除重复对象</a></li>
+</ul>
+
+<p>通过管道可以过滤某些对象和对象的属性，这个功能很实用，因为很多时候我们并不是对所有的结果感兴趣，可能只会对某些结果感兴趣。如果要过滤对象可以使用Where-Object；如果要过滤对象的属性，可以使用Select-Object；如果要自定义个性化的过滤效果可以使用ForEach-Object。最后如果想过滤重复的结果，可是使用Get-Uinque。</p>
+
+<h4>筛选管道结果中的对象</h4>
+
+<p>如果你只对管道结果的特定对象感兴趣，可是使用Where-Object对每个结果进行严格筛选，一旦满足你的标准才会保留，不满足标准的就会自动丢弃。例如你通过Get-service查看运行在机器上的当前服务，但是可能只关心哪些正在运行的服务，这时就可是通过每个服务的属性Status进行过滤。但是前提条件是你得事先知道待处理的对象拥有哪些属性。你可以通过Format-List * ，也可以通过Get-memeber。</p>
+
+<pre>
+PS C:Powershell&gt; Get-service | Select-Object -First 1 | Format-List *
+
+Name                : AdobeARMservice
+RequiredServices    : {}
+CanPauseAndContinue : False
+CanShutdown         : False
+CanStop             : True
+DisplayName         : Adobe Acrobat Update Service
+DependentServices   : {}
+MachineName         : .
+ServiceName         : AdobeARMservice
+ServicesDependedOn  : {}
+ServiceHandle       :
+Status              : Running
+ServiceType         : Win32OwnProcess
+Site                :
+Container           :
+
+PS C:Powershell&gt; Get-service | Select-Object -First 1 | Get-Member -MemberType
+Property
+
+   TypeName: System.ServiceProcess.ServiceController
+
+Name                MemberType Definition
+----                ---------- ----------
+CanPauseAndContinue Property   System.Boolean CanPauseAndContinue {get;}
+CanShutdown               Property   System.Boolean CanShutdown {get;}
+CanStop                       Property   System.Boolean CanStop {get;}
+Container                     Property   System.ComponentModel.IContainer Container {g...
+DependentServices       Property   System.ServiceProcess.ServiceController[] Dep...
+DisplayName                Property   System.String DisplayName {get;set;}
+MachineName              Property   System.String MachineName {get;set;}
+ServiceHandle               Property   System.Runtime.InteropServices.SafeHandle Ser...
+ServiceName                 Property   System.String ServiceName {get;set;}
+ServicesDependedOn    Property   System.ServiceProcess.ServiceController[] Ser...
+ServiceType                   Property   System.ServiceProcess.ServiceType ServiceType...
+Site                               Property   System.ComponentModel.ISite Site {get;set;}
+Status                           Property   System.ServiceProcess.ServiceControllerStatus...</pre>
+
+<p>知道了对象有哪些属性，要完成上面提到的需求就很容易了。</p>
+
+<pre>
+PS C:Powershell&gt; get-service | Where-Object {$_.Status -eq &quot;Running&quot;}
+
+Status   Name               DisplayName
+------   ----               -----------
+Running  AdobeARMservice    	Adobe Acrobat Update Service
+Running  AppHostSvc             	Application Host Helper Service
+Running  AppIDSvc           	Application Identity
+Running  Appinfo            	Application Information
+Running  AudioEndpointBu...    Windows Audio Endpoint Builder
+Running  Audiosrv           	Windows Audio
+Running  BDESVC             	BitLocker Drive Encryption Service
+Running  BFE                	Base Filtering Engine
+Running  BITS               	Background Intelligent Transfer Ser...
+Running  CcmExec             	SMS Agent Host</pre>
+
+<p>这里稍微解释一下，Where-Object的参数的是一个布尔表达式，$_代表过滤过程中经过管道的当前结果。另外Where-Object还有一个别名 &ldquo;?&rdquo; 更形象。</p>
+
+<h4>选择对象的属性</h4>
+
+<p>包含在每一个对象中的属性可能有很多，但是并不是所有的属性你都感兴趣，这时可以使用Select-Object 限制对象的属性。接下来的例子演示如果获取机器上匿名帐号的完整信息。</p>
+
+<pre>
+PS C:Usersv-bali.FAREAST&gt; Get-WmiObject Win32_UserAccount -filter &quot;LocalAccount=True AND Name=&#39;guest&#39;&quot;
+
+AccountType  : 512
+Caption          : myhomeguest
+Domain          : myhome
+SID                : S-1-5-21-3064017030-3269374297-2491181182-501
+FullName       :
+Name        : guest</pre>
+
+<p>如果你只对用户名、描述，启用感兴趣。</p>
+
+<pre>
+PS C:Powershell&gt; Get-WmiObject Win32_UserAccount -filter &quot;LocalAccount=True AND
+ Name=&#39;guest&#39;&quot; | Select-Object Name,Description,Disabled
+
+Name                       Description                                 Disabled
+----                           -----------                                 --------
+guest                      Built-in account for gu...                      True</pre>
+
+<p>Select-Object也支持通配符。</p>
+
+<pre>
+Dir | Select-Object * -exclude *A*</pre>
+
+<h4>限制对象的数量</h4>
+
+<p>列出最后修改的5个文件</p>
+
+<pre>
+PS C:Powershell&gt; Dir | Select-Object -ExcludeProperty &quot;*N*&quot; -First 5
+
+    目录: C:Powershell
+
+Mode                LastWriteTime     Length Name
+----                -------------     ------ ----
+-a---        2011/11/24     18:30      67580 a.html
+-a---        2011/11/24     20:04      26384 a.txt
+-a---        2011/11/24     20:26      12060 alias
+-a---        2011/11/25     11:20        556 employee.xml
+-a---        2011/11/29     19:23      21466 function.ps1</pre>
+
+<p>列出占用CPU最大的5个进程</p>
+
+<pre>
+PS C:Powershell&gt; get-process | sort -Descending cpu | select -First 5
+
+Handles NPM(K)  PM(K)  WS(K) VM(M) CPU(s)   Id ProcessName
+------- ------  -----  ----- ----- ------   -- -----------
+   1336     98 844304 809388  1081 164.69 3060 iexplore
+    224     10  74676  62468   188  81.10 4460 AcroRd32
+    130      9  28264  39092   167  70.57 3436 dwm
+    169      8   7576  29568   134  65.22 3364 notepad
+    989     34  72484  35996   393  62.67 4724 BingDict</pre>
+
+<h4>逐个处理所有管道结果</h4>
+
+<p>如果想对管道结果进行逐个个性化处理可是使用ForEach-Object</p>
+
+<pre>
+ls | ForEach-Object {&quot;文件名： 文件大小(M): &quot; -f $_.Name,$_.Length/1M}
+PS C:Powershell&gt; ls | ForEach-Object {&quot;文件名：{0} 文件大小{1}KB: &quot; -f $_.Name,
+($_.length/1kb).tostring()}
+文件名：a.html 文件大小65.99609375KB:
+文件名：a.txt 文件大小25.765625KB:
+文件名：alias 文件大小11.77734375KB:
+文件名：employee.xml 文件大小0.54296875KB:
+文件名：function.ps1 文件大小20.962890625KB:
+文件名：LogoTestConfig.xml 文件大小0.181640625KB:
+文件名：ls.html 文件大小3.37890625KB:</pre>
+
+<h4>删除重复对象</h4>
+
+<p>Get-Unique可以从已排序的对象列表中删除重复对象。Get-Unique会逐个遍历对象，每次遍历时都会与前一个对象进行比较，如果和前一个对象相等就会抛弃当前对象，否则就保留。所以如果对象列表中没有排序，Get-Unique不能完全发挥作用，只能保证相邻对象不重复。</p>
+
+<pre>
+PS C:Powershell&gt; 1,2,1,2 | Get-Unique
+
+PS C:Powershell&gt; 1,2,1,2 | Sort-Object |Get-Unique
+
+PS C:Powershell&gt; ls | foreach{$_.extension} | Sort-Object |Get-Unique
+
+.bat
+.html
+.ps1
+.txt
+.vbs
+.xml</pre>
