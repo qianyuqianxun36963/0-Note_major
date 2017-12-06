@@ -1,0 +1,147 @@
+<h1>使用到行转列的统计查询</h1>
+
+<p>发票1：</p>
+
+<p>finance_invoice id 001 userid 001 &nbsp; &nbsp; &nbsp; finance_invoice_order id 001 invoice_id 001 order_id 001 &nbsp; &nbsp; &nbsp; &nbsp;finance_order id 001 userid 001 account 46<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;&nbsp;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; finance_invoice_order id 002 invoice_id 001 order_id 002 &nbsp; &nbsp; &nbsp; &nbsp;finance_order id 002 userid 001 account 50<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;&nbsp;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; finance_invoice_order id 003 invoice_id 001 order_id 003 &nbsp; &nbsp; &nbsp; &nbsp;finance_order id 003 userid 001 account 23</p>
+
+<p>发票2：</p>
+
+<p>finance_invoice id 002 userid 002 &nbsp; &nbsp; &nbsp; finance_invoice_order id 004 invoice_id 002 order_id 001 &nbsp; &nbsp; &nbsp; &nbsp;finance_order id 004 userid 002 account 10<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;&nbsp;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; finance_invoice_order id 005 invoice_id 002 order_id 002 &nbsp; &nbsp; &nbsp; &nbsp;finance_order id 005 userid 002 account 20<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;&nbsp;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; finance_invoice_order id 006 invoice_id 002 order_id 003 &nbsp; &nbsp; &nbsp; &nbsp;finance_order id 006 userid 002 account 15</p>
+
+<p>统计查询：</p>
+
+<p>&nbsp;&nbsp; &nbsp;select brandid,sum(cnt) as counts from goods where userid = 1 group by brandid</p>
+
+<p>简单的左关联查询</p>
+
+<p>&nbsp; &nbsp; select * from finance_invoice_order IO left join finance_invoice I on IO.invoice_id = I.id left join finance_order O on IO.order_id = O.id;</p>
+
+<p><br />
+多条件分组查询</p>
+
+<p>&nbsp; &nbsp; select&nbsp;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; O.userid,<br />
+&nbsp; &nbsp; &nbsp; &nbsp; O.pay_type,<br />
+&nbsp; &nbsp; &nbsp; &nbsp; sum(account)&nbsp;<br />
+&nbsp; &nbsp; from finance_invoice_order IO&nbsp;<br />
+&nbsp; &nbsp; left join finance_invoice I on IO.invoice_id = I.id&nbsp;<br />
+&nbsp; &nbsp; left join finance_order O on IO.order_id = O.id&nbsp;<br />
+&nbsp; &nbsp; group by O.pay_type,O.userid&nbsp;</p>
+
+<p>&nbsp; &nbsp; userid &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;pay_type &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;sum(account)<br />
+&nbsp; &nbsp; 001 &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; 学分费 &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; 40.00<br />
+&nbsp; &nbsp; 002 &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; 学分费 &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; 50.00<br />
+&nbsp; &nbsp; 001 &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; 考试费 &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; 90.00<br />
+&nbsp; &nbsp; 002 &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; 考试费 &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; 25.00</p>
+
+<p>使用 case when &nbsp;进行多条件分组的 部分统计&nbsp;</p>
+
+<p>&nbsp; &nbsp; select<br />
+&nbsp; &nbsp; &nbsp; &nbsp; S.name,<br />
+&nbsp; &nbsp; &nbsp; &nbsp; T.userid,<br />
+&nbsp; &nbsp; &nbsp; &nbsp; T.account,<br />
+&nbsp; &nbsp; &nbsp; &nbsp; MAX(case T.pay_type when &#39;考试费&#39; then T.account else 0 end) &#39;scoreFee&#39;,<br />
+&nbsp; &nbsp; &nbsp; &nbsp; MAX(case T.pay_type when &#39;学分费&#39; then T.account else 0 end) &#39;examFee&#39;<br />
+&nbsp; &nbsp; from (<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; select&nbsp;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; O.userid,<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; O.pay_type,<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; I.id,<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; sum(O.account) account<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; from finance_invoice_order IO<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; left join finance_order O on IO.order_id = O.id<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; left join finance_invoice I on IO.invoice_id = I.id<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; group by O.pay_type,O.userid<br />
+&nbsp; &nbsp; &nbsp; &nbsp; ) T<br />
+&nbsp; &nbsp; left join base_stubase S on T.userid = S.id<br />
+&nbsp; &nbsp; group by T.userid</p>
+
+<p><br />
+在数据库上练习：</p>
+
+<p>select * from finance_invoice_order IO left join finance_invoice I on IO.invoice_id = I.id left join finance_order O on IO.order_id = O.id;</p>
+
+<p>select O.schoolroll_id,O.pay_type_id,sum(pay_account) from finance_invoice_order IO left join finance_invoice I on IO.invoice_id = I.id left join finance_order O on IO.order_id = O.id group by O.pay_type_id,O.schoolroll_id&nbsp;</p>
+
+<p>select &nbsp;T.schoolroll_id as schoolrollId,<br />
+&nbsp; &nbsp; &nbsp; &nbsp; T.invoice_id as invoiceId,<br />
+&nbsp; &nbsp; &nbsp; &nbsp; T.export_batch as exportBatch,<br />
+&nbsp; &nbsp; &nbsp; &nbsp; T.has_export as &quot;hasExport&quot;,<br />
+&nbsp; &nbsp; &nbsp; &nbsp; T.invoice_time as &quot;invoiceTime&quot;,<br />
+&nbsp; &nbsp; &nbsp; &nbsp; S.name as &quot;stuName&quot;,<br />
+&nbsp; &nbsp; &nbsp; &nbsp; R.student_no as &quot;schoolrollNo&quot;,<br />
+&nbsp; &nbsp; &nbsp; &nbsp; P.id as &quot;pointId&quot;,<br />
+&nbsp; &nbsp; &nbsp; &nbsp; P.point_name as &quot;pointName&quot;,<br />
+&nbsp; &nbsp; &nbsp; &nbsp; P.point_code as &quot;pointCode&quot;,<br />
+&nbsp; &nbsp; &nbsp; &nbsp; MAX(case T.typeid when &#39;0a1eec7fa7444856984be054c485cfd3&#39; then T.account else 0 end) &#39;scoreFee&#39;,<br />
+&nbsp; &nbsp; &nbsp; &nbsp; MAX(case T.typeid when &#39;1e98bfd9adbd41bea509c987887017e2&#39; then T.account else 0 end) &#39;examFee&#39;,<br />
+&nbsp; &nbsp; &nbsp; &nbsp; T.payment_amount as paymentAmount<br />
+from (<br />
+&nbsp; &nbsp; &nbsp; &nbsp; select&nbsp;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; O.schoolroll_id,<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; O.pay_type_id typeid,<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; I.id invoice_id,<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; I.point_id point_id,<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; I.export_batch,<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; I.has_export,<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; I.invoice_time,<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; I.has_del,<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; I.payment_amount payment_amount,<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; sum(pay_account) account&nbsp;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; from finance_invoice_order IO&nbsp;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; left join finance_invoice I on IO.invoice_id = I.id&nbsp;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; left join finance_order O on IO.order_id = O.id&nbsp;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; group by O.pay_type_id,O.schoolroll_id) T<br />
+left join roll_schoolroll R on T.schoolroll_id = R.id<br />
+left join roll_stu_base S on R.stu_base_id = S.id<br />
+left join sys_point P on T.point_id = P.id<br />
+WHERE T.HAS_DEL = 0<br />
+and &nbsp;T.schoolroll_id = &#39;2f8eb64ad1f84e05aced94ee561bcb7d&#39;<br />
+group by &nbsp;T.schoolroll_id<br />
+having &nbsp;T.schoolroll_id = &#39;2f8eb64ad1f84e05aced94ee561bcb7d&#39;</p>
+
+<p>SELECT COUNT(1)<br />
+&nbsp; &nbsp; &nbsp; &nbsp; FROM (<br />
+&nbsp; &nbsp; &nbsp; &nbsp; select &nbsp;T.schoolroll_id as schoolrollId,<br />
+&nbsp; &nbsp; &nbsp; &nbsp; T.invoice_id as invoiceId,<br />
+&nbsp; &nbsp; &nbsp; &nbsp; T.export_batch as exportBatch,<br />
+&nbsp; &nbsp; &nbsp; &nbsp; T.has_export as &quot;hasExport&quot;,<br />
+&nbsp; &nbsp; &nbsp; &nbsp; T.invoice_time as &quot;invoiceTime&quot;,<br />
+&nbsp; &nbsp; &nbsp; &nbsp; S.name as &quot;stuName&quot;,<br />
+&nbsp; &nbsp; &nbsp; &nbsp; R.student_no as &quot;schoolrollNo&quot;,<br />
+&nbsp; &nbsp; &nbsp; &nbsp; P.id as &quot;pointId&quot;,<br />
+&nbsp; &nbsp; &nbsp; &nbsp; P.point_name as &quot;pointName&quot;,<br />
+&nbsp; &nbsp; &nbsp; &nbsp; P.point_code as &quot;pointCode&quot;,<br />
+&nbsp; &nbsp; &nbsp; &nbsp; MAX(case T.typeid when &#39;0a1eec7fa7444856984be054c485cfd3&#39; then T.account else 0 end) &#39;scoreFee&#39;,<br />
+&nbsp; &nbsp; &nbsp; &nbsp; MAX(case T.typeid when &#39;1e98bfd9adbd41bea509c987887017e2&#39; then T.account else 0 end) &#39;examFee&#39;,<br />
+&nbsp; &nbsp; &nbsp; &nbsp; T.payment_amount as paymentAmount<br />
+from (<br />
+&nbsp; &nbsp; &nbsp; &nbsp; select&nbsp;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; O.schoolroll_id,<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; O.pay_type_id typeid,<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; I.id invoice_id,<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; I.point_id point_id,<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; I.export_batch,<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; I.has_export,<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; I.invoice_time,<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; I.has_del,<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; I.payment_amount payment_amount,<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; sum(pay_account) account&nbsp;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; from finance_invoice_order IO&nbsp;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; left join finance_invoice I on IO.invoice_id = I.id&nbsp;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; left join finance_order O on IO.order_id = O.id&nbsp;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; group by O.pay_type_id,O.schoolroll_id) T<br />
+left join roll_schoolroll R on T.schoolroll_id = R.id<br />
+left join roll_stu_base S on R.stu_base_id = S.id<br />
+left join sys_point P on T.point_id = P.id<br />
+WHERE T.HAS_DEL = 0<br />
+group by &nbsp;T.schoolroll_id<br />
+)N</p>

@@ -1,0 +1,78 @@
+<h1>一次向svn中增加所有新增文件 svn add all new files</h1>
+
+<p>转自：<a href="http://blog.csdn.net/spare_h/article/details/6677435" target="_blank">http://blog.csdn.net/spare_h/article/details/6677435 &nbsp; &nbsp;&nbsp;</a>&nbsp;</p>
+
+<p>&nbsp; 我经常会一次往Subversion里添加一批文件。在使用命令行做这件事时，你必须指定所有想要添加的文件名。如果文件不多的话这还不算太糟糕，但如果你要添加20个文件，那就费事了。当然你也可以用通配符，但这样一来就可能匹配到已经在版本控制之下的文件(这不会有什么损害，只不过会输出一堆错误信息，可能会跟别的错误信息混淆)。为了解决这个问题，我写了一行简单的bash命令：</p>
+
+<p>　　</p>
+
+<pre>
+svn st | grep &#39;^\?&#39; | tr &#39;^\?&#39; &#39; &#39; | sed &#39;s/[ ]*//&#39; | sed &#39;s/[ ]/\\ /g&#39; | xargs svn add</pre>
+
+<p>&nbsp;</p>
+
+<p>　　表4.3详细解释了这一行命令。</p>
+
+<p>　<img alt="" src="http://hi.csdn.net/attachment/201108/10/0_131299310710LW.gif" /></p>
+
+<p>　　我大概花了15分钟写出这条命令，然后用了它成百上千次。</p>
+
+<p>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ****************************************************</p>
+
+<p>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 这个自动化过程已经很完美了，一个&ldquo;简单&rdquo;的shell脚本，这是一个权威编写并使用了百上千次的脚本。</p>
+
+<blockquote>
+<pre>
+然后我在一个博客中看到这样一个脚本：
+
+svn st|awk &#39;{print $2}&#39;|xargs svn add。
+
+乍看之下觉得更加精炼，仔细看下就会发现这个脚本没有区分文件状态。所以完善了以下这个脚本：
+
+ 
+
+svn st | awk &#39;{if ( $1 == &quot;?&quot;) { print $2}}&#39; | xargs svn add
+
+这样，以后我可能使用这个脚本成百上千次。(当然这个脚本也没有考虑过滤掉不要添加的文件）
+
+当你第三次做一件事情的时候，就应该考虑将其工具化，自动化！
+
+ 
+
+名称
+svn add &mdash; 添加文件、目录或符号链。
+
+概要
+SVN子命令add PATH...描述
+文件、目录或符号链到你的工作拷贝并且预定添加到版本库。它们会在下次提交上传并添加到版本库，如果你在提交之前改变了主意，你可以使用svn revert取消预定。
+
+选项
+--targets FILENAME
+--non-recursive (-N)
+--quiet (-q)
+--config-dir DIR
+--no-ignore
+--auto-props
+--no-auto-props
+--force
+
+例子：
+我们通过一个例子来看一下SVN子命令add，添加一个文件到工作拷贝：
+$ svn add foo.c 
+A         foo.c
+当添加一个目录，svn add缺省的行为方式是递归的：
+$ svn add testdir
+A         testdir
+A         testdir/a
+A         testdir/b
+A         testdir/c
+A         testdir/d
+你可以只添加一个目录而不包括其内容：
+$ svn add --non-recursive otherdir
+A         otherdir
+通常情况下，命令svn add *会忽略所有已经在版本控制之下的目录，有时候，你会希望添加所有工作拷贝的未版本化文件，包括那些隐藏在深处的文件，可以使用svn add的--force递归到版本化的目录下：
+$ svn add * --force
+A         foo.c
+A         somedir/bar.c
+A         otherdir/docs/baz.doc。SVN子命令add的用法介绍讲解完毕。</pre>
+</blockquote>
