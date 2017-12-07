@@ -1,0 +1,365 @@
+<h1>Servlet、Filter、Listener总结</h1>
+
+<p>servlet规范提供了一组标准的servlet api。servlet容器就是servlet规范的实现。</p>
+
+<p>1、In Action</p>
+
+<p>（1）写一个类继承HttpServlet；</p>
+
+<p>（2）重写其中的方法。</p>
+
+<p>&nbsp;</p>
+
+<h2>（1）Servlet生命周期</h2>
+
+<p>每个Servlet都有自己的生命周期。Servlet的生命周期由web服务器维护。</p>
+
+<p><strong>服务器在启动时（配置了load-on-startup，且值不为0）或第一次请求servlet时（若没有设置load-on-startup，或值为0）初始化一个Servlet对象，然后用这个Servlet对象处理所有客户端请求。服务器关闭时才销毁这个Servlet对象。</strong></p>
+
+<p><strong>无论请求多少次Servlet，最多只有一个Servlet实例。多个客户端并发请求Servlet时，服务器会启动多个线程分别执行该Servlet的service()方法。service()方法里通过请求的方法来决定是调用doGet()还是doPost()方法。</strong></p>
+
+<p>从Java EE 5开始，servlet增加了两个影响servlet生命周期的注解：@PostConstruct和@PreDestroy。这两个注解用来修饰非静态的void()方法，且此方法不能抛出异常声明。</p>
+
+<p>PreDestroy中的Destroy指的是servlet的销毁，而不是destroy()方法。</p>
+
+<p>servlet的生命周期：</p>
+
+<p><strong>服务器加载servlet&mdash;&mdash;servlet构造函数&mdash;&mdash;@PostConstruct修饰的方法&mdash;&mdash;init()方法&mdash;&mdash;service()方法&mdash;&mdash;destroy()方法&mdash;&mdash;@PreDestroy修饰的方法&mdash;&mdash;服务器卸载servlet完毕。</strong></p>
+
+<p>支持@PostConstruct和@PreDestroy注解的服务器要支持到servlet2.5及以上规范。Tomcat 5仅支持到servlet2.4规范。</p>
+
+<p>服务器启动时，会遍历web应用的WEB-INF/classes下的所有class文件与WEB-INF/lib下的所有jar文件，以检查哪些类使用了注解。不支持注解的服务器不会这样做。若应用程序中没有使用任何注解，可在web.xml中设置&lt;web-app&gt;的metadata-complete属性为true来关闭服务器启动时例行的注解检查。</p>
+
+<h2>（2）servlet之间的跳转</h2>
+
+<p>servlet之间可以相互跳转，从一个servlet程序跳转到另一个servlet。servlet的跳转可以实现程序模块化。MVC框架中都使用了servlet跳转。</p>
+
+<p><strong>转向（Forward）</strong>是通过RequestDispatcher对象的forward()方法实现的。RequestDispatcher通过HttpServletRequest（或者ServletContext对象）的getRequestDispatcher()方法获得，其中的参数必须以/开始，/表示本webApp的根目录。可以Forward到servlet、jsp页面，甚至可以跳转到另外一个文件或WEB-INF文件夹下的文件。</p>
+
+<p><strong>重定向（Redirect）</strong>：重定向是利用服务器返回的状态码实现的。客户端浏览器请求服务器时，服务器端会返回一个状态码。服务器端通过response的setStatus()方法设置状态码。</p>
+
+<p>状态码：</p>
+
+<p>200表示一切正确； 301、302表示该资源已不存在或换了地址，客户端需重定向到一个新的资源，服务器响应中会附带这个新资源地址；401表示没有权限访问；404表示资源不存在；</p>
+
+<p>HttpServletResponse把setStatus()和setHeader()方法封装成sendRedirect()方法；</p>
+
+<p>如：response.setStatus(302);</p>
+
+<p>response.setHeader(&quot;Location&quot;,&quot;http://www.baidu.com&quot;);</p>
+
+<p>现在可以直接调用response.sendRedirect(&quot;http://www.baidu.com&quot;);</p>
+
+<p>自动刷新（Refresh）：</p>
+
+<p>不仅可以实现一段时间后自动跳转到另一个页面，还可以实现一段时间后自动刷新本页面。如：</p>
+
+<p>response.setHeader(&quot;Refresh&quot;, &quot;1000; URL=http://www.baidu.com&quot; );</p>
+
+<p>URL指定的网址是1s后跳转的页面。当URL设置的路径为servlet自己的路径时，就会每隔1s自动刷新本页面一次。自动实现和重定向原理一样，当为时间设为0，URL设为一个网址，效果就是重定向。</p>
+
+<h2>（3）servlet是线程不安全的。要谨慎使用类的变量。</h2>
+
+<p>线程安全：指多线程并发执行时，会不会出现问题。若有问题，则是线程不安全的。</p>
+
+<p>多个用户同时请求同一个servlet时，Tomcat会派生出多条线程执行servlet的代码。因此servlet是线程不安全的。</p>
+
+<p>多线程并发的读写会导致数据不同步的问题。</p>
+
+<p>多线程并发的读写servlet类属性会导致数据不同步，但若只是并发地读取属性而不写入，则不存在数据不同步问题。因此servlet里的只读属性最好定义为final类型。</p>
+
+<p>（4）一个servlet类只会有一个实例。</p>
+
+<h2>（5）Filter</h2>
+
+<p>Filter、Listener是servlet规范里德两个高级特性。不同于servlet，它们不用于处理客户端请求，只用于对request、response进行修改或者对context、session、request事件进行监听。</p>
+
+<p>多个Filter就组成了一个FilterChain。</p>
+
+<p>一个Filter必须实现javax.servlet.Filter接口。Filter需要配置在web.xml中才能生效。其中&lt;dispatcher&gt;配置到达servlet的方式。默认为request。</p>
+
+<p>request：表示仅当直接请求servlet时才生效。</p>
+
+<p>forward：表示仅当某servlet通过forward到该servlet时才生效。</p>
+
+<p>多个Filter的执行有先后顺序，规则是&lt;filter-mapping&gt;配置在前面的Filter执行要早于配置在后面的Filter。</p>
+
+<p>页面编码方式与Filter编码方式必须一致。此外，若表单是get方式提交的，需要修改Tomcat的/conf/server.xml文件，指定URIEncoding，默认为ISO-8859-1，否则依然会乱码。</p>
+
+<p>Filter中，若在chain.doFilter()上加一个try....catch语句，就能捕捉servlet中抛出的异常，然后根据不同的异常进行不同的异常处理。</p>
+
+<p>Filter和特定的URL关联，只有当客户请求访问此URL时，才会触发过滤器调用doFilter方法！</p>
+
+<p>过滤器的初始化，即被调用init()方法是webApp应用被Tomcat加载就执行。</p>
+
+<p>Filter配置多个url-pattern：</p>
+
+<p><a href="http://weidongke123-126-com.iteye.com/blog/1032546" target="_blank">http://weidongke123-126-com.iteye.com/blog/1032546</a></p>
+
+<p>&nbsp;</p>
+
+<h2>（6）Listener</h2>
+
+<p>Listener用于监听Java Web程序中的事件，如创建、属性修改、删除session、request、context等，并触发相应的事件。Servlet2.5规范中共有8种Listener，分别完成对不同事件的监听。其中两个Listener能监听存放在session中的对象。共有6种Event。</p>
+
+<p>Java web程序只要记住该类事件触发时一定会调用相应的Listener相应方法，并传回一个Event对象。触发时，服务器会顺次执行各个Listener的相应方法。</p>
+
+<p>HttpSessionListener接口、ServletContextListener、ServletRequestListener分别用于监控session、context、request的创建和销毁。</p>
+
+<p>HttpSessionListener：监听session的创建和销毁。创建session时执行sessionCreated()方法。超时或执行session.invalidate()时执行sessionDestroyed()方法。</p>
+
+<p>ServletContextListener：监听context的创建和销毁。context代表当前的web应用程序。服务器启动或热部署war包时执行contextInitialized()方法。服务器关闭或只关闭该web时会执行contextDestroyed()方法。该listener可用于启动时获取web.xml里配置的初始化参数。</p>
+
+<p>ServletRequestListener：监听request的创建和销毁。用户每次请求request都会执行requestInitialized()方法。request处理完毕自动销毁前执行requestDestroyed()方法。</p>
+
+<p>HttpSessionAttributeListener、ServletContextAttributeListener、ServletRequestAttributeListener用于监听session、context、request的属性变化。当向被监听对象中添加、修改、删除属性时，会分别执行对应的方法。</p>
+
+<p>HttpSessionBindingListener和HttpSessionActivationListener用于监控session内的对象。此两个Listener不需要在web.xml中声明。</p>
+
+<p>HttpSessionBindingListener：当对象被放到session里时，执行valueBound()方法。当对象被从session里移除时，执行valueUnbound()方法。对象必须实现该Listener接口。</p>
+
+<p>HttpSessionActivationListener：服务器关闭时，会将session里的内容保存到硬盘上。服务器重新启动时，会将session内容从硬盘上重新加载。当session里的对象被钝化时，执行sessionWillPassivate()方法。当对象被重新加载时，执行sessionDidActtivate()。对象必须实现该Listener接口。</p>
+
+<p>&lt;listener&gt;标签一般配置在&lt;servlet&gt;标签的前面。</p>
+
+<p>四个session监听器接口和与之关联的两个session事件。</p>
+
+<p>&nbsp;</p>
+
+<p>（7）ServletContext</p>
+
+<p>servlet容器在启动时会加载web应用，并为每个web应用创建唯一的ServletContext对象，被同一个web应用中所有组件共享。 在web运行期间，ServletContext设置的属性一直存在。当web应用被关闭时（如关闭Tomcat），servlet容器销毁ServletContext对象。</p>
+
+<p>&nbsp;</p>
+
+<p>（8）cookie</p>
+
+<p>通过cookie的setMaxAge()方法设置cookie的有效期。</p>
+
+<p>&nbsp;</p>
+
+<p>（9）filter、listener、servlet启动顺序</p>
+
+<p><a href="http://www.iteye.com/topic/1133753" target="_blank">http://www.iteye.com/topic/1133753</a></p>
+
+<p>&nbsp;</p>
+
+<p>2、PS （1） servlet&nbsp;&nbsp;</p>
+
+<p>init()&nbsp; service()&nbsp; destroy()</p>
+
+<p>其中init()、destroy()方法只会被服务器执行一次。</p>
+
+<p>&nbsp;</p>
+
+<p>（2） ServletContext&nbsp; Listener</p>
+
+<p>contextInitialized()&nbsp;&nbsp;&nbsp; contextDestroyed()</p>
+
+<p>&nbsp;</p>
+
+<p>（3） Filter</p>
+
+<p>init()&nbsp; doFilter()&nbsp; destroy()</p>
+
+<p>其中init()是web程序启动时调用此方法，用于初始化该Filter；</p>
+
+<p>chain.doFilter()将请求传给下一个Filter或servlet；因此，在doFilter()方法中一定要执行chain.doFilter()，否则reqeust不会交给后面的Filter或servlet。</p>
+
+<p>web程序关闭时调用destroy()方法；</p>
+
+<p>init()和destroy()方法只会被调用一次，doFilter()方法每次有客户端请求都会被调用一次。</p>
+
+<p>&nbsp;</p>
+
+<p>（4）</p>
+
+<p>所有HTTP头数据都可以通过request相应的方法得到。</p>
+
+<p>servlet规范是建立在HTTP规范基础上的。</p>
+
+<p>servlet有一个方法getLastModified()，返回该文档的最后修改时间，默认为-1，表示该文档永远是最新的。</p>
+
+<p>&nbsp;</p>
+
+<p>（5）Java web目录结构</p>
+
+<p>web程序部署在Tomcat的/webapps下面。如webapps/web1、webapps/web2。</p>
+
+<p>这两个不同的web应用分别称为两个context，路径/web1、/web2称为上下文路径（ContextPath）。</p>
+
+<p>&nbsp;</p>
+
+<p>若不使用上下文路径，web程序需放到webapps/ROOT下面，ROOT文件夹下的程序使用<a href="http://localhost:8080/" target="_blank">http://localhost:8080/</a>访问。</p>
+
+<p>&nbsp;</p>
+
+<p>根据servlet规范，web程序有自己特定的结构，部署时必须按照这样的结构部署。WEB-INF文件夹，里面有classes和lib文件夹，web.xml文件。</p>
+
+<p>Java web应用程序的WEB-INF有个特性：任何人都不能通过浏览器直接获取其文件夹下面的文件。WEB-INF下的文件是受保护的，这保证了文件的安全性。WEB-INF下的文件不能通过浏览器直接获取到，但可以通过程序读取到。</p>
+
+<p>&nbsp;</p>
+
+<p>（6）以get方式访问时，会执行doGet方法，但执行前会先执行getLastModified方法，若浏览器发现此方法返回的值与上次访问时返回的值相同，则认为此文档没有更新，浏览器采用缓存而不执行doGet方法。若此方法返回-1，则认为是时刻更新的，总是执行doGet方法。</p>
+
+<p>&nbsp;</p>
+
+<p>以post方式访问时，会执行doPost方法，执行前不会执行getLastModified方法。</p>
+
+<p>&nbsp;</p>
+
+<p>（7）在web.xml中，&lt;servlet&gt;标签里可以使用&lt;init-param&gt;标签配置初始化参数，</p>
+
+<p>包括一个参数名称&lt;param-name&gt;和一个参数值&lt;param-value&gt;。</p>
+
+<p>servlet中可使用getServletContext().getInitParameter()取得配置的初始化参数值。</p>
+
+<p>在servlet中，通过getInitParameter()来获取初始化参数值。</p>
+
+<p>还可以使用getInitParameterNames()方法返回所有的参数名称。</p>
+
+<p>这些初始化的参数，也可由ServletConfig对象取得。Servlet提供getServletConfig()返回ServletConfig对象。</p>
+
+<p>&nbsp;</p>
+
+<p>（8）上下文参数（context-param）</p>
+
+<p>由于init-param是配置在&lt;servlet&gt;标签里的，只能由这个servlet来读取。它不是全局的参数，不能被其它的servlet读取。若要配置一个所有servlet都能读取的参数，需要用到上下文参数。使用标签&lt;context-param&gt;配置。如：</p>
+
+<p>&lt;context-param&gt;</p>
+
+<p>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; &lt;param-name&gt;name&lt;/param-name&gt;</p>
+
+<p>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; &lt;param-value&gt;aaa&lt;/param-value&gt;</p>
+
+<p>&lt;/context-param&gt;</p>
+
+<p>获取context-param可使用ServletContext对象。Servlet中通过getServletConfig().getServletContext()来获取一个ServletContext对象。使用ServletContext的getInitParameter()方法来获取指定名称的全局初始化参数，通过getInitParameterNames()获取所有的context-param参数名称。</p>
+
+<p>&nbsp;</p>
+
+<p>servletContext.getRealPath();返回web应用程序内相对网址对应的绝对路径；</p>
+
+<p>&nbsp;</p>
+
+<p>（9）从Java EE 5开始，&lt;servlet-mapping&gt;标签可以配置多个&lt;url-pattern&gt;。*表示任意长度的字符串。</p>
+
+<p>web编程的过程就是通过请求分析客户需要什么信息或者进行了什么操作，然后进行一系列的处理，最后通过响应结果显示给客户。</p>
+
+<p>客户端浏览器发出的请求被封装成为一个HttpServletRequest对象。</p>
+
+<p>服务器对客户端浏览器做出的响应被封装成了一个HttpServletResponse对象。</p>
+
+<p>response.getWriter()用于写字符型数据，response.getOutputStream()用于写二进制数据。</p>
+
+<p>&nbsp;</p>
+
+<p>不同的输出类型需要声明不同的ContentType属性。</p>
+
+<p>&nbsp;</p>
+
+<p>（10）图片验证码的原理：</p>
+
+<p>服务器生成一个包含随机的字符串的图片发给客户端，客户端提交数据时需要填写字符串作为验证。由于字符串保存在图片中，机器很难识别，从而可防止有人使用计算机程序恶意发送信息的目的。</p>
+
+<p>&lt;img src=&quot;&quot;/&gt;显示图片验证码，如：&lt;img src=&quot;servlet/IdentityServlet&quot;/&gt;。</p>
+
+<p>&nbsp;</p>
+
+<p>（11）资源注射（@Resource）：是Java EE5规范，Tomcat6开始支持的功能。</p>
+
+<p>即不需要servlet主动去读取资源，Tomcat启动时会把web.xml里配置的信息主动注射到servlet里。</p>
+
+<p>注解是一种特殊的接口。</p>
+
+<p>如：</p>
+
+<p>@Resource(name=&quot;messageNameInWebXml&quot;)</p>
+
+<p>private String message;</p>
+
+<p>表示message的值会在servlet运行时动态注入。web.xml中配置一个名为messageNameInWexXml的参数。在web.xml中使用标签&lt;env-entry&gt;配置。</p>
+
+<p>&nbsp;</p>
+
+<p>（12）get提交时URL总长度不能超过255个字符。</p>
+
+<p>&nbsp;</p>
+
+<p>（13）解析二进制数据流比较麻烦，有很多类库以及完成了这项工作。如Apache Commons Fileupload类库。因此使用Apache的commons-fileupload实现文件上传。commons-fileupload从1.2版本开始支持上传监听器，能实时监听上传情况。</p>
+
+<p>&nbsp;</p>
+
+<p>（14）实时显示上传进度的原理</p>
+
+<p>服务器在处理上传文件的同时，将上传文件的信息如文件总长度、已上传多少、传输速率等写入session。客户端浏览器利用ajax技术新开一个独立的线程从session中获取上传进度信息，并实时显示。ajax技术能不刷新页面获取服务器数据。</p>
+
+<p>commons-fileupload1.2版本支持上传监听。监听器需要实现ProgressListener接口。并需要把监听器添加到上传组件上。</p>
+
+<p>添加了监听器后，上传组件在上传文件时，会不断回调方法，回传数据。</p>
+
+<p>&nbsp;</p>
+
+<p>上传文件时，若不对表单做特别处理，提交表单后会转到另一个页面，造成页面的刷新。在新页面显示之前，浏览器会因等待而显示白屏。可以对表单做一些处理，使提交表单后原页面内容不变，同时显示进度条，直到文件上传结束。方法是更改form的target属性。target属性默认为_self。若target为默认值，则提交后的新页面会在当前窗口显示，造成当前窗口短暂白屏。在页面内添加一个隐藏的iframe（指定iframe的宽高为0实现隐藏），把target属性指定为该iframe，则提交后的新页面会在iframe内显示。故上传文件时当前页面看不出任何变化。</p>
+
+<p>&nbsp;</p>
+
+<p>（15）内容替换Filter</p>
+
+<p>内容替换Filter的工作原理是：在servlet将内容输出到response时，response将内容缓存起来，在Filter中进行替换，然后再输出到客户端浏览器。由于默认的response不能严格缓存输出内容，因此需要自定义一个具备缓存功能的response。可以通过继承javax.servlet.http.HttpServletResponseWrapper类实现。该类覆盖了getWriter()方法，当Servlet中使用该response对象调用getWriter()来输出内容时，内容将被输出到CharArrayWriter对象（字符数组Writer）中，达到缓存的效果。</p>
+
+<p>自定义的response重写getWriter()方法：</p>
+
+<p>public PrintWriter getWriter() throws IOException {</p>
+
+<p>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; return new PrintWriter(charArrayWriter);</p>
+
+<p>}</p>
+
+<p>&nbsp;</p>
+
+<p>Filter中将自定义的response传进servlet中。如：</p>
+
+<p>HttpCharacterResponseWrapper response = new&nbsp; HttpCharacterResponseWrapper((HttpServletResponse)res);</p>
+
+<p>chain.doFilter(req, response);</p>
+
+<p>String output = response.getCharArrayWriter().toString();</p>
+
+<p>//对output进行处理</p>
+
+<p>PrintWriter out&nbsp; = res.getWriter();</p>
+
+<p>out.write(output);</p>
+
+<p>&nbsp;</p>
+
+<p>（16）GZIP压缩Filter</p>
+
+<p>网站常使用GZIP压缩算法对网页内容进行压缩，然后传给浏览器，以减少数据传输量、提高响应速度。浏览器收到GZIP压缩数据后会自动解压并正确显示。GZIP加速常用来解决网速慢的瓶颈。</p>
+
+<p>判断浏览器是否支持GZIP自动解压的依据是浏览器提供的Header信息（Accept-Encoding），</p>
+
+<p>&nbsp;</p>
+
+<p>（17）使用Filter在图像上动态加上一个Logo</p>
+
+<p>工作原理和GZIP类似，先把图像数据缓存起来，然后对图像数据进行水印处理后输出到浏览器。</p>
+
+<p>&nbsp;</p>
+
+<h2>filter/listener/servlet启动顺序</h2>
+
+<p>1.启动一个WEB项目的时候,容器(如:Tomcat)会去读它的配置文件web.xml.读两个节点: &lt;listener&gt;&lt;/listener&gt; 和 &lt;context-param&gt;&lt;/context-param&gt;&nbsp;</p>
+
+<p>2.紧接着,容器创建一个ServletContext(上下文),这个WEB项目所有部分都将共享这个上下文.&nbsp;</p>
+
+<p>3.容器将&lt;context-param&gt;&lt;/context-param&gt;转化为键值对,并交给ServletContext.&nbsp;</p>
+
+<p>4.容器创建&lt;listener&gt;&lt;/listener&gt;中的类实例,即创建监听(通过contextInitialized(ServletContextEvent args)这个方法). listener的类实例需要实现 javax.servlet.ServletContextListener接口。</p>
+
+<p>5.容器初始化&lt;filter&gt;&lt;/filter&gt;。filter的类实例需要实现 javax.servlet.Filter接口</p>
+
+<p>6.容器加载&lt;load-on-startup&gt;的&lt;serlvet/&gt;。 servlet实现javax.servlet.Servlet接口</p>
+
+<p>7.容器销毁时，按照servlet--&gt;filter--&gt;listener的顺序销毁servlet、filter和listener</p>
