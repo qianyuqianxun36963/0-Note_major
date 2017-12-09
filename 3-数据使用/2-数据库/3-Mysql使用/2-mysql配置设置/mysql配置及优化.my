@@ -1,0 +1,113 @@
+<h1>mysql：max_connection的设置及优化</h1>
+
+<p><em>摘要：</em>&nbsp;mysql：set-variable=max_connections设置及优化 参考下面两篇文章： 1.mysql官方文档：http://dev.mysql.com/doc/refman/5.5/en/too-many-connections.</p>
+
+<p>mysql：set-variable=max_connections设置及优化</p>
+
+<p>参考下面两篇文章：</p>
+
+<p>1.mysql官方文档：<a href="http://dev.mysql.com/doc/refman/5.5/en/too-many-connections.html">http://dev.mysql.com/doc/refman/5.5/en/too-many-connections.html</a></p>
+
+<p>飞诺网mysql优化：<a href="http://www.diybl.com/course/7_databases/mysql/myshl/2008627/128840.html">http://www.diybl.com/course/7_databases/mysql/myshl/2008627/128840.html</a></p>
+
+<p>windows：要通过修改 win2000的c:/winnt/my.ini 或者 win2003的 c:/windows/my.ini 来实现。</p>
+
+<p>linux： 则是修改 /etc/my.cnf 文件实现。</p>
+
+<p>首先，我们打开这个文件，先将最底部的密码项改成其它的，这个对数据库本身没影响，主要是防止一些有心人获取这个密码，对我们不利<br />
+<br />
+#This File was made using the WinMySQLAdmin 1.4 Tool<br />
+#2004-2-23 16:28:14<br />
+<br />
+#Uncomment or Add only the keys that you know how works.<br />
+#Read the MySQL Manual for instructions<br />
+<br />
+[mysqld]<br />
+basedir=D:/mysql<br />
+#bind-address=210.5.*.*<br />
+datadir=D:/mysql/data<br />
+#language=D:/mysql/share/your language directory<br />
+#slow query log#=<br />
+#tmpdir#=<br />
+#port=3306<br />
+<strong>set-variable&nbsp; &nbsp;= max_connections=1500</strong><br />
+skip-locking<br />
+#skip-networking<br />
+set-variable&nbsp; &nbsp;&nbsp;&nbsp;= key_buffer=384M<br />
+set-variable&nbsp; &nbsp;&nbsp;&nbsp;= max_allowed_packet=1M<br />
+set-variable&nbsp; &nbsp;&nbsp;&nbsp;= table_cache=512<br />
+set-variable&nbsp; &nbsp;&nbsp;&nbsp;= sort_buffer=2M<br />
+set-variable&nbsp; &nbsp;&nbsp;&nbsp;= record_buffer=2M<br />
+set-variable&nbsp; &nbsp;&nbsp;&nbsp;= thread_cache=8<br />
+# Try number of CPU&#39;s*2 for thread_concurrency<br />
+set-variable&nbsp; &nbsp;&nbsp;&nbsp;= thread_concurrency=8<br />
+set-variable&nbsp; &nbsp;&nbsp;&nbsp;= myisam_sort_buffer_size=64M<br />
+#set-variable&nbsp; &nbsp;&nbsp;&nbsp;= connect_timeout=5<br />
+#set-variable&nbsp; &nbsp;&nbsp;&nbsp;= wait_timeout=5<br />
+server-id&nbsp; &nbsp;&nbsp;&nbsp;= 1<br />
+[isamchk]<br />
+set-variable&nbsp; &nbsp;&nbsp;&nbsp;= key_buffer=128M<br />
+set-variable&nbsp; &nbsp;&nbsp;&nbsp;= sort_buffer=128M<br />
+set-variable&nbsp; &nbsp;&nbsp;&nbsp;= read_buffer=2M<br />
+set-variable&nbsp; &nbsp;&nbsp;&nbsp;= write_buffer=2M<br />
+<br />
+[myisamchk]<br />
+set-variable&nbsp; &nbsp;&nbsp;&nbsp;= key_buffer=128M<br />
+set-variable&nbsp; &nbsp;&nbsp;&nbsp;= sort_buffer=128M<br />
+set-variable&nbsp; &nbsp;&nbsp;&nbsp;= read_buffer=2M<br />
+set-variable&nbsp; &nbsp;&nbsp;&nbsp;= write_buffer=2M<br />
+[WinMySQLadmin]<br />
+Server=D:/mysql/bin/mysqld-nt.exe<br />
+这个方案，整体够用了，但是在pconnect和最大连接数上，需要研究<br />
+max_connections没必要那么大，我个人认为几百就够，否则给服务器加大了不少负担，经常会当机<br />
+连接超时的设置也要根据实际情况调整，大家可以自由调整，然后观察效果如何。<br />
+<br />
+下面是老高两年前的一些建议，大家参考一下<br />
+7、MYSQL 的优化（/etc/my.cnf）<br />
+&nbsp; &nbsp; 1)确认在&ldquo;[mysqld]&rdquo;部分加入了&ldquo;skip-innodb&rdquo;和&ldquo;skip-bdb&rdquo;参数；<br />
+&nbsp; &nbsp; 2)确认在&ldquo;[mysqld]&rdquo;部分加入了&ldquo;skip-name-resolve&rdquo;和&ldquo;skip-locking&rdquo;参数；<br />
+&nbsp; &nbsp; 3)如果不需要的话，可以将二进制日志（binlog）停掉，方法是将&ldquo;log-bin&rdquo;注释掉；<br />
+&nbsp; &nbsp; 4)在内存允许的情况下，对一些参数进行重新配置，目标在于将大部分操作集中于内存中，尽量不进行磁盘操作，对于我的 MYSQL 服务器我是如下修改的，基于 2G 内存情况：<br />
+<br />
+&nbsp; &nbsp; [mysqld]<br />
+&nbsp; &nbsp; set-variable&nbsp; &nbsp;= key_buffer=512M<br />
+&nbsp; &nbsp; set-variable&nbsp; &nbsp;= max_allowed_packet=4M<br />
+&nbsp; &nbsp; set-variable&nbsp; &nbsp;= table_cache=1024<br />
+&nbsp; &nbsp; set-variable&nbsp; &nbsp;= thread_cache=64<br />
+&nbsp; &nbsp; set-variable&nbsp; &nbsp;= join_buffer_size=32M<br />
+&nbsp; &nbsp; set-variable&nbsp; &nbsp;= sort_buffer=32M<br />
+&nbsp; &nbsp; set-variable&nbsp; &nbsp;= record_buffer=32M<br />
+&nbsp; &nbsp; set-variable&nbsp; &nbsp;= max_connections=512<br />
+&nbsp; &nbsp; set-variable&nbsp; &nbsp;= wait_timeout=120<br />
+&nbsp; &nbsp; set-variable&nbsp; &nbsp;= interactive_timeout=120<br />
+&nbsp; &nbsp; set-variable&nbsp; &nbsp;= max_connect_errors=30000<br />
+&nbsp; &nbsp; set-variable&nbsp; &nbsp;= long_query_time=1<br />
+&nbsp; &nbsp; set-variable&nbsp; &nbsp;= max_heap_table_size=256M<br />
+&nbsp; &nbsp; set-variable&nbsp; &nbsp;= tmp_table_size=128M<br />
+&nbsp; &nbsp; set-variable&nbsp; &nbsp;= thread_concurrency=8<br />
+&nbsp; &nbsp; set-variable&nbsp; &nbsp;= myisam_sort_buffer_size=128M<br />
+<br />
+&nbsp; &nbsp; 你可以根据&ldquo;show status&rdquo;命令返回的状态进行微调。我主要注意以下变量的数值，越小越好，最好为零：）<br />
+&nbsp; &nbsp; Created_tmp_disk_tables<br />
+&nbsp; &nbsp; Created_tmp_tables<br />
+&nbsp; &nbsp; Created_tmp_files<br />
+&nbsp; &nbsp; Slow_queries<br />
+另外 mysql wait_timeout 那个值设置大了没用 做10左右就可了 (大C说得)<br />
+wait_timeout是使用长久连线时 空闲进程的控制 只要数据库在连接状态 他是不进行干预的 不管是否有查询或更新操作 把这个设置小一点 再使用pconnect就比较理想了 ;)<br />
+timeout的時間﹐我的經驗值是5-20﹐看你的SERVER的訪問量了~~ (梦飞说的)<br />
+<br />
+访问量越大 这个值就应该越小 否则留出的空闲进程太多 会占用不必要的内存<br />
+在一个15分钟在线3000人的论坛上 设置为3比较合适 同时打开pconnect<br />
+<br />
+数据库连接过多的错误，可能的原因分析及解决办法<br />
+分析<br />
+系统不能连接数据库，关键要看两个数据：&nbsp;<br />
+1、数据库系统允许的最大可连接数max_connections。这个参数是可以设置的。如果不设置，默认是100。最大是16384。&nbsp;<br />
+2、数据库当前的连接线程数threads_connected。这是动态变化的。&nbsp;<br />
+查看max_connections、max_connections的办法见后。&nbsp;<br />
+<br />
+如果 threads_connected == max_connections 时，数据库系统就不能提供更多的连接数了，这时，如果程序还想新建连接线程，数据库系统就会拒绝，如果程序没做太多的错误处理，就会出现类似强坛的报错信息。&nbsp;<br />
+因为创建和销毁数据库的连接，都会消耗系统的资源。而且为了避免在同一时间同时打开过多的连接线程，现在编程一般都使用所谓数据库连接池技术。<br />
+但数据库连接池技术，并不能避免程序错误导致连接资源消耗殆尽。&nbsp;<br />
+<br />
+这种情况通</p>
