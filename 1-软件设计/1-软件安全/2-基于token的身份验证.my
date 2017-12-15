@@ -1,0 +1,410 @@
+<h1>基于 Token 的身份验证</h1>
+
+<p>最近了解下基于 Token 的身份验证，跟大伙分享下。很多大型网站也都在用，比如&nbsp;Facebook，Twitter，Google+，Github 等等，比起传统的身份验证方法，Token 扩展性更强，也更安全点，非常适合用在 Web 应用或者移动应用上。Token 的中文有人翻译成 &ldquo;令牌&rdquo;，我觉得挺好，意思就是，你拿着这个令牌，才能过一些关卡。</p>
+
+<h2>传统身份验证的方法</h2>
+
+<p>HTTP 是一种没有状态的协议，也就是它并不知道是谁是访问应用。这里我们把用户看成是客户端，客户端使用用户名还有密码通过了身份验证，不过下回这个客户端再发送请求时候，还得再验证一下。</p>
+
+<p>解决的方法就是，当用户请求登录的时候，如果没有问题，我们在服务端生成一条记录，这个记录里可以说明一下登录的用户是谁，然后把这条记录的 ID 号发送给客户端，客户端收到以后把这个 ID 号存储在 Cookie 里，下次这个用户再向服务端发送请求的时候，可以带着这个 Cookie ，这样服务端会验证一个这个 Cookie 里的信息，看看能不能在服务端这里找到对应的记录，如果可以，说明用户已经通过了身份验证，就把用户请求的数据返回给客户端。</p>
+
+<p>上面说的就是 Session，我们需要在服务端存储为登录的用户生成的 Session ，这些 Session 可能会存储在内存，磁盘，或者数据库里。我们可能需要在服务端定期的去清理过期的 Session 。</p>
+
+<h2>基于 Token 的身份验证方法</h2>
+
+<p>使用基于 Token 的身份验证方法，在服务端不需要存储用户的登录记录。大概的流程是这样的：</p>
+
+<ol>
+	<li>客户端使用用户名跟密码请求登录</li>
+	<li>服务端收到请求，去验证用户名与密码</li>
+	<li>验证成功后，服务端会签发一个 Token，再把这个 Token 发送给客户端</li>
+	<li>客户端收到 Token 以后可以把它存储起来，比如放在 Cookie 里或者 Local Storage 里</li>
+	<li>客户端每次向服务端请求资源的时候需要带着服务端签发的 Token</li>
+	<li>服务端收到请求，然后去验证客户端请求里面带着的 Token，如果验证成功，就向客户端返回请求的数据</li>
+</ol>
+
+<h2>JWT</h2>
+
+<p>实施 Token 验证的方法挺多的，还有一些标准方法，比如 JWT，读作：jot ，表示：JSON Web Tokens 。JWT 标准的 Token 有三个部分：</p>
+
+<ul>
+	<li>header</li>
+	<li>payload</li>
+	<li>signature</li>
+</ul>
+
+<p>中间用点分隔开，并且都会使用 Base64 编码，所以真正的 Token 看起来像这样：</p>
+
+<pre>
+eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJuaW5naGFvLm5ldCIsImV4cCI6IjE0Mzg5NTU0NDUiLCJuYW1lIjoid2FuZ2hhbyIsImFkbWluIjp0cnVlfQ.SwyHTEx_RQppr97g4J5lKXtabJecpejuef8AqKYMAJc</pre>
+
+<h4>Header</h4>
+
+<p>header 部分主要是两部分内容，一个是 Token 的类型，另一个是使用的算法，比如下面类型就是 JWT，使用的算法是 HS256。</p>
+
+<pre>
+{
+  &quot;typ&quot;: &quot;JWT&quot;,
+  &quot;alg&quot;: &quot;HS256&quot;
+}</pre>
+
+<p>上面的内容要用 Base64 的形式编码一下，所以就变成这样：</p>
+
+<pre>
+eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9</pre>
+
+<h4>Payload</h4>
+
+<p>Payload 里面是 Token 的具体内容，这些内容里面有一些是标准字段，你也可以添加其它需要的内容。下面是标准字段：</p>
+
+<ul>
+	<li>iss：Issuer，发行者</li>
+	<li>sub：Subject，主题</li>
+	<li>aud：Audience，观众</li>
+	<li>exp：Expiration time，过期时间</li>
+	<li>nbf：Not before</li>
+	<li>iat：Issued at，发行时间</li>
+	<li>jti：JWT ID</li>
+</ul>
+
+<p>比如下面这个 Payload ，用到了 iss 发行人，还有 exp 过期时间。另外还有两个自定义的字段，一个是 name ，还有一个是 admin 。</p>
+
+<pre>
+{
+ &quot;iss&quot;: &quot;ninghao.net&quot;,
+ &quot;exp&quot;: &quot;1438955445&quot;,
+ &quot;name&quot;: &quot;wanghao&quot;,
+ &quot;admin&quot;: true
+}</pre>
+
+<p>使用 Base64 编码以后就变成了这个样子：</p>
+
+<pre>
+eyJpc3MiOiJuaW5naGFvLm5ldCIsImV4cCI6IjE0Mzg5NTU0NDUiLCJuYW1lIjoid2FuZ2hhbyIsImFkbWluIjp0cnVlfQ</pre>
+
+<h4>Signature</h4>
+
+<p>JWT 的最后一部分是 Signature ，这部分内容有三个部分，先是用 Base64 编码的 header.payload ，再用加密算法加密一下，加密的时候要放进去一个 Secret ，这个相当于是一个密码，这个密码秘密地存储在服务端。</p>
+
+<ul>
+	<li>header</li>
+	<li>payload</li>
+	<li>secret</li>
+</ul>
+
+<pre>
+var encodedString = base64UrlEncode(header) + &quot;.&quot; + base64UrlEncode(payload); 
+HMACSHA256(encodedString, &#39;secret&#39;);</pre>
+
+<p>处理完成以后看起来像这样：</p>
+
+<pre>
+SwyHTEx_RQppr97g4J5lKXtabJecpejuef8AqKYMAJc</pre>
+
+<p>最后这个在服务端生成并且要发送给客户端的 Token 看起来像这样：</p>
+
+<pre>
+eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJuaW5naGFvLm5ldCIsImV4cCI6IjE0Mzg5NTU0NDUiLCJuYW1lIjoid2FuZ2hhbyIsImFkbWluIjp0cnVlfQ.SwyHTEx_RQppr97g4J5lKXtabJecpejuef8AqKYMAJc</pre>
+
+<p>客户端收到这个 Token 以后把它存储下来，下回向服务端发送请求的时候就带着这个 Token 。服务端收到这个 Token ，然后进行验证，通过以后就会返回给客户端想要的资源。</p>
+
+<h2>项目中代码</h2>
+
+<h3>common.js中相关代码</h3>
+
+<p>jQuery.ajaxSetup({<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;beforeSend:function(xhr,settings){<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;var _this = this;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;var _url = _this.url;<br />
+/*&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;if(_url.indexOf(&quot;ACCESSTOKEN&quot;) != -1) {<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;return ;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;}<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;if(_url.indexOf(&quot;?&quot;) != -1){<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;_this.url = _url + &quot;&amp;ACCESSTOKEN=&quot; + accessTokenId;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;}else{<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;_this.url = _url + &quot;?ACCESSTOKEN=&quot; + accessTokenId;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;}*/<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;var accessTokenId = $.cookie(&#39;ACCESSTOKEN&#39;);<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;if (!settings.crossDomain &amp;&amp; settings.type != null &amp;&amp; settings.type.toLowerCase() == &quot;post&quot;) {&nbsp;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;xhr.setRequestHeader(&quot;ACCESSTOKEN&quot;, accessTokenId);<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;} else {<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;_this.url = changeURLParam(_url,&quot;ACCESSTOKEN&quot;,accessTokenId);<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;}<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;},<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;complete :function(xhr,textStatus,settings){<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;try{<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;var loginStatus = xhr.getResponseHeader(&quot;loginStatus&quot;);<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;var tokenStatus = xhr.getResponseHeader(&quot;tokenStatus&quot;);<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;if(loginStatus == &#39;accessDenied&#39;){<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp; showSuccessOrErrorModal(&quot;登录超时，请重新登录&quot;,&quot;warning&quot;);<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp; setTimeout(function(){<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp; //top.location.href=base+&quot;/login&quot;;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp; location.reload(true);<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp; },2000);<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;} else if (tokenStatus == &#39;accessDenied&#39;) {<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;var accessTokenId = $.cookie(&#39;ACCESSTOKEN&#39;);<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;if (accessTokenId != null) {<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;$.extend(settings, {<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;global: false,<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;headers: {ACCESSTOKEN: accessTokenId}<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;});<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;$.ajax(settings);<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;}<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;}<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;}catch(e){<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp; showSuccessOrErrorModal(e,&quot;error&quot;);<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;}<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;}<br />
+&nbsp;&nbsp; &nbsp;});<br />
+&nbsp;&nbsp; &nbsp;<br />
+&nbsp;&nbsp; &nbsp;//针对form表单提交的进行自动添加token $this.attr(&quot;method&quot;) != null &amp;&amp; $this.attr(&quot;method&quot;).toLowerCase() == &quot;post&quot;<br />
+&nbsp;&nbsp; &nbsp;$(&quot;form&quot;).submit(function() {<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;var $this = $(this);<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;if ($this.find(&quot;input[name=&#39;ACCESSTOKEN&#39;]&quot;).size() == 0) {<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;var accessTokenId = $.cookie(&#39;ACCESSTOKEN&#39;);<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;if (accessTokenId != null) {<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;$this.append(&#39;&lt;input type=&quot;hidden&quot; name=&quot;ACCESSTOKEN&quot; value=&quot;&#39; + accessTokenId + &#39;&quot; \/&gt;&#39;);<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;}<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;}<br />
+&nbsp;&nbsp; &nbsp;});<br />
+&nbsp;&nbsp; &nbsp;<br />
+&nbsp;&nbsp; &nbsp;</p>
+
+<h3>ManageUserSessionFilter</h3>
+
+<p>package com.wh.eas.manage.base.shiro;</p>
+
+<p>import javax.servlet.ServletRequest;<br />
+import javax.servlet.ServletResponse;<br />
+import javax.servlet.http.HttpServletRequest;<br />
+import javax.servlet.http.HttpServletResponse;</p>
+
+<p>import org.apache.shiro.SecurityUtils;<br />
+import org.springframework.stereotype.Component;</p>
+
+<p>import com.alibaba.druid.util.StringUtils;<br />
+import com.wh.eas.manage.base.utils.GlobalConstant;</p>
+
+<p>@Component(&quot;manageuser&quot;)<br />
+public class ManageUserSessionFilter extends BaseUserSessionFilter{</p>
+
+<p>&nbsp;&nbsp; &nbsp;public ManageUserSessionFilter(){<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;//跳转到教务登录页面<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;super.setLoginUrl(&quot;/login&quot;);<br />
+&nbsp;&nbsp; &nbsp;}</p>
+
+<p>&nbsp;&nbsp; &nbsp;@Override<br />
+&nbsp;&nbsp; &nbsp;protected boolean isAccessAllowed(ServletRequest request,<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;ServletResponse response, Object mappedValue) {<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;boolean accessState = super.isAccessAllowed(request, response, mappedValue);<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;HttpServletRequest req = (HttpServletRequest) request;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;HttpServletResponse resp = (HttpServletResponse)response;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;//没有登录，跳转至onAccessDenied处理<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;if(!accessState) {<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;return accessState;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;}<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;Object obj = req.getSession().getAttribute(GlobalConstant.ACCESSTOKEN);<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;Object objectshirosession = SecurityUtils.getSubject().getSession().getAttribute(GlobalConstant.ACCESSTOKEN);<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;//没有sessionid，跳转到session错误页面<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;if(obj == null || (!obj.toString().startsWith(&quot;sys_&quot;))) {<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;request.setAttribute(GlobalConstant.ERRORACCESSTOKEN,&quot;accessDenied&quot;);<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;return false;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;}<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;String serverAccessTokenId = obj.toString();<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;if(checkAccessToken(request,response,serverAccessTokenId)){<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;return true;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;}<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;request.setAttribute(GlobalConstant.ERRORACCESSTOKEN,&quot;accessDenied&quot;);<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;return false;<br />
+&nbsp;&nbsp; &nbsp;}<br />
+&nbsp;&nbsp; &nbsp;<br />
+&nbsp;&nbsp; &nbsp;private boolean checkAccessToken(ServletRequest request,ServletResponse response,String serverTokenId) {<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;HttpServletRequest req = (HttpServletRequest)request;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;HttpServletResponse res = (HttpServletResponse)response;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;String reqAccessTokenId = null;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;if(req.getMethod().equalsIgnoreCase(&quot;POST&quot;)) {<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;String requestType = req.getHeader(&quot;X-Requested-With&quot;);<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;if(requestType != null &amp;&amp; requestType.equalsIgnoreCase(&quot;XMLHttpRequest&quot;)) {<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;reqAccessTokenId = req.getHeader(GlobalConstant.ACCESSTOKEN);<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;} else {<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;reqAccessTokenId = req.getParameter(GlobalConstant.ACCESSTOKEN);<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;}<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;} else {<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;reqAccessTokenId = req.getParameter(GlobalConstant.ACCESSTOKEN);<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;}<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;if(!StringUtils.isEmpty(serverTokenId) &amp;&amp; serverTokenId.equals(reqAccessTokenId)) {<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;return true;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;} else {<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;return false;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;}<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;<br />
+&nbsp;&nbsp; &nbsp;}<br />
+}<br />
+&nbsp;</p>
+
+<h3>LoginController</h3>
+
+<p>package com.wh.eas.manage.controller.sys;</p>
+
+<p>import java.util.HashMap;<br />
+import java.util.Map;</p>
+
+<p>import javax.annotation.Resource;<br />
+import javax.servlet.http.HttpServletRequest;<br />
+import javax.servlet.http.HttpServletResponse;<br />
+import javax.servlet.http.HttpSession;</p>
+
+<p>import org.apache.shiro.SecurityUtils;<br />
+import org.apache.shiro.authc.IncorrectCredentialsException;<br />
+import org.apache.shiro.authc.LockedAccountException;<br />
+import org.apache.shiro.authc.UnknownAccountException;<br />
+import org.apache.shiro.authc.UsernamePasswordToken;<br />
+import org.apache.shiro.subject.Subject;<br />
+import org.springframework.stereotype.Controller;<br />
+import org.springframework.ui.Model;<br />
+import org.springframework.web.bind.annotation.RequestMapping;<br />
+import org.springframework.web.bind.annotation.RequestMethod;<br />
+import org.springframework.web.bind.annotation.RequestParam;<br />
+import org.springframework.web.bind.annotation.ResponseBody;</p>
+
+<p>import com.wh.eas.manage.base.controller.BaseController;<br />
+import com.wh.eas.manage.base.utils.GlobalConstant;<br />
+import com.wh.eas.manage.base.utils.StringUtils;<br />
+import com.wh.eas.manage.base.utils.WebUtils;<br />
+import com.wh.eas.manage.service.sys.IPersonalDataService;</p>
+
+<p>@Controller<br />
+public class LoginController extends BaseController{</p>
+
+<p>&nbsp;&nbsp; &nbsp;@Resource<br />
+&nbsp;&nbsp; &nbsp;private IPersonalDataService personalDataService;<br />
+&nbsp;&nbsp; &nbsp;<br />
+&nbsp;&nbsp; &nbsp;public static final String LOGIN_VIEW = &quot;common/login.ftl&quot;;<br />
+&nbsp;&nbsp; &nbsp;@RequestMapping(&quot;/&quot;)<br />
+&nbsp;&nbsp; &nbsp;public String index(){<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;return &quot;redirect:/index&quot;;<br />
+&nbsp;&nbsp; &nbsp;}<br />
+&nbsp;&nbsp; &nbsp;<br />
+&nbsp;&nbsp; &nbsp;@RequestMapping(&quot;/index&quot;)<br />
+&nbsp;&nbsp; &nbsp;public String index(Model model){<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;return &quot;common/index.ftl&quot;;<br />
+&nbsp;&nbsp; &nbsp;}<br />
+&nbsp;&nbsp; &nbsp;<br />
+&nbsp;&nbsp; &nbsp;@RequestMapping(value=&quot;/login&quot;,method = RequestMethod.GET)<br />
+&nbsp;&nbsp; &nbsp;public String toLogin(Model model,HttpServletRequest request,HttpServletResponse response,HttpSession session){<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;//判断用户是否登录<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;if(SecurityUtils.getSubject().isAuthenticated()){<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;String reqAccessTokenId = request.getParameter(GlobalConstant.ACCESSTOKEN);<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;Object objectshirosession = SecurityUtils.getSubject().getSession().getAttribute(GlobalConstant.ACCESSTOKEN);<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;if(objectshirosession != null &amp;&amp; (!objectshirosession.toString().equals(reqAccessTokenId))){<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;reqAccessTokenId = objectshirosession.toString();<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;}<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;model.addAttribute(GlobalConstant.ACCESSTOKEN, reqAccessTokenId);<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;WebUtils.setCookie(response, GlobalConstant.ACCESSTOKEN, reqAccessTokenId, -1);<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;return REDIRECT+&quot;/index&quot;;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;}<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;String gotoUrl = request.getParameter(GlobalConstant.GOTOURL);<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;if(StringUtils.isNotBlank(gotoUrl)){<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;model.addAttribute(GlobalConstant.GOTOURL, gotoUrl);<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;}<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;return LOGIN_VIEW;<br />
+&nbsp;&nbsp; &nbsp;}<br />
+&nbsp;&nbsp; &nbsp;<br />
+&nbsp;&nbsp; &nbsp;/**<br />
+&nbsp;&nbsp; &nbsp; * 处理登录提交的方法<br />
+&nbsp;&nbsp; &nbsp; * @param request<br />
+&nbsp;&nbsp; &nbsp; * @param response<br />
+&nbsp;&nbsp; &nbsp; * @param userName<br />
+&nbsp;&nbsp; &nbsp; * @param password<br />
+&nbsp;&nbsp; &nbsp; * @param rememberMe<br />
+&nbsp;&nbsp; &nbsp; * @param model<br />
+&nbsp;&nbsp; &nbsp; * @return<br />
+&nbsp;&nbsp; &nbsp; */<br />
+&nbsp;&nbsp; &nbsp;@RequestMapping(value=&quot;/login&quot;,method=RequestMethod.POST)<br />
+&nbsp;&nbsp; &nbsp;@ResponseBody<br />
+&nbsp;&nbsp; &nbsp;public Object sysLogin(HttpServletRequest request,HttpServletResponse response,HttpSession session,<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;@RequestParam(value=&quot;userName&quot;) String userName,<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;@RequestParam(value=&quot;password&quot;) String password,<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;@RequestParam(value=&quot;rememberMe&quot;,defaultValue=&quot;0&quot;) Integer rememberMe,Model model){<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;if(StringUtils.isBlank(userName)) {<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;throw new RuntimeException(&quot;用户名不能为空&quot;);<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;}<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;if(StringUtils.isBlank(password)) {<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;throw new RuntimeException(&quot;密码不能为空&quot;);<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;}<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;//用户输入的验证码<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;String submitCode = org.apache.shiro.web.util.WebUtils.getCleanParam(request, GlobalConstant.DEFAULT_CAPTCHA_PARAM);<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;//回话中存储的验证码<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;String secCode = (String) session.getAttribute(GlobalConstant.DEFAULT_CAPTCHA_PARAM);<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;session.removeAttribute(GlobalConstant.DEFAULT_CAPTCHA_PARAM);<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;if(StringUtils.isNotBlank(secCode)) {<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;secCode = secCode.toUpperCase();<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;}<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;</p>
+
+<p>&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;if(StringUtils.isNotBlank(submitCode)) {<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;submitCode = submitCode.toUpperCase();<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;}&nbsp;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;if(StringUtils.isBlank(submitCode) || StringUtils.isBlank(secCode) || !secCode.equals(submitCode)) {<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;throw new RuntimeException(&quot;验证码错误&quot;);<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;}<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;String gotoUrl=request.getParameter(GlobalConstant.GOTOURL);<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;Subject user = SecurityUtils.getSubject();<br />
+&nbsp; &nbsp; &nbsp; &nbsp;&nbsp;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; UsernamePasswordToken token = new UsernamePasswordToken(userName, password);<br />
+&nbsp; &nbsp; &nbsp; &nbsp; // 设置记住密码<br />
+&nbsp; &nbsp; &nbsp; &nbsp; token.setRememberMe(1 == rememberMe);<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;try{<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;//会调用 shiroDbRealm 的认证方法<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;//org.springrain.frame.shiro.ShiroDbRealm.doGetAuthenticationInfo(AuthenticationToken)<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;user.login(token);<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;if(StringUtils.isBlank(gotoUrl)){<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;gotoUrl = null;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;}<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;//设置tokenkey<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;String accessTokenId = &quot;sys_&quot;+StringUtils.getUUId();<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;session.setAttribute(GlobalConstant.ACCESSTOKEN, accessTokenId);<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;WebUtils.setCookie(response, GlobalConstant.ACCESSTOKEN, accessTokenId, -1);<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;model.addAttribute(GlobalConstant.ACCESSTOKEN, accessTokenId);<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;Map&lt;String,Object&gt; data = new HashMap&lt;String,Object&gt;();<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;data.put(&quot;status&quot;, &quot;success&quot;);<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;data.put(&quot;gotoUrl&quot;, gotoUrl);<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;data.put(GlobalConstant.ACCESSTOKEN, accessTokenId);<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;data.put(&quot;msg&quot;, &quot;登录成功&quot;);<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;return data;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;}catch(UnknownAccountException e){<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;throw new RuntimeException(&quot;账户不存在&quot;);<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;}catch(IncorrectCredentialsException e){<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;throw new RuntimeException(&quot;密码错误&quot;,e);<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;}catch(LockedAccountException e){<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;throw new RuntimeException(&quot;账户被锁定&quot;,e);<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;}catch(Exception e){<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;throw new RuntimeException(&quot;未知错误，请联系管理员&quot;,e);<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;}<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;<br />
+&nbsp;&nbsp; &nbsp;}&nbsp;&nbsp; &nbsp;<br />
+&nbsp;&nbsp; &nbsp;<br />
+&nbsp;&nbsp; &nbsp;<br />
+&nbsp;&nbsp; &nbsp;@RequestMapping(value=&quot;/logout&quot;)<br />
+&nbsp;&nbsp; &nbsp;public String logout(HttpServletRequest request,HttpServletResponse response) {<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;WebUtils.removeCookie(response, GlobalConstant.ACCESSTOKEN);<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;Subject subject = SecurityUtils.getSubject();<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;if(subject != null) {<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;subject.logout();<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;}<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;return REDIRECT + &quot;/login&quot;;<br />
+&nbsp;&nbsp; &nbsp;}<br />
+}<br />
+&nbsp;</p>
+
+<p>&nbsp;</p>
