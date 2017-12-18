@@ -1,0 +1,157 @@
+<h1>Eclipse搭建hadoop开发环境[hadoop-eclipse-plugin-2.5.2]</h1>
+
+<blockquote>
+<p><a href="http://blog.csdn.net/antgan/article/details/52067937">上一篇，展示了一个简单的WordCount程序，但是总是使用命令行来操作有些繁琐。</a>&nbsp;<br />
+接下来将分享如何使用Eclipse来搭建hadoop开发环境。</p>
+</blockquote>
+
+<hr />
+<p>开发环境：&nbsp;<br />
+系统：window7&nbsp;<br />
+IDE：Eclipse Java EE IDE for Web Developers【Version: Juno Service Release 2】&nbsp;<br />
+Hadoop版本：hadoop2.5.2</p>
+
+<hr />
+<h3>准备工作</h3>
+
+<blockquote>
+<ol>
+	<li>下载<a href="http://pan.baidu.com/s/1jIIwBPW">hadoop2.5.2.tar.gz</a>（如果从前两篇文章传送过来的就可以免这步操作。）</li>
+	<li>下载<a href="http://pan.baidu.com/s/1cJsSn8">hadoop-eclipse-plugin-2.5.2.jar</a>插件。如果你的hadoop步是这个版本的，请自己动手编译插件，<a href="http://doc.okbase.net/congcong68/archive/119982.html">教程戳这</a></li>
+</ol>
+</blockquote>
+
+<hr />
+<h3>一、解压安装hadoop2.5.2.tar.gz，并配置相关文件。</h3>
+
+<p>具体我就不说了，可以戳这看教程。<a href="http://blog.csdn.net/antgan/article/details/52067441">【教你Windows平台安装配置Hadoop2.5.2(不借助cygwin)】</a></p>
+
+<h3>二、安装插件</h3>
+
+<ol>
+	<li>
+	<p>将<strong>hadoop-eclipse-plugin-2.5.2.jar</strong>，复制到eclipse安装目录下的plugins下。<strong>如：D:\eclipse4\plugins</strong></p>
+	</li>
+	<li>
+	<p>重启Eclipse。</p>
+	</li>
+	<li>
+	<p>点击菜单栏<strong>Windows&ndash;&gt;Preferences</strong>&nbsp;，如果插件安装成功，就会出现如下图&nbsp;<br />
+	【如果插件安装不成功，可能是因为plugin版本的问题，或者是Eclipse未刷新插件，可以自行百度解决。】&nbsp;<br />
+	<img alt="这里写图片描述" src="http://img.blog.csdn.net/20160729193153514" title="" /></p>
+	</li>
+	<li>
+	<p>选择，hadoop安装目录，如：<strong>D:\dev\hadoop-2.5.2</strong></p>
+	</li>
+	<li>
+	<p>点击<strong>Windows&ndash;&gt; Show View &ndash;&gt; Others &ndash;&gt; Map/Redure Location 。</strong>&nbsp;然后点击右上角<strong>Map/Redure</strong>切换视图。&nbsp;<br />
+	<img alt="这里写图片描述" src="http://img.blog.csdn.net/20160729193557814" title="" /></p>
+	</li>
+	<li>
+	<p>点击下方Map/Redure Locations 窗口，空白处右键<strong>New Hadoop location</strong>&nbsp;<br />
+	<img alt="这里写图片描述" src="http://img.blog.csdn.net/20160729193818264" title="" /></p>
+	</li>
+	<li>
+	<p>填写参数，连接参数&nbsp;<br />
+	<img alt="这里写图片描述" src="http://img.blog.csdn.net/20160729194222333" title="" /></p>
+	</li>
+</ol>
+
+<p>连接成功后，如图所示。&nbsp;<br />
+<img alt="这里写图片描述" src="http://img.blog.csdn.net/20160729194359820" title="" /></p>
+
+<h3>三、 编写测试类，依旧是WordCount.java</h3>
+
+<ol>
+	<li>创建Map/Redure Project，<strong>右键 &ndash;&gt; New &ndash;&gt; Other &ndash;&gt; Map/Redure Project 。</strong>&nbsp;<br />
+	<img alt="这里写图片描述" src="http://img.blog.csdn.net/20160729194642839" title="" /></li>
+</ol>
+
+<p><strong>WordCount.java</strong></p>
+
+<pre>
+<code>package test;
+import java.io.IOException;
+import java.util.StringTokenizer;
+
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.io.IntWritable;
+import org.apache.hadoop.io.LongWritable;
+import org.apache.hadoop.io.Text;
+import org.apache.hadoop.mapreduce.Job;
+import org.apache.hadoop.mapreduce.Mapper;
+import org.apache.hadoop.mapreduce.Reducer;
+import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
+import org.apache.hadoop.mapreduce.lib.input.TextInputFormat;
+import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
+import org.apache.hadoop.mapreduce.lib.output.TextOutputFormat;
+
+/**
+ * Hadoop - 统计文件单词出现频次
+ * @author antgan
+ *
+ */
+public class WordCount {
+    public static class WordCountMap extends
+            Mapper&lt;LongWritable, Text, Text, IntWritable&gt; {
+        private final IntWritable one = new IntWritable(1);
+        private Text word = new Text();
+
+        public void map(LongWritable key, Text value, Context context)
+                throws IOException, InterruptedException {
+            String line = value.toString();
+            StringTokenizer token = new StringTokenizer(line);
+            while (token.hasMoreTokens()) {
+                word.set(token.nextToken());
+                context.write(word, one);
+            }
+        }
+    }
+
+    public static class WordCountReduce extends
+            Reducer&lt;Text, IntWritable, Text, IntWritable&gt; {
+        public void reduce(Text key, Iterable&lt;IntWritable&gt; values,
+                Context context) throws IOException, InterruptedException {
+            int sum = 0;
+            for (IntWritable val : values) {
+                sum += val.get();
+            }
+            context.write(key, new IntWritable(sum));
+        }
+    }
+
+    public static void main(String[] args) throws Exception {
+        Configuration conf = new Configuration();
+        Job job = new Job(conf);
+        job.setJarByClass(WordCount.class);
+        job.setJobName(&quot;wordcount&quot;);
+        job.setOutputKeyClass(Text.class);
+        job.setOutputValueClass(IntWritable.class);
+        job.setMapperClass(WordCountMap.class);
+        job.setReducerClass(WordCountReduce.class);
+        job.setInputFormatClass(TextInputFormat.class);
+        job.setOutputFormatClass(TextOutputFormat.class);
+        FileInputFormat.addInputPath(job, new Path(args[0]));
+        FileOutputFormat.setOutputPath(job, new Path(args[1]));
+        job.waitForCompletion(true);
+    }
+}
+</code></pre>
+
+<ol>
+	<li>
+	<p>点击WordCount类，右键<strong>Run As &ndash;&gt; Run Configurations</strong>&nbsp;，点击<strong>Arguments</strong>，填写输入目录，输出目录参数。&nbsp;<br />
+	<img alt="这里写图片描述" src="http://img.blog.csdn.net/20160729194923164" title="" /></p>
+	</li>
+	<li>
+	<p>运行。Run，刷新Reflash，输出结果如下图。&nbsp;<br />
+	<img alt="这里写图片描述" src="http://img.blog.csdn.net/20160729195054486" title="" /></p>
+	</li>
+</ol>
+
+<hr />
+<p>大功告成</p>
+
+<hr />
+<p>我正在学习hadoop平台，如果你也是，可以评论留下QQ，我加你，一起交流下学习心得~</p>
