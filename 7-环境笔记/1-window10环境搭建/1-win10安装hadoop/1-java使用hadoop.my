@@ -1,0 +1,160 @@
+<h1><span style="font-size:24px"><span style="font-family:&quot;PingFang SC&quot;,&quot;Microsoft YaHei&quot;,SimHei,Arial,SimSun"><strong>hadoop简单实例-WordCount</strong></span></span></h1>
+
+<div class="article_bar clearfix" style="-webkit-text-stroke-width:0px; border-bottom:1px solid #e5e5e5; margin-bottom:0px; margin-left:0px; margin-right:0px; margin-top:5px; padding:0px 29px 8px; text-align:start">
+<div class="artical_tag" style="padding:0px"><span style="font-size:16px"><span style="font-family:&quot;PingFang SC&quot;,&quot;Microsoft YaHei&quot;,SimHei,Arial,SimSun"><span style="font-size:16px"><span style="font-family:&quot;microsoft yahei&quot;"><span style="font-size:1em">开发环境：window7&nbsp;<br />
+如果不知道怎么在window环境下安装hadoop，请参考<a href="http://blog.csdn.net/antgan/article/details/52067441" style="box-sizing:border-box; background:transparent; color:#ca0c16; text-decoration:none; margin:0px; padding:0px; font-weight:400; outline:0px">教你Windows平台安装配置Hadoop2.5.2(不借助cygwin)</a></span></span></span></span></span></div>
+</div>
+
+<div class="article_content csdn-tracking-statistics" id="article_content" style="-webkit-text-stroke-width:0px; margin-bottom:30px; margin-left:0px; margin-right:0px; margin-top:0px; padding:20px 30px 0px; text-align:start">
+<div class="markdown_views" style="padding:0px">
+<p style="margin-left:0px; margin-right:0px"><span style="font-size:16px"><span style="font-family:&quot;PingFang SC&quot;,&quot;Microsoft YaHei&quot;,SimHei,Arial,SimSun"><span style="font-size:16px"><span style="font-family:&quot;microsoft yahei&quot;">本实例先贴源代码，再讲解步骤。&nbsp;<br />
+代码如下：</span></span></span></span></p>
+
+<pre style="margin-left:0px; margin-right:0px">
+<span style="font-size:16px"><span style="font-family:&quot;PingFang SC&quot;,&quot;Microsoft YaHei&quot;,SimHei,Arial,SimSun"><span style="font-size:16px"><span style="font-family:&quot;microsoft yahei&quot;"><span style="font-size:14px"><span style="font-family:&quot;Source Code Pro&quot;,monospace"><code>package test;
+import java.io.IOException;
+import java.util.StringTokenizer;
+
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.io.IntWritable;
+import org.apache.hadoop.io.LongWritable;
+import org.apache.hadoop.io.Text;
+import org.apache.hadoop.mapreduce.Job;
+import org.apache.hadoop.mapreduce.Mapper;
+import org.apache.hadoop.mapreduce.Reducer;
+import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
+import org.apache.hadoop.mapreduce.lib.input.TextInputFormat;
+import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
+import org.apache.hadoop.mapreduce.lib.output.TextOutputFormat;
+
+/**
+ * Hadoop - 统计文件单词出现频次
+ * @author antgan
+ *
+ */
+public class WordCount {
+    public static class WordCountMap extends
+            Mapper&lt;LongWritable, Text, Text, IntWritable&gt; {
+        private final IntWritable one = new IntWritable(1);
+        private Text word = new Text();
+
+        public void map(LongWritable key, Text value, Context context)
+                throws IOException, InterruptedException {
+            String line = value.toString();
+            StringTokenizer token = new StringTokenizer(line);
+            while (token.hasMoreTokens()) {
+                word.set(token.nextToken());
+                context.write(word, one);
+            }
+        }
+    }
+
+    public static class WordCountReduce extends
+            Reducer&lt;Text, IntWritable, Text, IntWritable&gt; {
+        public void reduce(Text key, Iterable&lt;IntWritable&gt; values,
+                Context context) throws IOException, InterruptedException {
+            int sum = 0;
+            for (IntWritable val : values) {
+                sum += val.get();
+            }
+            context.write(key, new IntWritable(sum));
+        }
+    }
+
+    public static void main(String[] args) throws Exception {
+        Configuration conf = new Configuration();
+        Job job = new Job(conf);
+        job.setJarByClass(WordCount.class);
+        job.setJobName(&quot;wordcount&quot;);
+        job.setOutputKeyClass(Text.class);
+        job.setOutputValueClass(IntWritable.class);
+        job.setMapperClass(WordCountMap.class);
+        job.setReducerClass(WordCountReduce.class);
+        job.setInputFormatClass(TextInputFormat.class);
+        job.setOutputFormatClass(TextOutputFormat.class);
+        FileInputFormat.addInputPath(job, new Path(args[0]));
+        FileOutputFormat.setOutputPath(job, new Path(args[1]));
+        job.waitForCompletion(true);
+    }
+}</code></span></span></span></span></span></span></pre>
+
+<h2 style="margin-left:0px; margin-right:0px"><span style="font-size:16px"><span style="font-family:&quot;PingFang SC&quot;,&quot;Microsoft YaHei&quot;,SimHei,Arial,SimSun"><span style="font-size:16px"><span style="font-family:&quot;microsoft yahei&quot;">运行测试：</span></span></span></span></h2>
+
+<h3 style="margin-left:0px; margin-right:0px"><span style="font-size:16px"><span style="font-family:&quot;PingFang SC&quot;,&quot;Microsoft YaHei&quot;,SimHei,Arial,SimSun"><span style="font-size:16px"><span style="font-family:&quot;microsoft yahei&quot;">一、 打包WordCount.java成jar包</span></span></span></span></h3>
+
+<p style="margin-left:0px; margin-right:0px"><span style="font-size:16px"><span style="font-family:&quot;PingFang SC&quot;,&quot;Microsoft YaHei&quot;,SimHei,Arial,SimSun"><span style="font-size:16px"><span style="font-family:&quot;microsoft yahei&quot;">两种方法：&nbsp;<br />
+1. 采用javac 指令打包，因为程序依赖两个jar包<strong>hadoop-core.1.2.1.jar</strong>,和<strong>commons-cli.1.2.jar</strong>。所以要指定依赖包的路径。</span></span></span></span></p>
+
+<pre style="margin-left:0px; margin-right:0px">
+<span style="font-size:16px"><span style="font-family:&quot;PingFang SC&quot;,&quot;Microsoft YaHei&quot;,SimHei,Arial,SimSun"><span style="font-size:16px"><span style="font-family:&quot;microsoft yahei&quot;"><span style="font-size:14px"><span style="font-family:&quot;Source Code Pro&quot;,monospace"><code>#编译WordCount.java 转成.class
+javac -classpath D:/lib/hadoop-core-1.2.1.jar:D:/lib/commons-cli.1.2.jar -d D:/output WordCount.java
+#打包成jar包
+jar -cvf wordcount.jar *.class 
+
+</code></span></span></span></span></span></span>2.采用IDE来打包，这里我使用的是eclipse。&nbsp;</pre>
+
+<p style="margin-left:0px; margin-right:0px"><span style="font-size:16px"><span style="font-family:&quot;PingFang SC&quot;,&quot;Microsoft YaHei&quot;,SimHei,Arial,SimSun"><span style="font-size:16px"><span style="font-family:&quot;microsoft yahei&quot;">创建项目，maven构建，或者创建普通java项目都可以（自行导入依赖包），这里我使用了maven构建项目。&nbsp;<br />
+<img alt="这里写图片描述" src="http://img.blog.csdn.net/20160729181716684" style="border:0px; box-sizing:border-box; margin-bottom:15px; margin-top:15px; max-width:100%; outline:0px; vertical-align:middle" title="" /></span></span></span></span></p>
+
+<p style="margin-left:0px; margin-right:0px"><span style="font-size:16px"><span style="font-family:&quot;PingFang SC&quot;,&quot;Microsoft YaHei&quot;,SimHei,Arial,SimSun"><span style="font-size:16px"><span style="font-family:&quot;microsoft yahei&quot;"><strong>pom.xml</strong></span></span></span></span></p>
+
+<pre style="margin-left:0px; margin-right:0px">
+<span style="font-size:16px"><span style="font-family:&quot;PingFang SC&quot;,&quot;Microsoft YaHei&quot;,SimHei,Arial,SimSun"><span style="font-size:16px"><span style="font-family:&quot;microsoft yahei&quot;"><span style="font-size:14px"><span style="font-family:&quot;Source Code Pro&quot;,monospace"><code>        &lt;dependency&gt;
+            &lt;groupId&gt;org.apache.hadoop&lt;/groupId&gt;
+            &lt;artifactId&gt;hadoop-common&lt;/artifactId&gt;
+            &lt;version&gt;2.5.2&lt;/version&gt;
+        &lt;/dependency&gt;
+        &lt;dependency&gt;
+            &lt;groupId&gt;org.apache.hadoop&lt;/groupId&gt;
+            &lt;artifactId&gt;hadoop-hdfs&lt;/artifactId&gt;
+            &lt;version&gt;2.5.2&lt;/version&gt;
+        &lt;/dependency&gt;
+        &lt;dependency&gt;
+            &lt;groupId&gt;org.apache.hadoop&lt;/groupId&gt;
+            &lt;artifactId&gt;hadoop-client&lt;/artifactId&gt;
+            &lt;version&gt;2.5.2&lt;/version&gt;
+        &lt;/dependency&gt;</code></span></span></span></span></span></span></pre>
+
+<p style="margin-left:0px; margin-right:0px"><span style="font-size:16px"><span style="font-family:&quot;PingFang SC&quot;,&quot;Microsoft YaHei&quot;,SimHei,Arial,SimSun"><span style="font-size:16px"><span style="font-family:&quot;microsoft yahei&quot;">点击WordCount.java右键<strong>Export</strong>。</span></span></span></span></p>
+
+<p style="margin-left:0px; margin-right:0px"><span style="font-size:16px"><span style="font-family:&quot;PingFang SC&quot;,&quot;Microsoft YaHei&quot;,SimHei,Arial,SimSun"><span style="font-size:16px"><span style="font-family:&quot;microsoft yahei&quot;"><strong>选择JAR file</strong>&nbsp;<br />
+<img alt="这里写图片描述" src="http://img.blog.csdn.net/20160729182027405" style="border:0px; box-sizing:border-box; margin-bottom:15px; margin-top:15px; max-width:100%; outline:0px; vertical-align:middle" title="" /></span></span></span></span></p>
+
+<p style="margin-left:0px; margin-right:0px"><span style="font-size:16px"><span style="font-family:&quot;PingFang SC&quot;,&quot;Microsoft YaHei&quot;,SimHei,Arial,SimSun"><span style="font-size:16px"><span style="font-family:&quot;microsoft yahei&quot;"><strong>选择导入目录</strong>&nbsp;<br />
+<img alt="这里写图片描述" src="http://img.blog.csdn.net/20160729185600612" style="border:0px; box-sizing:border-box; margin-bottom:15px; margin-top:15px; max-width:100%; outline:0px; vertical-align:middle" title="" /></span></span></span></span></p>
+
+<p style="margin-left:0px; margin-right:0px"><span style="font-size:16px"><span style="font-family:&quot;PingFang SC&quot;,&quot;Microsoft YaHei&quot;,SimHei,Arial,SimSun"><span style="font-size:16px"><span style="font-family:&quot;microsoft yahei&quot;"><strong>选择程序主入口</strong>&nbsp;<br />
+<img alt="这里写图片描述" src="http://img.blog.csdn.net/20160729185629796" style="border:0px; box-sizing:border-box; margin-bottom:15px; margin-top:15px; max-width:100%; outline:0px; vertical-align:middle" title="" /></span></span></span></span></p>
+
+<p style="margin-left:0px; margin-right:0px"><span style="font-size:16px"><span style="font-family:&quot;PingFang SC&quot;,&quot;Microsoft YaHei&quot;,SimHei,Arial,SimSun"><span style="font-size:16px"><span style="font-family:&quot;microsoft yahei&quot;"><strong>Finish</strong>即可。</span></span></span></span></p>
+
+<hr />
+<h3 style="margin-left:0px; margin-right:0px"><span style="font-size:16px"><span style="font-family:&quot;PingFang SC&quot;,&quot;Microsoft YaHei&quot;,SimHei,Arial,SimSun"><span style="font-size:16px"><span style="font-family:&quot;microsoft yahei&quot;">二、 运行WordCount.jar</span></span></span></span></h3>
+
+<p style="margin-left:0px; margin-right:0px"><span style="font-size:16px"><span style="font-family:&quot;PingFang SC&quot;,&quot;Microsoft YaHei&quot;,SimHei,Arial,SimSun"><span style="font-size:16px"><span style="font-family:&quot;microsoft yahei&quot;"><a href="http://blog.csdn.net/antgan/article/details/52067441" style="box-sizing:border-box; background:transparent; color:#ca0c16; text-decoration:none; margin:0px; padding:0px; font-weight:400; outline:0px">上篇文章中</a>，我们已经在hadoop下创建了输入目录<strong>/user/wcinput</strong>，并上传了2个txt文本文件。</span></span></span></span></p>
+
+<p style="margin-left:0px; margin-right:0px"><span style="font-size:16px"><span style="font-family:&quot;PingFang SC&quot;,&quot;Microsoft YaHei&quot;,SimHei,Arial,SimSun"><span style="font-size:16px"><span style="font-family:&quot;microsoft yahei&quot;">现在只需一个命令即可运行<strong>WordCount</strong>，cd切换到wordcount.jar包目录，指定输入目录，和输出目录，回车。（output目录，如果不存在，会自动创建，无需先mkdir创建目录）</span></span></span></span></p>
+
+<pre style="margin-left:0px; margin-right:0px">
+<span style="font-size:16px"><span style="font-family:&quot;PingFang SC&quot;,&quot;Microsoft YaHei&quot;,SimHei,Arial,SimSun"><span style="font-size:16px"><span style="font-family:&quot;microsoft yahei&quot;"><span style="font-size:14px"><span style="font-family:&quot;Source Code Pro&quot;,monospace"><code>hadoop jar wordcount.jar hdfs://localhost:9000/user/wcinput hdfs://localhost:9000/user/output </code></span></span></span></span></span></span>
+</pre>
+
+<p style="margin-left:0px; margin-right:0px"><span style="font-size:16px"><span style="font-family:&quot;PingFang SC&quot;,&quot;Microsoft YaHei&quot;,SimHei,Arial,SimSun"><span style="font-size:16px"><span style="font-family:&quot;microsoft yahei&quot;"><img alt="这里写图片描述" src="http://img.blog.csdn.net/20160729190634253" style="border:0px; box-sizing:border-box; margin-bottom:15px; margin-top:15px; max-width:100%; outline:0px; vertical-align:middle" title="" /></span></span></span></span></p>
+
+<p style="margin-left:0px; margin-right:0px"><span style="font-size:16px"><span style="font-family:&quot;PingFang SC&quot;,&quot;Microsoft YaHei&quot;,SimHei,Arial,SimSun"><span style="font-size:16px"><span style="font-family:&quot;microsoft yahei&quot;">运行完毕后，运行命令：<strong>hadoop fs -ls</strong>&nbsp;查看output文件夹里的文件。</span></span></span></span></p>
+
+<p style="margin-left:0px; margin-right:0px"><span style="font-size:16px"><span style="font-family:&quot;PingFang SC&quot;,&quot;Microsoft YaHei&quot;,SimHei,Arial,SimSun"><span style="font-size:16px"><span style="font-family:&quot;microsoft yahei&quot;"><img alt="这里写图片描述" src="http://img.blog.csdn.net/20160729190811786" style="border:0px; box-sizing:border-box; margin-bottom:15px; margin-top:15px; max-width:100%; outline:0px; vertical-align:middle" title="" /></span></span></span></span></p>
+
+<p style="margin-left:0px; margin-right:0px"><span style="font-size:16px"><span style="font-family:&quot;PingFang SC&quot;,&quot;Microsoft YaHei&quot;,SimHei,Arial,SimSun"><span style="font-size:16px"><span style="font-family:&quot;microsoft yahei&quot;">其中<strong>part-r-0000</strong>就是输出结果文件。</span></span></span></span></p>
+
+<p style="margin-left:0px; margin-right:0px"><span style="font-size:16px"><span style="font-family:&quot;PingFang SC&quot;,&quot;Microsoft YaHei&quot;,SimHei,Arial,SimSun"><span style="font-size:16px"><span style="font-family:&quot;microsoft yahei&quot;">运行命令：<strong>hadoop fs -cat</strong>&nbsp;打开文件查看，结果如图&nbsp;<br />
+<img alt="这里写图片描述" src="http://img.blog.csdn.net/20160729191054211" style="border:0px; box-sizing:border-box; margin-bottom:15px; margin-top:15px; max-width:100%; outline:0px; vertical-align:middle" title="" /></span></span></span></span></p>
+
+<hr />
+<p style="margin-left:0px; margin-right:0px"><span style="font-size:16px"><span style="font-family:&quot;PingFang SC&quot;,&quot;Microsoft YaHei&quot;,SimHei,Arial,SimSun"><span style="font-size:16px"><span style="font-family:&quot;microsoft yahei&quot;">大功告成</span></span></span></span></p>
+
+<hr />
+<p style="margin-left:0px; margin-right:0px"><span style="font-size:16px"><span style="font-family:&quot;PingFang SC&quot;,&quot;Microsoft YaHei&quot;,SimHei,Arial,SimSun"><span style="font-size:16px"><span style="font-family:&quot;microsoft yahei&quot;">第一个hadoop程序跑起来了，赶紧去试试看吧~</span></span></span></span></p>
+</div>
+</div>
