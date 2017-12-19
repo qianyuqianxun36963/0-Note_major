@@ -1,0 +1,209 @@
+<h2>Javaweb获取表单数据的几种方式</h2>
+
+<h3>一、通过键值对的形式获取表单数据</h3>
+
+<ul>
+	<li>getParameter(String name)：通过key，返回一个value。</li>
+	<li>getParameterValues(String name)：通过key返回一个string数组(多个值)</li>
+	<li>getParameterNames():返回form表单中的所有key值。</li>
+</ul>
+
+<p>下面介绍通过键值对获取form表单数据的数据的方法：</p>
+
+<pre>
+<code>@WebServlet({ &quot;/FormServlet&quot;, &quot;/form&quot; })
+public class FormServlet extends HttpServlet {
+    private static final long serialVersionUID = 1L;
+
+    public FormServlet() {
+        super();
+    }
+
+    protected void doGet(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
+
+        response.setContentType(&quot;text/json;charset=utf-8&quot;);
+
+        PrintWriter out = response.getWriter();
+
+        Enumeration&lt;String&gt;  paramNames =  request.getParameterNames();
+
+        while (paramNames.hasMoreElements()) {
+            String  name = paramNames.nextElement();
+
+            String[] values =  request.getParameterValues(name);
+
+            if(values!=null &amp;&amp; values.length&gt;0){
+                StringBuilder builder = new StringBuilder(); 
+                for (int i = 0; i &lt; values.length; i++) {
+                    builder.append(values[i]+&quot; &quot;);
+                }
+                out.println(name+&quot; : &quot;+builder.toString());
+            }
+        }
+    }
+
+    protected void doPost(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
+        doGet(request, response);
+    }
+
+}
+</code></pre>
+
+<p>form表单：</p>
+
+<pre>
+<code>&lt;!DOCTYPE html&gt;
+&lt;html&gt;
+&lt;head&gt;
+&lt;meta charset=&quot;UTF-8&quot;&gt;
+&lt;title&gt;Insert title here&lt;/title&gt;
+&lt;/head&gt;
+&lt;body&gt;
+    &lt;form action=&quot;/TomcatDemo/form&quot; method=&quot;post&quot;&gt;
+
+        用户名&lt;input type=&quot;text&quot; name=&quot;username&quot;/&gt;&lt;br/&gt;
+        密码    &lt;input type=&quot;password&quot; name=&quot;password&quot;/&gt;&lt;br/&gt;
+        性别    &lt;input type=&quot;radio&quot; name=&quot;sex&quot; value=&quot;male&quot; checked=&quot;checked&quot;/&gt;男
+              &lt;input type=&quot;radio&quot; name=&quot;sex&quot; value=&quot;female&quot;/&gt;女&lt;br/&gt;
+        爱好    &lt;input type=&quot;checkbox&quot; name=&quot;hobby&quot; value=&quot;basketball&quot;/&gt;篮球
+              &lt;input type=&quot;checkbox&quot; name=&quot;hobby&quot; value=&quot;football&quot;/&gt;足球
+              &lt;input type=&quot;checkbox&quot; name=&quot;hobby&quot; value=&quot;game&quot;/&gt;游戏
+              &lt;input type=&quot;checkbox&quot; name=&quot;hobby&quot; value=&quot;media&quot;/&gt;电影&lt;br/&gt;
+               城市    &lt;select name=&quot;city&quot;&gt;
+                    &lt;option value=&quot;bj&quot;&gt;北京&lt;/option&gt;
+                    &lt;option value=&quot;sh&quot;&gt;上海&lt;/option&gt;
+                    &lt;option value=&quot;sz&quot;&gt;深圳&lt;/option&gt;
+                    &lt;option value=&quot;hz&quot;&gt;杭州&lt;/option&gt;
+                  &lt;/select&gt;&lt;br/&gt;
+                  &lt;input type=&quot;submit&quot; value=&quot;注册&quot;/&gt;
+                  &lt;input type=&quot;submit&quot;  value=&quot;登入&quot;/&gt;&lt;br/&gt;
+
+    &lt;/form&gt;
+&lt;/body&gt;
+&lt;/html&gt;</code></pre>
+
+<hr />
+<h3>二、通过Map的形式获取表单数据</h3>
+
+<ul>
+	<li>getParameterMap()：获取form表单的数据，以map的格式封装起来</li>
+</ul>
+
+<p>示例：</p>
+
+<pre>
+<code>@WebServlet({ &quot;/FormServlet&quot;, &quot;/form&quot; })
+public class FormServlet extends HttpServlet {
+    private static final long serialVersionUID = 1L;
+
+    public FormServlet() {
+        super();
+    }
+
+    protected void doGet(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
+
+        response.setContentType(&quot;text/json;charset=utf-8&quot;);
+
+        PrintWriter out = response.getWriter();
+
+        User user = new User();
+        out.println(&quot;获取表单数据之前：&quot;+user.toString());
+
+        Map&lt;String,String[]&gt; map = request.getParameterMap();
+
+        for (Map.Entry&lt;String, String[]&gt; m : map.entrySet()) {
+
+            String name = m.getKey();
+            String[] values = m.getValue();
+            //属性描述器：表示JavaBean类通过存储器导出一个属性
+            PropertyDescriptor pd=null;
+            try {
+                 pd = new PropertyDescriptor(name, User.class);
+            } catch (IntrospectionException e) {
+                e.printStackTrace();
+            }
+
+            if (values!=null&amp;&amp; pd !=null) {
+
+                Method setter = pd.getWriteMethod();
+                try {
+                    if (values.length==1) {
+                        setter.invoke(user, values[0]);
+                    }else {
+                        setter.invoke(user, (Object)values);
+                    }
+                } catch (IllegalAccessException e) {
+                    e.printStackTrace();
+                } catch (IllegalArgumentException e) {
+                    e.printStackTrace();
+                } catch (InvocationTargetException e) {
+                    e.printStackTrace();
+                }
+            }
+        }
+        out.println(&quot;获取表单数据之后：&quot;+user.toString());
+    }
+
+    protected void doPost(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
+        doGet(request, response);
+    }
+}
+</code></pre>
+
+<p><a href="http://blog.csdn.net/z69183787/article/details/8443777" target="_blank">PropertyDescriptor的使用</a></p>
+
+<p>User类</p>
+
+<pre>
+<code>public class User {
+    private String username;//属性名称需要和表单数据中的name值保持一致
+    private String password;
+    private String sex;
+    private String[] hobby;
+    private String city;
+    ...
+    //set get方法省略
+}</code></pre>
+
+<hr />
+<h3>三、通过第三方jar包获取封装表单数据</h3>
+
+<p>使用第三方jar包：<a href="http://download.csdn.net/detail/qq_33689414/9763956" target="_blank">commons-beanutils-1.8.3.jar，下载</a></p>
+
+<pre>
+<code>@WebServlet({ &quot;/FormServlet&quot;, &quot;/form&quot; })
+public class FormServlet extends HttpServlet {
+    private static final long serialVersionUID = 1L;
+
+    public FormServlet() {
+        super();
+    }
+
+    protected void doGet(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
+
+        response.setContentType(&quot;text/json;charset=utf-8&quot;);
+
+        PrintWriter out = response.getWriter();
+
+        User user = new User();
+        out.println(&quot;获取表单数据之前：&quot;+user.toString());
+
+        try {
+            //通过第三方jar包处理
+            BeanUtils.populate(user, request.getParameterMap());
+        } catch (IllegalAccessException e) {
+            e.printStackTrace();
+        } catch (InvocationTargetException e) {
+            e.printStackTrace();
+        }
+
+        out.println(&quot;获取表单数据之后：&quot;+user.toString());
+
+    }
+
+
+    protected void doPost(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
+        doGet(request, response);
+    }
+
+}</code></pre>
