@@ -1,0 +1,184 @@
+<h1>轻松搞定JSONP跨域请求</h1>
+
+<h3><strong>一、同源策略</strong></h3>
+
+<p>要理解跨域，先要了解一下&ldquo;同源策略&rdquo;。所谓同源是指，域名，协议，端口相同。所谓&ldquo;同源策略&ldquo;，简单的说就是基于安全考虑，当前域不能访问其他域的东西。</p>
+
+<p>一些常见的是否同源示例可参照下表：</p>
+
+<p><img alt="这里写图片描述" src="http://img.blog.csdn.net/20160726105444396" style="height:235px; width:600px" title="" /></p>
+
+<p>在同源策略下，在某个服务器下的页面是无法获取到该服务器以外的数据的。例如我们在自己的网站通过ajax去获取豆瓣上<a href="https://developers.douban.com/wiki/?title=api_v2">https://developers.douban.com/wiki/?title=api_v2</a>提供的接口数据。这里我们以搜索图书为例，参数链接为：<a href="https://api.douban.com/v2/book/search?q=javascript&amp;count=1">https://api.douban.com/v2/book/search?q=javascript&amp;count=1</a>，该链接中数据为JSON格式，如下：</p>
+
+<p><img alt="这里写图片描述" src="http://img.blog.csdn.net/20160726153258687" style="height:302px; width:600px" title="" /></p>
+
+<p>我通过如下代码去访问该数据：</p>
+
+<pre>
+&lt;!DOCTYPE html&gt;
+&lt;html lang=&quot;en&quot;&gt;
+&lt;head&gt;
+    &lt;meta charset=&quot;UTF-8&quot;&gt;
+    &lt;title&gt;ajax&lt;/title&gt;
+&lt;/head&gt;
+&lt;body&gt;
+    &lt;div id=&quot;mydiv&quot;&gt;
+        &lt;button id=&quot;btn&quot;&gt;点击&lt;/button&gt;
+    &lt;/div&gt;
+&lt;/body&gt;
+&lt;script type=&quot;text/javascript&quot;&gt;
+    window.onload = function() {
+
+    var oBtn = document.getElementById(&#39;btn&#39;);
+
+    oBtn.onclick = function() {
+
+        var xhr = new XMLHttpRequest();
+
+        xhr.onreadystatechange = function() {
+            if (xhr.readyState == 4 &amp;&amp; xhr.status == 200) {
+                    alert( xhr.responseText );
+            }
+        };
+
+        xhr.open(&#39;get&#39;, &#39;https://api.douban.com/v2/book/search?q=javascript&amp;count=1&#39;, true);
+        xhr.send(); 
+    };
+
+};
+&lt;/script&gt;
+&lt;/html&gt;
+</pre>
+
+<p>上述程序运行时会报错：</p>
+
+<p><img alt="" src="http://images2017.cnblogs.com/blog/656873/201708/656873-20170804151121225-1539378133.png" style="height:47px; width:600px" /></p>
+
+<p>但<code>&lt;img&gt;</code>的src（获取图片），<code>&lt;link&gt;</code>的href（获取css），<code>&lt;script&gt;</code>的src（获取javascript）这三个都不符合同源策略，它们可以跨域获取数据。这里要介绍的JSONP就是利用<code>&lt;script&gt;</code>的src来实现跨域获取数据的。</p>
+
+<h3><strong>二、JSONP</strong></h3>
+
+<p>JSONP 是 JSON with padding（填充式 JSON 或参数式 JSON）的简写。</p>
+
+<p>JSONP实现跨域请求的原理简单的说，就是动态创建<code>&lt;script&gt;</code>标签，然后利用<code>&lt;script&gt;</code>的src 不受同源策略约束来跨域获取数据。</p>
+
+<p>JSONP 由两部分组成：回调函数和数据。回调函数是当响应到来时应该在页面中调用的函数。回调函数的名字一般是在请求中指定的。而数据就是传入回调函数中的 JSON 数据。</p>
+
+<p>动态创建<code>&lt;script&gt;</code>标签，设置其src，回调函数在src中设置：</p>
+
+<pre>
+var script = document.createElement(&quot;script&quot;);
+script.src = &quot;https://api.douban.com/v2/book/search?q=javascript&amp;count=1&amp;callback=handleResponse&quot;;
+document.body.insertBefore(script, document.body.firstChild);</pre>
+
+<p>在页面中，返回的JSON作为参数传入回调函数中，我们通过回调函数来来操作数据。</p>
+
+<pre>
+function handleResponse(response){
+    // 对response数据进行操作代码
+}</pre>
+
+<p>了解了JSONP的基本使用方法，我们在实现上面通过ajax调用豆瓣接口的需求，实现代码如下：</p>
+
+<pre>
+&lt;!DOCTYPE html&gt;
+&lt;html lang=&quot;en&quot;&gt;
+&lt;head&gt;
+    &lt;meta charset=&quot;UTF-8&quot;&gt;
+    &lt;title&gt;JSONP实现跨域2&lt;/title&gt;
+&lt;/head&gt;
+&lt;body&gt;
+    &lt;div id=&quot;mydiv&quot;&gt;
+        &lt;button id=&quot;btn&quot;&gt;点击&lt;/button&gt;
+    &lt;/div&gt;
+&lt;/body&gt;
+&lt;script type=&quot;text/javascript&quot;&gt;
+    function handleResponse(response){
+            console.log(response);
+    }
+&lt;/script&gt;
+&lt;script type=&quot;text/javascript&quot;&gt;
+    window.onload = function() {
+
+    var oBtn = document.getElementById(&#39;btn&#39;);
+
+    oBtn.onclick = function() {     
+
+        var script = document.createElement(&quot;script&quot;);
+        script.src = &quot;https://api.douban.com/v2/book/search?q=javascript&amp;count=1&amp;callback=handleResponse&quot;;
+        document.body.insertBefore(script, document.body.firstChild);   
+    };
+};
+&lt;/script&gt;
+&lt;/html&gt;
+</pre>
+
+<p>在控制台，我们可以查看到返回的response数据格式为JSON对象格式的，具体需要取出哪些参数，可以根据自己的需要：</p>
+
+<p><img alt="" src="http://images2017.cnblogs.com/blog/656873/201708/656873-20170804151236709-371627982.png" style="height:463px; width:700px" /></p>
+
+<p>JSONP目前还是比较流行的跨域方式，虽然JSONP使用起来方便，但是也存在一些问题：&nbsp;<br />
+首先， JSONP 是从其他域中加载代码执行。如果其他域不安全，很可能会在响应中夹带一些恶意代码，而此时除了完全放弃 JSONP 调用之外，没有办法追究。因此在使用不是你自己运维的 Web 服务时，一定得保证它安全可靠。</p>
+
+<p>其次，要确定 JSONP 请求是否失败并不容易。虽然 HTML5 给<code>&lt;script&gt;</code>元素新增了一个 onerror事件处理程序，但目前还没有得到任何浏览器支持。为此，开发人员不得不使用计时器检测指定时间内是否接收到了响应。</p>
+
+<h3><strong>二、jQuery封装JSONP</strong></h3>
+
+<p>对于经常用jQuery的开发者来说，能注意到jQuery封装的<code>$.ajax</code>中有一个<code>dataType</code>属性，如果将该属性设置成<code>dataType:&quot;jsonp&quot;</code>，就能实现JSONP跨域了。需要了解的一点是，虽然jQuery将JSONP封装在<code>$.ajax</code>中，但是其本质与<code>$.ajax</code>不一样。</p>
+
+<p><strong>通过jQuery的<code>$.ajax</code>实现跨域的代码参考如下</strong>：</p>
+
+<p><a href="javascript:void(0);" onclick="copyCnblogsCode(this)" title="复制代码"><img alt="复制代码" src="https://common.cnblogs.com/images/copycode.gif" /></a></p>
+
+<pre>
+&lt;!DOCTYPE html&gt;
+&lt;html lang=&quot;en&quot;&gt;
+&lt;head&gt;
+    &lt;meta charset=&quot;UTF-8&quot;&gt;
+    &lt;title&gt;jQuery实现JSONP&lt;/title&gt;
+&lt;/head&gt;
+&lt;body&gt;
+    &lt;div id=&quot;mydiv&quot;&gt;
+        &lt;button id=&quot;btn&quot;&gt;点击&lt;/button&gt;
+    &lt;/div&gt;
+&lt;/body&gt;
+&lt;script type=&quot;text/javascript&quot; src=&quot;https://code.jquery.com/jquery-3.1.0.min.js&quot;&gt;&lt;/script&gt;
+&lt;script type=&quot;text/javascript&quot;&gt;
+    $(function(){
+        $(&quot;#btn&quot;).click(function(){
+
+            $.ajax({
+                async : true,
+                url : &quot;https://api.douban.com/v2/book/search&quot;,
+                type : &quot;GET&quot;,
+                dataType : &quot;jsonp&quot;, // 返回的数据类型，设置为JSONP方式
+                jsonp : &#39;callback&#39;, //指定一个查询参数名称来覆盖默认的 jsonp 回调参数名 callback
+                jsonpCallback: &#39;handleResponse&#39;, //设置回调函数名
+                data : {
+                    q : &quot;javascript&quot;, 
+                    count : 1
+                }, 
+                success: function(response, status, xhr){
+                    console.log(&#39;状态为：&#39; + status + &#39;,状态是：&#39; + xhr.statusText);
+                    console.log(response);
+                }
+            });
+        });
+    });
+&lt;/script&gt;
+&lt;/html&gt;</pre>
+
+<p>最后的结果与JavaScript通过动态添加<code>&lt;script&gt;</code>标签得到的结果是一样的。</p>
+
+<p><img alt="" src="http://images2017.cnblogs.com/blog/656873/201708/656873-20170804151316178-1386976485.png" style="height:256px; width:600px" /></p>
+
+<p><strong>通过$.getJSON(）</strong></p>
+
+<p>利用getJSON来实现，只要在地址中加上callback=?参数即可，参考代码如下：</p>
+
+<pre>
+$.getJSON(&quot;https://api.douban.com/v2/book/search?q=javascript&amp;count=1&amp;callback=?&quot;, function(data){
+                console.log(data);
+            });</pre>
+
+<p>这样也能实现跨域的功能。</p>
