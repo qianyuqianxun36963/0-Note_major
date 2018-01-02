@@ -1,0 +1,1484 @@
+<h1>掌握Tiles 框架 (一)---Tiles入门和Tiles 框架和体系结构</h1>
+
+<h2><strong>入门</strong></h2>
+
+<p><strong>本教程所讲述的内容</strong></p>
+
+<p>本教程讲述如何使用 Tiles 框架来创建可重用的表示组件。（在最初创建它时，Tiles 框架被命名为 Components。 后来改变了名称是因为&ldquo;components（组件）&rdquo;代表了太多不同的东西，不过原先的名称的精髓仍然得到了保留。） 然而，除了站点布局之外，使用 tile 还能做其他许多事情。例如，您可以划分表示层以更好地重用布局、HTML以及其他可视组件。</p>
+
+<p>本教程力图揭示使用 Tiles 框架的基础，然后让您的知识再上一个台阶。当完成本教程的学习时，您将能够使用更高级的 Tiles 特性来创建可重用组件。</p>
+
+<p><strong>注意：</strong>贯穿本教程，我们交替使用术语&nbsp;<em>tile</em>&nbsp;和&nbsp;<em>页面</em>，因为任何 Web 资源都可以是 tile。 一个 tile 布局代表一种特殊类型的 tile，即可以用来在它内部放置其他 tile。 一个 tile 布局可以用作另一个 tile 布局内的 tile。</p>
+
+<p>明确地说，本教程：</p>
+
+<ul>
+	<li>定义 Tiles 框架和体系结构。</li>
+	<li>介绍 Tiles 体系结构以及它是如何与 Struts 集成的。</li>
+	<li>澄清一些关键 Tiles 概念。</li>
+	<li>展示如何生成 tile 以及将 tile 用作站点模板。</li>
+	<li>展示如何使用 XML 和 JavaServer Pages (JSP) 中的 tile 定义。</li>
+	<li>定义 tile 范围（scope）以及如何将对象移进和移出 tile 范围。</li>
+	<li>使用属性列表。</li>
+	<li>展示如何嵌套 tile。</li>
+	<li>展示如何生成 tile 以及将 tile 布局用作小型可视组件。</li>
+	<li>展示如何细分定义。</li>
+	<li>为 tile 创建控制器。</li>
+	<li>展示如何将 tile 用作&nbsp;<code>ActionForward</code>。</li>
+</ul>
+
+<hr />
+<p><strong>谁应该学习本教程？</strong></p>
+
+<p>如果您发现自己在每个页面上都要编写三行相同的 JSP 代码，或者您想容易地定义复杂的模版布局，那么您就会从本教程中获益。</p>
+
+<p>本教程假设您完全理解 Java 编程、MVC（Model-View-Controller，模型-视图-控制器）、Model 2 和 JSP 技术。虽然良好的 Struts 背景会让您从本教程中获得最大好处，不过只要您精通 JSP 编程，就应该能够理解本教程讲述的大多数内容。</p>
+
+<hr />
+<p><strong>软件需求和代码安装</strong></p>
+
+<p>为完成本教程的学习，您将需要：</p>
+
+<ul>
+	<li>符合 JSP 1.1、1.2 或 2.0 版的 servlet/JSP 容器。&nbsp;<a href="http://jakarta.apache.org/tomcat/index.html" target="_blank">Apache Tomcat 3.x 或更高版本</a>是一个优秀的选择。注意：本教程的例子是使用符合 JSP 1.2 的容器来编写的。</li>
+	<li>Tiles 框架。可作为<a href="http://jakarta.apache.org/struts/index.html" target="_blank">Struts 1.1</a>下载包的一部分或作为单独的组件从<a href="http://www.lifl.fr/~dumoulin/tiles/" target="_blank">Tiles Web 站点</a>获得该框架。</li>
+	<li>源代码。我已提供了两个版本：<a href="http://www.ibm.com/developerworks/cn/education/java/j-tiles/j-tiles-source.zip" target="_blank">一个带 jar 文件的版本</a>和为窄带用户准备的<a href="http://www.ibm.com/developerworks/cn/education/java/j-tiles/j-tiles-source-nojar.zip" target="_blank">一个不带 jar 文件的版本</a>。 Struts 附带了一个空 war 文件&nbsp;<code>struts-blank.war</code>（在&nbsp;<code>webapps</code>&nbsp;目录下），它说明了您需要哪些配置文件和 jar 文件，以及通常将它们放在哪里。您将对本教程中的例子代码使用相同的结构。</li>
+</ul>
+
+<p>请参阅<a href="http://www.ibm.com/developerworks/cn/education/java/j-tiles/resources.html" target="_blank">参考资料</a>以了解关于这些材料和附加参考资料的信息。</p>
+
+<p><strong>Tiles 框架和体系结构</strong></p>
+
+<p><strong>Tiles 框架</strong></p>
+
+<p>Tiles 框架彻底揭示了&nbsp;<code>jsp:includes</code>&nbsp;内部的概念 ―― 从而允许您更灵活地创建可重用的页面。使用 Tiles 框架，开发人员能够通过组合可重用的 tile 来构建页面。您应该将 tile 看作是可视组件。</p>
+
+<p>Tile 布局是允许在其上放置其他 tile 的特殊 JSP 页面。 Tile 布局控制了 tile 在页面上的放置位置。从许多方面看来，tile 布局都和模板布局类似。事实上，如果以前使用过 Struts，那么您会注意到 Tile 框架与模板自定义标签库向是后兼容的。</p>
+
+<hr />
+<p><strong>术语解释</strong></p>
+
+<p>本教程中出现的术语初看起来可能有点难以招架，因此在更详细地讨论 Tiles 框架之前，让我们首先定义一些重要术语。</p>
+
+<p><strong>术语词汇表</strong></p>
+
+<p><strong>Tiles</strong>&nbsp;&nbsp; Struts 用来创建表示组件的模板框架。</p>
+
+<p><strong>页面</strong>&nbsp;&nbsp;&nbsp; tile 布局包括的 Web 资源。</p>
+
+<p><strong>Tile</strong>&nbsp;&nbsp;&nbsp;&nbsp; 同页面。</p>
+
+<p><strong>区域&nbsp;&nbsp;&nbsp;&nbsp;</strong>tile 布局中插入其他 tile 的范围。 区域拥有诸如页眉、页脚之类的逻辑名称。</p>
+
+<p><strong>Tile 布局</strong>&nbsp; 描述其他页面应该定位在何处的 JSP 页面。Tile 布局充当模板，定义了插入其他 tile 的区域。 一个 tile 布局可以是另一个 tile 布局的 tile。</p>
+
+<p><strong>定义</strong>&nbsp;&nbsp;&nbsp;&nbsp; 定义用于调用某个 tile 布局的参数。</p>
+
+<hr />
+<p><strong>Tile 布局</strong></p>
+
+<p>从某些方面看来，tile 布局工作起来就像一个显示函数。要使用某个 tile 布局，可使用&nbsp;<code>tiles:insert</code>&nbsp;标签来调用它。调用 tile 布局时要向它传递参数。这些参数将成为该 tile 布局的属性；例如，参数将放入 tile 范围。</p>
+
+<p>调用 tile 时传递的参数可以是其他 JSP 页面或 Web 资源，您可以将它们插入布局中的预定义位置（称为&nbsp;<em>区域</em>）。参数还包含能够插入 tile 布局的字符串。事实上，可以将许多类型的对象作为参数传递给 tile。这些参数会成为仅对该 tile 可用的 tile 范围内的属性。</p>
+
+<p><em>tile 范围</em>&nbsp;类似页面范围，因为 tile 范围比请求范围更特殊化。 tile 范围允许 tile 用户给 tile 传递参数（称为属性）。tile 范围允许您传递仅对该 tile 布局或 tile 可用的变量（称为属性）。 特殊自定义标签允许您将属性从 tile 范围复制到页面、请求、会话或应用程序范围，或者将属性作为包含的 Web 资源来显示。</p>
+
+<hr />
+<p><strong>默认参数</strong></p>
+
+<p>有些编程语言，比如 C++、Visual Basic 和 Python，允许您向函数和方法传递默认参数。为进一步扩展这个显示函数，Tiles 框架还允许您向 tile 布局传递默认参数。为此，您必须定义一个&nbsp;<em>tile 定义</em>&nbsp;。 Tile 定义允许您定义 tile 的默认参数。Tile 定义（definition）可以在 JSP 代码或 XML 中定义。</p>
+
+<p>像类扩展其他类一样，定义可以扩展其他定义。通过使用定义和 tile 布局，您能够创建可重用的显示组件。</p>
+
+<p>可以结合 Struts 使用 Tiles，也可以在没有 Struts 的情况下使用 Tiles。要结合 Struts 使用 Tiles，您将使用 Struts 附带的 Tiles 标签库。 此外，Tiles 框架包括它自己的&nbsp;<code>RequestProcessor</code>，用于将 tile 布局作为&nbsp;<code>ActionForward</code>&nbsp;来处理――从而允许您转到 tile 定义而不是转到 JSP 页面。Tile 是通过在它的&nbsp;<code>RequestProcessor</code>&nbsp;中重写&nbsp;<code>processActionForward</code>&nbsp;来实现这点的。</p>
+
+<hr />
+<p><strong>典型的 tile 布局</strong></p>
+
+<p>典型的 tile 布局可能为页眉、页脚、菜单和正文定义矩形区域，如图 1 所示。</p>
+
+<p>图 1 所示的区域可以映射到类似图 2 所示的某个 Web 站点。</p>
+
+<p>注意，只需传递正确的参数，就能够容易地重新定义这个应用程序的可重用部分。 例如，雇员清单可能使用相同的页眉和页脚，但是使用不同的菜单和正文，同时仍然能够使用 tile 布局所定义的全部通用布局区域。 这样允许对不同的内容重用相同的 tile 布局。 与包括 HTML 标记不同的是，您将在标记中包括内容。</p>
+
+<p><a href="http://www.cnblogs.com/laoyangHJ/articles/tilesframe2.html" id="ctl02_TitleUrl" target="_blank">掌握Tiles框架 (二)-- Tiles布局和定义</a></p>
+
+<p><strong>1. Tile 布局</strong></p>
+
+<p><strong>构建第一个 tile 布局</strong></p>
+
+<p>如果站点能够重用相同的布局（使用 HTML 表格来实现）和图像，而不必重复相同的 HTML 代码，这样不是很好吗？</p>
+
+<p>Tile 在为站点创建共同的外观方面特别出色。话虽这样说，许多开发人员并没有认识到 Tiles 在创建用 JSP 实现的可重用组件方面同样也很出色。</p>
+
+<p>如果您发现自己在多个页面上重复相同的 HTML 代码，就可考虑对那些页面使用 tile 布局。类似地，如果在不同页面上的不同地方使用相同的 HTML 或 JSP 标签，这种情形也很适合使用 tile 来创建小型可视组件。</p>
+
+<p>作为 Tiles 框架的一个例子，下面将重构一个简单的股票报价应用程序来利用 tile 布局，如图 3 所示。</p>
+
+<hr />
+<p><strong>示例应用程序</strong></p>
+
+<p>这个简单的示例应用程序主要包含一个股票报价页面，它具有一个接受单个参数（即股票代码）的表单（<code>index.jsp</code>）。 另一个页面显示股票报价的值（<code>quote.jsp</code>）。</p>
+
+<p>研究一下下面这两个代码清单。您将重构它们以使用各种各样的 tile 布局。</p>
+
+<p><strong><code>index.jsp</code></strong></p>
+
+<pre>
+&lt;%@ taglib uri=&quot;/WEB-INF/struts-html.tld&quot; prefix=&quot;html&quot; %&gt;
+ &lt;%@ taglib uri=&quot;/WEB-INF/struts-bean.tld&quot; prefix=&quot;bean&quot; %&gt;
+
+ &lt;html&gt;
+   &lt;head&gt;
+     &lt;title&gt;Stock Quote&lt;/title&gt;
+   &lt;/head&gt;
+
+   &lt;body&gt;
+     &lt;table width=&quot;500&quot; border=&quot;0&quot; cellspacing=&quot;0&quot; cellpadding=&quot;0&quot;&gt;
+       &lt;tr&gt;
+         &lt;td&gt; &lt;/td&gt;
+       &lt;/tr&gt;
+       &lt;tr bgcolor=&quot;#36566E&quot;&gt; 
+         &lt;td height=&quot;68&quot; width=&quot;48%&quot;&gt; 
+           &lt;div align=&quot;left&quot;&gt;
+             &lt;img src=&quot;images/hp_logo_rickhightower.gif&quot;
+               width=&quot;220&quot;
+              height=&quot;74&quot;&gt;
+           &lt;/div&gt;
+         &lt;/td&gt;
+       &lt;/tr&gt;
+       &lt;tr&gt;
+         &lt;td&gt; &lt;/td&gt;
+       &lt;/tr&gt;
+     &lt;/table&gt;
+
+     &lt;html:form action=&quot;Lookup&quot;&gt; 
+       &lt;table width=&quot;45%&quot; border=&quot;0&quot;&gt;
+         &lt;tr&gt;
+           &lt;td&gt;&lt;bean:message key=&quot;app.symbol&quot; /&gt;:&lt;/td&gt;
+           &lt;td&gt;&lt;html:text property=&quot;symbol&quot; /&gt;&lt;/td&gt;
+         &lt;/tr&gt;
+         &lt;tr&gt;
+           &lt;td colspan=&quot;2&quot; align=&quot;center&quot;&gt;&lt;html:submit /&gt;&lt;/td&gt;
+         &lt;/tr&gt;
+       &lt;/table&gt;
+     &lt;/html:form&gt; 
+
+   &lt;/body&gt;
+ &lt;/html&gt;</pre>
+
+<p><strong><code>quote.jsp</code></strong></p>
+
+<pre>
+ &lt;%@ taglib uri=&quot;/WEB-INF/struts-bean.tld&quot; prefix=&quot;bean&quot; %&gt;
+
+ &lt;html&gt;
+   &lt;head&gt;
+     &lt;title&gt;Stock Quote&lt;/title&gt;
+   &lt;/head&gt;
+   &lt;body&gt;
+
+     &lt;table width=&quot;500&quot; border=&quot;0&quot; cellspacing=&quot;0&quot; cellpadding=&quot;0&quot;&gt;
+       &lt;tr&gt;
+         &lt;td&gt; &lt;/td&gt;
+       &lt;/tr&gt;
+       &lt;tr bgcolor=&quot;#36566E&quot;&gt; 
+         &lt;td height=&quot;68&quot; width=&quot;48%&quot;&gt; 
+           &lt;div align=&quot;left&quot;&gt;
+             &lt;img src=&quot;images/hp_logo_rickhightower.gif&quot; width=&quot;220&quot; height=&quot;74&quot;&gt;
+           &lt;/div&gt;
+         &lt;/td&gt;
+       &lt;/tr&gt;
+       &lt;tr&gt;
+         &lt;td&gt; &lt;/td&gt;
+       &lt;/tr&gt;
+       &lt;tr&gt;
+         &lt;td&gt; &lt;/td&gt;
+       &lt;/tr&gt;
+       &lt;tr&gt;
+         &lt;td&gt; &lt;/td&gt;
+       &lt;/tr&gt;
+       &lt;tr&gt;
+         &lt;td&gt;
+           &lt;bean:message key=&quot;app.price&quot; /&gt;: &lt;%= request.getAttribute(&quot;PRICE&quot;) %&gt;
+         &lt;/td&gt;
+       &lt;/tr&gt;
+       &lt;tr&gt;
+         &lt;td&gt; &lt;/td&gt;
+       &lt;/tr&gt;
+     &lt;/table&gt;
+   &lt;/body&gt;
+ &lt;/html&gt;</pre>
+
+<p>欲学习如何使用 Tiles 框架，您首先必须编写一个 tile 布局，然后重构上述两个例子页面，以便它们不必重复如此多的 HTML 代码。</p>
+
+<hr />
+<p><strong>逐步创建 tile 布局</strong></p>
+
+<p>为了创建一个 tile 布局，您需要做以下事情：</p>
+
+<ol>
+	<li>找出两个页面的相似之处。</li>
+	<li>创建一个新的布局页面。</li>
+	<li>创建两个新的内容页面，它们仅包含 和 之间的不同之处。<code>EmployeeListing.jsp</code><code>DeptListing.jsp</code></li>
+	<li>将 tile 布局插入页面 ―― 也就是让 和 在它们的页面中插入 tile 布局，并将内容作为参数传递，同时传递其他必要的参数（比如标题）。<code>EmployeeListing.jsp</code><code>DeptListing.jsp</code></li>
+</ol>
+
+<p>由于找出两个页面之间的相似之处需要 HTML 布局和 Web 站点适用性方面的技能，事实证明这项工作更像一门艺术，而不是像一门科学。由于某些原因，拥有紫色的头发和纹身是有所帮助的。如果您不这样认为，可以问我的朋友 Boo。</p>
+
+<p>本教程重点集中于 Struts，而不是 HTML 布局和 Web 站点适用性方面的必要技能。 因此，您不会了解关于纹身和紫色头发方面的内容。事实上，例子中的 HTML 布局是刻意简单化的，以防分散我们对 Tiles 框架的注意力。</p>
+
+<hr />
+<p><strong>创建 tile 布局</strong></p>
+
+<p>一旦找出了页面之间的相似之处（这是困难的部分），您就能够创建新的布局页面（这是容易的部分）。为了创建一个 tile 布局，您必须做以下事情：</p>
+
+<ul>
+	<li>使用标签库指令将 tile 标签库导入 JSP，同时导入需要的其他任何标签库。</li>
+	<li>使用字符串参数来显示像页面这样使用 标签的内容。<code>tiles:getAsString</code></li>
+	<li>使用 标签将 tile 插入布局的适当区域。<code>tiles:insert</code></li>
+	<li>使用&nbsp;<code>tiles:put</code>&nbsp;标签向内部 tile 传递任何需要的参数 ―― 这个标签是&nbsp;<code>tiles:insert</code>&nbsp;标签的子标签。</li>
+</ul>
+
+<p>将 tile 标签库导入 JSP，同时导入需要的其他任何标签库，如下所示（<code>siteLayout.jsp</code>）：</p>
+
+<pre>
+&lt;%@ taglib uri=&quot;/WEB-INF/struts-html.tld&quot; prefix=&quot;html&quot; %&gt;
+ &lt;%@ taglib uri=&quot;/WEB-INF/struts-bean.tld&quot; prefix=&quot;bean&quot; %&gt;
+ &lt;%@ taglib uri=&quot;/WEB-INF/struts-tiles.tld&quot; prefix=&quot;tiles&quot; %</pre>
+
+<p><strong>注意：</strong>要使用 tile 标签库，不要忘了包括&nbsp;<code>web.xml</code>文件中的标签库：</p>
+
+<pre>
+&lt;taglib&gt;
+     &lt;taglib-uri&gt;/WEB-INF/struts-tiles.tld&lt;/taglib-uri&gt;
+     &lt;taglib-location&gt;/WEB-INF/struts-tiles.tld
+     &lt;/taglib-location&gt;
+   &lt;/taglib&gt;</pre>
+
+<p>接下来使用字符串参数显示诸如页面标题之类的内容。您不仅需要更改页面的内容，而且还需要更改出现在浏览器中的标题。为此，需要传入 tile 布局将要使用的标题：</p>
+
+<pre>
+&lt;html&gt;
+   &lt;head&gt;
+     &lt;title&gt;
+         &lt;tiles:getAsString name=&quot;title&quot; ignore=&quot;true&quot;/&gt;
+     &lt;/title&gt;
+   &lt;/head&gt;</pre>
+
+<p>注意该代码中使用了<code>tiles:getAsString</code>&nbsp;标签来显示字符串参数。您不仅能够传递字符串参数，而且能够传递要插入这个页面的其他页面。这里假设调用 JSP 页面向这个 tile 布局传递了一个标题；否则，标题将是空白。</p>
+
+<p><strong>注意：</strong>&nbsp;<code>ignore</code>&nbsp;属性：</p>
+
+<p><code>ignore</code>&nbsp;属性如果为 true，这意味着在缺失该属性的情况下忽略它。否则，如果&nbsp;<code>ignore</code>&nbsp;属性为 false，那么在没有传递该参数的情况下，Tiles 框架将抛出异常，页面将不会显示出来（false 是默认值）。</p>
+
+<p>要插入内容 JSP，可使用&nbsp;<code>tiles:insert</code>标签，它插入该框架作为 tile 来引用的任何页面或 Web 资源。这个标签实际上在 tile 布局中定义了一个区域。 记住，tile 布局的目标是将 tile 布置到该布局中。下面是向该布局插入一个 tile 的例子：</p>
+
+<pre>
+&lt;tiles:insert attribute=&quot;content&quot;/&gt;</pre>
+
+<p>上面这个例子非常简单。如果想要插入一个 tile，并向它传递当前页面范围内的项，那该怎么办呢？例如，使用 Tiles 框架给&nbsp;<code>header.jsp</code>&nbsp;传递一个标题参数（在 tile 范围内）是可以做到的。</p>
+
+<hr />
+<p><strong>调用其他 tile（传递属性）</strong></p>
+
+<p>在插入 tile 的任何时候，您都可以选择性地给它传递参数。传递给 tile 的参数将被放入该 tile 的标题范围（称为&ldquo;标题属性&rdquo;）。例如，除了让标题显示在浏览器的标题栏之外，可能还希望该标题出现在页面的页眉区域。</p>
+
+<p><code>header.jsp</code>文件将完成这个任务。虽然标题变量在该 tile 布局页面范围之内，但它不在该 tile 布局所插入的 tile 的范围之内。脆弱方法每个 tile 和 tile 布局都获取它自己的环境 ―― 也就是它自己的 tile 范围。因而，您必须像下面这样给页眉 tile 传递该 tile 变量：</p>
+
+<p><img alt="" id="code_img_closed_18326ed0-10f9-4c3f-8621-4accc5689aeb" src="http://images.cnblogs.com/OutliningIndicators/ContractedBlock.gif" /><img alt="" id="code_img_opened_18326ed0-10f9-4c3f-8621-4accc5689aeb" src="http://images.cnblogs.com/OutliningIndicators/ExpandedBlockStart.gif" />View Code</p>
+
+<pre>
+&lt;tiles:insert attribute=&quot;header&quot; ignore=&quot;true&quot;&gt;
+       &lt;tiles:put name=&quot;title&quot; 
+                  beanName=&quot;title&quot; beanScope=&quot;tile&quot;/&gt;
+ &lt;/tiles:insert&gt;</pre>
+
+<p><code>tiles:put</code>&nbsp;标签将这个 tile 布局范围内的 tile 参数放进页眉 tile 的范围。然后页眉 tile 就能够像 tile 布局所做的那样，通过&nbsp;<code>tiles:getAsString</code>&nbsp;标签来使用这个参数。参数名称就是页眉的 tile 范围内的属性名称。 bean 参数是当前范围内（<code>siteLayout.jsp</code>）的 bean 的名称。 beanScope 是您在其中查找这个属性的范围（可能的值是页面、tile、请求、会话和应用程序）。 您可以从任何范围向该 tile 传递 bean。</p>
+
+<hr />
+<p><strong>这个 tile 布局的完整清单</strong></p>
+
+<p>接下来，您会看到&nbsp;<code>quote.jsp</code>&nbsp;和&nbsp;<code>index.jsp</code>&nbsp;将要使用的这个新布局页面（<code>siteLayout.jsp</code>）的完整清单：</p>
+
+<pre>
+&lt;%@ taglib uri=&quot;/WEB-INF/struts-html.tld&quot; prefix=&quot;html&quot; %&gt;
+ &lt;%@ taglib uri=&quot;/WEB-INF/struts-bean.tld&quot; prefix=&quot;bean&quot; %&gt;
+ &lt;%@ taglib uri=&quot;/WEB-INF/struts-tiles.tld&quot; prefix=&quot;tiles&quot; %&gt;
+
+ &lt;html&gt;
+
+   &lt;head&gt;
+     &lt;title&gt;
+         &lt;tiles:getAsString name=&quot;title&quot; ignore=&quot;true&quot;/&gt;
+     &lt;/title&gt;
+   &lt;/head&gt;
+
+   &lt;body&gt;
+     &lt;table width=&quot;500&quot; border=&quot;0&quot; cellspacing=&quot;0&quot; cellpadding=&quot;0&quot;&gt;
+
+       &lt;tr bgcolor=&quot;#36566E&quot;&gt; 
+         &lt;td height=&quot;68&quot; width=&quot;48%&quot;&gt; 
+           &lt;div align=&quot;left&quot;&gt;
+             &lt;img src=&quot;images/hp_logo_rickhightower.gif&quot; 
+                  width=&quot;220&quot; height=&quot;74&quot;&gt;
+           &lt;/div&gt;
+         &lt;/td&gt;
+       &lt;/tr&gt;
+
+       &lt;tr&gt;
+         &lt;td height=&quot;68&quot; width=&quot;2000&quot;&gt;  
+             &lt;tiles:insert attribute=&quot;header&quot; ignore=&quot;true&quot;&gt;
+                &lt;tiles:put name=&quot;title&quot; 
+                           beanName=&quot;title&quot; beanScope=&quot;tile&quot;/&gt;
+             &lt;/tiles:insert&gt;
+          &lt;/td&gt;   
+       &lt;/tr&gt;
+       &lt;tr&gt;
+         &lt;td&gt;
+             &lt;div align=&quot;center&quot;&gt;
+             &lt;tiles:insert attribute=&quot;content&quot;/&gt;
+             &lt;/div&gt;
+         &lt;/td&gt;
+       &lt;/tr&gt;
+       &lt;tr&gt;
+         &lt;td&gt;
+             &lt;tiles:insert attribute=&quot;footer&quot; ignore=&quot;true&quot;/&gt;
+         &lt;/td&gt;
+       &lt;/tr&gt;
+       
+     &lt;/table&gt;
+     
+   &lt;/body&gt;
+ &lt;/html&gt;</pre>
+
+<p>请花点时间研究一下上面的代码。注意 tile 是如何插入不同区域的（页眉、页脚、内容），以及如何利用 HTML 布局来为 tile 定义区域，从而为应用程序定义完整的布局。</p>
+
+<hr />
+<p><strong>使用 tile 布局</strong></p>
+
+<p>现在已经定义好了使用 tiles 的 tile 布局，您需要使用该布局。&nbsp;<code>index.jsp</code>&nbsp;和&nbsp;<code>quote.jsp</code>&nbsp;都将使用同一个布局。虽然这对两个页面来说似乎是大量的工作，但是对于真实的 Web 应用程序，你可能会对 20 个或更多的页面使用同一个布局。 通过这种方式，您不必在 20 个位置重复 HTML 或包括 JSP 片断。</p>
+
+<p><strong>注意：</strong>为什么不就使用&nbsp;<code>jsp:include</code>&nbsp;呢？</p>
+
+<p>在适当的位置包括 JSP 片断是重用 HTML 的脆弱方法。设想一下包括相同的 5 个 JSP 片断的 20 个页面 ―― 您必须重复 100 次。</p>
+
+<p>为了使用 tile，您需要执行以下步骤：</p>
+
+<ol>
+	<li>使用<code>taglib</code>指令导入 tile 标签库。</li>
+	<li>使用&nbsp;<code>tiles:insert</code>标签来将 tile 布局插入当前页面。</li>
+	<li>使用&nbsp;<code>tiles:put</code>来传递字符串参数。</li>
+	<li>使用&nbsp;<code>tiles:put</code>&nbsp;来传入参数 tile。</li>
+</ol>
+
+<p>通过使用 tile 布局，您能够在一个位置中将站点布局所需要的整个 HTML 外部化，然后只需将它插入每个页面。观察一下下面的例子，它显示了如何把 tile 布局插入&nbsp;<code>index.jsp</code>：</p>
+
+<pre>
+&lt;%@ taglib uri=&quot;/WEB-INF/struts-tiles.tld&quot; prefix=&quot;tiles&quot; %&gt;
+
+ &lt;tiles:insert page=&quot;/siteLayout.jsp&quot; flush=&quot;true&quot;&gt;
+
+     &lt;tiles:put name=&quot;title&quot; type=&quot;string&quot;
+                      value=&quot;Get Rick Hightower Stock Quote&quot; /&gt; 
+     &lt;tiles:put name=&quot;header&quot; value=&quot;/header.jsp&quot; /&gt;
+     &lt;tiles:put name=&quot;footer&quot; value=&quot;/footer.jsp&quot; /&gt;
+     &lt;tiles:put name=&quot;content&quot; value=&quot;/indexContent.jsp&quot;/&gt;
+ &lt;/tiles:insert&gt;</pre>
+
+<p>现在，当您想要在&nbsp;<code>quote.jsp</code>&nbsp;中做相同的事情时，只需更改内容和页眉。</p>
+
+<p>您需要使用插入标签来调用 tile 布局（显示函数）。（注意用来将 tile 布局插入当前页面的&nbsp;<code>tiles:insert</code>标签）：</p>
+
+<pre>
+&lt;tiles:insert page=&quot;/siteLayout.jsp&quot; flush=&quot;true&quot;&gt;</pre>
+
+<p>page 属性指定了上一节中定义的 tile 布局。如果&nbsp;<code>flush</code>&nbsp;属性被设置为 true，这个 tile（以及到目前为止的页面）将在页面的其余部分之前（或在缓冲区满而迫使执行刷新时）写到浏览器。</p>
+
+<p>要更改&nbsp;<code>quote.jsp</code>&nbsp;和&nbsp;<code>header.jsp</code>&nbsp;之间的页面 tile，可使用子标签&nbsp;<code>tiles:put</code>：</p>
+
+<pre>
+&lt;tiles:put name=&quot;title&quot; type=&quot;string&quot;
+                      value=&quot;Get Stock Quote&quot; /&gt;</pre>
+
+<p>注意&nbsp;<code>tiles:put</code>&nbsp;是如何向 tile 布局传递字符串参数的。&nbsp;<code>tiles:put</code>&nbsp;的&nbsp;<code>name</code>&nbsp;属性标签指定了参数名称。<code>tiles:put</code>&nbsp;的&nbsp;<code>type</code>属性指定了参数的类型。最后，<code>value</code>&nbsp;参数用于传递&nbsp;<code>title</code>&nbsp;属性的值。这允许您在使用&nbsp;<code>tiles:insert</code>&nbsp;标签来调用 tile 布局（显示函数）时，把简单的字符串作为参数来传递。这些参数将成为该 tile 布局属性；也就是被插入该 tile 布局的 tile 范围。</p>
+
+<p>注意您是如何将三个 tile 作为页眉、页脚和内容参数来传递的（&nbsp;<code>header.jsp</code>、<code>footer.jsp</code>&nbsp;和&nbsp;<code>indexContent.jsp</code>）：</p>
+
+<pre>
+&lt;tiles:put name=&quot;header&quot; value=&quot;/header.jsp&quot; /&gt;
+&lt;tiles:put name=&quot;footer&quot; value=&quot;/footer.jsp&quot; /&gt;
+&lt;tiles:put name=&quot;content&quot; value=&quot;/indexContent.jsp&quot;/&gt;</pre>
+
+<p><code>header.jsp</code>&nbsp;页面将被插入该 tile 布局的页眉区域。&nbsp;<code>footer.jsp</code>&nbsp;页面将被插入该 tile 布局的页脚区域。<code>indexContent.jsp</code>页面将被插入该 tile 布局的内容区域。 如果想插入不同的内容和 tile，只需改变内容参数的值。</p>
+
+<p>注意用于&nbsp;<code>index.jsp</code>&nbsp;的表单不再驻留在&nbsp;<code>index.jsp</code>&nbsp;中。该表单现在驻留在&nbsp;<code>indexContent.jsp</code>中，如下面所列出的：</p>
+
+<p><img alt="" id="code_img_closed_df4b6792-0ae7-4396-b96c-bae38aaa0271" src="http://images.cnblogs.com/OutliningIndicators/ContractedBlock.gif" /><img alt="" id="code_img_opened_df4b6792-0ae7-4396-b96c-bae38aaa0271" src="http://images.cnblogs.com/OutliningIndicators/ExpandedBlockStart.gif" />View Code</p>
+
+<pre>
+ &lt;%@ taglib uri=&quot;/WEB-INF/struts-html.tld&quot; prefix=&quot;html&quot; %&gt;
+ &lt;%@ taglib uri=&quot;/WEB-INF/struts-bean.tld&quot; prefix=&quot;bean&quot; %&gt;
+
+ &lt;html:form action=&quot;Lookup&quot;&gt; 
+   &lt;table width=&quot;45%&quot; border=&quot;0&quot;&gt;
+     &lt;tr&gt;
+       &lt;td&gt;&lt;bean:message key=&quot;app.symbol&quot; /&gt;:&lt;/td&gt;
+       &lt;td&gt;&lt;html:text property=&quot;symbol&quot; /&gt;&lt;/td&gt;
+     &lt;/tr&gt;
+     &lt;tr&gt;
+       &lt;td colspan=&quot;2&quot; align=&quot;center&quot;&gt;&lt;html:submit /&gt;&lt;/td&gt;
+     &lt;/tr&gt;
+   &lt;/table&gt;
+ &lt;/html:form&gt;</pre>
+
+<p>除了将 tile 指定为 JSP 页面外，您还能够在&nbsp;<code>tiles:put</code>&nbsp;标签的正文内将文本作为 tile 来传递。<code>quote.jsp</code>所做的正好就是这样：</p>
+
+<p><img alt="" id="code_img_closed_8d42862d-02e7-4959-a340-8bfc436d7c66" src="http://images.cnblogs.com/OutliningIndicators/ContractedBlock.gif" /><img alt="" id="code_img_opened_8d42862d-02e7-4959-a340-8bfc436d7c66" src="http://images.cnblogs.com/OutliningIndicators/ExpandedBlockStart.gif" />View Code</p>
+
+<pre>
+&lt;%@ taglib uri=&quot;/WEB-INF/struts-bean.tld&quot; prefix=&quot;bean&quot; %&gt;
+ &lt;%@ taglib uri=&quot;/WEB-INF/struts-tiles.tld&quot; prefix=&quot;tiles&quot; %&gt;
+
+ &lt;tiles:insert page=&quot;/siteLayout.jsp&quot; flush=&quot;true&quot;&gt;
+     &lt;tiles:put name=&quot;title&quot; type=&quot;string&quot; value=&quot;Rick Hightower Stock Quote&quot; /&gt; 
+     &lt;tiles:put name=&quot;header&quot; value=&quot;/header.jsp&quot; /&gt;
+     &lt;tiles:put name=&quot;footer&quot; value=&quot;/footer.jsp&quot; /&gt;
+     &lt;tiles:put name=&quot;content&quot; type=&quot;string&quot;&gt;
+            &lt;bean:message key=&quot;app.price&quot;/&gt;
+            &lt;%= request.getAttribute(&quot;PRICE&quot;) %&gt;
+     &lt;/tiles:put&gt;
+ &lt;/tiles:insert</pre>
+
+<p>注意&nbsp;<code>tiles:put</code>&nbsp;标签的标签体包含&nbsp;<code>quote.jsp</code>&nbsp;的内容。其他每项内容都是该布局所定义的，都与上一个例子中使用的 tile 相同。这样的优点是能够减少系统中的 JSP 页面的数目。 关于哪种方法工作得最好，很久以来一直存在争议，我的结论是它取决于 put 标签体中有多少代码。</p>
+
+<p>您看到这里存在的问题了吗？存在这样一条规则：不要重复您自己（Don&#39;t repeat yourself，DRY），而您已经违背了这点规则。您知道为什么吗？</p>
+
+<p><strong>2. Tile 定义</strong></p>
+
+<p><strong>创建定义</strong></p>
+
+<p>遗憾的是，<code>quote.jsp</code>&nbsp;和&nbsp;<code>index.jsp</code>&nbsp;都违背了 DRY 规则，它们都重复定义了页眉和页脚参数。由于它们都使用相同的参数值，因此不必在两个页面上重复相同的参数是很理想的。</p>
+
+<p>设想有这样一个真实的应用程序，其中的 tile 布局包括更多的区域（比如说 8 个）和使用该 tile 布局的更多页面。您会发现每次想使用某个 tile 布局时都要重复每个参数是一件很痛苦的事情。既然大多数页面都将使用相同的页眉和页脚，那么在单个位置而不是在每个页面定义它们将会带来好处。</p>
+
+<p>回顾一下前面的显示函数类比，tile 布局在某些方面类似一个显示函数。 您使用&nbsp;<code>tiles:insert</code>&nbsp;来调用 tile 布局，并且使用<code>tiles:put</code>&nbsp;来传入参数。参数是能够插入 tile 布局区域的其他 JSP 页面或字符串。</p>
+
+<p>您现在需要定义对应于页眉和页脚区域的默认参数的能力。Tile 框架还允许您使用定义（definition）来给 tile 布局传递默认参数。</p>
+
+<p>在本节中，您将学习如何创建和使用定义。定义（definition）定义了 tile 布局的默认参数。定义（definition）可以在 JSP 代码或 XML 中定义。在结束本节的学习时，您将能够同时使用这两种方法创建定义。</p>
+
+<hr />
+<p><strong>创建和使用 JSP 定义</strong></p>
+
+<p>您将发现使用 JSP 页面来创建定义是最容易的方法，因为它需要最少的配置。</p>
+
+<p>要创建一个 JSP 定义，请执行以下步骤：</p>
+
+<ol>
+	<li>使用&nbsp;<code>taglib</code>指令导入 tile 标签库。</li>
+	<li>使用&nbsp;<code>logic:notPresent</code>标签来确保该定义仅被定义一次。</li>
+	<li>使用&nbsp;<code>tiles:definition</code>标签来定义该定义，同时传递定义了 tile 布局的 JSP 页面以及新创建的定义的范围。</li>
+	<li>使用&nbsp;<code>tiles:put</code>&nbsp;标签定义默认参数。</li>
+</ol>
+
+<p>在下面的清单中，<code>siteLayoutDefinition.jsp</code>&nbsp;定义了这样一个定义，它使用&nbsp;<code>siteLayout.jsp</code>&nbsp;作为 tile 布局，并定义了页眉和页脚的默认参数（以及其他参数）：</p>
+
+<p><img alt="" id="code_img_closed_1b837bf9-579d-435b-a577-e0c4fa237cfe" src="http://images.cnblogs.com/OutliningIndicators/ContractedBlock.gif" /><img alt="" id="code_img_opened_1b837bf9-579d-435b-a577-e0c4fa237cfe" src="http://images.cnblogs.com/OutliningIndicators/ExpandedBlockStart.gif" />View Code</p>
+
+<pre>
+ &lt;%@ taglib uri=&quot;/WEB-INF/struts-logic.tld&quot; prefix=&quot;logic&quot; %&gt;
+ &lt;%@ taglib uri=&quot;/WEB-INF/struts-tiles.tld&quot; prefix=&quot;tiles&quot; %&gt;
+
+ &lt;logic:notPresent name=&quot;siteLayoutDef&quot; scope=&quot;application&quot;&gt;
+   &lt;tiles:definition id=&quot;siteLayoutDef&quot; page=&quot;/siteLayout.jsp&quot;  scope=&quot;application&quot;&gt;
+     &lt;tiles:put name=&quot;title&quot; type=&quot;string&quot;  value=&quot;Rick Hightower Stock Quote System&quot; /&gt; 
+     &lt;tiles:put name=&quot;header&quot; value=&quot;/header.jsp&quot; /&gt;
+     &lt;tiles:put name=&quot;footer&quot; value=&quot;/footer.jsp&quot; /&gt;
+     &lt;tiles:put name=&quot;content&quot; type=&quot;string&quot;&gt;
+        Content goes here
+     &lt;/tiles:put&gt;
+   &lt;/tiles:definition&gt;
+ &lt;/logic:notPresent&gt;</pre>
+
+<p><code>tiles:definition</code>&nbsp;标签定义了一个<code>ComponentDefinition（org.apache.struts.tiles.ComponentDefinition）</code>&nbsp;类型的 JavaBean。<code>ComponentDefinition</code>&nbsp;具有用于传递给它的所有属性的 getter 和 setter 方法。<code>logic:notPresent</code>&nbsp;标签通过在定义之前检查它是否已经在范围中，从而确保&nbsp;<code>ComponentDefinition</code>&nbsp;对每个应用程序仅创建一次。</p>
+
+<p><strong>注意：</strong>&nbsp;默认设置可能会带来麻烦。</p>
+
+<p>注意您还要为内容和标题定义默认参数。然而，这被认为是很糟糕的做法。为什么这样说呢？如果有人忘了使用这个标题，他们将取得默认值。由于标题应该随每个页面而改变，您不应该为它定义默认值。那样的话，如果有人忘了传递这个标题，tile 布局就会失败。为了使 tile 在这种情况下失败，您需要做以下两件事情：</p>
+
+<ul>
+	<li>不要在定义中定义默认值。</li>
+	<li>在使用&nbsp;<code>tiles:insert</code>&nbsp;标签定义 tile 布局中的区域时，不要将&nbsp;<code>ignore</code>&nbsp;设置为 true。</li>
+</ul>
+
+<hr />
+<p>&nbsp;<strong>使用 JSP tile 定义</strong></p>
+
+<p>Tile 定义的使用类似于直接使用 tile 布局。唯一的区别：您将指定定义而不是指定 tile 布局 JSP 页面，并且您将使用&nbsp;<code>tiles:put</code>&nbsp;传入更少的参数。</p>
+
+<p>要使用 tile 定义，请执行以下步骤：</p>
+
+<ol>
+	<li>使用&nbsp;<code>taglib</code>&nbsp;指令导入 tile 标签库。</li>
+	<li>使用&nbsp;jsp:include&nbsp;来包含定义该定义的 JSP 页面。</li>
+	<li>使用&nbsp;tiles:insert标签，不过要指定&ldquo;定义 bean（definition bean）&rdquo;名称和范围而不是指定 tile 布局页面。</li>
+	<li>使用&nbsp;tiles:put属性来仅指定标题和内容（不指定页眉和页脚）。</li>
+</ol>
+
+<p>&nbsp;下面是一个使用 tile 定义的例子（<code>index2.jsp</code>）：</p>
+
+<p><img alt="" id="code_img_closed_2514b2ac-2e54-4a12-abfb-ef7fd01574fc" src="http://images.cnblogs.com/OutliningIndicators/ContractedBlock.gif" /><img alt="" id="code_img_opened_2514b2ac-2e54-4a12-abfb-ef7fd01574fc" src="http://images.cnblogs.com/OutliningIndicators/ExpandedBlockStart.gif" />View Code</p>
+
+<pre>
+&lt;%@ taglib uri=&quot;/WEB-INF/struts-tiles.tld&quot; prefix=&quot;tiles&quot; %&gt;
+ &lt;jsp:include page=&quot;siteLayoutDefinition.jsp&quot;/&gt;
+
+ &lt;tiles:insert beanName=&quot;siteLayoutDef&quot; beanScope=&quot;application&quot;&gt;
+     &lt;tiles:put name=&quot;title&quot; type=&quot;string&quot; 
+                value=&quot;Get Rick Hightower Stock Quote 2&quot; /&gt; 
+     &lt;tiles:put name=&quot;content&quot; value=&quot;indexContent2.jsp&quot;/&gt;
+ &lt;/tiles:insert&gt;</pre>
+
+<p>注意代码中使用了&nbsp;<code>beanName</code>&nbsp;属性&nbsp;<code>siteLayoutDef</code>&nbsp;来指定上一节定义的定义。<code>beanName</code>&nbsp;属性值对应于上一节中的 bean 定义的&nbsp;<code>id</code>&nbsp;属性值。请注意例子中使用&nbsp;<code>tiles:put</code>&nbsp;来指定两个参数而不是四个参数，这意味着更少的键入工作和维护更少的代码 ―― 这就是 DRY 的乐趣。</p>
+
+<p>您看到这里存在的问题了吗？您必须为定义创建一个 JSP 页面（<code>siteLayoutDefinition.jsp</code>），为内容创建一个页面（<code>indexContent.jsp</code>），为&nbsp;<code>index.jsp</code>&nbsp;本身创建一个页面，为布局创建一个页面（<code>siteLayout.jsp</code>），为页眉创建一个页面，以及为页脚创建一个页面。吆! 您总计要创建 6 个而不是 1 个 JSP 页面（而这还只是一个&nbsp;<em>简单</em>&nbsp;的例子）。就算您获得了可重用性，但这是以牺牲简单性为代价的。</p>
+
+<p>关于这个例子的另一个不可思议之处在于该定义本身。JSP 页面的本意是为了以文档为中心的方式表达可视内容。然而，该定义没有任何内容本质上是可视的。事实上，它主要不过就是配置。一个布局可能有多组定义，因此您会发现每个定义都有一个 JSP 页面真是一件麻烦事情。将所有配置保留在单个位置很不错，但是如何做到这点呢？</p>
+
+<p><strong>注意：</strong>对定义使用&nbsp;<code>jsp:include</code>&nbsp;而不是&nbsp;<code>@page include</code>。</p>
+
+<p>如果以前使用过 tile，您也许已经看到过使用包含指令（<code>@page include</code>）而不是使用动态包含操作（<code>jsp:include</code>）的例子。 我更喜欢&nbsp;<code>jsp:include</code>，因为包含指令在编译时执行，而且，除非包含它的页面改变了，否则新的 JSP 定义就不会重新定义。使用&nbsp;<code>jsp:include</code>&nbsp;操作吧，它会帮您省去一些开发方面的麻烦。事实证明两者之间的性能差别是可以忽略的（指令要稍微快一点），但是过时的 JSP 定义的痛苦使人们躲避去使用它。</p>
+
+<hr />
+<p>&nbsp;</p>
+
+<p>XML 定义解决了非可视化的 JSPpage 暴露的问题。与其为每个 JSPpage 定义一个定义，您可以在单个配置文件中定义所有配置。然而在能够开始使用 XML 定义之前，您需要首先使用对应的 Struts 的 Tiles 插件：</p>
+
+<p><img alt="" id="code_img_closed_8a54d79d-ec1d-4f0f-a5d0-5c52f18fbc00" src="http://images.cnblogs.com/OutliningIndicators/ContractedBlock.gif" /><img alt="" id="code_img_opened_8a54d79d-ec1d-4f0f-a5d0-5c52f18fbc00" src="http://images.cnblogs.com/OutliningIndicators/ExpandedBlockStart.gif" />View Code</p>
+
+<pre>
+&lt;plug-in className=&quot;org.apache.struts.tiles.TilesPlugin&quot; &gt;
+     &lt;set-property property=&quot;definitions-config&quot; 
+                  value=&quot;/WEB-INF/tiles-defs.xml&quot; /&gt;     
+     &lt;set-property property=&quot;moduleAware&quot; value=&quot;true&quot; /&gt;
+     &lt;set-property property=&quot;definitions-parser-validate&quot; value=&quot;true&quot; /&gt;
+   &lt;/plug-in&gt;</pre>
+
+<p>您需要向 struts 配置文件添加上述代码。注意&nbsp;<code>definition-config</code>&nbsp;属性指定了将包含基于 XML 的定义的 XML 文件。这段代码还指定这个 tile 引擎是模块感知的（module-aware），并指定它验证 XML 文件：</p>
+
+<hr />
+<p><strong>使用 XML tile 定义</strong></p>
+
+<p>一旦定义了该插件，创建 XML 定义就变得容易了。 您只需在 tile 定义文件（例如&nbsp;<code>tiles-def.xml</code>）中添加另一个条目：</p>
+
+<p><img alt="" id="code_img_closed_2361915f-5586-4fc5-8797-031a7c12ec1b" src="http://images.cnblogs.com/OutliningIndicators/ContractedBlock.gif" /><img alt="" id="code_img_opened_2361915f-5586-4fc5-8797-031a7c12ec1b" src="http://images.cnblogs.com/OutliningIndicators/ExpandedBlockStart.gif" />View Code</p>
+
+<pre>
+&lt;tiles-definitions&gt;
+
+   &lt;definition name=&quot;siteLayoutDef&quot; path=&quot;/siteLayout.jsp&quot;&gt;
+     &lt;put name=&quot;title&quot; value=&quot;Rick Hightower Stock Quote System&quot; /&gt; 
+     &lt;put name=&quot;header&quot; value=&quot;/header.jsp&quot; /&gt;
+     &lt;put name=&quot;footer&quot; value=&quot;/footer.jsp&quot; /&gt;
+     &lt;put name=&quot;content&quot; type=&quot;string&quot;&gt;
+        Content goes here
+     &lt;/put&gt;
+   &lt;/definition&gt;</pre>
+
+<p>根元素是&nbsp;<code>tiles-definition;</code>&nbsp;―― 这个模块的所有 tile 定义都将定义在 tiles-definition 元素内。</p>
+
+<p>definition 元素指定一个 tile 定义。上面定义的定义在功能上等价于前面定义的 JSP 版本。注意该定义的属性稍有区别：使用&nbsp;<code>name</code>&nbsp;而不是&nbsp;<code>id</code>，以及使用&nbsp;<code>path</code>&nbsp;而不是&nbsp;<code>page</code>。（很气人，不是吗？）如果您知道如何定义一个基于 JSP 的定义，那么定义基于 XML 的定义将证明只是小孩子玩的游戏，因为它们在形式和功能上几乎是完全相同的。</p>
+
+<hr />
+<p>使用 XML tile 定义</p>
+
+<p>现在已经定义好了 XML 定义，您需要更改&nbsp;<code>quote.jsp</code>&nbsp;和&nbsp;<code>index.jsp</code>&nbsp;以使用它。事实证明该定义的使用和以前几乎没有区别：唯一的区别是传递给&nbsp;<code>tiles:insert</code>&nbsp;标签的属性，如下所示（<code>index3.jsp</code>）：</p>
+
+<p><img alt="" id="code_img_closed_566d9dfa-3303-480d-b085-2de3e93750d4" src="http://images.cnblogs.com/OutliningIndicators/ContractedBlock.gif" /><img alt="" id="code_img_opened_566d9dfa-3303-480d-b085-2de3e93750d4" src="http://images.cnblogs.com/OutliningIndicators/ExpandedBlockStart.gif" />View Code</p>
+
+<pre>
+&lt;%@ taglib uri=&quot;/WEB-INF/struts-tiles.tld&quot; prefix=&quot;tiles&quot; %&gt;
+ &lt;tiles:insert definition=&quot;siteLayoutDef&quot;&gt;
+     &lt;tiles:put name=&quot;title&quot; type=&quot;string&quot; 
+                value=&quot;Get Rick Hightower Stock Quote 3&quot; /&gt; 
+     &lt;tiles:put name=&quot;content&quot; value=&quot;indexContent3.jsp&quot;/&gt;
+ &lt;/tiles:insert&gt;</pre>
+
+<p>注意您现在使用 definition 属性来指定 tile 定义文件（<code>tiles-def.xml</code>）中创建的定义，而不是使用&nbsp;<code>beanName</code>&nbsp;和&nbsp;<code>beanScope</code>。还要注意您需要在定义 JSP 中使用&nbsp;<code>jsp:include</code>&nbsp;或&nbsp;<code>logic:notPresent</code>。</p>
+
+<p>一旦您转变思路，开始使用 XML 定义而不是使用 JSP 定义，那么 tile 的使用将变得更容易一些。您将只需编写更少的代码和维护更少的非可视化 JSP 页面。</p>
+
+<p>&nbsp;</p>
+
+<p>&nbsp;</p>
+
+<p><a href="http://www.cnblogs.com/laoyangHJ/articles/tilesframe3.html" id="ctl02_TitleUrl" target="_blank">掌握Tiles 框架 (三)&mdash;高级 tile 主题和列表</a></p>
+
+<p><strong>1. 高级 tile 主题</strong></p>
+
+<p><strong>理解和使用 tile 范围</strong></p>
+
+<p>记住 Tiles 框架定义了一个称为&ldquo;tile 范围&rdquo;的附加范围，它与页面范围类似。像页面范围一样，tile 范围比请求范围更私有。Tile 范围允许 tile 用户给 tile 传递变量（称为参数）。本质上，它使得页面像函数一样可调用。</p>
+
+<p>记住，<code>jsp:include</code>&nbsp;允许您调用一个页面，同时传递给它一个请求参数（jsp:param）。<code>tiles:insert</code>&nbsp;标签类似<code>jsp:include</code>，不过前者更强大。&nbsp;<code>tiles:insert</code>&nbsp;标签允许您调用一个页面，同时向它传递子页面（称为 tile）和属性。Tile 范围本质上允许您传递仅对该 tile 布局可用的变量。</p>
+
+<p>如果知道 tile 范围是如何实现的，您就能够理解它。我曾创建过一个名为 listTileScope 的调试实用程序，它允许我打印出 tile 范围中的变量，如下面的代码片段所示：</p>
+
+<p><img alt="" id="code_img_closed_702ad04c-691a-4696-9556-c41d0720e636" src="http://images.cnblogs.com/OutliningIndicators/ContractedBlock.gif" /><img alt="" id="code_img_opened_702ad04c-691a-4696-9556-c41d0720e636" src="http://images.cnblogs.com/OutliningIndicators/ExpandedBlockStart.gif" />View Code</p>
+
+<pre>
+ import org.apache.struts.taglib.tiles.ComponentConstants;
+ import org.apache.struts.tiles.ComponentContext;
+
+ public static void listTileScope(PageContext context) 
+                    throws JspException, IOException {
+
+     JspWriter out = context.getOut();
+     ComponentContext compContext =
+             (ComponentContext)context.getAttribute( 
+                         ComponentConstants.COMPONENT_CONTEXT,
+                         PageContext.REQUEST_SCOPE);
+
+     out.println(&quot;--- TILE Attributes --- &lt;br /&gt;&quot;);
+
+     if (compContext!=null){ 
+
+         Iterator iter = compContext.getAttributeNames();
+         while(iter.hasNext()){
+             String name = (String)iter.next();
+             Object value = compContext.getAttribute(name);
+             printNameValueType(name, value, out);
+         }
+     }else{
+         out.println(&quot;---TILE Attributes NOT FOUND---&lt;br /&gt;&quot;);
+     }
+
+     out.println(&quot;--------------------------- &lt;br /&gt;&quot;);
+
+ }
+
+ private static void printNameValueType(
+                             String name, 
+                             Object value, 
+                             JspWriter out) 
+                                     throws IOException{
+
+     if (value !=null){
+         
+         out.println(
+         name + &quot; = &quot; +  value + 
+         &quot; type (&quot; +  
+             value.getClass().getName()+ &quot;) &quot; +  
+         &quot;&lt;br /&gt;&lt;br /&gt;&quot;);
+
+     }else{
+         out.println(name + &quot; = &quot; +  value +  
+         &quot;&lt;br /&gt;&lt;br /&gt;&quot;);
+
+     }
+ }</pre>
+
+<p>注意&nbsp;<code>ComponentContext</code>&nbsp;类实现了 tile 范围。&nbsp;<code>ComponentContext</code>&nbsp;类位于&nbsp;<code>ComponentConstants.COMPONENT_CONTEXT</code>&nbsp;键下面的请求范围中。这种 tile 机制确保每个 tile 获得它自己的组件环境。</p>
+
+<p>嵌套的 tile 不会和它们的父亲共享相同的 tile（我费了好大的劲才了解到这点）。当前 tile 的 tile 范围已在显示嵌套的 tile 之前得到保存。在嵌套的 tile 结束之后，父亲的 tile 范围将恢复到请求中。这个神奇的特性是在<code>InsertTag (org.apache.struts.taglib.tiles.InsertTag)</code>&nbsp;类的嵌套类&nbsp;<code>InsertHandler</code>&nbsp;中实现的。</p>
+
+<hr />
+<p><strong>使用 bean 属性作为参数</strong></p>
+
+<p>到目前为止，您已经向对应于子 tile 的 tile 布局传递过属性或传递简单的字符串。可以将您希望的任意 bean 类型作为属性传入 tile 布局。然后在那个 tile 布局内使用该属性。</p>
+
+<p>假设您的应用程序具有这样一个操作，它将一个&nbsp;<code>User</code>对象放入会话范围，或许是在用户登录系统之后：</p>
+
+<p><img alt="" id="code_img_closed_bee8cd25-bb8c-4f03-ba6b-1db691bdbf47" src="http://images.cnblogs.com/OutliningIndicators/ContractedBlock.gif" /><img alt="" id="code_img_opened_bee8cd25-bb8c-4f03-ba6b-1db691bdbf47" src="http://images.cnblogs.com/OutliningIndicators/ExpandedBlockStart.gif" />View Code</p>
+
+<pre>
+public ActionForward execute(ActionMapping mapping,
+     ActionForm form,
+     HttpServletRequest request,
+     HttpServletResponse response)
+
+     throws IOException, ServletException {
+
+     // Default target to success
+     String target = new String(&quot;success&quot;);
+     
+     // If login successful.
+     UserDomainObject user = new UserDomainObject();
+     ...
+     request.getSession().setAttribute(&quot;user&quot;, user);
+     return (mapping.findForward(target));
+   }</pre>
+
+<p>接下来您将该用户传递到您正在插入的 tile。这个例子将使用您在 tile 布局（<code>siteLayout2.jsp</code>）内所使用的那个 tile：</p>
+
+<p><img alt="" id="code_img_closed_e52e2dac-bf05-4ac3-a28e-dacc1aa29032" src="http://images.cnblogs.com/OutliningIndicators/ContractedBlock.gif" /><img alt="" id="code_img_opened_e52e2dac-bf05-4ac3-a28e-dacc1aa29032" src="http://images.cnblogs.com/OutliningIndicators/ExpandedBlockStart.gif" />View Code</p>
+
+<pre>
+&lt;tiles:insert attribute=&quot;header&quot; ignore=&quot;true&quot;&gt;
+     &lt;tiles:put name=&quot;title&quot; beanName=&quot;title&quot; beanScope=&quot;tile&quot;/&gt;
+     &lt;tiles:put name=&quot;user&quot; beanName=&quot;user&quot; 
+                                           beanScope=&quot;session&quot;/&gt;
+ &lt;/tiles:insert&gt;</pre>
+
+<p>该 tile 布局通过指定&nbsp;<code>session</code>&nbsp;的范围和&nbsp;<code>user</code>&nbsp;的 bean 名称，从而将&nbsp;<code>user</code>bean 传递给页眉 tile。使用这项技术，您可以在任何 JSP 范围中将任意 bean 传递给 tile 或 tile 布局，这样该 tile 范围就变成了另一个范围。这与以前并没有什么不同。</p>
+
+<p>为了在&nbsp;<code>header.jsp</code>&nbsp;中使用这个&nbsp;<code>user</code>bean，可把它从 tile 范围复制到一个其他 bean 能够理解的范围。这可以使用<code>tiles:useAttribute</code>&nbsp;标签来实现。&nbsp;<code>tiles:useAttribute</code>&nbsp;标签类似于&nbsp;<code>jsp:useBean</code>&nbsp;操作，只不过仅适用于 tile 范围(<code>header2.jsp</code>)：</p>
+
+<p><img alt="" id="code_img_closed_333e2454-d95b-46a3-b67e-4c449fe45cc7" src="http://images.cnblogs.com/OutliningIndicators/ContractedBlock.gif" /><img alt="" id="code_img_opened_333e2454-d95b-46a3-b67e-4c449fe45cc7" src="http://images.cnblogs.com/OutliningIndicators/ExpandedBlockStart.gif" />View Code</p>
+
+<pre>
+&lt;tiles:useAttribute id=&quot;user&quot; name=&quot;user&quot;   classname=&quot;rickhightower.UserDomainObject&quot;  /&gt;</pre>
+
+<p>因此&nbsp;<code>tiles:useAttribute</code>将把 user 对象从 tile 范围复制到页面范围。一旦 bean 得到定义，您就能够像使用页面范围中定义的任何 bean 一样使用它：</p>
+
+<p><img alt="" id="code_img_closed_4b99748b-a4a2-4b39-a6b7-ede972da717c" src="http://images.cnblogs.com/OutliningIndicators/ContractedBlock.gif" /><img alt="" id="code_img_opened_4b99748b-a4a2-4b39-a6b7-ede972da717c" src="http://images.cnblogs.com/OutliningIndicators/ExpandedBlockStart.gif" />View Code</p>
+
+<pre>
+&lt;bean:write name=&quot;user&quot; property=&quot;userName&quot;/&gt;</pre>
+
+<p>接下来，让我们看一下新的&nbsp;<code>header2.jsp</code>文件的完整清单：</p>
+
+<p><img alt="" id="code_img_closed_944d0742-851e-4d61-9b9d-cc216ebb9943" src="http://images.cnblogs.com/OutliningIndicators/ContractedBlock.gif" /><img alt="" id="code_img_opened_944d0742-851e-4d61-9b9d-cc216ebb9943" src="http://images.cnblogs.com/OutliningIndicators/ExpandedBlockStart.gif" />View Code</p>
+
+<pre>
+&lt;%@ taglib uri=&quot;/WEB-INF/struts-tiles.tld&quot; prefix=&quot;tiles&quot; %&gt;
+ &lt;%@ taglib uri=&quot;/WEB-INF/struts-bean.tld&quot; prefix=&quot;bean&quot; %&gt;
+ &lt;center&gt;
+ &lt;table&gt;
+ &lt;tr&gt;
+
+ &lt;tiles:useAttribute id=&quot;user&quot;
+                     name=&quot;user&quot; 
+                     classname=&quot;rickhightower.UserDomainObject&quot; 
+                     /&gt;
+ 
+      &lt;td width=&quot;33%&quot; bgcolor=&quot;#36566E&quot;&gt;
+
+         &lt;div align=&#39;left&#39;&gt;
+         &lt;font size=&quot;1&quot; color=&quot;orange&quot;&gt;
+
+               currently logged in as 
+              &lt;bean:write name=&quot;user&quot; property=&quot;userName&quot;/&gt;
+         &lt;/font&gt;
+
+         &lt;/div&gt;
+
+       &lt;/td&gt;
+
+
+      &lt;td width=&quot;33%&quot;&gt;
+
+          &lt;font color=&quot;#36566E&quot;&gt;
+              &lt;tiles:getAsString name=&quot;title&quot; ignore=&quot;true&quot;/&gt;
+          &lt;/font&gt;          
+
+      &lt;/td&gt;
+      &lt;td width=&quot;33%&quot; bgcolor=&quot;#36566E&quot;&gt;
+
+         &lt;div align=&#39;left&#39;&gt;
+
+         &lt;font size=&quot;1&quot; color=&quot;white&quot;&gt;
+
+             &lt;blockquote&gt;
+
+              &lt;bean:write name=&quot;user&quot; property=&quot;firstName&quot;/&gt;
+
+               &lt;br /&gt;
+
+              &lt;bean:write name=&quot;user&quot; property=&quot;lastName&quot;/&gt; 
+
+               &lt;br /&gt;
+
+              &lt;/blockquote&gt;
+
+         &lt;/font&gt;
+
+         &lt;/div&gt;
+
+          
+
+      &lt;/td&gt;
+
+ &lt;/tr&gt;
+
+ &lt;/table&gt;
+
+ &lt;/center&gt;</pre>
+
+<p>可以看到，页眉现在显示了关于当前登录站点的用户信息 ―― 这是一个强大的特性。可以创建专门用于显示域对象的 tile，然后在应用程序的许多部分重用那些 tile。考虑到这点，弄清为什么人们原先考虑将 Tiles 框架称为&ldquo;组件&rdquo;就很容易了：您事实上能够创建显示组件。与自定义标签（JSP 2.0 之前的版本）不同，这些组件全都是在 JSP 页面中创建的。</p>
+
+<p>2.&nbsp;<strong>列表</strong></p>
+
+<p><strong>理解列表</strong></p>
+
+<p>经常会遇到必须传递多个参数的情况。例如，您可能想要传递一个参数列表，以显示 tile 布局的导航区域中的链接。</p>
+
+<p>回顾前面的&ldquo;雇员清单&rdquo;例子，您可能有一个 Web 应用程序需要显示公司的分公司、部门和雇员。当在雇员名单视图中时，<code>employeeListing.jsp</code>&nbsp;将处于 tile 布局的内容区域，而当前分公司的部门链接将处于导航区域中。当用户单击某个部门链接时，该部门的雇员的新名单将会显示出来。当在部门视图中时，&nbsp;<code>deptListing.jsp</code>&nbsp;将处于 tile 布局的内容区域，而当前公司的分公司链接列表将处于导航区域中。当用户单击某个分公司链接时，新的部门名单就会显示出来。因此，每个页面（<code>employeeListing.jsp</code>&nbsp;和&nbsp;<code>deptListing.jsp</code>）都将传入一个新的链接列表。您可以使用&nbsp;<code>putList</code>&nbsp;来完成这个任务。</p>
+
+<hr />
+<p><strong>在 XML 中使用 putList</strong></p>
+
+<p>Tile 允许用户使用&nbsp;<code>putList</code>&nbsp;子元素传入链接 ―― 适合于在 XML 和 JSP 定义中使用，或在对定义的调用或 JSP 中的 tile 布局中使用。</p>
+
+<p>假设您想使用一组标准导航链接作为站点布局。可以在 tile 配置文件中使用&nbsp;<code>putList</code>&nbsp;子元素来指定这样的链接，如下所示（<code>tiles-def.xml</code>）：</p>
+
+<p><img alt="" id="code_img_closed_8bf9aaad-116e-423b-8bfe-3cc76f0a8a80" src="http://images.cnblogs.com/OutliningIndicators/ContractedBlock.gif" /><img alt="" id="code_img_opened_8bf9aaad-116e-423b-8bfe-3cc76f0a8a80" src="http://images.cnblogs.com/OutliningIndicators/ExpandedBlockStart.gif" />View Code</p>
+
+<pre>
+&lt;definition name=&quot;siteLayoutDef3&quot; path=&quot;/siteLayout3.jsp&quot;&gt;
+     &lt;put name=&quot;title&quot; value=&quot;Rick Hightower Stock Quote System&quot; /&gt; 
+     &lt;put name=&quot;header&quot; value=&quot;/header2.jsp&quot; /&gt;
+     &lt;put name=&quot;footer&quot; value=&quot;/footer.jsp&quot; /&gt;
+     &lt;put name=&quot;content&quot; type=&quot;string&quot;&gt;
+        Content goes here
+     &lt;/put&gt;
+     
+     &lt;putList name=&quot;items&quot; &gt;
+       &lt;item value=&quot;Home&quot;    
+             link=&quot;/index.html&quot;  /&gt;
+       &lt;item value=&quot;Wiley&quot;    
+
+             link=&quot;http://www.wiley.com&quot;  /&gt;
+       &lt;item value=&quot;Trivera Technologies&quot;   
+             link=&quot;http://www.triveratech.com/&quot;  /&gt;
+       &lt;item value=&quot;Virtuas&quot;    
+             link=&quot;http://www.virtuas.com/&quot;  /&gt;
+       &lt;item value=&quot;Rick Hightower&quot;  
+             link=&quot;http://www.rickhightower.com&quot;  /&gt;
+       &lt;item value=&quot;Rick&#39;s Blog&quot;  
+             link=&quot;http://rickhightower.blogspot.com/&quot;  /&gt;
+     &lt;/putList&gt;
+   &lt;/definition&gt;</pre>
+
+<p><code>putList</code>&nbsp;元素允许您指定与链接相关联的项的一个列表。在上面的清单中，<code>putList</code>&nbsp;定义了六个链接。</p>
+
+<p><code>items</code>&nbsp;列表（<code>java.util.List</code>）被放入 tile 范围。名称&nbsp;<code>items</code>&nbsp;使用&nbsp;<code>putList</code>&nbsp;元素的&nbsp;<code>name</code>&nbsp;属性来设置。</p>
+
+<p><code>item</code>&nbsp;元素通过把&nbsp;<code>org.apache.struts.tiles.beans.MenuItem</code>&nbsp;的一个实例插入该列表来定义一个链接。value 属性对应于链接上的标签（label），而 link 则指向链接的 URL。</p>
+
+<p><strong>图标与工具提示</strong></p>
+
+<p><code>item</code>&nbsp;元素还有为链接指定工具提示和图标的元素。通过查看 Struts 源代码中的 DTD (<code>tiles-config_1_1.dtd</code>)，可以了解有关&nbsp;<code>item</code>&nbsp;元素和&nbsp;<code>putList</code>&nbsp;的更多内容。</p>
+
+<hr />
+<p><a name="N10786"></a><strong>使用 tile 布局中的列表</strong></p>
+
+<p>要使用这种链接列表，必须修改 tile 布局，如下所示（<code>siteLayout3.jsp</code>）：</p>
+
+<p><img alt="" id="code_img_closed_c5dc47da-0b92-499b-814c-39768872d728" src="http://images.cnblogs.com/OutliningIndicators/ContractedBlock.gif" /><img alt="" id="code_img_opened_c5dc47da-0b92-499b-814c-39768872d728" src="http://images.cnblogs.com/OutliningIndicators/ExpandedBlockStart.gif" />View Code</p>
+
+<pre>
+&lt;%@ taglib uri=&quot;/WEB-INF/struts-html.tld&quot; prefix=&quot;html&quot; %&gt;
+ &lt;%@ taglib uri=&quot;/WEB-INF/struts-bean.tld&quot; prefix=&quot;bean&quot; %&gt;
+ &lt;%@ taglib uri=&quot;/WEB-INF/struts-tiles.tld&quot; prefix=&quot;tiles&quot; %&gt;
+ &lt;%@ taglib uri=&quot;/WEB-INF/struts-logic.tld&quot; prefix=&quot;logic&quot; %&gt;
+
+ &lt;tiles:importAttribute /&gt;
+
+ &lt;html&gt;
+   &lt;head&gt;
+     &lt;logic:present name=&quot;title&quot;&gt;
+         &lt;title&gt;
+         &lt;tiles:getAsString name=&quot;title&quot; ignore=&quot;true&quot;/&gt;
+         &lt;/title&gt;
+     &lt;/logic:present&gt;    
+   &lt;/head&gt;
+
+   &lt;body&gt;
+     &lt;table width=&quot;500&quot; border=&quot;0&quot; cellspacing=&quot;0&quot; cellpadding=&quot;0&quot;&gt;
+
+       &lt;tr bgcolor=&quot;#36566E&quot;&gt; 
+         &lt;td height=&quot;68&quot; width=&quot;70%&quot;&gt; 
+           &lt;div align=&quot;left&quot;&gt;
+    &lt;img src=&quot;images/hp_logo_rickhightower.gif&quot; width=&quot;220&quot; height=&quot;74&quot;&gt;
+           &lt;/div&gt;
+         &lt;/td&gt;
+       &lt;/tr&gt;
+
+       &lt;tr&gt;
+         &lt;td height=&quot;68&quot; width=&quot;2000&quot;&gt;  
+             &lt;tiles:insert attribute=&quot;header&quot; ignore=&quot;true&quot;&gt;
+                &lt;tiles:put name=&quot;title&quot; 
+                           beanName=&quot;title&quot; beanScope=&quot;tile&quot;/&gt;
+                &lt;tiles:put name=&quot;user&quot; 
+                           beanName=&quot;user&quot; beanScope=&quot;session&quot;/&gt;
+             &lt;/tiles:insert&gt;
+          &lt;/td&gt;   
+
+       &lt;/tr&gt;
+       
+       &lt;table&gt;
+       &lt;tr&gt;
+         &lt;td width=&quot;50%&quot;&gt;
+         &lt;ul&gt;
+         &lt;logic:iterate id=&quot;item&quot; name=&quot;items&quot; 
+                 type=&quot;org.apache.struts.tiles.beans.MenuItem&quot; &gt;
+            &lt;li&gt;
+
+            &lt;bean:define id=&quot;link&quot; name=&quot;item&quot; property=&quot;link&quot;
+                         type=&quot;java.lang.String&quot;/&gt;
+            
+            &lt;logic:match name=&quot;link&quot; 
+                         location=&quot;start&quot; value=&quot;/&quot; &gt;
+                   &lt;html:link page=&quot;&lt;%=link%&gt;&quot; &gt;      
+                        &lt;bean:write name=&quot;item&quot; 
+                                   property=&quot;value&quot;/&gt;
+                     &lt;/html:link&gt;
+                &lt;/logic:match&gt;
+            &lt;logic:notMatch name=&quot;link&quot; 
+                            location=&quot;start&quot; value=&quot;/&quot; &gt;
+                    &lt;html:link href=&quot;&lt;%=link%&gt;&quot;&gt;      
+                        &lt;bean:write name=&quot;item&quot; 
+                                   property=&quot;value&quot;/&gt;
+                     &lt;/html:link&gt;
+                &lt;/logic:notMatch&gt;
+                
+            &lt;/li&gt;
+             &lt;/logic:iterate&gt;
+         &lt;/ul&gt;
+         &lt;/td&gt;
+         &lt;td width=&quot;50%&quot;&gt;
+             &lt;div align=&quot;center&quot;&gt;
+             &lt;tiles:insert attribute=&quot;content&quot;/&gt;
+             &lt;/div&gt;
+         &lt;/td&gt;
+       &lt;/tr&gt;
+       &lt;/table&gt;
+       
+       &lt;tr&gt;
+         &lt;td&gt;
+             &lt;tiles:insert attribute=&quot;footer&quot; ignore=&quot;true&quot;/&gt;
+         &lt;/td&gt;
+       &lt;/tr&gt;
+       
+     &lt;/table&gt;
+     
+   &lt;/body&gt;
+ &lt;/html&gt;</pre>
+
+<p>特别要注意在列表上进行迭代的代码段：</p>
+
+<p><img alt="" id="code_img_closed_8addbf48-43fa-4d6b-827b-ffa1af330dd7" src="http://images.cnblogs.com/OutliningIndicators/ContractedBlock.gif" /><img alt="" id="code_img_opened_8addbf48-43fa-4d6b-827b-ffa1af330dd7" src="http://images.cnblogs.com/OutliningIndicators/ExpandedBlockStart.gif" />View Code</p>
+
+<pre>
+&lt;ul&gt;
+         &lt;logic:iterate id=&quot;item&quot; name=&quot;items&quot; 
+                 type=&quot;org.apache.struts.tiles.beans.MenuItem&quot; &gt;
+            &lt;li&gt;
+            &lt;bean:define id=&quot;link&quot; name=&quot;item&quot; property=&quot;link&quot;  type=&quot;java.lang.String&quot;/&gt;
+             &lt;logic:match name=&quot;link&quot;  location=&quot;start&quot; value=&quot;/&quot; &gt;
+                    &lt;html:link page=&quot;&lt;%=link%&gt;&quot; &gt;      
+                        &lt;bean:write name=&quot;item&quot;   property=&quot;value&quot;/&gt;
+                     &lt;/html:link&gt;
+                &lt;/logic:match&gt;
+            &lt;logic:notMatch name=&quot;link&quot; location=&quot;start&quot; value=&quot;/&quot; &gt;
+                    &lt;html:link href=&quot;&lt;%=link%&gt;&quot;&gt;      
+                        &lt;bean:write name=&quot;item&quot;  property=&quot;value&quot;/&gt;
+                     &lt;/html:link&gt;
+                &lt;/logic:notMatch&gt;
+            &lt;/li&gt;
+             &lt;/logic:iterate&gt;
+         &lt;/ul&gt;</pre>
+
+<p>后面会对此进行简化。</p>
+
+<hr />
+<p><strong>使用 tiles:importAttribute</strong></p>
+
+<p><code>tiles:importAttribute</code>&nbsp;标签将 tile 范围中的属性导入到页面范围。它类似于&nbsp;<code>tiles:useAttrribute</code>&nbsp;标签，但它更接近猎枪而不是解剖刀。它是懒散的、肮脏的和便宜的；我一直用它（这说明了我什么呢？）。这有效地将条目列表从 tile 范围拷贝到页面范围。</p>
+
+<p><strong>注意：</strong>&nbsp;<code>tiles:importAttribute</code>&nbsp;可拷贝到任何指定的范围。</p>
+
+<p>默认情况下，<code>tiles:importAttribute</code>&nbsp;将所有这些属性拷贝到页面范围。你也可以通过使用范围属性将这些属性拷贝到其他范围。</p>
+
+<p>一旦条目列表在页面范围中，您就可以使用标准 Struts 标签访问它，如下所示（<code>siteLayout3.jsp</code>）：</p>
+
+<p><img alt="" id="code_img_closed_90cb960f-c26f-49e3-812d-d4f88e3867a0" src="http://images.cnblogs.com/OutliningIndicators/ContractedBlock.gif" /><img alt="" id="code_img_opened_90cb960f-c26f-49e3-812d-d4f88e3867a0" src="http://images.cnblogs.com/OutliningIndicators/ExpandedBlockStart.gif" />View Code</p>
+
+<pre>
+&lt;logic:iterate id=&quot;item&quot; name=&quot;items&quot; 
+ type=&quot;org.apache.struts.tiles.beans.MenuItem&quot; &gt;      
+   ...
+  &lt;/logic:iterate&gt;</pre>
+
+<p>注意使用&nbsp;<code>logic</code>&nbsp;标签实现的逻辑用于显示链接。可以检查链接是否以&ldquo;/&rdquo;开始，从而确定链接是否是相对的。如果链接<em>是</em>&nbsp;相对的，使用&nbsp;<code>html:link</code>&nbsp;标签的&nbsp;<code>page</code>&nbsp;属性。否则，如果链接指向绝对 URL 的话，使用&nbsp;<code>html:link</code>&nbsp;标签的&nbsp;<code>href</code>&nbsp;属性，如下所示（<code>siteLayout3.jsp</code>）：</p>
+
+<p><img alt="" id="code_img_closed_d4d6f709-0408-4f25-bc2e-fdfa95fb9a53" src="http://images.cnblogs.com/OutliningIndicators/ContractedBlock.gif" /><img alt="" id="code_img_opened_d4d6f709-0408-4f25-bc2e-fdfa95fb9a53" src="http://images.cnblogs.com/OutliningIndicators/ExpandedBlockStart.gif" />View Code</p>
+
+<pre>
+&lt;bean:define id=&quot;link&quot; name=&quot;item&quot; property=&quot;link&quot;    type=&quot;java.lang.String&quot;/&gt;
+            &lt;logic:match name=&quot;link&quot;  location=&quot;start&quot; value=&quot;/&quot; &gt;
+                    &lt;html:link page=&quot;&lt;%=link%&gt;&quot; &gt;      
+                        &lt;bean:write name=&quot;item&quot;  property=&quot;value&quot;/&gt;
+                    &lt;/html:link&gt;
+             &lt;/logic:match&gt;
+            &lt;logic:notMatch name=&quot;link&quot;    location=&quot;start&quot; value=&quot;/&quot; &gt;
+                    &lt;html:link href=&quot;&lt;%=link%&gt;&quot;&gt;      
+                        &lt;bean:write name=&quot;item&quot;   property=&quot;value&quot;/&gt;
+                     &lt;/html:link&gt;
+             &lt;/logic:notMatch&gt;</pre>
+
+<p>如您所想到的那样，您可能想要使用这一显示逻辑来在不止一个位置显示菜单项。这就是说，您可能想要在这个页面的范围之外重用它。在稍后部分，您将看到如何通过将一个 tile 布局嵌套进另一个 tile 布局来实现这一点。</p>
+
+<hr />
+<p><strong>在 JSP 中使用 putList</strong></p>
+
+<p>除了能向 tile 定义中的列表添加条目之外，还可以使用&nbsp;<code>tiles:putList</code>&nbsp;元素和它的&nbsp;<code>tiles:add</code>&nbsp;子元素向 JSP 中的列表添加条目（<code>index6.jsp</code>）：</p>
+
+<p><img alt="" id="code_img_closed_a47104eb-da01-4472-ab60-a386f46aa87e" src="http://images.cnblogs.com/OutliningIndicators/ContractedBlock.gif" /><img alt="" id="code_img_opened_a47104eb-da01-4472-ab60-a386f46aa87e" src="http://images.cnblogs.com/OutliningIndicators/ExpandedBlockStart.gif" />View Code</p>
+
+<pre>
+&lt;%@ taglib uri=&quot;/WEB-INF/struts-tiles.tld&quot; prefix=&quot;tiles&quot; %&gt;
+
+ &lt;%@ page import=&quot;org.apache.struts.tiles.beans.SimpleMenuItem&quot; %&gt;
+ &lt;tiles:insert definition=&quot;siteLayoutDef4&quot;&gt;
+     &lt;tiles:put name=&quot;title&quot; type=&quot;string&quot; 
+                value=&quot;Get Rick Hightower Stock Quote6&quot; /&gt; 
+     &lt;tiles:put name=&quot;content&quot; value=&quot;indexContent5.jsp&quot;/&gt;
+         
+     &lt;tiles:putList name=&quot;items&quot; &gt;
+         &lt;jsp:useBean id=&quot;item1&quot; class=&quot;SimpleMenuItem&quot;/&gt;
+         &lt;jsp:setProperty name=&quot;item1&quot; property=&quot;link&quot;  
+                          value=&quot;/index.html&quot;/&gt;
+         &lt;jsp:setProperty name=&quot;item1&quot; property=&quot;value&quot; 
+                          value=&quot;Home&quot; /&gt;
+         &lt;tiles:add beanName=&quot;item1&quot;/&gt;
+     &lt;/tiles:putList&gt;
+ &lt;/tiles:insert&gt;</pre>
+
+<p>上面的清单使用&nbsp;<code>jsp:useBean</code>&nbsp;来创建&nbsp;<code>SimpleMenuItem</code>&nbsp;的实例。然后使用&nbsp;<code>jsp:setProperty</code>&nbsp;来设置&nbsp;<code>SimpleMenuItem</code>&nbsp;bean 的链接和值属性。最后，使用&nbsp;<code>tiles:add</code>&nbsp;将这个 bean 添加到列表中。</p>
+
+<p>在上面的例子中，添加了一个&nbsp;<code>SimpleMenuItem</code>，它细分了 tile 布局使用的&nbsp;<code>MenuItem</code>。然而，您可以添加任何 bean 类型。</p>
+
+<p><strong>注意：</strong>&nbsp;在 XML 中添加任何类型的 bean。</p>
+
+<p>要在 tiles XML 定义中添加任何类型的 bean，可使用&nbsp;<code>putList</code>&nbsp;的子元素 bean。这个 bean 元素带有一个&nbsp;<code>id</code>&nbsp;和&nbsp;<code>classtype</code>。对于简单类型，您也可以使用&nbsp;<code>putList</code>&nbsp;的&nbsp;<code>add</code>&nbsp;子元素。请参阅 tiles configuration DTD (<code>tiles-config_1_1.dtd</code>) 以获取更多信息。</p>
+
+<p>&nbsp;</p>
+
+<p><a href="http://www.cnblogs.com/laoyangHJ/articles/tilesframe4.html" id="ctl02_TitleUrl" target="_blank">掌握Tiles 框架(四) --高级定义概念,结束,参考资料及作者</a></p>
+
+<p><strong>1. 高级定义概念</strong></p>
+
+<p><strong>扩展定义</strong></p>
+
+<p>几个 JSP 页面经常使用相同的默认参数。其他页面也使用相同的 tile 布局但使用不同的 tile 参数。无需再定义一个完全不同的定义，一个定义可以扩展另一个定义。<code>extends</code>&nbsp;属性让一个定义扩展另一个定义。</p>
+
+<p>下面是一个例子：</p>
+
+<p><img alt="" id="code_img_closed_e8734352-dec5-4305-b133-960ac430757c" src="http://images.cnblogs.com/OutliningIndicators/ContractedBlock.gif" /><img alt="" id="code_img_opened_e8734352-dec5-4305-b133-960ac430757c" src="http://images.cnblogs.com/OutliningIndicators/ExpandedBlockStart.gif" />View Code</p>
+
+<pre>
+&lt;definition name=&quot;siteLayoutDef3&quot; path=&quot;/siteLayout3.jsp&quot;&gt;
+     &lt;put name=&quot;title&quot; value=&quot;Rick Hightower Stock Quote System&quot; /&gt; 
+     &lt;put name=&quot;header&quot; value=&quot;/header2.jsp&quot; /&gt;
+     &lt;put name=&quot;footer&quot; value=&quot;/footer.jsp&quot; /&gt;
+     &lt;put name=&quot;content&quot; type=&quot;string&quot;&gt;
+        Content goes here
+     &lt;/put&gt;
+     
+     &lt;putList name=&quot;items&quot; &gt;
+       &lt;item value=&quot;Home&quot;    
+             link=&quot;/index.html&quot;  /&gt;
+       &lt;item value=&quot;Wiley&quot;    
+             link=&quot;http://www.wiley.com&quot;  /&gt;
+       &lt;item value=&quot;Trivera Technologies&quot;    
+             link=&quot;http://www.triveratech.com/&quot;  /&gt;
+       &lt;item value=&quot;Virtuas&quot;    
+             link=&quot;http://www.virtuas.com/&quot;  /&gt;
+       &lt;item value=&quot;Rick Hightower&quot;  
+             link=&quot;http://www.rickhightower.com&quot;  /&gt;
+       &lt;item value=&quot;Rick&#39;s Blog&quot;  
+             link=&quot;http://rickhightower.blogspot.com/&quot;  /&gt;
+     &lt;/putList&gt;
+   &lt;/definition&gt;  
+
+   &lt;definition name=&quot;siteLayoutDef4&quot; extends=&quot;siteLayoutDef3&quot;&gt;
+     &lt;put name=&quot;title&quot; value=&quot;Rick Hightower Quote Sub System&quot; /&gt; 
+     &lt;putList name=&quot;items&quot; &gt;
+       &lt;item value=&quot;Home&quot;    
+             link=&quot;/index.html&quot;  /&gt;
+       &lt;item value=&quot;Wiley&quot;    
+             link=&quot;http://www.wiley.com&quot;  /&gt;
+       &lt;item value=&quot;Trivera Technologies&quot;    
+             link=&quot;http://www.triveratech.com/&quot;  /&gt;
+       &lt;item value=&quot;Virtuas&quot;    
+             link=&quot;http://www.virtuas.com/&quot;  /&gt;
+     &lt;/putList&gt;
+    &lt;/definition&gt;  
+
+   &lt;definition name=&quot;siteLayoutDef5&quot;  extends=&quot;siteLayoutDef4&quot;&gt;
+     &lt;putList name=&quot;items&quot; &gt;
+     &lt;/putList&gt;
+   &lt;/definition&gt;  
+
+   &lt;definition name=&quot;siteLayoutDef6&quot; path=&quot;/siteLayout4.jsp&quot; 
+               extends=&quot;siteLayoutDef4&quot;&gt;
+   &lt;/definition&gt;</pre>
+
+<p>注意&nbsp;<code>siteLayoutDef4</code>&nbsp;扩展了&nbsp;<code>siteLayoutDef3</code>，覆盖了标题值，并定义了一个更短的导航列表。它从所覆盖的<code>siteLayoutDef4</code>&nbsp;继承了所有其他参数，即页眉、页脚和内容。此外，注意&nbsp;<code>siteLayoutDef5</code>&nbsp;也扩展了&nbsp;<code>siteLayout4</code>，只是它清空了条目列表。一个定义继承了它的上层定义及更上一层定义（依此类推无限制）的所有属性。</p>
+
+<p>除了覆盖属性之外，还可改变 tile 布局 JSP。看看&nbsp;<code>siteLayoutDef6</code>，它扩展自&nbsp;<code>siteLayoutDef5</code>，并指定了一个新的 tile 布局（<code>siteLayout4.jsp</code>）。</p>
+
+<hr />
+<p><strong>嵌套 tiles</strong></p>
+
+<p>一个 tile 布局可以插入到另一个 tile 布局中，依此类推。实际上，创建的 tile 布局如此之小，以至于它们本身并不是真正的模板。相反，它们是更类似于自定义标签的小型可视组件，而不是页面模板。</p>
+
+<p>记住您实现的逻辑用于显示一条链接。可以检查链接是否以&ldquo;/&rdquo;开始，从而确定链接是否是相对的，然后再正确地显示它。如果想要在应用程序的多个地方使用同一例程，需要创建一个可视组件。</p>
+
+<hr />
+<p><strong>创建可视组件</strong></p>
+
+<p>可视组件只是另一种 tile 布局。tile 布局是一个可视组件还是一个模板，只取决于您的观点（旁观者清）。下面的 tile 布局定义了一个可视组件，用于显示一个链接（<code>linkLayout.jsp</code>）：</p>
+
+<p><img alt="" id="code_img_closed_7ee99b58-86dd-47ec-8ad9-fe02282722cc" src="http://images.cnblogs.com/OutliningIndicators/ContractedBlock.gif" /><img alt="" id="code_img_opened_7ee99b58-86dd-47ec-8ad9-fe02282722cc" src="http://images.cnblogs.com/OutliningIndicators/ExpandedBlockStart.gif" />View Code</p>
+
+<pre>
+&lt;%@ taglib uri=&quot;/WEB-INF/struts-html.tld&quot; prefix=&quot;html&quot; %&gt;
+ &lt;%@ taglib uri=&quot;/WEB-INF/struts-bean.tld&quot; prefix=&quot;bean&quot; %&gt;
+ &lt;%@ taglib uri=&quot;/WEB-INF/struts-tiles.tld&quot; prefix=&quot;tiles&quot; %&gt;
+ &lt;%@ taglib uri=&quot;/WEB-INF/struts-logic.tld&quot; prefix=&quot;logic&quot; %&gt;
+
+    &lt;tiles:useAttribute id=&quot;item&quot;
+           name=&quot;item&quot; 
+           classname=&quot;org.apache.struts.tiles.beans.MenuItem&quot; 
+                     /&gt;
+
+    &lt;bean:define id=&quot;link&quot; name=&quot;item&quot; property=&quot;link&quot;
+                 type=&quot;java.lang.String&quot;/&gt;
+
+    &lt;logic:match name=&quot;link&quot; location=&quot;start&quot; value=&quot;/&quot; &gt;
+        &lt;html:link page=&quot;&lt;%=link%&gt;&quot; &gt;      
+            &lt;bean:write name=&quot;item&quot; property=&quot;value&quot;/&gt;
+             &lt;/html:link&gt;
+    &lt;/logic:match&gt;
+    &lt;logic:notMatch name=&quot;link&quot; location=&quot;start&quot; value=&quot;/&quot; &gt;
+        &lt;html:link href=&quot;&lt;%=link%&gt;&quot;&gt;      
+            &lt;bean:write name=&quot;item&quot; property=&quot;value&quot;/&gt;
+             &lt;/html:link&gt;
+    &lt;/logic:notMatch&gt;</pre>
+
+<p>这种方法与 JSP Custom 标签相比，允许您使用其他自定义标签。另外，与 Java 类（比如 Custom 标签）相比，它是一个以文档为中心的 JSP，这使得使用 HTML 标签和自定义标签更容易。</p>
+
+<p><strong>注意：</strong>&nbsp;JSP 2.0 标签文件。</p>
+
+<p>您可能认识到 JSP 2.0 及其后续版本中 JSP 标签文件的 tile 布局的许多优点。如果您使用的 JSP 版本太老，不支持标签文件，那么您现在就可以使用这种技术。然而，如您很快就要看到的那样，按我的观点，Tiles 框架更好地实现了控制器与视图的分离。</p>
+
+<hr />
+<p><strong>使用可视组件</strong></p>
+
+<p>一旦定义了可视组件，就应该为它创建一个定义，如下所示：</p>
+
+<p><img alt="" id="code_img_closed_159aad66-879a-4956-a6ab-6a3a449e5d6c" src="http://images.cnblogs.com/OutliningIndicators/ContractedBlock.gif" /><img alt="" id="code_img_opened_159aad66-879a-4956-a6ab-6a3a449e5d6c" src="http://images.cnblogs.com/OutliningIndicators/ExpandedBlockStart.gif" />View Code</p>
+
+<pre>
+ &lt;definition name=&quot;linkLayoutDef&quot; path=&quot;/linkLayout.jsp&quot;&gt;
+ &lt;/definition&gt;</pre>
+
+<p>现在您已经定义好这个定义，通过使用&nbsp;<code>tiles:insert&nbsp;</code>标签 ，您可以在任何页面使用这个可视组件。甚至可以在另一个 tile 中使用这个可视组件。下面的代码示例展示了在前面定义的 tile 布局中使用这个可视组件 （<code>siteLayout4.jsp</code>）。</p>
+
+<p><img alt="" id="code_img_closed_cbac8b3a-df96-4b15-9995-be2a05f76b94" src="http://images.cnblogs.com/OutliningIndicators/ContractedBlock.gif" /><img alt="" id="code_img_opened_cbac8b3a-df96-4b15-9995-be2a05f76b94" src="http://images.cnblogs.com/OutliningIndicators/ExpandedBlockStart.gif" />View Code</p>
+
+<pre>
+ &lt;td width=&quot;50%&quot;&gt;
+       &lt;ul&gt;
+          &lt;logic:iterate id=&quot;item&quot; name=&quot;items&quot; type=&quot;org.apache.struts.tiles.beans.MenuItem&quot; &gt;
+            &lt;li&gt;
+                  &lt;tiles:insert definition=&quot;linkLayoutDef&quot;&gt;
+                   &lt;tiles:put name=&quot;item&quot;   beanName=&quot;item&quot; beanScope=&quot;page&quot;/&gt;        
+                   &lt;/tiles:insert&gt;
+            &lt;/li&gt;
+           &lt;/logic:iterate&gt;
+         &lt;/ul&gt;
+ &lt;/td&gt;</pre>
+
+<p>上面的代码在条目列表上进行迭代，然后调用&nbsp;<code>tiles:insert</code>，将当前条目传递给可视组件 （<code>linkLayoutDef</code>）以用于显示。可视组件知道如何显示一个域对象（一个菜单项）。如果您觉得自己需要再三重复编写相同的 JSP 代码，就应该考虑使用 tile 布局编写一个可视组件了。</p>
+
+<hr />
+<p><strong>将 tile 作为参数传递给另一个 tile</strong></p>
+
+<p>上面的例子显式地调用定义好的可视组件。如果您使用的 tile 布局根据几个因素而变化该怎么办呢？（即这个用户是否登录，他是否处于某个特定的角色，您位于站点的哪个部分）。在这种情况下，将 tile 作为一个参数传递将是个好主意。</p>
+
+<p>使用&nbsp;<code>put</code>&nbsp;元素可以完成这件事，如下所示（<code>tiles-def.xml</code>）：</p>
+
+<p><img alt="" id="code_img_closed_140a562b-d73d-4a68-82bf-544f5820d197" src="http://images.cnblogs.com/OutliningIndicators/ContractedBlock.gif" /><img alt="" id="code_img_opened_140a562b-d73d-4a68-82bf-544f5820d197" src="http://images.cnblogs.com/OutliningIndicators/ExpandedBlockStart.gif" />View Code</p>
+
+<pre>
+&lt;definition name=&quot;link.layout.def&quot; path=&quot;/linkLayout.jsp&quot;&gt;
+   &lt;/definition&gt;  
+
+   &lt;definition name=&quot;siteLayoutDef7&quot; path=&quot;/siteLayout5.jsp&quot; extends=&quot;siteLayoutDef4&quot;&gt;
+     &lt;put name=&quot;title&quot; value=&quot;Rick Hightower Quote System 9&quot; /&gt; 
+     &lt;putList name=&quot;items&quot; &gt;
+     &lt;/putList&gt;
+     &lt;put name=&quot;linkDisplay&quot; value=&quot;link.layout.def&quot;/&gt;
+   &lt;/definition&gt;</pre>
+
+<p>注意&nbsp;<code>siteLayoutDef7</code>&nbsp;的&nbsp;<code>linkDisplay</code>&nbsp;属性的值等于&nbsp;<code>link.layout.def</code>。现在在 tile 布局（<code>siteLayout5.jsp</code>）的内部，您可以指定&nbsp;<code>linkDisplay</code>属性，而不是明确地调用一个特殊的 tile 布局定义：</p>
+
+<p><img alt="" id="code_img_closed_b0e8206b-9940-49eb-aebc-35bb298f984b" src="http://images.cnblogs.com/OutliningIndicators/ContractedBlock.gif" /><img alt="" id="code_img_opened_b0e8206b-9940-49eb-aebc-35bb298f984b" src="http://images.cnblogs.com/OutliningIndicators/ExpandedBlockStart.gif" />View Code</p>
+
+<pre>
+&lt;ul&gt;
+      &lt;logic:iterate id=&quot;item&quot; name=&quot;items&quot; type=&quot;org.apache.struts.tiles.beans.MenuItem&quot;&gt;
+           &lt;li&gt;
+             &lt;tiles:insert attribute=&quot;linkDisplay&quot;&gt;
+                   &lt;tiles:put name=&quot;item&quot;   beanName=&quot;item&quot;  beanScope=&quot;page&quot;/&gt;        
+             &lt;/tiles:insert&gt;
+           &lt;/li&gt;
+       &lt;/logic:iterate&gt;
+ &lt;/ul&gt;</pre>
+
+<p>这样的话，您的站点布局不知道它所使用的是哪种可视组件。通过切换站点布局使用哪一种可视组件，您可以通过编程切换布局部分的显示方式。</p>
+
+<hr />
+<p><strong>控制器</strong></p>
+
+<p>如果您觉得需要向 tile 布局中放入太多的 Java 代码，或者必须在每个指向使用特定 tile 布局的页面的操作中放相同的 Java 代码，那么应该使用 tile 控制器。在使用&nbsp;<code>controllerClass</code>属性插入 tile 之前，您可以指定一个进行调用的控制器类：</p>
+
+<p><img alt="" id="code_img_closed_97d52f5d-22b3-4262-8965-b45d6a338b47" src="http://images.cnblogs.com/OutliningIndicators/ContractedBlock.gif" /><img alt="" id="code_img_opened_97d52f5d-22b3-4262-8965-b45d6a338b47" src="http://images.cnblogs.com/OutliningIndicators/ExpandedBlockStart.gif" />View Code</p>
+
+<pre>
+&lt;%@ taglib uri=&quot;/WEB-INF/struts-tiles.tld&quot; prefix=&quot;tiles&quot; %&gt;
+ &lt;tiles:insert definition=&quot;siteLayoutDef5&quot; controllerClass=&quot;rickhightower.SimpleController&quot;&gt;
+     &lt;tiles:put name=&quot;content&quot; value=&quot;indexContent5.jsp&quot; /&gt;        
+ &lt;/tiles:insert&gt;</pre>
+
+<p>控制器类类似于一个操作。在控制器中，可以将模型对象映射到某个范围中，以便 tile 能够显示条目。</p>
+
+<p>要编写一个 tile 控制器，必须执行以下操作：</p>
+
+<ol>
+	<li>创建一个实现&nbsp;org.apache.struts.tiles.Controller的类。</li>
+	<li>实现&nbsp;perform()方法。</li>
+	<li>在&nbsp;<code>perform()</code>&nbsp;方法中，执行一些模型操作，并将结果映射到范围中，这样 tile 就能使用它。</li>
+</ol>
+
+<p>下面的清单展示了实现一个控制器的方法（<code>rickhightower.SimpleController</code>）：</p>
+
+<p><img alt="" id="code_img_closed_de55888c-e45f-4488-8610-e77fec8feb4a" src="http://images.cnblogs.com/OutliningIndicators/ContractedBlock.gif" /><img alt="" id="code_img_opened_de55888c-e45f-4488-8610-e77fec8feb4a" src="http://images.cnblogs.com/OutliningIndicators/ExpandedBlockStart.gif" />View Code</p>
+
+<pre>
+package rickhightower;
+
+ import java.io.IOException;
+
+ import javax.servlet.ServletContext;
+ import javax.servlet.ServletException;
+ import javax.servlet.http.HttpServletRequest;
+ import javax.servlet.http.HttpServletResponse;
+
+ import org.apache.struts.tiles.ComponentContext;
+ import org.apache.struts.tiles.Controller;
+
+
+ import org.apache.struts.tiles.beans.MenuItem;
+ import org.apache.struts.tiles.beans.SimpleMenuItem;
+
+ import java.util.ArrayList;
+ import java.util.List;
+
+ /**
+  * @author rhightower
+  */
+ public class SimpleController implements Controller{
+
+
+     private MenuItem createMenuItem(String label, String link){
+             SimpleMenuItem item = new SimpleMenuItem();
+             item.setLink(link);
+             item.setValue(label);    
+             return item;      
+     }
+
+     private List getLinks(){
+             List list = new ArrayList();
+
+             list.add(createMenuItem(&quot;Home&quot;,  &quot;/index.html&quot;));
+
+             list.add(createMenuItem(&quot;Rick&#39;s&quot;, &quot;http://www.rickhightower.com&quot;));
+
+             list.add(createMenuItem(&quot;Trivera&quot;, &quot;http://www.triveratech.com&quot;));
+             
+             return list;
+             
+     }
+       /* (non-Javadoc)
+        *       
+       */
+       public void perform(ComponentContext context, 
+                           HttpServletRequest request, 
+                           HttpServletResponse response, 
+                           ServletContext servletContext) 
+                         throws ServletException,package rickhightower;
+
+ import java.io.IOException;
+
+ import javax.servlet.ServletContext;
+ import javax.servlet.ServletException;
+ import javax.servlet.http.HttpServletRequest;
+ import javax.servlet.http.HttpServletResponse;
+
+ import org.apache.struts.tiles.ComponentContext;
+ import org.apache.struts.tiles.Controller;
+
+
+ import org.apache.struts.tiles.beans.MenuItem;
+ import org.apache.struts.tiles.beans.SimpleMenuItem;
+
+ import java.util.ArrayList;
+ import java.util.List;
+
+ /**
+  * @author rhightower
+  */
+ public class SimpleController implements Controller{
+
+
+     private MenuItem createMenuItem(String label, String link){
+             SimpleMenuItem item = new SimpleMenuItem();
+             item.setLink(link);
+             item.setValue(label);    
+             return item;      
+     }
+
+     private List getLinks(){
+             List list = new ArrayList();
+
+             list.add(createMenuItem(&quot;Home&quot;,
+                   &quot;/index.html&quot;));
+
+             list.add(createMenuItem(&quot;Rick&#39;s&quot;,
+             &quot;http://www.rickhightower.com&quot;));
+
+             list.add(createMenuItem(&quot;Trivera&quot;,
+                   &quot;http://www.triveratech.com&quot;));
+             
+             return list;
+             
+     }
+       /* (non-Javadoc)
+        *       
+       */
+       public void perform(ComponentContext context, 
+                           HttpServletRequest request, 
+                           HttpServletResponse response, 
+                           ServletContext servletContext) 
+                         throws ServletException, IOException {
+             List items = (List)getLinks();
+             context.putAttribute(&quot;items&quot;,items);
+       }
+ IOException {
+             List items = (List)getLinks();
+             context.putAttribute(&quot;items&quot;,items);
+       }
+}</pre>
+
+<p>注意&nbsp;<code>perform()</code>&nbsp;方法获得传递过来的组件上下文。组件上下文带有 tile 范围的属性。将东西放进组件上下文中可将它们放进 tile 范围中。在这个简单的例子中，调用&nbsp;<code>getLinks</code>，它返回一个简单的映射到 tile 范围的&nbsp;<code>MenuItems</code>&nbsp;列表。一个真实的例子很可能会涉及到模型――也许是一个面（facade），它与数据库进行通信，查找特定于登录进系统的用户类型的链接。</p>
+
+<p><strong>注意：</strong>使用操作作为控制器。</p>
+
+<p>您也可以使用操作作为 tile 的控制器。要完成这项任务，请指定带有&nbsp;<code>controllerUrl</code>&nbsp;属性的操作的路径。</p>
+
+<hr />
+<p><strong>将 tile 定义用作 ActionForward</strong></p>
+
+<p>您可能还未觉察到，在您安装 Tiles 插件时，它安装了一个自定义请求处理程序，扩展了 Struts 处理&nbsp;<code>ActionForward</code>&nbsp;的方式。因此，您应该转到 tile 定义而不是 JSP 页面。</p>
+
+<p>假设您有一个定义类似这样：</p>
+
+<p><img alt="" id="code_img_closed_d8636a31-a9b2-45a1-b2d4-4dada0c37190" src="http://images.cnblogs.com/OutliningIndicators/ContractedBlock.gif" /><img alt="" id="code_img_opened_d8636a31-a9b2-45a1-b2d4-4dada0c37190" src="http://images.cnblogs.com/OutliningIndicators/ExpandedBlockStart.gif" />View Code</p>
+
+<pre>
+&lt;definition name=&quot;main.index&quot; extends=&quot;siteLayoutDef7&quot;&gt;
+     &lt;put name=&quot;content&quot; value=&quot;/indexContent.jsp&quot;/&gt;
+ &lt;/definition&gt;</pre>
+
+<p>在您的 struts 配置文件中，您可以定义一个 forward 以转到&nbsp;<code>main.index</code>定义，而不是指定一个 JSP 页面：</p>
+
+<p><img alt="" id="code_img_closed_3bb2b3e0-41f2-4af9-8b22-412c25984b30" src="http://images.cnblogs.com/OutliningIndicators/ContractedBlock.gif" /><img alt="" id="code_img_opened_3bb2b3e0-41f2-4af9-8b22-412c25984b30" src="http://images.cnblogs.com/OutliningIndicators/ExpandedBlockStart.gif" />View Code</p>
+
+<pre>
+  &lt;action path=&quot;/Lookup&quot; type=&quot;rickhightower.SimpleLookupAction&quot;
+             name=&quot;lookupForm&quot;  input=&quot;/index.jsp&quot;&gt;
+         &lt;forward name=&quot;success&quot; path=&quot;/quote.jsp&quot;/&gt;
+         &lt;!-- forward name=&quot;failure&quot; path=&quot;/index.jsp&quot;/ --&gt;
+          &lt;forward name=&quot;failure&quot; path=&quot;main.index&quot; /&gt;
+  &lt;/action&gt;</pre>
+
+<p>可以转到定义已证实是一项强大的工具，消除了 JSP 中无关的逻辑。例如，如果用户以经理身份而不是以常规用户身份登录，您可以将该用户转到一个定义，它定义了只有经理才能使用的特殊参数 tiles。</p>
+
+<p>经理的定义可以在常规用户定义的基础上进行扩展。如果 tile 布局使用带有&nbsp;<code>ignore</code>&nbsp;属性的&nbsp;<code>insert</code>&nbsp;标签的话，它们甚至可以使用相同的 tile 布局。这个操作将选择正确的 forward。您根本无需使用&nbsp;<code>logic:*</code>&nbsp;标签。</p>
+
+<p>将逻辑从 JSP 中取出并置入控制器中，是正确方向的一步，并且使用 Tiles 框架来执行这一步是如此地容易。</p>
+
+<p><strong>2. 结束语</strong></p>
+
+<p><strong>结束语</strong></p>
+
+<p>如果您是 Tiles 框架的初学者，并且已经阅读了本教程，那么您已经迈出了重要一步。在相对短的时间中，我们介绍了：</p>
+
+<ul>
+	<li>Tiles 框架和架构。</li>
+	<li>如何构建和使用 tile 布局作为站点模板。</li>
+	<li>如何在 XML 和 JSP 中使用 tile 定义。</li>
+	<li>如何在 tile 范围中移出和移入对象。</li>
+	<li>如何使用属性列表。</li>
+	<li>如何嵌套 tiles。</li>
+	<li>如何构建和使用 tile 布局作为小型可视组件。</li>
+	<li>如何细分定义。</li>
+	<li>如何创建 tile 的控制器。</li>
+	<li>如何使用 tile 作为一个&nbsp;<code>ActionForward</code>。</li>
+</ul>
+
+<p>Tiles 框架使得创建可重用页面和可视组件更加容易。通过组装可重用 tiles，开发人员能够构建 Web 应用程序。可以使用 tiles 作为模板或者可视组件。</p>
+
+<p>在某些方面，tile 布局更类似于一个显示函数。首先您传递需要使用的 tile 布局参数。参数可以是简单的字符串、bean 或者 tiles。参数是 tile 的属性，存储在 tile 的 tile 范围中。对于它的一部分，tile 范围类似于页面范围，比请求范围更少见。tile 范围允许 tile 的用户传递参数（也称为属性）给 tile。</p>
+
+<p>定义允许您定义 tiles 的默认参数。定义能够在 JSP 或者 XML 中进行定义。定义能够扩展其他定义，这类似于类可以扩展另一个类。此外，定义可以覆盖它所扩展的定义的一部分。</p>
+
+<p>Tiles 框架包括了它自己的&nbsp;<code>RequestProcessor</code>，以便作为&nbsp;<code>ActionForward</code>&nbsp;处理 tile 布局。因此如果您安装了 Tiles 插件的话，可以转到 tile 定义而不是 JSP 。</p>
+
+<p>如果您正在使用 Struts 而不是 Tiles，那么您不能从 Struts 获得完全受益，并且很可能进行不必要的自我重复。Tiles 框架使得创建可重用的站点布局和可视组件变得切实可行。</p>
+
+<p>3.&nbsp;<strong>参考资料</strong></p>
+
+<ul>
+	<li>
+	<ul>
+		<li>下载本教程使用的源代码。有两个版本可用：<a href="http://www.ibm.com/developerworks/cn/education/java/j-tiles/j-tiles-source.zip" target="_blank">一个带有 jar 文件</a>&nbsp;，<a href="http://www.ibm.com/developerworks/cn/education/java/j-tiles/j-tiles-source-nojar.zip" target="_blank">一个不带 jar 文件</a>。</li>
+		<li>如果您想要使用 Tiles 和 Struts，请下载&nbsp;<a href="http://jakarta.apache.org/struts/" target="_blank">Struts 1.1</a>，它包括了一个 Tiles 框架。</li>
+		<li>如果想要单独使用 Tiles ，请访问&nbsp;<a href="http://www.lifl.fr/~dumoulin/tiles/" target="_blank">Tiles 网站</a>，下载该软件或者获取其他有用信息。</li>
+		<li>在&nbsp;<a href="http://jakarta.apache.org/tomcat/index.html" target="_blank">官方 Tomcat 网站</a>下载最新版的 Apache Tomcat 。</li>
+		<li>Tomcat 5 有一些有用的附件。Sing Li 的文章详细介绍了它们，<a href="http://www.ibm.com/developerworks/java/library/j-tomcat2/" target="_blank">servlet filtering</a>（<em>developerWorks</em>，2003 年 3 月）</li>
+		<li><em>developerWorks</em>上还有以下关于 Struts/Tiles 的文章：
+		<ul>
+			<li>Malcolm Davis 的&ldquo;<a href="http://www.ibm.com/developerworks/ibm/library/j-struts/" target="_blank">Struts, an open-source MVC implementation</a>&rdquo;（2001 年 2 月），介绍了 Struts 并展示了如何管理大型 Web 站点的复杂性。</li>
+			<li>Wellie Chao 的&ldquo;<a href="http://www.ibm.com/developerworks/java/library/j-strutstiles.html" target="_blank">Struts and Tiles aid component-based development</a>&rdquo;（2002 年 6 月），结合使用 Struts 和 Tiles 来构建 Web 应用程序。</li>
+			<li>在&ldquo;<a href="http://www.ibm.com/developerworks/ibm/edu/i-dw-iextreme21-i.html" target="_blank">Struttin&#39; your stuff with WebSphere Studio Application Developer, Part 2: Tiles</a>&rdquo;中（2002 年 11 月），David Carew 展示了如何使用带有 Struts 的 Tiles 模板化框架。</li>
+			<li>&ldquo;<a href="http://www.ibm.com/developerworks/java/library/j-integrate/" target="_blank">集成 Struts、Tiles 和 JavaServer Faces</a>&rdquo; （2003 年 10 月）将三种技术的强大功能结合到一个功能强大的软件包中。</li>
+			<li>&ldquo;<a href="http://www.ibm.com/developerworks/webservices/library/ws-arcstruts/" target="_blank">为 Web 服务构建 Struts 应用程序</a>&rdquo;（2003 年 12 月）将 MVC 的强大功能带进 Web 服务中。</li>
+			<li>David Carew　的&ldquo;<a href="http://www.ibm.com/developerworks/ibm/edu/i-dw-iextreme19-i.html" target="_blank">Go-ForIt Chronicles, Part 19: Struttin&#39; your stuff with WebSphere Studio</a>&rdquo; （2002 年 9 月），该教程将带您使用 WebSphere Studio IDE 开始构建基于 Struts 的应用程序。</li>
+			<li>Rick Hightower 还与 James Goodwill 合著了&nbsp;<a href="http://www.amazon.com/exec/obidos/tg/detail/-/0471213020/qid=1068510647/sr=1-1/ref=sr_1_1/103-7573276-7692630?v=glance&amp;s=books" target="_blank"><em>Mastering Jakarta Struts, 2nd edition</em>&nbsp;</a>一书（Wrox Press）。</li>
+			<li>Chuck Cavaness 是<em>Programming Jakarta Struts</em>&nbsp;一书的作者，从他的书中摘录了本系列&nbsp;<a href="http://www.onjava.com/pub/a/onjava/excerpt/progjakstruts_14/index1.html" target="_blank">关于 Tiles 的四部分系列文章</a>&nbsp;。</li>
+		</ul>
+		</li>
+		<li><em>JavaWorld</em>&nbsp;上 Prakash Malani 的&ldquo;<a href="http://www.javaworld.com/javaworld/jw-01-2002/jw-0104-tilestrut.html" target="_blank">UI design with Struts and Tiles</a>&rdquo;提供了 Tiles 的介绍。</li>
+		<li>在 IBM&nbsp;<em>developerWorks</em>&nbsp;的&nbsp;<a href="http://www.ibm.com/developerworks/java/" target="_blank">Java 技术专区</a>上可以找到数百篇关于 Java 编程的各个方面的文章。</li>
+	</ul>
+	</li>
+</ul>
+
+<p>4.&nbsp;<strong>关于作者</strong></p>
+
+<p><a href="http://www.rickhightower.com/" target="_blank">Rick Hightower</a>喜欢使用 Java 技术、Ant、Struts、IBM Emerging Technologies Toolkit（ETTK）以及 XDoclet。 Rick 最近担任<a href="http://www.arc-mind.com/" target="_blank">ArcMind Inc.</a>的 CTO，这是一家主要从事企业开发方面的顾问、咨询和培训服务的公司。作为 IBM&nbsp;<em>developerWorks</em>&nbsp;的积极投稿者，Rick 已编写了 10 多个教程，涵盖从 EJB (Enterprise JavaBeans) 技术到 Web 服务以至 XDoclet 的广泛内容。</p>
+
+<p>在 eBlox 工作的同时，Rick 和 eBlox 团队使用 Struts 构建了用于在线电子商店的两个框架和一个 ASP（application service provider，应用服务提供程序）。 他们远在 1.0 版发布之前就在使用 Struts。 Rick 最近帮助 Trivera Technologies 整理了一套很受欢迎的课程，这些课程讲授运行在 Tomcat、Resin EE、WebSphere Studio Application Developer 以及其他平台上的 Structs。</p>
+
+<p>Rick 与 James Goodwill 合著了<em>Mastering Struts, 2nd edition</em>&nbsp;一书（Wrox Press 出版）。他还参与编写了<a href="http://www.rickhightower.com/JavaXPToolkit/" target="_blank">&nbsp;<em>Java Tools for Extreme Programming</em>&nbsp;</a>一书（John Wiley&amp; Sons 出版，2001 年），这本书于 2002 年在 Amazon.com 网站上连续三个月被评为&ldquo;畅销软件开发书籍&rdquo;。它介绍了如何把 Ant、JUnit、Cactus 等应用于 J2EE（Java 2 Platform, Enterprise Edition）开发。 Rick 还为<em>Mastering Tomcat Development</em>&nbsp;一书（John Wiley &amp; Sons，2002 年）撰写了两章的内容，并参与编写过其他许多出版物。</p>
+
+<p>Rick 在 2003 JavaOne 开发人员大会上作了关于 EJB CMP/CMR 和 XDoclet 的演讲，在 TheServerSide.com 软件座谈会上作了关于使用 XDoclet 进行 J2EE 开发的演讲。此外，Rick 还在 JDJEdge 和 WebServicesEdge 大会上作过演讲。而且，Rick 还在 Complete Programmer Network 座谈会（跨越美国 6 个不同城市）上作了关于高级 Struts 主题的演讲。</p>
+
+<p>当不在全国各地讲授 Trivera Struts 课程、在大会上作关于 Struts 的演讲，或从事 Struts 咨询的时候，Rick 喜欢在通宵咖啡馆喝咖啡，编写关于 Struts 和其他主题的文章，以及以第三人称写关于他自己的事情。</p>
