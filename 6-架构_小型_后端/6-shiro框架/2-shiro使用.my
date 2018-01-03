@@ -1,0 +1,573 @@
+<h1 style="font-style:normal; margin-left:0px; margin-right:0px">shiro简介&mdash;&mdash;《跟我学Shiro》</h1>
+
+<h2 style="font-style:normal; margin-left:0px; margin-right:0px">1.1&nbsp; 简介</h2>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif">Apache Shiro是Java的一个安全框架。目前，使用Apache Shiro的人越来越多，因为它相当简单，对比Spring Security，可能没有Spring Security做的功能强大，但是在实际工作时可能并不需要那么复杂的东西，所以使用小而简单的Shiro就足够了。对于它俩到底哪个好，这个不必纠结，能更简单的解决项目问题就好了。</span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif">本教程只介绍基本的Shiro使用，不会过多分析源码等，重在使用。</span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif">Shiro可以非常容易的开发出足够好的应用，其不仅可以用在JavaSE环境，也可以用在JavaEE环境。Shiro可以帮助我们完成：认证、授权、加密、会话管理、与Web集成、缓存等。这不就是我们想要的嘛，而且Shiro的API也是非常简单；其基本功能点如下图所示：</span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><img alt="" src="http://dl2.iteye.com/upload/attachment/0093/9788/d59f6d02-1f45-3285-8983-4ea5f18111d5.png" style="border:0px" /></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><strong>Authentication</strong><strong>：</strong>身份认证/登录，验证用户是不是拥有相应的身份；</span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><strong>Authorization</strong><strong>：</strong>授权，即权限验证，验证某个已认证的用户是否拥有某个权限；即判断用户是否能做事情，常见的如：验证某个用户是否拥有某个角色。或者细粒度的验证某个用户对某个资源是否具有某个权限；</span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><strong>Session Manager</strong><strong>：</strong>会话管理，即用户登录后就是一次会话，在没有退出之前，它的所有信息都在会话中；会话可以是普通JavaSE环境的，也可以是如Web环境的；</span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><strong>Cryptography</strong><strong>：</strong>加密，保护数据的安全性，如密码加密存储到数据库，而不是明文存储；</span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><strong>Web Support</strong><strong>：</strong>Web支持，可以非常容易的集成到Web环境；</span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif">Caching：缓存，比如用户登录后，其用户信息、拥有的角色/权限不必每次去查，这样可以提高效率；</span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><strong>Concurrency</strong><strong>：</strong>shiro支持多线程应用的并发验证，即如在一个线程中开启另一个线程，能把权限自动传播过去；</span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><strong>Testing</strong><strong>：</strong>提供测试支持；</span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><strong>Run As</strong><strong>：</strong>允许一个用户假装为另一个用户（如果他们允许）的身份进行访问；</span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><strong>Remember Me</strong><strong>：</strong>记住我，这个是非常常见的功能，即一次登录后，下次再来的话不用登录了。</span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif">&nbsp;</span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><strong>记住一点，Shiro</strong><strong>不会去维护用户、维护权限；这些需要我们自己去设计/</strong><strong>提供；然后通过相应的接口注入给Shiro</strong><strong>即可。</strong></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif">&nbsp;</span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif">接下来我们分别从外部和内部来看看Shiro的架构，对于一个好的框架，从外部来看应该具有非常简单易于使用的API，且API契约明确；从内部来看的话，其应该有一个可扩展的架构，即非常容易插入用户自定义实现，因为任何框架都不能满足所有需求。</span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif">&nbsp;</span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif">首先，我们从外部来看Shiro吧，即从应用程序角度的来观察如何使用Shiro完成工作。如下图：</span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><img alt="" src="http://dl2.iteye.com/upload/attachment/0093/9790/5e0e9b41-0cca-367f-8c87-a8398910e7a6.png" style="border:0px" />&nbsp;</span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif">可以看到：应用代码直接交互的对象是Subject，也就是说Shiro的对外API核心就是Subject；其每个API的含义：</span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><strong>Subject</strong><strong>：</strong>主体，代表了当前&ldquo;用户&rdquo;，这个用户不一定是一个具体的人，与当前应用交互的任何东西都是Subject，如网络爬虫，机器人等；即一个抽象概念；所有Subject都绑定到SecurityManager，与Subject的所有交互都会委托给SecurityManager；可以把Subject认为是一个门面；SecurityManager才是实际的执行者；</span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><strong>SecurityManager</strong><strong>：</strong>安全管理器；即所有与安全有关的操作都会与SecurityManager交互；且它管理着所有Subject；可以看出它是Shiro的核心，它负责与后边介绍的其他组件进行交互，如果学习过SpringMVC，你可以把它看成DispatcherServlet前端控制器；</span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><strong>Realm</strong><strong>：</strong>域，Shiro从从Realm获取安全数据（如用户、角色、权限），就是说SecurityManager要验证用户身份，那么它需要从Realm获取相应的用户进行比较以确定用户身份是否合法；也需要从Realm得到用户相应的角色/权限进行验证用户是否能进行操作；可以把Realm看成DataSource，即安全数据源。</span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif">&nbsp;</span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif">也就是说对于我们而言，最简单的一个Shiro应用：</span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif">1、应用代码通过Subject来进行认证和授权，而Subject又委托给SecurityManager；</span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif">2、我们需要给Shiro的SecurityManager注入Realm，从而让SecurityManager能得到合法的用户及其权限进行判断。</span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif">&nbsp;</span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><strong>从以上也可以看出，Shiro</strong><strong>不提供维护用户/</strong><strong>权限，而是通过Realm</strong><strong>让开发人员自己注入。</strong></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><strong>&nbsp;</strong></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif">接下来我们来从Shiro内部来看下Shiro的架构，如下图所示：</span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><img alt="" src="http://dl2.iteye.com/upload/attachment/0093/9792/9b959a65-799d-396e-b5f5-b4fcfe88f53c.png" style="border:0px" /><br />
+&nbsp;&nbsp;</span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><strong>Subject</strong><strong>：</strong>主体，可以看到主体可以是任何可以与应用交互的&ldquo;用户&rdquo;；</span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><strong>SecurityManager</strong><strong>：</strong>相当于SpringMVC中的DispatcherServlet或者Struts2中的FilterDispatcher；是Shiro的心脏；所有具体的交互都通过SecurityManager进行控制；它管理着所有Subject、且负责进行认证和授权、及会话、缓存的管理。</span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><strong>Authenticator</strong><strong>：</strong>认证器，负责主体认证的，这是一个扩展点，如果用户觉得Shiro默认的不好，可以自定义实现；其需要认证策略（Authentication Strategy），即什么情况下算用户认证通过了；</span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><strong>Authrizer</strong><strong>：</strong>授权器，或者访问控制器，用来决定主体是否有权限进行相应的操作；即控制着用户能访问应用中的哪些功能；</span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><strong>Realm</strong><strong>：</strong>可以有1个或多个Realm，可以认为是安全实体数据源，即用于获取安全实体的；可以是JDBC实现，也可以是LDAP实现，或者内存实现等等；由用户提供；注意：Shiro不知道你的用户/权限存储在哪及以何种格式存储；所以我们一般在应用中都需要实现自己的Realm；</span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><strong>SessionManager</strong><strong>：</strong>如果写过Servlet就应该知道Session的概念，Session呢需要有人去管理它的生命周期，这个组件就是SessionManager；而Shiro并不仅仅可以用在Web环境，也可以用在如普通的JavaSE环境、EJB等环境；所有呢，Shiro就抽象了一个自己的Session来管理主体与应用之间交互的数据；这样的话，比如我们在Web环境用，刚开始是一台Web服务器；接着又上了台EJB服务器；这时想把两台服务器的会话数据放到一个地方，这个时候就可以实现自己的分布式会话（如把数据放到Memcached服务器）；</span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><strong>SessionDAO</strong><strong>：</strong>DAO大家都用过，数据访问对象，用于会话的CRUD，比如我们想把Session保存到数据库，那么可以实现自己的SessionDAO，通过如JDBC写到数据库；比如想把Session放到Memcached中，可以实现自己的Memcached SessionDAO；另外SessionDAO中可以使用Cache进行缓存，以提高性能；</span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><strong>CacheManager</strong><strong>：</strong>缓存控制器，来管理如用户、角色、权限等的缓存的；因为这些数据基本上很少去改变，放到缓存中后可以提高访问的性能</span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><strong>Cryptography</strong><strong>：</strong>密码模块，Shiro提高了一些常见的加密组件用于如密码加密/解密的。</span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif">&nbsp;</span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif">到此Shiro架构及其组件就认识完了，接下来挨着学习Shiro的组件吧。</span></span></p>
+
+<p>参考<a href="http://shiro.apache.org/reference.html" target="_blank">http://shiro.apache.org/reference.html</a></p>
+
+<p>示例源代码：<a href="https://github.com/zhangkaitao/shiro-example" target="_blank">https://github.com/zhangkaitao/shiro-example</a>；可加群134755960探讨Spring/Shiro技术。</p>
+
+<p>&nbsp;</p>
+
+<div class="blog_title" style="-webkit-text-stroke-width:0px; margin-bottom:15px; text-align:left">
+<h2 style="margin-left:0px; margin-right:0px">第二章 身份验证&mdash;&mdash;《跟我学Shiro》</h2>
+</div>
+
+<div class="blog_content" id="blog_content" style="-webkit-text-stroke-width:0px; text-align:left">
+<div class="iteye-blog-content-contain">
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><strong>身份验证</strong>，即在应用中谁能证明他就是他本人。一般提供如他们的身份ID一些标识信息来表明他就是他本人，如提供身份证，用户名/密码来证明。</span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">在shiro中，用户需要提供principals&nbsp;（身份）和credentials（证明）给shiro，从而应用能验证用户身份：</span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><strong>principals</strong>：身份，即主体的标识属性，可以是任何东西，如用户名、邮箱等，唯一即可。一个主体可以有多个principals，但只有一个Primary principals，一般是用户名/密码/手机号。</span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><strong>credentials</strong>：证明/凭证，即只有主体知道的安全值，如密码/数字证书等。</span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">最常见的principals和credentials组合就是用户名/密码了。接下来先进行一个基本的身份认证。</span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">&nbsp;</span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">另外两个相关的概念是之前提到的<strong>Subject</strong>及<strong>Realm</strong>，分别是主体及验证主体的数据源。</span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">&nbsp;</span></span></span></p>
+
+<h2 style="margin-left:0px; margin-right:0px"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">2.2&nbsp;&nbsp;环境准备</span></span></span></h2>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">本文使用Maven构建，因此需要一点Maven知识。首先准备环境依赖：&nbsp;</span></span></span></p>
+
+<div class="dp-highlighter" id="" style="margin-left:9px; padding:1px; width:679px">
+<ol start="1" style="margin-left:0px; margin-right:0px">
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&lt;dependencies&gt;&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;&lt;dependency&gt;&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;groupId&gt;junit&lt;/groupId&gt;&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;artifactId&gt;junit&lt;/artifactId&gt;&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;version&gt;4.9&lt;/version&gt;&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;&lt;/dependency&gt;&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;&lt;dependency&gt;&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;groupId&gt;commons-logging&lt;/groupId&gt;&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;artifactId&gt;commons-logging&lt;/artifactId&gt;&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;version&gt;1.1.3&lt;/version&gt;&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;&lt;/dependency&gt;&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;&lt;dependency&gt;&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;groupId&gt;org.apache.shiro&lt;/groupId&gt;&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;artifactId&gt;shiro-core&lt;/artifactId&gt;&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;version&gt;1.2.2&lt;/version&gt;&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;&lt;/dependency&gt;&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&lt;/dependencies&gt;&nbsp;&nbsp;&nbsp;</span></span></span></span></span></li>
+</ol>
+</div>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">添加junit、common-logging及shiro-core依赖即可。</span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">&nbsp;</span></span></span></p>
+
+<h2 style="margin-left:0px; margin-right:0px"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">2.3&nbsp;&nbsp;登录/退出</span></span></span></h2>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">1、首先准备一些用户身份/凭据（shiro.ini）</span></span></span></p>
+
+<div class="dp-highlighter" id="" style="margin-left:9px; padding:1px; width:679px">
+<ol start="1" style="margin-left:0px; margin-right:0px">
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">[users]&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">zhang=123&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">wang=123&nbsp;&nbsp;</span></span></span></span></span></li>
+</ol>
+</div>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">此处使用ini配置文件，通过[users]指定了两个主体：zhang/123、wang/123。</span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">&nbsp;&nbsp;</span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">2、测试用例（com.github.zhangkaitao.shiro.chapter2.LoginLogoutTest）&nbsp;</span></span></span></p>
+
+<div class="dp-highlighter" id="" style="margin-left:9px; padding:1px; width:679px">
+<ol start="1" style="margin-left:0px; margin-right:0px">
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">@Test&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace"><strong>public</strong>&nbsp;<strong>void</strong>&nbsp;testHelloworld()&nbsp;{&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;//1、获取SecurityManager工厂，此处使用Ini配置文件初始化SecurityManager&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;Factory&lt;org.apache.shiro.mgt.SecurityManager&gt;&nbsp;factory&nbsp;=&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<strong>new</strong>&nbsp;IniSecurityManagerFactory(&quot;classpath:shiro.ini&quot;);&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;//2、得到SecurityManager实例&nbsp;并绑定给SecurityUtils&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;org.apache.shiro.mgt.SecurityManager&nbsp;securityManager&nbsp;=&nbsp;factory.getInstance();&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;SecurityUtils.setSecurityManager(securityManager);&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;//3、得到Subject及创建用户名/密码身份验证Token（即用户身份/凭证）&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;Subject&nbsp;subject&nbsp;=&nbsp;SecurityUtils.getSubject();&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;UsernamePasswordToken&nbsp;token&nbsp;=&nbsp;<strong>new</strong>&nbsp;UsernamePasswordToken(&quot;zhang&quot;,&nbsp;&quot;123&quot;);&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;<strong>try</strong>&nbsp;{&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//4、登录，即身份验证&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;subject.login(token);&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;<strong>catch</strong>&nbsp;(AuthenticationException&nbsp;e)&nbsp;{&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//5、身份验证失败&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;Assert.assertEquals(<strong>true</strong>,&nbsp;subject.isAuthenticated());&nbsp;//断言用户已经登录&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;//6、退出&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;subject.logout();&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">}&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;</span></span></span></span></span></li>
+</ol>
+</div>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">2.1、首先通过new IniSecurityManagerFactory并指定一个ini配置文件来创建一个SecurityManager工厂；</span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">2.2、接着获取SecurityManager并绑定到SecurityUtils，这是一个全局设置，设置一次即可；</span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">2.3、通过SecurityUtils得到Subject，其会自动绑定到当前线程；如果在web环境在请求结束时需要解除绑定；然后获取身份验证的Token，如用户名/密码；</span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">2.4、调用subject.login方法进行登录，其会自动委托给SecurityManager.login方法进行登录；</span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">2.5、如果身份验证失败请捕获AuthenticationException或其子类，常见的如：&nbsp;DisabledAccountException（禁用的帐号）、LockedAccountException（锁定的帐号）、UnknownAccountException（错误的帐号）、ExcessiveAttemptsException（登录失败次数过多）、IncorrectCredentialsException&nbsp;（错误的凭证）、ExpiredCredentialsException（过期的凭证）等，具体请查看其继承关系；对于页面的错误消息展示，最好使用如&ldquo;用户名/密码错误&rdquo;而不是&ldquo;用户名错误&rdquo;/&ldquo;密码错误&rdquo;，防止一些恶意用户非法扫描帐号库；</span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">2.6、最后可以调用subject.logout退出，其会自动委托给SecurityManager.logout方法退出。</span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">&nbsp;</span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><strong>从如上代码可总结出身份验证的步骤：</strong></span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">1、收集用户身份/凭证，即如用户名/密码；</span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">2、调用Subject.login进行登录，如果失败将得到相应的AuthenticationException异常，根据异常提示用户错误信息；否则登录成功；</span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">3、最后调用Subject.logout进行退出操作。</span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">&nbsp;</span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">如上测试的几个问题：</span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">1、用户名/密码硬编码在ini配置文件，以后需要改成如数据库存储，且密码需要加密存储；</span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">2、用户身份Token可能不仅仅是用户名/密码，也可能还有其他的，如登录时允许用户名/邮箱/手机号同时登录。&nbsp;</span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">&nbsp;</span></span></span></p>
+
+<h2 style="margin-left:0px; margin-right:0px"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">2.4&nbsp;&nbsp;身份认证流程</span></span></span></h2>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><img alt="" src="http://dl2.iteye.com/upload/attachment/0094/0173/8d639160-cd3e-3b9c-8dd6-c7f9221827a5.png" style="border:0px" /></span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">流程如下：</span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">1、首先调用Subject.login(token)进行登录，其会自动委托给Security Manager，调用之前必须通过SecurityUtils. setSecurityManager()设置；</span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">2、SecurityManager负责真正的身份验证逻辑；它会委托给Authenticator进行身份验证；</span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">3、Authenticator才是真正的身份验证者，Shiro API中核心的身份认证入口点，此处可以自定义插入自己的实现；</span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">4、Authenticator可能会委托给相应的AuthenticationStrategy进行多Realm身份验证，默认ModularRealmAuthenticator会调用AuthenticationStrategy进行多Realm身份验证；</span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">5、Authenticator会把相应的token传入Realm，从Realm获取身份验证信息，如果没有返回/抛出异常表示身份验证失败了。此处可以配置多个Realm，将按照相应的顺序及策略进行访问。</span></span></span></p>
+
+<h2 style="margin-left:0px; margin-right:0px"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">2.5&nbsp; Realm</span></span></span></h2>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">Realm：域，Shiro从从Realm获取安全数据（如用户、角色、权限），就是说SecurityManager要验证用户身份，那么它需要从Realm获取相应的用户进行比较以确定用户身份是否合法；也需要从Realm得到用户相应的角色/权限进行验证用户是否能进行操作；可以把Realm看成DataSource，即安全数据源。如我们之前的ini配置方式将使用org.apache.shiro.realm.text.IniRealm。</span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">&nbsp;</span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">org.apache.shiro.realm.Realm接口如下：&nbsp;</span></span></span></p>
+
+<div class="dp-highlighter" id="" style="margin-left:9px; padding:1px; width:679px">
+<ol start="1" style="margin-left:0px; margin-right:0px">
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">String&nbsp;getName();&nbsp;//返回一个唯一的Realm名字&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace"><strong>boolean</strong>&nbsp;supports(AuthenticationToken&nbsp;token);&nbsp;//判断此Realm是否支持此Token&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">AuthenticationInfo&nbsp;getAuthenticationInfo(AuthenticationToken&nbsp;token)&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;<strong>throws</strong>&nbsp;AuthenticationException;&nbsp;&nbsp;//根据Token获取认证信息&nbsp;&nbsp;</span></span></span></span></span></li>
+</ol>
+</div>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">&nbsp;</span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><strong>单</strong><strong>Realm</strong><strong>配置</strong></span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">1、自定义Realm实现（com.github.zhangkaitao.shiro.chapter2.realm.MyRealm1）：&nbsp;&nbsp;</span></span></span></p>
+
+<div class="dp-highlighter" id="" style="margin-left:9px; padding:1px; width:679px">
+<ol start="1" style="margin-left:0px; margin-right:0px">
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace"><strong>public</strong>&nbsp;<strong>class</strong>&nbsp;MyRealm1&nbsp;<strong>implements</strong>&nbsp;Realm&nbsp;{&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;@Override&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;<strong>public</strong>&nbsp;String&nbsp;getName()&nbsp;{&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<strong>return</strong>&nbsp;&quot;myrealm1&quot;;&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;@Override&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;<strong>public</strong>&nbsp;<strong>boolean</strong>&nbsp;supports(AuthenticationToken&nbsp;token)&nbsp;{&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//仅支持UsernamePasswordToken类型的Token&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<strong>return</strong>&nbsp;token&nbsp;<strong>instanceof</strong>&nbsp;UsernamePasswordToken;&nbsp;&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;@Override&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;<strong>public</strong>&nbsp;AuthenticationInfo&nbsp;getAuthenticationInfo(AuthenticationToken&nbsp;token)&nbsp;<strong>throws</strong>&nbsp;AuthenticationException&nbsp;{&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;String&nbsp;username&nbsp;=&nbsp;(String)token.getPrincipal();&nbsp;&nbsp;//得到用户名&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;String&nbsp;password&nbsp;=&nbsp;<strong>new</strong>&nbsp;String((<strong>char</strong>[])token.getCredentials());&nbsp;//得到密码&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<strong>if</strong>(!&quot;zhang&quot;.equals(username))&nbsp;{&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<strong>throw</strong>&nbsp;<strong>new</strong>&nbsp;UnknownAccountException();&nbsp;//如果用户名错误&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<strong>if</strong>(!&quot;123&quot;.equals(password))&nbsp;{&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<strong>throw</strong>&nbsp;<strong>new</strong>&nbsp;IncorrectCredentialsException();&nbsp;//如果密码错误&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//如果身份认证验证成功，返回一个AuthenticationInfo实现；&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<strong>return</strong>&nbsp;<strong>new</strong>&nbsp;SimpleAuthenticationInfo(username,&nbsp;password,&nbsp;getName());&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">}&nbsp;&nbsp;&nbsp;</span></span></span></span></span></li>
+</ol>
+</div>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">&nbsp;</span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">2、ini配置文件指定自定义Realm实现(shiro-realm.ini)&nbsp;&nbsp;</span></span></span></p>
+
+<div class="dp-highlighter" id="" style="margin-left:9px; padding:1px; width:679px">
+<ol start="1" style="margin-left:0px; margin-right:0px">
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">#声明一个realm&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">myRealm1=com.github.zhangkaitao.shiro.chapter2.realm.MyRealm1&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">#指定securityManager的realms实现&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">securityManager.realms=$myRealm1&nbsp;&nbsp;&nbsp;</span></span></span></span></span></li>
+</ol>
+</div>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">通过$name来引入之前的realm定义</span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">&nbsp;</span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">3、测试用例请参考com.github.zhangkaitao.shiro.chapter2.LoginLogoutTest的testCustomRealm测试方法，只需要把之前的shiro.ini配置文件改成shiro-realm.ini即可。</span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">&nbsp;</span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><strong>多</strong><strong>Realm</strong><strong>配置</strong></span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">1、ini配置文件（shiro-multi-realm.ini）&nbsp;&nbsp;</span></span></span></p>
+
+<div class="dp-highlighter" id="" style="margin-left:9px; padding:1px; width:679px">
+<ol start="1" style="margin-left:0px; margin-right:0px">
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">#声明一个realm&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">myRealm1=com.github.zhangkaitao.shiro.chapter2.realm.MyRealm1&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">myRealm2=com.github.zhangkaitao.shiro.chapter2.realm.MyRealm2&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">#指定securityManager的realms实现&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">securityManager.realms=$myRealm1,$myRealm2&nbsp;&nbsp;&nbsp;</span></span></span></span></span></li>
+</ol>
+</div>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">securityManager会按照realms指定的顺序进行身份认证。此处我们使用显示指定顺序的方式指定了Realm的顺序，如果删除&ldquo;securityManager.realms=$myRealm1,$myRealm2&rdquo;，那么securityManager会按照realm声明的顺序进行使用（即无需设置realms属性，其会自动发现），当我们显示指定realm后，其他没有指定realm将被忽略，如&ldquo;securityManager.realms=$myRealm1&rdquo;，那么myRealm2不会被自动设置进去。</span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">&nbsp;</span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">2、测试用例请参考com.github.zhangkaitao.shiro.chapter2.LoginLogoutTest的testCustomMultiRealm测试方法。</span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">&nbsp;</span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><strong>Shiro</strong><strong>默认提供的</strong><strong>Realm</strong></span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><img alt="" src="http://dl2.iteye.com/upload/attachment/0094/0175/34062d4e-8ac5-378a-a9e2-4845f0828292.png" style="border:0px" /></span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">以后一般继承AuthorizingRealm（授权）即可；其继承了AuthenticatingRealm（即身份验证），而且也间接继承了CachingRealm（带有缓存实现）。其中主要默认实现如下：</span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><strong>org.apache.shiro.realm.text.IniRealm</strong><strong>：</strong>[users]部分指定用户名/密码及其角色；[roles]部分指定角色即权限信息；</span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><strong>org.apache.shiro.realm.text.PropertiesRealm</strong><strong>：</strong>&nbsp;user.username=password,role1,role2指定用户名/密码及其角色；role.role1=permission1,permission2指定角色及权限信息；</span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><strong>org.apache.shiro.realm.jdbc.JdbcRealm</strong><strong>：</strong>通过sql查询相应的信息，如&ldquo;select password from users where username = ?&rdquo;获取用户密码，&ldquo;select password, password_salt from users where username = ?&rdquo;获取用户密码及盐；&ldquo;select role_name from user_roles where username = ?&rdquo;获取用户角色；&ldquo;select permission from roles_permissions where role_name = ?&rdquo;获取角色对应的权限信息；也可以调用相应的api进行自定义sql；</span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">&nbsp;</span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><strong>JDBC Realm</strong><strong>使用</strong></span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">1、数据库及依赖</span></span></span></p>
+
+<div class="dp-highlighter" id="" style="margin-left:9px; padding:1px; width:679px">
+<ol start="1" style="margin-left:0px; margin-right:0px">
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&lt;dependency&gt;&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;&lt;groupId&gt;mysql&lt;/groupId&gt;&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;&lt;artifactId&gt;mysql-connector-java&lt;/artifactId&gt;&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;&lt;version&gt;5.1.25&lt;/version&gt;&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&lt;/dependency&gt;&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&lt;dependency&gt;&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;&lt;groupId&gt;com.alibaba&lt;/groupId&gt;&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;&lt;artifactId&gt;druid&lt;/artifactId&gt;&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;&lt;version&gt;0.2.23&lt;/version&gt;&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&lt;/dependency&gt;&nbsp;&nbsp;&nbsp;</span></span></span></span></span></li>
+</ol>
+</div>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">本文将使用mysql数据库及druid连接池；&nbsp;</span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">&nbsp;</span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">2、到数据库shiro下建三张表：users（用户名/密码）、user_roles（用户/角色）、roles_permissions（角色/权限），具体请参照shiro-example-chapter2/sql/shiro.sql；并添加一个用户记录，用户名/密码为zhang/123；</span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">&nbsp;</span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">3、ini配置（shiro-jdbc-realm.ini）&nbsp;</span></span></span></p>
+
+<div class="dp-highlighter" id="" style="margin-left:9px; padding:1px; width:679px">
+<ol start="1" style="margin-left:0px; margin-right:0px">
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">jdbcRealm=org.apache.shiro.realm.jdbc.JdbcRealm&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">dataSource=com.alibaba.druid.pool.DruidDataSource&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">dataSource.driverClassName=com.mysql.jdbc.Driver&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">dataSource.url=jdbc:mysql://localhost:3306/shiro&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">dataSource.username=root&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">#dataSource.password=&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">jdbcRealm.dataSource=$dataSource&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">securityManager.realms=$jdbcRealm&nbsp;&nbsp;&nbsp;</span></span></span></span></span></li>
+</ol>
+</div>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">1、变量名=全限定类名会自动创建一个类实例</span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">2、变量名.属性=值&nbsp;自动调用相应的setter方法进行赋值</span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">3、$变量名&nbsp;引用之前的一个对象实例&nbsp;</span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">4、测试代码请参照com.github.zhangkaitao.shiro.chapter2.LoginLogoutTest的testJDBCRealm方法，和之前的没什么区别。</span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">&nbsp;</span></span></span></p>
+
+<h2 style="margin-left:0px; margin-right:0px"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">2.6&nbsp;&nbsp;Authenticator及AuthenticationStrategy</span></span></span></h2>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">Authenticator的职责是验证用户帐号，是Shiro API中身份验证核心的入口点：&nbsp;</span></span></span></p>
+
+<div class="dp-highlighter" id="" style="margin-left:9px; padding:1px; width:679px">
+<div class="bar">
+<div class="tools" style="padding:3px; text-align:left"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace"><strong>Java代码&nbsp;<embed allowscriptaccess="always" height="15" pluginspage="http://www.macromedia.com/go/getflashplayer" quality="high" src="http://jinnianshilongnian.iteye.com/javascripts/syntaxhighlighter/clipboard_new.swf" type="application/x-shockwave-flash" width="14" wmode="transparent"></embed>&nbsp;<a href="javascript:void()" onclick="code_favorites_do_favorite(this);return false;" style="color:#108ac6; text-decoration:underline" title="收藏这段代码"><img alt="收藏代码" class="star" src="http://jinnianshilongnian.iteye.com/images/icon_star.png" style="border:0px" /></a></strong></span></span></span></span></span></div>
+</div>
+
+<ol start="1" style="margin-left:0px; margin-right:0px">
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace"><strong>public</strong>&nbsp;AuthenticationInfo&nbsp;authenticate(AuthenticationToken&nbsp;authenticationToken)&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<strong>throws</strong>&nbsp;AuthenticationException;&nbsp;&nbsp;&nbsp;</span></span></span></span></span></li>
+</ol>
+</div>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">如果验证成功，将返回AuthenticationInfo验证信息；此信息中包含了身份及凭证；如果验证失败将抛出相应的AuthenticationException实现。</span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">&nbsp;</span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">SecurityManager接口继承了Authenticator，另外还有一个ModularRealmAuthenticator实现，其委托给多个Realm进行验证，验证规则通过AuthenticationStrategy接口指定，默认提供的实现：</span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><strong>FirstSuccessfulStrategy</strong>：只要有一个Realm验证成功即可，只返回第一个Realm身份验证成功的认证信息，其他的忽略；</span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><strong>AtLeastOneSuccessfulStrategy</strong>：只要有一个Realm验证成功即可，和FirstSuccessfulStrategy不同，返回所有Realm身份验证成功的认证信息；</span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><strong>AllSuccessfulStrategy</strong>：所有Realm验证成功才算成功，且返回所有Realm身份验证成功的认证信息，如果有一个失败就失败了。</span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">&nbsp;</span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">ModularRealmAuthenticator默认使用AtLeastOneSuccessfulStrategy策略。</span></span></span></p>
+
+<p>&nbsp;</p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">假设我们有三个realm：</span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">myRealm1：&nbsp;用户名/密码为zhang/123时成功，且返回身份/凭据为zhang/123；</span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">myRealm2：&nbsp;用户名/密码为wang/123时成功，且返回身份/凭据为wang/123；</span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">myRealm3：&nbsp;用户名/密码为zhang/123时成功，且返回身份/凭据为zhang@163.com/123，和myRealm1不同的是返回时的身份变了；</span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">&nbsp;</span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">1、ini配置文件(shiro-authenticator-all-success.ini)&nbsp;</span></span></span></p>
+
+<div class="dp-highlighter" id="" style="margin-left:9px; padding:1px; width:679px">
+<ol start="1" style="margin-left:0px; margin-right:0px">
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">#指定securityManager的authenticator实现&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">authenticator=org.apache.shiro.authc.pam.ModularRealmAuthenticator&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">securityManager.authenticator=$authenticator&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">#指定securityManager.authenticator的authenticationStrategy&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">allSuccessfulStrategy=org.apache.shiro.authc.pam.AllSuccessfulStrategy&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">securityManager.authenticator.authenticationStrategy=$allSuccessfulStrategy&nbsp;&nbsp;</span></span></span></span></span></li>
+</ol>
+</div>
+
+<div class="dp-highlighter" id="" style="margin-left:9px; padding:1px; width:679px">
+<ol start="1" style="margin-left:0px; margin-right:0px">
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">myRealm1=com.github.zhangkaitao.shiro.chapter2.realm.MyRealm1&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">myRealm2=com.github.zhangkaitao.shiro.chapter2.realm.MyRealm2&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">myRealm3=com.github.zhangkaitao.shiro.chapter2.realm.MyRealm3&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">securityManager.realms=$myRealm1,$myRealm3&nbsp;&nbsp;</span></span></span></span></span></li>
+</ol>
+</div>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">&nbsp;</span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">2、测试代码（com.github.zhangkaitao.shiro.chapter2.AuthenticatorTest）</span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">2.1、首先通用化登录逻辑&nbsp;</span></span></span></p>
+
+<div class="dp-highlighter" id="" style="margin-left:9px; padding:1px; width:679px">
+<ol start="1" style="margin-left:0px; margin-right:0px">
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace"><strong>private</strong>&nbsp;<strong>void</strong>&nbsp;login(String&nbsp;configFile)&nbsp;{&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;//1、获取SecurityManager工厂，此处使用Ini配置文件初始化SecurityManager&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;Factory&lt;org.apache.shiro.mgt.SecurityManager&gt;&nbsp;factory&nbsp;=&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<strong>new</strong>&nbsp;IniSecurityManagerFactory(configFile);&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;//2、得到SecurityManager实例&nbsp;并绑定给SecurityUtils&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;org.apache.shiro.mgt.SecurityManager&nbsp;securityManager&nbsp;=&nbsp;factory.getInstance();&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;SecurityUtils.setSecurityManager(securityManager);&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;//3、得到Subject及创建用户名/密码身份验证Token（即用户身份/凭证）&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;Subject&nbsp;subject&nbsp;=&nbsp;SecurityUtils.getSubject();&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;UsernamePasswordToken&nbsp;token&nbsp;=&nbsp;<strong>new</strong>&nbsp;UsernamePasswordToken(&quot;zhang&quot;,&nbsp;&quot;123&quot;);&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;subject.login(token);&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">}&nbsp;&nbsp;</span></span></span></span></span></li>
+</ol>
+</div>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">&nbsp;</span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">2.2、测试AllSuccessfulStrategy成功：&nbsp;&nbsp;&nbsp;&nbsp;</span></span></span></p>
+
+<div class="dp-highlighter" id="" style="margin-left:9px; padding:1px; width:679px">
+<ol start="1" style="margin-left:0px; margin-right:0px">
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">@Test&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace"><strong>public</strong>&nbsp;<strong>void</strong>&nbsp;testAllSuccessfulStrategyWithSuccess()&nbsp;{&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;login(&quot;classpath:shiro-authenticator-all-success.ini&quot;);&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;Subject&nbsp;subject&nbsp;=&nbsp;SecurityUtils.getSubject();&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;//得到一个身份集合，其包含了Realm验证成功的身份信息&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;PrincipalCollection&nbsp;principalCollection&nbsp;=&nbsp;subject.getPrincipals();&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;Assert.assertEquals(2,&nbsp;principalCollection.asList().size());&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">}&nbsp;&nbsp;&nbsp;</span></span></span></span></span></li>
+</ol>
+</div>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">即PrincipalCollection包含了zhang和zhang@163.com身份信息。</span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">&nbsp;</span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">2.3、测试AllSuccessfulStrategy失败：</span></span></span></p>
+
+<div class="dp-highlighter" id="" style="margin-left:9px; padding:1px; width:679px">
+<ol start="1" style="margin-left:0px; margin-right:0px">
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;@Test(expected&nbsp;=&nbsp;UnknownAccountException.<strong>class</strong>)&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;<strong>public</strong>&nbsp;<strong>void</strong>&nbsp;testAllSuccessfulStrategyWithFail()&nbsp;{&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;login(&quot;classpath:shiro-authenticator-all-fail.ini&quot;);&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Subject&nbsp;subject&nbsp;=&nbsp;SecurityUtils.getSubject();&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">}&nbsp;&nbsp;&nbsp;</span></span></span></span></span></li>
+</ol>
+</div>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">shiro-authenticator-all-fail.ini与shiro-authenticator-all-success.ini不同的配置是使用了securityManager.realms=$myRealm1,$myRealm2；即myRealm验证失败。</span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">对于AtLeastOneSuccessfulStrategy和FirstSuccessfulStrategy的区别，请参照testAtLeastOneSuccessfulStrategyWithSuccess和testFirstOneSuccessfulStrategyWithSuccess测试方法。唯一不同点一个是返回所有验证成功的Realm的认证信息；另一个是只返回第一个验证成功的Realm的认证信息。</span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">自定义AuthenticationStrategy实现，首先看其API：</span></span></span></p>
+
+<div class="dp-highlighter" id="" style="margin-left:9px; padding:1px; width:679px">
+<ol start="1" style="margin-left:0px; margin-right:0px">
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">//在所有Realm验证之前调用&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">AuthenticationInfo&nbsp;beforeAllAttempts(&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">Collection&lt;?&nbsp;<strong>extends</strong>&nbsp;Realm&gt;&nbsp;realms,&nbsp;AuthenticationToken&nbsp;token)&nbsp;&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace"><strong>throws</strong>&nbsp;AuthenticationException;&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">//在每个Realm之前调用&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">AuthenticationInfo&nbsp;beforeAttempt(&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">Realm&nbsp;realm,&nbsp;AuthenticationToken&nbsp;token,&nbsp;AuthenticationInfo&nbsp;aggregate)&nbsp;&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace"><strong>throws</strong>&nbsp;AuthenticationException;&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">//在每个Realm之后调用&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">AuthenticationInfo&nbsp;afterAttempt(&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">Realm&nbsp;realm,&nbsp;AuthenticationToken&nbsp;token,&nbsp;&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">AuthenticationInfo&nbsp;singleRealmInfo,&nbsp;AuthenticationInfo&nbsp;aggregateInfo,&nbsp;Throwable&nbsp;t)&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace"><strong>throws</strong>&nbsp;AuthenticationException;&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">//在所有Realm之后调用&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">AuthenticationInfo&nbsp;afterAllAttempts(&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">AuthenticationToken&nbsp;token,&nbsp;AuthenticationInfo&nbsp;aggregate)&nbsp;&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace"><strong>throws</strong>&nbsp;AuthenticationException;&nbsp;&nbsp;&nbsp;</span></span></span></span></span></li>
+</ol>
+</div>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">因为每个AuthenticationStrategy实例都是无状态的，所有每次都通过接口将相应的认证信息传入下一次流程；通过如上接口可以进行如合并/返回第一个验证成功的认证信息。</span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">自定义实现时一般继承org.apache.shiro.authc.pam.AbstractAuthenticationStrategy即可，具体可以参考代码com.github.zhangkaitao.shiro.chapter2.authenticator.strategy包下OnlyOneAuthenticatorStrategy&nbsp;和AtLeastTwoAuthenticatorStrategy。</span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">到此基本的身份验证就搞定了，对于AuthenticationToken&nbsp;、AuthenticationInfo和Realm的详细使用后续章节再陆续介绍。</span></span></span></p>
+
+<p>示例源代码：<a href="https://github.com/zhangkaitao/shiro-example" target="_blank">https://github.com/zhangkaitao/shiro-example</a>；可加群134755960探讨Spring/Shiro技术。</p>
+</div>
+</div>

@@ -1,0 +1,737 @@
+<div class="blog_title" style="-webkit-text-stroke-width:0px; margin-bottom:15px; text-align:left">
+<h1 style="margin-left:0px; margin-right:0px">第六章 Realm及相关对象&mdash;&mdash;《跟我学Shiro》</h1>
+</div>
+
+<div class="blog_content" id="blog_content" style="-webkit-text-stroke-width:0px; text-align:left">
+<div class="iteye-blog-content-contain">
+<h2 style="margin-left:0px; margin-right:0px"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">6.1 Realm</span></span></span></h2>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">【2.5 Realm】及【3.5 Authorizer】部分都已经详细介绍过Realm了，接下来再来看一下一般真实环境下的Realm如何实现。</span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">&nbsp;&nbsp;</span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><strong>1</strong><strong>、定义实体及关系</strong></span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><strong><img alt="" src="http://dl2.iteye.com/upload/attachment/0094/1329/dd9f6a00-f6bc-3563-8afd-0c11048060b8.png" style="border:0px" /></strong></span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">即用户-角色之间是多对多关系，角色-权限之间是多对多关系；且用户和权限之间通过角色建立关系；在系统中验证时通过权限验证，角色只是权限集合，即所谓的显示角色；其实权限应该对应到资源（如菜单、URL、页面按钮、Java方法等）中，即应该将权限字符串存储到资源实体中，但是目前为了简单化，直接提取一个权限表，【综合示例】部分会使用完整的表结构。</span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">&nbsp;</span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">用户实体包括：编号(id)、用户名(username)、密码(password)、盐(salt)、是否锁定(locked)；是否锁定用于封禁用户使用，其实最好使用Enum字段存储，可以实现更复杂的用户状态实现。</span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">角色实体包括：、编号(id)、角色标识符（role）、描述（description）、是否可用（available）；其中角色标识符用于在程序中进行隐式角色判断的，描述用于以后再前台界面显示的、是否可用表示角色当前是否激活。</span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">权限实体包括：编号（id）、权限标识符（permission）、描述（description）、是否可用（available）；含义和角色实体类似不再阐述。</span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">&nbsp;</span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">另外还有两个关系实体：用户-角色实体（用户编号、角色编号，且组合为复合主键）；角色-权限实体（角色编号、权限编号，且组合为复合主键）。</span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">&nbsp;</span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">sql及实体请参考源代码中的sql\shiro.sql 和 com.github.zhangkaitao.shiro.chapter6.entity对应的实体。</span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">&nbsp;</span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><strong>2</strong><strong>、环境准备</strong></span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">为了方便数据库操作，使用了&ldquo;org.springframework: spring-jdbc: 4.0.0.RELEASE&rdquo;依赖，虽然是spring4版本的，但使用上和spring3无区别。其他依赖请参考源码的pom.xml。</span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">&nbsp;</span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><strong>3</strong><strong>、定义</strong><strong>Service</strong><strong>及</strong><strong>Dao</strong></span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">为了实现的简单性，只实现必须的功能，其他的可以自己实现即可。</span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">&nbsp;</span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><strong>PermissionService</strong></span></span></span></p>
+
+<div class="dp-highlighter" id="" style="margin-left:9px; padding:1px; width:679px">
+<div class="bar">
+<div class="tools" style="padding:3px; text-align:left"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace"><strong>Java代码&nbsp;<embed allowscriptaccess="always" height="15" pluginspage="http://www.macromedia.com/go/getflashplayer" quality="high" src="http://jinnianshilongnian.iteye.com/javascripts/syntaxhighlighter/clipboard_new.swf" type="application/x-shockwave-flash" width="14" wmode="transparent"></embed>&nbsp;<a href="javascript:void()" onclick="code_favorites_do_favorite(this);return false;" style="color:#108ac6; text-decoration:underline" title="收藏这段代码"><img alt="收藏代码" class="star" src="http://jinnianshilongnian.iteye.com/images/icon_star.png" style="border:0px" /></a></strong></span></span></span></span></span></div>
+</div>
+
+<ol start="1" style="margin-left:0px; margin-right:0px">
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace"><strong>public</strong>&nbsp;<strong>interface</strong>&nbsp;PermissionService&nbsp;{&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;<strong>public</strong>&nbsp;Permission&nbsp;createPermission(Permission&nbsp;permission);&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;<strong>public</strong>&nbsp;<strong>void</strong>&nbsp;deletePermission(Long&nbsp;permissionId);&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">}&nbsp;&nbsp;</span></span></span></span></span></li>
+</ol>
+</div>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">实现基本的创建/删除权限。</span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">&nbsp;</span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><strong>RoleService</strong>&nbsp;</span></span></span></p>
+
+<div class="dp-highlighter" id="" style="margin-left:9px; padding:1px; width:679px">
+<div class="bar">
+<div class="tools" style="padding:3px; text-align:left"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace"><strong>Java代码&nbsp;<embed allowscriptaccess="always" height="15" pluginspage="http://www.macromedia.com/go/getflashplayer" quality="high" src="http://jinnianshilongnian.iteye.com/javascripts/syntaxhighlighter/clipboard_new.swf" type="application/x-shockwave-flash" width="14" wmode="transparent"></embed>&nbsp;<a href="javascript:void()" onclick="code_favorites_do_favorite(this);return false;" style="color:#108ac6; text-decoration:underline" title="收藏这段代码"><img alt="收藏代码" class="star" src="http://jinnianshilongnian.iteye.com/images/icon_star.png" style="border:0px" /></a></strong></span></span></span></span></span></div>
+</div>
+
+<ol start="1" style="margin-left:0px; margin-right:0px">
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace"><strong>public</strong>&nbsp;<strong>interface</strong>&nbsp;RoleService&nbsp;{&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;<strong>public</strong>&nbsp;Role&nbsp;createRole(Role&nbsp;role);&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;<strong>public</strong>&nbsp;<strong>void</strong>&nbsp;deleteRole(Long&nbsp;roleId);&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;//添加角色-权限之间关系&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;<strong>public</strong>&nbsp;<strong>void</strong>&nbsp;correlationPermissions(Long&nbsp;roleId,&nbsp;Long...&nbsp;permissionIds);&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;//移除角色-权限之间关系&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;<strong>public</strong>&nbsp;<strong>void</strong>&nbsp;uncorrelationPermissions(Long&nbsp;roleId,&nbsp;Long...&nbsp;permissionIds);//&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">}&nbsp;&nbsp;&nbsp;</span></span></span></span></span></li>
+</ol>
+</div>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">相对于PermissionService多了关联/移除关联角色-权限功能。</span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">&nbsp;</span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><strong>UserService</strong>&nbsp;</span></span></span></p>
+
+<div class="dp-highlighter" id="" style="margin-left:9px; padding:1px; width:679px">
+<div class="bar">
+<div class="tools" style="padding:3px; text-align:left"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace"><strong>Java代码&nbsp;<embed allowscriptaccess="always" height="15" pluginspage="http://www.macromedia.com/go/getflashplayer" quality="high" src="http://jinnianshilongnian.iteye.com/javascripts/syntaxhighlighter/clipboard_new.swf" type="application/x-shockwave-flash" width="14" wmode="transparent"></embed>&nbsp;<a href="javascript:void()" onclick="code_favorites_do_favorite(this);return false;" style="color:#108ac6; text-decoration:underline" title="收藏这段代码"><img alt="收藏代码" class="star" src="http://jinnianshilongnian.iteye.com/images/icon_star.png" style="border:0px" /></a></strong></span></span></span></span></span></div>
+</div>
+
+<ol start="1" style="margin-left:0px; margin-right:0px">
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace"><strong>public</strong>&nbsp;<strong>interface</strong>&nbsp;UserService&nbsp;{&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;<strong>public</strong>&nbsp;User&nbsp;createUser(User&nbsp;user);&nbsp;//创建账户&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;<strong>public</strong>&nbsp;<strong>void</strong>&nbsp;changePassword(Long&nbsp;userId,&nbsp;String&nbsp;newPassword);//修改密码&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;<strong>public</strong>&nbsp;<strong>void</strong>&nbsp;correlationRoles(Long&nbsp;userId,&nbsp;Long...&nbsp;roleIds);&nbsp;//添加用户-角色关系&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;<strong>public</strong>&nbsp;<strong>void</strong>&nbsp;uncorrelationRoles(Long&nbsp;userId,&nbsp;Long...&nbsp;roleIds);//&nbsp;移除用户-角色关系&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;<strong>public</strong>&nbsp;User&nbsp;findByUsername(String&nbsp;username);//&nbsp;根据用户名查找用户&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;<strong>public</strong>&nbsp;Set&lt;String&gt;&nbsp;findRoles(String&nbsp;username);//&nbsp;根据用户名查找其角色&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;<strong>public</strong>&nbsp;Set&lt;String&gt;&nbsp;findPermissions(String&nbsp;username);&nbsp;//根据用户名查找其权限&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">}&nbsp;&nbsp;&nbsp;</span></span></span></span></span></li>
+</ol>
+</div>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">此处使用findByUsername、findRoles及findPermissions来查找用户名对应的帐号、角色及权限信息。之后的Realm就使用这些方法来查找相关信息。</span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">&nbsp;</span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><strong>UserServiceImpl</strong>&nbsp;&nbsp;</span></span></span></p>
+
+<div class="dp-highlighter" id="" style="margin-left:9px; padding:1px; width:679px">
+<div class="bar">
+<div class="tools" style="padding:3px; text-align:left"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace"><strong>Java代码&nbsp;<embed allowscriptaccess="always" height="15" pluginspage="http://www.macromedia.com/go/getflashplayer" quality="high" src="http://jinnianshilongnian.iteye.com/javascripts/syntaxhighlighter/clipboard_new.swf" type="application/x-shockwave-flash" width="14" wmode="transparent"></embed>&nbsp;<a href="javascript:void()" onclick="code_favorites_do_favorite(this);return false;" style="color:#108ac6; text-decoration:underline" title="收藏这段代码"><img alt="收藏代码" class="star" src="http://jinnianshilongnian.iteye.com/images/icon_star.png" style="border:0px" /></a></strong></span></span></span></span></span></div>
+</div>
+
+<ol start="1" style="margin-left:0px; margin-right:0px">
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace"><strong>public</strong>&nbsp;User&nbsp;createUser(User&nbsp;user)&nbsp;{&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;//加密密码&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;passwordHelper.encryptPassword(user);&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;<strong>return</strong>&nbsp;userDao.createUser(user);&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">}&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace"><strong>public</strong>&nbsp;<strong>void</strong>&nbsp;changePassword(Long&nbsp;userId,&nbsp;String&nbsp;newPassword)&nbsp;{&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;User&nbsp;user&nbsp;=userDao.findOne(userId);&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;user.setPassword(newPassword);&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;passwordHelper.encryptPassword(user);&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;userDao.updateUser(user);&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">}&nbsp;&nbsp;&nbsp;</span></span></span></span></span></li>
+</ol>
+</div>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">在创建账户及修改密码时直接把生成密码操作委托给PasswordHelper。</span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">&nbsp;</span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><strong>PasswordHelper</strong></span></span></span></p>
+
+<div class="dp-highlighter" id="" style="margin-left:9px; padding:1px; width:679px">
+<div class="bar">
+<div class="tools" style="padding:3px; text-align:left"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace"><strong>Java代码&nbsp;<embed allowscriptaccess="always" height="15" pluginspage="http://www.macromedia.com/go/getflashplayer" quality="high" src="http://jinnianshilongnian.iteye.com/javascripts/syntaxhighlighter/clipboard_new.swf" type="application/x-shockwave-flash" width="14" wmode="transparent"></embed>&nbsp;<a href="javascript:void()" onclick="code_favorites_do_favorite(this);return false;" style="color:#108ac6; text-decoration:underline" title="收藏这段代码"><img alt="收藏代码" class="star" src="http://jinnianshilongnian.iteye.com/images/icon_star.png" style="border:0px" /></a></strong></span></span></span></span></span></div>
+</div>
+
+<ol start="1" style="margin-left:0px; margin-right:0px">
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace"><strong>public</strong>&nbsp;<strong>class</strong>&nbsp;PasswordHelper&nbsp;{&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;<strong>private</strong>&nbsp;RandomNumberGenerator&nbsp;randomNumberGenerator&nbsp;=&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<strong>new</strong>&nbsp;SecureRandomNumberGenerator();&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;<strong>private</strong>&nbsp;String&nbsp;algorithmName&nbsp;=&nbsp;&quot;md5&quot;;&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;<strong>private</strong>&nbsp;<strong>final</strong>&nbsp;<strong>int</strong>&nbsp;hashIterations&nbsp;=&nbsp;2;&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;<strong>public</strong>&nbsp;<strong>void</strong>&nbsp;encryptPassword(User&nbsp;user)&nbsp;{&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;user.setSalt(randomNumberGenerator.nextBytes().toHex());&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;String&nbsp;newPassword&nbsp;=&nbsp;<strong>new</strong>&nbsp;SimpleHash(&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;algorithmName,&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;user.getPassword(),&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ByteSource.Util.bytes(user.getCredentialsSalt()),&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;hashIterations).toHex();&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;user.setPassword(newPassword);&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">}&nbsp;&nbsp;&nbsp;</span></span></span></span></span></li>
+</ol>
+</div>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">之后的CredentialsMatcher需要和此处加密的算法一样。user.getCredentialsSalt()辅助方法返回username+salt。</span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">&nbsp;</span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">为了节省篇幅，对于DAO/Service的接口及实现，具体请参考源码com.github.zhangkaitao.shiro.chapter6。另外请参考Service层的测试用例com.github.zhangkaitao.shiro.chapter6.service.ServiceTest。</span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">&nbsp;</span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><strong>4</strong><strong>、定义</strong><strong>Realm</strong></span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><strong>RetryLimitHashedCredentialsMatcher</strong>&nbsp;</span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">和第五章的一样，在此就不罗列代码了，请参考源码com.github.zhangkaitao.shiro.chapter6.credentials.RetryLimitHashedCredentialsMatcher。</span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">&nbsp;&nbsp;</span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><strong>UserRealm</strong></span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">另外请参考Service层的测试用例com.github.zhangkaitao.shiro.chapter6.service.ServiceTest。&nbsp;</span></span></span></p>
+
+<div class="dp-highlighter" id="" style="margin-left:9px; padding:1px; width:679px">
+<div class="bar">
+<div class="tools" style="padding:3px; text-align:left"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace"><strong>Java代码&nbsp;<embed allowscriptaccess="always" height="15" pluginspage="http://www.macromedia.com/go/getflashplayer" quality="high" src="http://jinnianshilongnian.iteye.com/javascripts/syntaxhighlighter/clipboard_new.swf" type="application/x-shockwave-flash" width="14" wmode="transparent"></embed>&nbsp;<a href="javascript:void()" onclick="code_favorites_do_favorite(this);return false;" style="color:#108ac6; text-decoration:underline" title="收藏这段代码"><img alt="收藏代码" class="star" src="http://jinnianshilongnian.iteye.com/images/icon_star.png" style="border:0px" /></a></strong></span></span></span></span></span></div>
+</div>
+
+<ol start="1" style="margin-left:0px; margin-right:0px">
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace"><strong>public</strong>&nbsp;<strong>class</strong>&nbsp;UserRealm&nbsp;<strong>extends</strong>&nbsp;AuthorizingRealm&nbsp;{&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;<strong>private</strong>&nbsp;UserService&nbsp;userService&nbsp;=&nbsp;<strong>new</strong>&nbsp;UserServiceImpl();&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;<strong>protected</strong>&nbsp;AuthorizationInfo&nbsp;doGetAuthorizationInfo(PrincipalCollection&nbsp;principals)&nbsp;{&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;String&nbsp;username&nbsp;=&nbsp;(String)principals.getPrimaryPrincipal();&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;SimpleAuthorizationInfo&nbsp;authorizationInfo&nbsp;=&nbsp;<strong>new</strong>&nbsp;SimpleAuthorizationInfo();&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;authorizationInfo.setRoles(userService.findRoles(username));&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;authorizationInfo.setStringPermissions(userService.findPermissions(username));&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<strong>return</strong>&nbsp;authorizationInfo;&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;<strong>protected</strong>&nbsp;AuthenticationInfo&nbsp;doGetAuthenticationInfo(AuthenticationToken&nbsp;token)&nbsp;<strong>throws</strong>&nbsp;AuthenticationException&nbsp;{&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;String&nbsp;username&nbsp;=&nbsp;(String)token.getPrincipal();&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;User&nbsp;user&nbsp;=&nbsp;userService.findByUsername(username);&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<strong>if</strong>(user&nbsp;==&nbsp;<strong>null</strong>)&nbsp;{&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<strong>throw</strong>&nbsp;<strong>new</strong>&nbsp;UnknownAccountException();//没找到帐号&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<strong>if</strong>(Boolean.TRUE.equals(user.getLocked()))&nbsp;{&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<strong>throw</strong>&nbsp;<strong>new</strong>&nbsp;LockedAccountException();&nbsp;//帐号锁定&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//交给AuthenticatingRealm使用CredentialsMatcher进行密码匹配，如果觉得人家的不好可以在此判断或自定义实现&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;SimpleAuthenticationInfo&nbsp;authenticationInfo&nbsp;=&nbsp;<strong>new</strong>&nbsp;SimpleAuthenticationInfo(&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;user.getUsername(),&nbsp;//用户名&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;user.getPassword(),&nbsp;//密码&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ByteSource.Util.bytes(user.getCredentialsSalt()),//salt=username+salt&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;getName()&nbsp;&nbsp;//realm&nbsp;name&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;);&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<strong>return</strong>&nbsp;authenticationInfo;&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">}&nbsp;&nbsp;&nbsp;</span></span></span></span></span></li>
+</ol>
+</div>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><strong>1</strong><strong>、UserRealm</strong><strong>父类AuthorizingRealm</strong><strong>将获取Subject</strong><strong>相关信息分成两步</strong>：获取身份验证信息（doGetAuthenticationInfo）及授权信息（doGetAuthorizationInfo）；</span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><strong>2</strong><strong>、doGetAuthenticationInfo</strong><strong>获取身份验证相关信息</strong>：首先根据传入的用户名获取User信息；然后如果user为空，那么抛出没找到帐号异常UnknownAccountException；如果user找到但锁定了抛出锁定异常LockedAccountException；最后生成AuthenticationInfo信息，交给间接父类AuthenticatingRealm使用CredentialsMatcher进行判断密码是否匹配，如果不匹配将抛出密码错误异常IncorrectCredentialsException；另外如果密码重试此处太多将抛出超出重试次数异常ExcessiveAttemptsException；在组装SimpleAuthenticationInfo信息时，需要传入：身份信息（用户名）、凭据（密文密码）、盐（username+salt），CredentialsMatcher使用盐加密传入的明文密码和此处的密文密码进行匹配。</span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><strong>3</strong><strong>、doGetAuthorizationInfo</strong><strong>获取授权信息</strong>：PrincipalCollection是一个身份集合，因为我们现在就一个Realm，所以直接调用getPrimaryPrincipal得到之前传入的用户名即可；然后根据用户名调用UserService接口获取角色及权限信息。</span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">&nbsp;</span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><strong>5</strong><strong>、测试用例</strong></span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">为了节省篇幅，请参考测试用例com.github.zhangkaitao.shiro.chapter6.realm.UserRealmTest。包含了：登录成功、用户名错误、密码错误、密码超出重试次数、有/没有角色、有/没有权限的测试。</span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">&nbsp;</span></span></span></p>
+
+<h2 style="margin-left:0px; margin-right:0px"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">6.2 AuthenticationToken</span></span></span></h2>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><img alt="" src="http://dl2.iteye.com/upload/attachment/0094/1333/6c026012-2583-3a26-af70-bb1b0eae491b.png" style="border:0px" /></span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">AuthenticationToken用于收集用户提交的身份（如用户名）及凭据（如密码）：</span></span></span></p>
+
+<div class="dp-highlighter" id="" style="margin-left:9px; padding:1px; width:679px">
+<div class="bar">
+<div class="tools" style="padding:3px; text-align:left"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace"><strong>Java代码&nbsp;<embed allowscriptaccess="always" height="15" pluginspage="http://www.macromedia.com/go/getflashplayer" quality="high" src="http://jinnianshilongnian.iteye.com/javascripts/syntaxhighlighter/clipboard_new.swf" type="application/x-shockwave-flash" width="14" wmode="transparent"></embed>&nbsp;<a href="javascript:void()" onclick="code_favorites_do_favorite(this);return false;" style="color:#108ac6; text-decoration:underline" title="收藏这段代码"><img alt="收藏代码" class="star" src="http://jinnianshilongnian.iteye.com/images/icon_star.png" style="border:0px" /></a></strong></span></span></span></span></span></div>
+</div>
+
+<ol start="1" style="margin-left:0px; margin-right:0px">
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace"><strong>public</strong>&nbsp;<strong>interface</strong>&nbsp;AuthenticationToken&nbsp;<strong>extends</strong>&nbsp;Serializable&nbsp;{&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;Object&nbsp;getPrincipal();&nbsp;//身份&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;Object&nbsp;getCredentials();&nbsp;//凭据&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">}&nbsp;&nbsp;&nbsp;</span></span></span></span></span></li>
+</ol>
+</div>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">扩展接口RememberMeAuthenticationToken：提供了&ldquo;boolean isRememberMe()&rdquo;现&ldquo;记住我&rdquo;的功能；</span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">扩展接口是HostAuthenticationToken：提供了&ldquo;String getHost()&rdquo;方法用于获取用户&ldquo;主机&rdquo;的功能。</span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">&nbsp;</span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">Shiro提供了一个直接拿来用的UsernamePasswordToken，用于实现用户名/密码Token组，另外其实现了RememberMeAuthenticationToken和HostAuthenticationToken，可以实现记住我及主机验证的支持。</span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">&nbsp;</span></span></span></p>
+
+<h2 style="margin-left:0px; margin-right:0px"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">6.3 AuthenticationInfo</span></span></span></h2>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><img alt="" src="http://dl2.iteye.com/upload/attachment/0094/1337/0be597af-cd61-34ce-b1f0-8ebd15dbdeb9.png" style="border:0px" /></span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">AuthenticationInfo有两个作用：</span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">1、如果Realm是AuthenticatingRealm子类，则提供给AuthenticatingRealm内部使用的CredentialsMatcher进行凭据验证；（如果没有继承它需要在自己的Realm中自己实现验证）；</span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">2、提供给SecurityManager来创建Subject（提供身份信息）；</span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">&nbsp;</span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">MergableAuthenticationInfo用于提供在多Realm时合并AuthenticationInfo的功能，主要合并Principal、如果是其他的如credentialsSalt，会用后边的信息覆盖前边的。</span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">&nbsp;</span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">比如HashedCredentialsMatcher，在验证时会判断AuthenticationInfo是否是SaltedAuthenticationInfo子类，来获取盐信息。</span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">&nbsp;</span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">Account相当于我们之前的User，SimpleAccount是其一个实现；在IniRealm、PropertiesRealm这种静态创建帐号信息的场景中使用，这些Realm直接继承了SimpleAccountRealm，而SimpleAccountRealm提供了相关的API来动态维护SimpleAccount；即可以通过这些API来动态增删改查SimpleAccount；动态增删改查角色/权限信息。及如果您的帐号不是特别多，可以使用这种方式，具体请参考SimpleAccountRealm Javadoc。</span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">&nbsp;</span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">其他情况一般返回SimpleAuthenticationInfo即可。</span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">&nbsp;</span></span></span></p>
+
+<h2 style="margin-left:0px; margin-right:0px"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">6.4 PrincipalCollection</span></span></span></h2>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><img alt="" src="http://dl2.iteye.com/upload/attachment/0094/1341/772c988b-e930-31d1-ad14-c9ae8f476f66.png" style="border:0px" /></span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">因为我们可以在Shiro中同时配置多个Realm，所以呢身份信息可能就有多个；因此其提供了PrincipalCollection用于聚合这些身份信息：</span></span></span></p>
+
+<div class="dp-highlighter" id="" style="margin-left:9px; padding:1px; width:679px">
+<div class="bar">
+<div class="tools" style="padding:3px; text-align:left"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace"><strong>Java代码&nbsp;<embed allowscriptaccess="always" height="15" pluginspage="http://www.macromedia.com/go/getflashplayer" quality="high" src="http://jinnianshilongnian.iteye.com/javascripts/syntaxhighlighter/clipboard_new.swf" type="application/x-shockwave-flash" width="14" wmode="transparent"></embed>&nbsp;<a href="javascript:void()" onclick="code_favorites_do_favorite(this);return false;" style="color:#108ac6; text-decoration:underline" title="收藏这段代码"><img alt="收藏代码" class="star" src="http://jinnianshilongnian.iteye.com/images/icon_star.png" style="border:0px" /></a></strong></span></span></span></span></span></div>
+</div>
+
+<ol start="1" style="margin-left:0px; margin-right:0px">
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace"><strong>public</strong>&nbsp;<strong>interface</strong>&nbsp;PrincipalCollection&nbsp;<strong>extends</strong>&nbsp;Iterable,&nbsp;Serializable&nbsp;{&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;Object&nbsp;getPrimaryPrincipal();&nbsp;//得到主要的身份&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;&lt;T&gt;&nbsp;T&nbsp;oneByType(Class&lt;T&gt;&nbsp;type);&nbsp;//根据身份类型获取第一个&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;&lt;T&gt;&nbsp;Collection&lt;T&gt;&nbsp;byType(Class&lt;T&gt;&nbsp;type);&nbsp;//根据身份类型获取一组&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;List&nbsp;asList();&nbsp;//转换为List&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;Set&nbsp;asSet();&nbsp;//转换为Set&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;Collection&nbsp;fromRealm(String&nbsp;realmName);&nbsp;//根据Realm名字获取&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;Set&lt;String&gt;&nbsp;getRealmNames();&nbsp;//获取所有身份验证通过的Realm名字&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;<strong>boolean</strong>&nbsp;isEmpty();&nbsp;//判断是否为空&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">}&nbsp;&nbsp;&nbsp;</span></span></span></span></span></li>
+</ol>
+</div>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">因为PrincipalCollection聚合了多个，此处最需要注意的是getPrimaryPrincipal，如果只有一个Principal那么直接返回即可，如果有多个Principal，则返回第一个（因为内部使用Map存储，所以可以认为是返回任意一个）；oneByType / byType根据凭据的类型返回相应的Principal；fromRealm根据Realm名字（每个Principal都与一个Realm关联）获取相应的Principal。</span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">&nbsp;</span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">MutablePrincipalCollection是一个可变的PrincipalCollection接口，即提供了如下可变方法：</span></span></span></p>
+
+<div class="dp-highlighter" id="" style="margin-left:9px; padding:1px; width:679px">
+<div class="bar">
+<div class="tools" style="padding:3px; text-align:left"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace"><strong>Java代码&nbsp;<embed allowscriptaccess="always" height="15" pluginspage="http://www.macromedia.com/go/getflashplayer" quality="high" src="http://jinnianshilongnian.iteye.com/javascripts/syntaxhighlighter/clipboard_new.swf" type="application/x-shockwave-flash" width="14" wmode="transparent"></embed>&nbsp;<a href="javascript:void()" onclick="code_favorites_do_favorite(this);return false;" style="color:#108ac6; text-decoration:underline" title="收藏这段代码"><img alt="收藏代码" class="star" src="http://jinnianshilongnian.iteye.com/images/icon_star.png" style="border:0px" /></a></strong></span></span></span></span></span></div>
+</div>
+
+<ol start="1" style="margin-left:0px; margin-right:0px">
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace"><strong>public</strong>&nbsp;<strong>interface</strong>&nbsp;MutablePrincipalCollection&nbsp;<strong>extends</strong>&nbsp;PrincipalCollection&nbsp;{&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;<strong>void</strong>&nbsp;add(Object&nbsp;principal,&nbsp;String&nbsp;realmName);&nbsp;//添加Realm-Principal的关联&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;<strong>void</strong>&nbsp;addAll(Collection&nbsp;principals,&nbsp;String&nbsp;realmName);&nbsp;//添加一组Realm-Principal的关联&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;<strong>void</strong>&nbsp;addAll(PrincipalCollection&nbsp;principals);//添加PrincipalCollection&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;<strong>void</strong>&nbsp;clear();//清空&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">}&nbsp;&nbsp;&nbsp;</span></span></span></span></span></li>
+</ol>
+</div>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">目前Shiro只提供了一个实现SimplePrincipalCollection，还记得之前的AuthenticationStrategy实现嘛，用于在多Realm时判断是否满足条件的，在大多数实现中（继承了AbstractAuthenticationStrategy）afterAttempt方法会进行AuthenticationInfo（实现了MergableAuthenticationInfo）的merge，比如SimpleAuthenticationInfo会合并多个Principal为一个PrincipalCollection。</span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">&nbsp;</span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">对于PrincipalMap是Shiro 1.2中的一个实验品，暂时无用，具体可以参考其Javadoc。接下来通过示例来看看PrincipalCollection。</span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">&nbsp;</span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><strong>1</strong><strong>、准备三个Realm</strong></span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><strong>MyRealm1</strong></span></span></span></p>
+
+<div class="dp-highlighter" id="" style="margin-left:9px; padding:1px; width:679px">
+<div class="bar">
+<div class="tools" style="padding:3px; text-align:left"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace"><strong>Java代码&nbsp;<embed allowscriptaccess="always" height="15" pluginspage="http://www.macromedia.com/go/getflashplayer" quality="high" src="http://jinnianshilongnian.iteye.com/javascripts/syntaxhighlighter/clipboard_new.swf" type="application/x-shockwave-flash" width="14" wmode="transparent"></embed>&nbsp;<a href="javascript:void()" onclick="code_favorites_do_favorite(this);return false;" style="color:#108ac6; text-decoration:underline" title="收藏这段代码"><img alt="收藏代码" class="star" src="http://jinnianshilongnian.iteye.com/images/icon_star.png" style="border:0px" /></a></strong></span></span></span></span></span></div>
+</div>
+
+<ol start="1" style="margin-left:0px; margin-right:0px">
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace"><strong>public</strong>&nbsp;<strong>class</strong>&nbsp;MyRealm1&nbsp;<strong>implements</strong>&nbsp;Realm&nbsp;{&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;@Override&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;<strong>public</strong>&nbsp;String&nbsp;getName()&nbsp;{&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<strong>return</strong>&nbsp;&quot;a&quot;;&nbsp;//realm&nbsp;name&nbsp;为&nbsp;&ldquo;a&rdquo;&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;//省略supports方法，具体请见源码&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;@Override&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;<strong>public</strong>&nbsp;AuthenticationInfo&nbsp;getAuthenticationInfo(AuthenticationToken&nbsp;token)&nbsp;<strong>throws</strong>&nbsp;AuthenticationException&nbsp;{&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<strong>return</strong>&nbsp;<strong>new</strong>&nbsp;SimpleAuthenticationInfo(&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&quot;zhang&quot;,&nbsp;//身份&nbsp;字符串类型&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&quot;123&quot;,&nbsp;&nbsp;&nbsp;//凭据&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;getName()&nbsp;//Realm&nbsp;Name&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;);&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">}&nbsp;&nbsp;</span></span></span></span></span></li>
+</ol>
+</div>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><strong>MyRealm2</strong>&nbsp;</span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">和MyRealm1完全一样，只是Realm名字为b。</span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">&nbsp;&nbsp;</span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><strong>MyRealm3</strong></span></span></span></p>
+
+<div class="dp-highlighter" id="" style="margin-left:9px; padding:1px; width:679px">
+<div class="bar">
+<div class="tools" style="padding:3px; text-align:left"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace"><strong>Java代码&nbsp;<embed allowscriptaccess="always" height="15" pluginspage="http://www.macromedia.com/go/getflashplayer" quality="high" src="http://jinnianshilongnian.iteye.com/javascripts/syntaxhighlighter/clipboard_new.swf" type="application/x-shockwave-flash" width="14" wmode="transparent"></embed>&nbsp;<a href="javascript:void()" onclick="code_favorites_do_favorite(this);return false;" style="color:#108ac6; text-decoration:underline" title="收藏这段代码"><img alt="收藏代码" class="star" src="http://jinnianshilongnian.iteye.com/images/icon_star.png" style="border:0px" /></a></strong></span></span></span></span></span></div>
+</div>
+
+<ol start="1" style="margin-left:0px; margin-right:0px">
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace"><strong>public</strong>&nbsp;<strong>class</strong>&nbsp;MyRealm3&nbsp;<strong>implements</strong>&nbsp;Realm&nbsp;{&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;@Override&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;<strong>public</strong>&nbsp;String&nbsp;getName()&nbsp;{&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<strong>return</strong>&nbsp;&quot;c&quot;;&nbsp;//realm&nbsp;name&nbsp;为&nbsp;&ldquo;c&rdquo;&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;//省略supports方法，具体请见源码&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;@Override&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;<strong>public</strong>&nbsp;AuthenticationInfo&nbsp;getAuthenticationInfo(AuthenticationToken&nbsp;token)&nbsp;<strong>throws</strong>&nbsp;AuthenticationException&nbsp;{&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;User&nbsp;user&nbsp;=&nbsp;<strong>new</strong>&nbsp;User(&quot;zhang&quot;,&nbsp;&quot;123&quot;);&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<strong>return</strong>&nbsp;<strong>new</strong>&nbsp;SimpleAuthenticationInfo(&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;user,&nbsp;//身份&nbsp;User类型&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&quot;123&quot;,&nbsp;&nbsp;&nbsp;//凭据&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;getName()&nbsp;//Realm&nbsp;Name&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;);&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">}&nbsp;&nbsp;&nbsp;</span></span></span></span></span></li>
+</ol>
+</div>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">和MyRealm1同名，但返回的Principal是User类型。</span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">&nbsp;</span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><strong>2、ini配置（shiro-multirealm.ini）</strong></span></span></span></p>
+
+<div class="dp-highlighter" id="" style="margin-left:9px; padding:1px; width:679px">
+<div class="bar">
+<div class="tools" style="padding:3px; text-align:left"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace"><strong>Java代码&nbsp;<embed allowscriptaccess="always" height="15" pluginspage="http://www.macromedia.com/go/getflashplayer" quality="high" src="http://jinnianshilongnian.iteye.com/javascripts/syntaxhighlighter/clipboard_new.swf" type="application/x-shockwave-flash" width="14" wmode="transparent"></embed>&nbsp;<a href="javascript:void()" onclick="code_favorites_do_favorite(this);return false;" style="color:#108ac6; text-decoration:underline" title="收藏这段代码"><img alt="收藏代码" class="star" src="http://jinnianshilongnian.iteye.com/images/icon_star.png" style="border:0px" /></a></strong></span></span></span></span></span></div>
+</div>
+
+<ol start="1" style="margin-left:0px; margin-right:0px">
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">[main]&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">realm1=com.github.zhangkaitao.shiro.chapter6.realm.MyRealm1&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">realm2=com.github.zhangkaitao.shiro.chapter6.realm.MyRealm2&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">realm3=com.github.zhangkaitao.shiro.chapter6.realm.MyRealm3&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">securityManager.realms=$realm1,$realm2,$realm3&nbsp;&nbsp;&nbsp;</span></span></span></span></span></li>
+</ol>
+</div>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><strong>3</strong><strong>、测试用例（com.github.zhangkaitao.shiro.chapter6.realm.PrincialCollectionTest</strong><strong>）</strong></span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">因为我们的Realm中没有进行身份及凭据验证，所以相当于身份验证都是成功的，都将返回：</span></span></span></p>
+
+<div class="dp-highlighter" id="" style="margin-left:9px; padding:1px; width:679px">
+<div class="bar">
+<div class="tools" style="padding:3px; text-align:left"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace"><strong>Java代码&nbsp;<embed allowscriptaccess="always" height="15" pluginspage="http://www.macromedia.com/go/getflashplayer" quality="high" src="http://jinnianshilongnian.iteye.com/javascripts/syntaxhighlighter/clipboard_new.swf" type="application/x-shockwave-flash" width="14" wmode="transparent"></embed>&nbsp;<a href="javascript:void()" onclick="code_favorites_do_favorite(this);return false;" style="color:#108ac6; text-decoration:underline" title="收藏这段代码"><img alt="收藏代码" class="star" src="http://jinnianshilongnian.iteye.com/images/icon_star.png" style="border:0px" /></a></strong></span></span></span></span></span></div>
+</div>
+
+<ol start="1" style="margin-left:0px; margin-right:0px">
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">Object&nbsp;primaryPrincipal1&nbsp;=&nbsp;subject.getPrincipal();&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">PrincipalCollection&nbsp;princialCollection&nbsp;=&nbsp;subject.getPrincipals();&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">Object&nbsp;primaryPrincipal2&nbsp;=&nbsp;princialCollection.getPrimaryPrincipal();&nbsp;&nbsp;&nbsp;</span></span></span></span></span></li>
+</ol>
+</div>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">我们可以直接调用subject.getPrincipal获取PrimaryPrincipal（即所谓的第一个）；或者通过getPrincipals获取PrincipalCollection；然后通过其getPrimaryPrincipal获取PrimaryPrincipal。</span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">&nbsp;</span></span></span></p>
+
+<div class="dp-highlighter" id="" style="margin-left:9px; padding:1px; width:679px">
+<div class="bar">
+<div class="tools" style="padding:3px; text-align:left"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace"><strong>Java代码&nbsp;<embed allowscriptaccess="always" height="15" pluginspage="http://www.macromedia.com/go/getflashplayer" quality="high" src="http://jinnianshilongnian.iteye.com/javascripts/syntaxhighlighter/clipboard_new.swf" type="application/x-shockwave-flash" width="14" wmode="transparent"></embed>&nbsp;<a href="javascript:void()" onclick="code_favorites_do_favorite(this);return false;" style="color:#108ac6; text-decoration:underline" title="收藏这段代码"><img alt="收藏代码" class="star" src="http://jinnianshilongnian.iteye.com/images/icon_star.png" style="border:0px" /></a></strong></span></span></span></span></span></div>
+</div>
+
+<ol start="1" style="margin-left:0px; margin-right:0px">
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">Set&lt;String&gt;&nbsp;realmNames&nbsp;=&nbsp;princialCollection.getRealmNames();&nbsp;&nbsp;</span></span></span></span></span></li>
+</ol>
+</div>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">获取所有身份验证成功的Realm名字。&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">&nbsp;</span></span></span></p>
+
+<div class="dp-highlighter" id="" style="margin-left:9px; padding:1px; width:679px">
+<div class="bar">
+<div class="tools" style="padding:3px; text-align:left"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace"><strong>Java代码&nbsp;<embed allowscriptaccess="always" height="15" pluginspage="http://www.macromedia.com/go/getflashplayer" quality="high" src="http://jinnianshilongnian.iteye.com/javascripts/syntaxhighlighter/clipboard_new.swf" type="application/x-shockwave-flash" width="14" wmode="transparent"></embed>&nbsp;<a href="javascript:void()" onclick="code_favorites_do_favorite(this);return false;" style="color:#108ac6; text-decoration:underline" title="收藏这段代码"><img alt="收藏代码" class="star" src="http://jinnianshilongnian.iteye.com/images/icon_star.png" style="border:0px" /></a></strong></span></span></span></span></span></div>
+</div>
+
+<ol start="1" style="margin-left:0px; margin-right:0px">
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">Set&lt;Object&gt;&nbsp;principals&nbsp;=&nbsp;princialCollection.asSet();&nbsp;//asList和asSet的结果一样&nbsp;&nbsp;</span></span></span></span></span></li>
+</ol>
+</div>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">将身份信息转换为Set/List，即使转换为List，也是先转换为Set再完成的。</span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">&nbsp;</span></span></span></p>
+
+<div class="dp-highlighter" id="" style="margin-left:9px; padding:1px; width:679px">
+<div class="bar">
+<div class="tools" style="padding:3px; text-align:left"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace"><strong>Java代码&nbsp;<embed allowscriptaccess="always" height="15" pluginspage="http://www.macromedia.com/go/getflashplayer" quality="high" src="http://jinnianshilongnian.iteye.com/javascripts/syntaxhighlighter/clipboard_new.swf" type="application/x-shockwave-flash" width="14" wmode="transparent"></embed>&nbsp;<a href="javascript:void()" onclick="code_favorites_do_favorite(this);return false;" style="color:#108ac6; text-decoration:underline" title="收藏这段代码"><img alt="收藏代码" class="star" src="http://jinnianshilongnian.iteye.com/images/icon_star.png" style="border:0px" /></a></strong></span></span></span></span></span></div>
+</div>
+
+<ol start="1" style="margin-left:0px; margin-right:0px">
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">Collection&lt;User&gt;&nbsp;users&nbsp;=&nbsp;princialCollection.fromRealm(&quot;c&quot;);&nbsp;&nbsp;</span></span></span></span></span></li>
+</ol>
+</div>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">根据Realm名字获取身份，因为Realm名字可以重复，所以可能多个身份，建议Realm名字尽量不要重复。</span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">&nbsp;</span></span></span></p>
+
+<h2 style="margin-left:0px; margin-right:0px"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">6.4 AuthorizationInfo</span></span></span></h2>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><img alt="" src="http://dl2.iteye.com/upload/attachment/0094/1345/c8868cea-6b01-34cc-b7be-45ee244bd217.png" style="border:0px" /></span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">AuthorizationInfo用于聚合授权信息的：</span></span></span></p>
+
+<div class="dp-highlighter" id="" style="margin-left:9px; padding:1px; width:679px">
+<div class="bar">
+<div class="tools" style="padding:3px; text-align:left"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace"><strong>Java代码&nbsp;<embed allowscriptaccess="always" height="15" pluginspage="http://www.macromedia.com/go/getflashplayer" quality="high" src="http://jinnianshilongnian.iteye.com/javascripts/syntaxhighlighter/clipboard_new.swf" type="application/x-shockwave-flash" width="14" wmode="transparent"></embed>&nbsp;<a href="javascript:void()" onclick="code_favorites_do_favorite(this);return false;" style="color:#108ac6; text-decoration:underline" title="收藏这段代码"><img alt="收藏代码" class="star" src="http://jinnianshilongnian.iteye.com/images/icon_star.png" style="border:0px" /></a></strong></span></span></span></span></span></div>
+</div>
+
+<ol start="1" style="margin-left:0px; margin-right:0px">
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace"><strong>public</strong>&nbsp;<strong>interface</strong>&nbsp;AuthorizationInfo&nbsp;<strong>extends</strong>&nbsp;Serializable&nbsp;{&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;Collection&lt;String&gt;&nbsp;getRoles();&nbsp;//获取角色字符串信息&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;Collection&lt;String&gt;&nbsp;getStringPermissions();&nbsp;//获取权限字符串信息&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;Collection&lt;Permission&gt;&nbsp;getObjectPermissions();&nbsp;//获取Permission对象信息&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">}&nbsp;&nbsp;&nbsp;</span></span></span></span></span></li>
+</ol>
+</div>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">当我们使用AuthorizingRealm时，如果身份验证成功，在进行授权时就通过doGetAuthorizationInfo方法获取角色/权限信息用于授权验证。</span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">&nbsp;</span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">Shiro提供了一个实现SimpleAuthorizationInfo，大多数时候使用这个即可。</span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">&nbsp;</span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">对于Account及SimpleAccount，之前的【6.3 AuthenticationInfo】已经介绍过了，用于SimpleAccountRealm子类，实现动态角色/权限维护的。</span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">&nbsp;</span></span></span></p>
+
+<h2 style="margin-left:0px; margin-right:0px"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">6.5 Subject</span></span></span></h2>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><img alt="" src="http://dl2.iteye.com/upload/attachment/0094/1347/131b0c95-9aed-36b0-9c09-0a6f9c6b3605.png" style="border:0px; line-height:1.5" /></span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">Subject是Shiro的核心对象，基本所有身份验证、授权都是通过Subject完成。</span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><strong>1</strong><strong>、身份信息获取</strong></span></span></span></p>
+
+<div class="dp-highlighter" id="" style="margin-left:9px; padding:1px; width:679px">
+<div class="bar">
+<div class="tools" style="padding:3px; text-align:left"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace"><strong>Java代码&nbsp;<embed allowscriptaccess="always" height="15" pluginspage="http://www.macromedia.com/go/getflashplayer" quality="high" src="http://jinnianshilongnian.iteye.com/javascripts/syntaxhighlighter/clipboard_new.swf" type="application/x-shockwave-flash" width="14" wmode="transparent"></embed>&nbsp;<a href="javascript:void()" onclick="code_favorites_do_favorite(this);return false;" style="color:#108ac6; text-decoration:underline" title="收藏这段代码"><img alt="收藏代码" class="star" src="http://jinnianshilongnian.iteye.com/images/icon_star.png" style="border:0px" /></a></strong></span></span></span></span></span></div>
+</div>
+
+<ol start="1" style="margin-left:0px; margin-right:0px">
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">Object&nbsp;getPrincipal();&nbsp;//Primary&nbsp;Principal&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">PrincipalCollection&nbsp;getPrincipals();&nbsp;//&nbsp;PrincipalCollection&nbsp;&nbsp;&nbsp;</span></span></span></span></span></li>
+</ol>
+</div>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">&nbsp;</span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><strong>2</strong><strong>、身份验证</strong></span></span></span></p>
+
+<div class="dp-highlighter" id="" style="margin-left:9px; padding:1px; width:679px">
+<div class="bar">
+<div class="tools" style="padding:3px; text-align:left"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace"><strong>Java代码&nbsp;<embed allowscriptaccess="always" height="15" pluginspage="http://www.macromedia.com/go/getflashplayer" quality="high" src="http://jinnianshilongnian.iteye.com/javascripts/syntaxhighlighter/clipboard_new.swf" type="application/x-shockwave-flash" width="14" wmode="transparent"></embed>&nbsp;<a href="javascript:void()" onclick="code_favorites_do_favorite(this);return false;" style="color:#108ac6; text-decoration:underline" title="收藏这段代码"><img alt="收藏代码" class="star" src="http://jinnianshilongnian.iteye.com/images/icon_star.png" style="border:0px" /></a></strong></span></span></span></span></span></div>
+</div>
+
+<ol start="1" style="margin-left:0px; margin-right:0px">
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace"><strong>void</strong>&nbsp;login(AuthenticationToken&nbsp;token)&nbsp;<strong>throws</strong>&nbsp;AuthenticationException;&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace"><strong>boolean</strong>&nbsp;isAuthenticated();&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace"><strong>boolean</strong>&nbsp;isRemembered();&nbsp;&nbsp;</span></span></span></span></span></li>
+</ol>
+</div>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">通过login登录，如果登录失败将抛出相应的AuthenticationException，如果登录成功调用isAuthenticated就会返回true，即已经通过身份验证；如果isRemembered返回true，表示是通过记住我功能登录的而不是调用login方法登录的。isAuthenticated/isRemembered是互斥的，即如果其中一个返回true，另一个返回false。</span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">&nbsp;&nbsp;</span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><strong>3</strong><strong>、角色授权验证</strong>&nbsp;</span></span></span></p>
+
+<div class="dp-highlighter" id="" style="margin-left:9px; padding:1px; width:679px">
+<div class="bar">
+<div class="tools" style="padding:3px; text-align:left"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace"><strong>Java代码&nbsp;<embed allowscriptaccess="always" height="15" pluginspage="http://www.macromedia.com/go/getflashplayer" quality="high" src="http://jinnianshilongnian.iteye.com/javascripts/syntaxhighlighter/clipboard_new.swf" type="application/x-shockwave-flash" width="14" wmode="transparent"></embed>&nbsp;<a href="javascript:void()" onclick="code_favorites_do_favorite(this);return false;" style="color:#108ac6; text-decoration:underline" title="收藏这段代码"><img alt="收藏代码" class="star" src="http://jinnianshilongnian.iteye.com/images/icon_star.png" style="border:0px" /></a></strong></span></span></span></span></span></div>
+</div>
+
+<ol start="1" style="margin-left:0px; margin-right:0px">
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace"><strong>boolean</strong>&nbsp;hasRole(String&nbsp;roleIdentifier);&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace"><strong>boolean</strong>[]&nbsp;hasRoles(List&lt;String&gt;&nbsp;roleIdentifiers);&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace"><strong>boolean</strong>&nbsp;hasAllRoles(Collection&lt;String&gt;&nbsp;roleIdentifiers);&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace"><strong>void</strong>&nbsp;checkRole(String&nbsp;roleIdentifier)&nbsp;<strong>throws</strong>&nbsp;AuthorizationException;&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace"><strong>void</strong>&nbsp;checkRoles(Collection&lt;String&gt;&nbsp;roleIdentifiers)&nbsp;<strong>throws</strong>&nbsp;AuthorizationException;&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace"><strong>void</strong>&nbsp;checkRoles(String...&nbsp;roleIdentifiers)&nbsp;<strong>throws</strong>&nbsp;AuthorizationException;&nbsp;&nbsp;&nbsp;</span></span></span></span></span></li>
+</ol>
+</div>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">hasRole*进行角色验证，验证后返回true/false；而checkRole*验证失败时抛出AuthorizationException异常。&nbsp;</span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">&nbsp;</span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><strong>4</strong><strong>、权限授权验证</strong></span></span></span></p>
+
+<div class="dp-highlighter" id="" style="margin-left:9px; padding:1px; width:679px">
+<div class="bar">
+<div class="tools" style="padding:3px; text-align:left"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace"><strong>Java代码&nbsp;<embed allowscriptaccess="always" height="15" pluginspage="http://www.macromedia.com/go/getflashplayer" quality="high" src="http://jinnianshilongnian.iteye.com/javascripts/syntaxhighlighter/clipboard_new.swf" type="application/x-shockwave-flash" width="14" wmode="transparent"></embed>&nbsp;<a href="javascript:void()" onclick="code_favorites_do_favorite(this);return false;" style="color:#108ac6; text-decoration:underline" title="收藏这段代码"><img alt="收藏代码" class="star" src="http://jinnianshilongnian.iteye.com/images/icon_star.png" style="border:0px" /></a></strong></span></span></span></span></span></div>
+</div>
+
+<ol start="1" style="margin-left:0px; margin-right:0px">
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace"><strong>boolean</strong>&nbsp;isPermitted(String&nbsp;permission);&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace"><strong>boolean</strong>&nbsp;isPermitted(Permission&nbsp;permission);&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace"><strong>boolean</strong>[]&nbsp;isPermitted(String...&nbsp;permissions);&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace"><strong>boolean</strong>[]&nbsp;isPermitted(List&lt;Permission&gt;&nbsp;permissions);&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace"><strong>boolean</strong>&nbsp;isPermittedAll(String...&nbsp;permissions);&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace"><strong>boolean</strong>&nbsp;isPermittedAll(Collection&lt;Permission&gt;&nbsp;permissions);&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace"><strong>void</strong>&nbsp;checkPermission(String&nbsp;permission)&nbsp;<strong>throws</strong>&nbsp;AuthorizationException;&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace"><strong>void</strong>&nbsp;checkPermission(Permission&nbsp;permission)&nbsp;<strong>throws</strong>&nbsp;AuthorizationException;&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace"><strong>void</strong>&nbsp;checkPermissions(String...&nbsp;permissions)&nbsp;<strong>throws</strong>&nbsp;AuthorizationException;&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace"><strong>void</strong>&nbsp;checkPermissions(Collection&lt;Permission&gt;&nbsp;permissions)&nbsp;<strong>throws</strong>&nbsp;AuthorizationException;&nbsp;&nbsp;</span></span></span></span></span></li>
+</ol>
+</div>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">isPermitted*进行权限验证，验证后返回true/false；而checkPermission*验证失败时抛出AuthorizationException。</span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">&nbsp;</span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><strong>5</strong><strong>、会话</strong></span></span></span></p>
+
+<div class="dp-highlighter" id="" style="margin-left:9px; padding:1px; width:679px">
+<div class="bar">
+<div class="tools" style="padding:3px; text-align:left"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace"><strong>Java代码&nbsp;<embed allowscriptaccess="always" height="15" pluginspage="http://www.macromedia.com/go/getflashplayer" quality="high" src="http://jinnianshilongnian.iteye.com/javascripts/syntaxhighlighter/clipboard_new.swf" type="application/x-shockwave-flash" width="14" wmode="transparent"></embed>&nbsp;<a href="javascript:void()" onclick="code_favorites_do_favorite(this);return false;" style="color:#108ac6; text-decoration:underline" title="收藏这段代码"><img alt="收藏代码" class="star" src="http://jinnianshilongnian.iteye.com/images/icon_star.png" style="border:0px" /></a></strong></span></span></span></span></span></div>
+</div>
+
+<ol start="1" style="margin-left:0px; margin-right:0px">
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">Session&nbsp;getSession();&nbsp;//相当于getSession(true)&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">Session&nbsp;getSession(<strong>boolean</strong>&nbsp;create);&nbsp;&nbsp;&nbsp;&nbsp;</span></span></span></span></span></li>
+</ol>
+</div>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">类似于Web中的会话。如果登录成功就相当于建立了会话，接着可以使用getSession获取；如果create=false如果没有会话将返回null，而create=true如果没有会话会强制创建一个。</span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">&nbsp;</span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><strong>6</strong><strong>、退出</strong>&nbsp;</span></span></span></p>
+
+<div class="dp-highlighter" id="" style="margin-left:9px; padding:1px; width:679px">
+<div class="bar">
+<div class="tools" style="padding:3px; text-align:left"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace"><strong>Java代码&nbsp;<embed allowscriptaccess="always" height="15" pluginspage="http://www.macromedia.com/go/getflashplayer" quality="high" src="http://jinnianshilongnian.iteye.com/javascripts/syntaxhighlighter/clipboard_new.swf" type="application/x-shockwave-flash" width="14" wmode="transparent"></embed>&nbsp;<a href="javascript:void()" onclick="code_favorites_do_favorite(this);return false;" style="color:#108ac6; text-decoration:underline" title="收藏这段代码"><img alt="收藏代码" class="star" src="http://jinnianshilongnian.iteye.com/images/icon_star.png" style="border:0px" /></a></strong></span></span></span></span></span></div>
+</div>
+
+<ol start="1" style="margin-left:0px; margin-right:0px">
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace"><strong>void</strong>&nbsp;logout();&nbsp;&nbsp;</span></span></span></span></span></li>
+</ol>
+</div>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">&nbsp;</span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><strong>7</strong><strong>、RunAs</strong>&nbsp;&nbsp;</span></span></span></p>
+
+<div class="dp-highlighter" id="" style="margin-left:9px; padding:1px; width:679px">
+<div class="bar">
+<div class="tools" style="padding:3px; text-align:left"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace"><strong>Java代码&nbsp;<embed allowscriptaccess="always" height="15" pluginspage="http://www.macromedia.com/go/getflashplayer" quality="high" src="http://jinnianshilongnian.iteye.com/javascripts/syntaxhighlighter/clipboard_new.swf" type="application/x-shockwave-flash" width="14" wmode="transparent"></embed>&nbsp;<a href="javascript:void()" onclick="code_favorites_do_favorite(this);return false;" style="color:#108ac6; text-decoration:underline" title="收藏这段代码"><img alt="收藏代码" class="star" src="http://jinnianshilongnian.iteye.com/images/icon_star.png" style="border:0px" /></a></strong></span></span></span></span></span></div>
+</div>
+
+<ol start="1" style="margin-left:0px; margin-right:0px">
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace"><strong>void</strong>&nbsp;runAs(PrincipalCollection&nbsp;principals)&nbsp;<strong>throws</strong>&nbsp;NullPointerException,&nbsp;IllegalStateException;&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace"><strong>boolean</strong>&nbsp;isRunAs();&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">PrincipalCollection&nbsp;getPreviousPrincipals();&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">PrincipalCollection&nbsp;releaseRunAs();&nbsp;&nbsp;&nbsp;</span></span></span></span></span></li>
+</ol>
+</div>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">RunAs即实现&ldquo;允许A假设为B身份进行访问&rdquo;；通过调用subject.runAs(b)进行访问；接着调用subject.getPrincipals将获取到B的身份；此时调用isRunAs将返回true；而a的身份需要通过subject. getPreviousPrincipals获取；如果不需要RunAs了调用subject. releaseRunAs即可。</span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">&nbsp;</span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><strong>8</strong><strong>、多线程</strong></span></span></span></p>
+
+<div class="dp-highlighter" id="" style="margin-left:9px; padding:1px; width:679px">
+<div class="bar">
+<div class="tools" style="padding:3px; text-align:left"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace"><strong>Java代码&nbsp;<embed allowscriptaccess="always" height="15" pluginspage="http://www.macromedia.com/go/getflashplayer" quality="high" src="http://jinnianshilongnian.iteye.com/javascripts/syntaxhighlighter/clipboard_new.swf" type="application/x-shockwave-flash" width="14" wmode="transparent"></embed>&nbsp;<a href="javascript:void()" onclick="code_favorites_do_favorite(this);return false;" style="color:#108ac6; text-decoration:underline" title="收藏这段代码"><img alt="收藏代码" class="star" src="http://jinnianshilongnian.iteye.com/images/icon_star.png" style="border:0px" /></a></strong></span></span></span></span></span></div>
+</div>
+
+<ol start="1" style="margin-left:0px; margin-right:0px">
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&lt;V&gt;&nbsp;V&nbsp;execute(Callable&lt;V&gt;&nbsp;callable)&nbsp;<strong>throws</strong>&nbsp;ExecutionException;&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace"><strong>void</strong>&nbsp;execute(Runnable&nbsp;runnable);&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&lt;V&gt;&nbsp;Callable&lt;V&gt;&nbsp;associateWith(Callable&lt;V&gt;&nbsp;callable);&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">Runnable&nbsp;associateWith(Runnable&nbsp;runnable);&nbsp;&nbsp;&nbsp;</span></span></span></span></span></li>
+</ol>
+</div>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">实现线程之间的Subject传播，因为Subject是线程绑定的；因此在多线程执行中需要传播到相应的线程才能获取到相应的Subject。最简单的办法就是通过execute(runnable/callable实例)直接调用；或者通过associateWith(runnable/callable实例)得到一个包装后的实例；它们都是通过：1、把当前线程的Subject绑定过去；2、在线程执行结束后自动释放。</span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">&nbsp;</span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">Subject自己不会实现相应的身份验证/授权逻辑，而是通过DelegatingSubject委托给SecurityManager实现；及可以理解为Subject是一个面门。</span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">&nbsp;</span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">对于Subject的构建一般没必要我们去创建；一般通过SecurityUtils.getSubject()获取：</span></span></span></p>
+
+<div class="dp-highlighter" id="" style="margin-left:9px; padding:1px; width:679px">
+<div class="bar">
+<div class="tools" style="padding:3px; text-align:left"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace"><strong>Java代码&nbsp;<embed allowscriptaccess="always" height="15" pluginspage="http://www.macromedia.com/go/getflashplayer" quality="high" src="http://jinnianshilongnian.iteye.com/javascripts/syntaxhighlighter/clipboard_new.swf" type="application/x-shockwave-flash" width="14" wmode="transparent"></embed>&nbsp;<a href="javascript:void()" onclick="code_favorites_do_favorite(this);return false;" style="color:#108ac6; text-decoration:underline" title="收藏这段代码"><img alt="收藏代码" class="star" src="http://jinnianshilongnian.iteye.com/images/icon_star.png" style="border:0px" /></a></strong></span></span></span></span></span></div>
+</div>
+
+<ol start="1" style="margin-left:0px; margin-right:0px">
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace"><strong>public</strong>&nbsp;<strong>static</strong>&nbsp;Subject&nbsp;getSubject()&nbsp;{&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;Subject&nbsp;subject&nbsp;=&nbsp;ThreadContext.getSubject();&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;<strong>if</strong>&nbsp;(subject&nbsp;==&nbsp;<strong>null</strong>)&nbsp;{&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;subject&nbsp;=&nbsp;(<strong>new</strong>&nbsp;Subject.Builder()).buildSubject();&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ThreadContext.bind(subject);&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;<strong>return</strong>&nbsp;subject;&nbsp;&nbsp;</span></span></span></span></span></li>
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">}&nbsp;&nbsp;&nbsp;</span></span></span></span></span></li>
+</ol>
+</div>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">即首先查看当前线程是否绑定了Subject，如果没有通过Subject.Builder构建一个然后绑定到现场返回。</span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">&nbsp;</span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">如果想自定义创建，可以通过：</span></span></span></p>
+
+<div class="dp-highlighter" id="" style="margin-left:9px; padding:1px; width:679px">
+<div class="bar">
+<div class="tools" style="padding:3px; text-align:left"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace"><strong>Java代码&nbsp;<embed allowscriptaccess="always" height="15" pluginspage="http://www.macromedia.com/go/getflashplayer" quality="high" src="http://jinnianshilongnian.iteye.com/javascripts/syntaxhighlighter/clipboard_new.swf" type="application/x-shockwave-flash" width="14" wmode="transparent"></embed>&nbsp;<a href="javascript:void()" onclick="code_favorites_do_favorite(this);return false;" style="color:#108ac6; text-decoration:underline" title="收藏这段代码"><img alt="收藏代码" class="star" src="http://jinnianshilongnian.iteye.com/images/icon_star.png" style="border:0px" /></a></strong></span></span></span></span></span></div>
+</div>
+
+<ol start="1" style="margin-left:0px; margin-right:0px">
+	<li><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace"><strong>new</strong>&nbsp;Subject.Builder().principals(身份).authenticated(<strong>true</strong>/<strong>false</strong>).buildSubject()&nbsp;&nbsp;</span></span></span></span></span></li>
+</ol>
+</div>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">这种可以创建相应的Subject实例了，然后自己绑定到线程即可。在new Builder()时如果没有传入SecurityManager，自动调用SecurityUtils.getSecurityManager获取；也可以自己传入一个实例。</span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">&nbsp;</span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">对于Subject我们一般这么使用：</span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><strong>1、身份验证（login）</strong></span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><strong>2、授权（hasRole*/isPermitted*或checkRole*/checkPermission*）</strong></span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><strong>3、将相应的数据存储到会话（Session）</strong></span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><strong>4、切换身份（RunAs）/多线程身份传播</strong></span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><strong>5、退出</strong></span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><strong>&nbsp;</strong></span></span></span><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">而我们必须的功能就是1、2、5。到目前为止我们就可以使用Shiro进行应用程序的安全控制了，但是还是缺少如对Web验证、Java方法验证等的一些简化实现。 &nbsp; &nbsp;</span></span></span></p>
+</div>
+</div>
