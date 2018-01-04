@@ -1,0 +1,307 @@
+<h1>Apache Shiro 集成Cas作为cas client端实现</h1>
+
+<h3>第一步、添加maven依赖</h3>
+
+<pre>
+　　  &lt;!-- shiro依赖包 --&gt;
+        &lt;!-- &lt;dependency&gt; &lt;groupId&gt;org.apache.shiro&lt;/groupId&gt; &lt;artifactId&gt;shiro-quartz&lt;/artifactId&gt; &lt;version&gt;${shiro.version}&lt;/version&gt; &lt;/dependency&gt; --&gt;
+        &lt;dependency&gt;
+            &lt;groupId&gt;org.apache.shiro&lt;/groupId&gt;
+            &lt;artifactId&gt;shiro-ehcache&lt;/artifactId&gt;
+            &lt;version&gt;${shiro.version}&lt;/version&gt;
+        &lt;/dependency&gt;
+        &lt;dependency&gt;
+            &lt;groupId&gt;org.apache.shiro&lt;/groupId&gt;
+            &lt;artifactId&gt;shiro-spring&lt;/artifactId&gt;
+            &lt;version&gt;${shiro.version}&lt;/version&gt;
+        &lt;/dependency&gt;
+        &lt;!-- shiro-cas集成依赖包 --&gt;
+        &lt;dependency&gt;
+            &lt;groupId&gt;org.apache.shiro&lt;/groupId&gt;
+            &lt;artifactId&gt;shiro-cas&lt;/artifactId&gt;
+            &lt;version&gt;${shiro.version}&lt;/version&gt;
+        &lt;/dependency&gt;
+</pre>
+
+<h3>第二步、添加spring-shiro.xml配置文件</h3>
+
+<pre>
+&lt;beans xmlns=&quot;http://www.springframework.org/schema/beans&quot; xmlns:xsi=&quot;http://www.w3.org/2001/XMLSchema-instance&quot; xmlns:aop=&quot;http://www.springframework.org/schema/aop&quot;
+    xmlns:tx=&quot;http://www.springframework.org/schema/tx&quot; xmlns:context=&quot;http://www.springframework.org/schema/context&quot; xmlns:util=&quot;http://www.springframework.org/schema/util&quot;
+    xsi:schemaLocation=&quot;  
+     http://www.springframework.org/schema/beans   
+     http://www.springframework.org/schema/beans/spring-beans-3.0.xsd  
+     http://www.springframework.org/schema/context   
+     http://www.springframework.org/schema/context/spring-context-3.0.xsd  
+     http://www.springframework.org/schema/util  
+     http://www.springframework.org/schema/util/spring-util-3.0.xsd&quot;
+    default-lazy-init=&quot;true&quot;&gt;
+    &lt;bean id=&quot;shiroFilter&quot; class=&quot;org.apache.shiro.spring.web.ShiroFilterFactoryBean&quot;&gt;
+        &lt;property name=&quot;securityManager&quot; ref=&quot;securityManager&quot; /&gt;
+        &lt;!-- 设定角色的登录链接，这里为cas登录页面的链接可配置回调地址 --&gt;
+        &lt;property name=&quot;loginUrl&quot; value=&quot;http://192.168.20.248:8080/cas/login?service=http://127.0.0.1:8080/nhmz/shiro-cas&quot; /&gt;
+        &lt;property name=&quot;successUrl&quot; value=&quot;/index.htm&quot;&gt;&lt;/property&gt;
+        &lt;property name=&quot;filters&quot;&gt;
+            &lt;util:map&gt;
+                &lt;entry key=&quot;casFilter&quot; value-ref=&quot;casFilter&quot; /&gt;
+                &lt;entry key=&quot;logout&quot; value-ref=&quot;logout&quot; /&gt;
+            &lt;/util:map&gt;
+        &lt;/property&gt;
+        &lt;property name=&quot;filterChainDefinitions&quot;&gt;
+            &lt;value&gt;
+                /shiro-cas=casFilter
+                /logout.htm=logout
+                /login.htm=authc
+                /xzqh/**=authc
+                /tjfx/**=authc
+                /gxfw/**=authc
+                /xtsz/**=authc
+                /region/**=authc
+                /shareApi/**=authc
+                /**=anon
+            &lt;/value&gt;
+        &lt;/property&gt;
+    &lt;/bean&gt;
+    &lt;!-- shiro-cas登录过滤器 --&gt;
+    &lt;bean id=&quot;casFilter&quot; class=&quot;org.apache.shiro.cas.CasFilter&quot;&gt;
+        &lt;!-- 配置验证错误时的失败页面 ，这里配置为登录页面 --&gt;
+        &lt;property name=&quot;failureUrl&quot; value=&quot;http://192.168.20.248:8080/cas/login?service=http://127.0.0.1:8080/nhmz/shiro-cas&quot; /&gt;
+    &lt;/bean&gt;
+    &lt;!-- 退出登录过滤器 --&gt;
+    &lt;bean id=&quot;logout&quot; class=&quot;org.apache.shiro.web.filter.authc.LogoutFilter&quot;&gt;
+        &lt;property name=&quot;redirectUrl&quot; value=&quot;http://192.168.20.248:8080/cas/logout?service=http://127.0.0.1:8080/nhmz/index.htm&quot; /&gt;
+    &lt;/bean&gt;
+
+   &lt;!-- 自定义casRealm --&gt;
+    &lt;bean id=&quot;casRealm&quot; class=&quot;com.ld.nhmz.shiro.MzCasRealm&quot;&gt;
+        &lt;!-- &lt;property name=&quot;defaultRoles&quot; value=&quot;ROLE_USER&quot; /&gt; --&gt;
+        &lt;!-- 配置cas服务器地址 --&gt;
+        &lt;property name=&quot;casServerUrlPrefix&quot; value=&quot;http://192.168.20.248:8080/cas&quot; /&gt;
+        &lt;!-- 客户端的回调地址设置，必须和上面的shiro-cas过滤器casFilter拦截的地址一致 --&gt;
+        &lt;property name=&quot;casService&quot; value=&quot;http://127.0.0.1:8080/nhmz/shiro-cas&quot; /&gt;
+    &lt;/bean&gt;
+
+    &lt;!--缓存机制 --&gt;
+    &lt;bean id=&quot;cacheManager&quot; class=&quot;org.apache.shiro.cache.ehcache.EhCacheManager&quot;&gt;
+        &lt;property name=&quot;cacheManagerConfigFile&quot; value=&quot;classpath:ehcache-shiro.xml&quot; /&gt;
+    &lt;/bean&gt;
+
+    &lt;bean id=&quot;securityManager&quot; class=&quot;org.apache.shiro.web.mgt.DefaultWebSecurityManager&quot;&gt;
+        &lt;property name=&quot;realm&quot; ref=&quot;casRealm&quot; /&gt;
+        &lt;property name=&quot;subjectFactory&quot; ref=&quot;casSubjectFactory&quot; /&gt;
+        &lt;property name=&quot;cacheManager&quot; ref=&quot;cacheManager&quot; /&gt;
+    &lt;/bean&gt;
+
+    &lt;!-- 如果要实现cas的remember me的功能，需要用到下面这个bean，并设置到securityManager的subjectFactory中 --&gt;
+    &lt;bean id=&quot;casSubjectFactory&quot; class=&quot;org.apache.shiro.cas.CasSubjectFactory&quot; /&gt;
+
+    &lt;bean id=&quot;lifecycleBeanPostProcessor&quot; class=&quot;org.apache.shiro.spring.LifecycleBeanPostProcessor&quot; /&gt;
+
+    &lt;bean class=&quot;org.springframework.beans.factory.config.MethodInvokingFactoryBean&quot;&gt;
+        &lt;property name=&quot;staticMethod&quot; value=&quot;org.apache.shiro.SecurityUtils.setSecurityManager&quot; /&gt;
+        &lt;property name=&quot;arguments&quot; ref=&quot;securityManager&quot; /&gt;
+    &lt;/bean&gt;
+&lt;/beans&gt; 
+</pre>
+
+<p>这里由于前端的每一个操作shiro都会做登录和权限认证，所以上面配置添加了缓存机制</p>
+
+<p><img alt="" src="https://images2015.cnblogs.com/blog/507108/201608/507108-20160823191622667-1914659717.png" />所以在classpath目录下还要添加缓存而配置文件ehcache-shiro.xml，配置如下：</p>
+
+<pre>
+&lt;?xml version=&quot;1.1&quot; encoding=&quot;UTF-8&quot;?&gt;
+&lt;ehcache name=&quot;shirocache&quot;&gt;
+
+    &lt;diskStore path=&quot;java.io.tmpdir&quot;/&gt;
+
+     &lt;defaultCache
+        maxElementsInMemory=&quot;2000&quot;
+        eternal=&quot;false&quot;
+        timeToIdleSeconds=&quot;120&quot;
+        timeToLiveSeconds=&quot;120&quot;
+        overflowToDisk=&quot;true&quot;
+        /&gt;
+        
+&lt;!--     &lt;cache name=&quot;diskCache&quot;
+           maxEntriesLocalHeap=&quot;2000&quot;
+           eternal=&quot;false&quot;
+           timeToIdleSeconds=&quot;300&quot;
+           timeToLiveSeconds=&quot;0&quot;
+           overflowToDisk=&quot;false&quot;
+           statistics=&quot;true&quot;&gt;
+    &lt;/cache&gt; --&gt;
+    
+    &lt;cache name=&quot;passwordRetryCache&quot;
+           maxElementsInMemory=&quot;2000&quot;
+           eternal=&quot;false&quot;
+           timeToIdleSeconds=&quot;300&quot;
+           timeToLiveSeconds=&quot;0&quot;
+           overflowToDisk=&quot;false&quot;
+           &gt;
+    &lt;/cache&gt;
+
+    &lt;cache name=&quot;authorizationCache&quot;
+           maxElementsInMemory=&quot;2000&quot;
+           eternal=&quot;false&quot;
+           timeToIdleSeconds=&quot;1800&quot;
+           timeToLiveSeconds=&quot;0&quot;
+           overflowToDisk=&quot;false&quot;
+           &gt;
+    &lt;/cache&gt;
+
+    &lt;cache name=&quot;authenticationCache&quot;
+           maxElementsInMemory=&quot;2000&quot;
+           eternal=&quot;false&quot;
+           timeToIdleSeconds=&quot;1800&quot;
+           timeToLiveSeconds=&quot;0&quot;
+           overflowToDisk=&quot;false&quot;
+           &gt;
+    &lt;/cache&gt;
+
+    &lt;cache name=&quot;shiro-activeSessionCache&quot;
+           maxElementsInMemory=&quot;2000&quot;
+           eternal=&quot;false&quot;
+           timeToIdleSeconds=&quot;1800&quot;
+           timeToLiveSeconds=&quot;0&quot;
+           overflowToDisk=&quot;false&quot;
+           &gt;
+    &lt;/cache&gt;
+&lt;/ehcache&gt;
+</pre>
+
+<h3>第三步、添加&lt;bean id=&quot;casRealm&quot; class=&quot;com.ld.nhmz.shiro.MzCasRealm&quot;&gt;配置的自定义实现类</h3>
+
+<pre>
+package com.ld.nhmz.shiro;
+
+import java.util.List;
+
+import org.apache.shiro.authc.AuthenticationException;
+import org.apache.shiro.authc.AuthenticationInfo;
+import org.apache.shiro.authc.AuthenticationToken;
+import org.apache.shiro.authz.AuthorizationInfo;
+import org.apache.shiro.authz.SimpleAuthorizationInfo;
+import org.apache.shiro.cas.CasRealm;
+import org.apache.shiro.subject.PrincipalCollection;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.transaction.annotation.Transactional;
+
+import com.ld.nhmz.ebo.SusRoleEntity;
+import com.ld.nhmz.ebo.SusUserEntity;
+import com.ld.nhmz.service.SusRolePermissionService;
+import com.ld.nhmz.service.SusRoleService;
+import com.ld.nhmz.service.SusUserService;
+
+//@Service
+@SuppressWarnings(&quot;deprecation&quot;)
+@Transactional(value = &quot;nhmzTM&quot;)
+public class MzCasRealm extends CasRealm {
+
+    @Autowired
+    private SusUserService userService;
+
+    @Autowired
+    private SusRolePermissionService rolePermissionService;
+
+    @Autowired
+    private SusRoleService roleService;
+
+    /**
+     * 授权访问控制，用于对用户进行的操作进行人证授权，证明该用户是否允许进行当前操作，如访问某个链接，某个资源文件等
+     */
+    @Override
+    protected AuthorizationInfo doGetAuthorizationInfo(PrincipalCollection principals) {
+        String username = (String) principals.getPrimaryPrincipal();
+        SusUserEntity user = userService.findByUsername(username);
+
+        if (user != null) {
+            SimpleAuthorizationInfo authorizationInfo = new SimpleAuthorizationInfo();
+
+            // 设置用户的角色
+            String roleId = userService.getRoleIdFromUserId(user.getId());
+            SusRoleEntity roleEntity = roleService.getRole(roleId);
+            if (null != roleEntity)
+                authorizationInfo.addRole(roleEntity.getRolecode());
+
+            // 设置用户对应的角色的权限集合
+            List&lt;String&gt; permissons;
+            try {
+                permissons = rolePermissionService.getPermissionIds2(roleId);
+                for (String permission : permissons) {
+                    authorizationInfo.addStringPermission(permission);
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+
+            return authorizationInfo;
+        }
+        return null;
+
+    }
+
+    /**
+     * 验证用户身份
+     */
+    @Override
+    protected AuthenticationInfo doGetAuthenticationInfo(AuthenticationToken token) throws AuthenticationException {
+        return super.doGetAuthenticationInfo(token);
+    }
+
+    @Override
+    public void clearCachedAuthorizationInfo(PrincipalCollection principals) {
+        super.clearCachedAuthorizationInfo(principals);
+    }
+
+    @Override
+    public void clearCachedAuthenticationInfo(PrincipalCollection principals) {
+        super.clearCachedAuthenticationInfo(principals);
+    }
+
+    @Override
+    public void clearCache(PrincipalCollection principals) {
+        super.clearCache(principals);
+    }
+
+    public void clearAllCachedAuthorizationInfo() {
+        getAuthorizationCache().clear();
+    }
+
+    public void clearAllCachedAuthenticationInfo() {
+        getAuthenticationCache().clear();
+    }
+
+    public void clearAllCachedKickoutInfo() {
+
+    }
+
+    public void clearAllCache() {
+        clearAllCachedAuthenticationInfo();
+        clearAllCachedAuthorizationInfo();
+        clearAllCachedKickoutInfo();
+    }
+}
+</pre>
+
+<h3>第四步、将spring-shiro.xml配置文件导入到spring的配置文件中，注意配置文件间的相对路径</h3>
+
+<h3><img alt="" src="https://images2015.cnblogs.com/blog/507108/201608/507108-20160823192945105-507299969.png" style="height:255px; width:800px" />第五步、web.xml中添加shiro过滤器</h3>
+
+<pre>
+&lt;!-- shiro filter的名字是shiroFilter,那么在spring的配置文件中要有一个名字为shiroFilter的bean --&gt;
+    &lt;filter&gt;
+        &lt;filter-name&gt;shiroFilter&lt;/filter-name&gt;
+        &lt;filter-class&gt;org.springframework.web.filter.DelegatingFilterProxy&lt;/filter-class&gt;
+        &lt;init-param&gt;
+            &lt;param-name&gt;targetFilterLifecycle&lt;/param-name&gt;
+            &lt;param-value&gt;true&lt;/param-value&gt;
+        &lt;/init-param&gt;
+    &lt;/filter&gt;
+
+    &lt;filter-mapping&gt;
+        &lt;filter-name&gt;shiroFilter&lt;/filter-name&gt;
+        &lt;url-pattern&gt;/*&lt;/url-pattern&gt;
+    &lt;/filter-mapping&gt;
+</pre>
+
+<p>以上步骤完成，shiro集成cas的步骤就完成了，实现了单点登录和单点注销登录。</p>

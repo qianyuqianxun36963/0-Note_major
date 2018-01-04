@@ -1,0 +1,572 @@
+<h1>shiro安全框架扩展教程--整合cas框架扩展自定义CasRealm</h1>
+
+<p>这次我给大家讲讲如何在shiro中整合cas框架,以及扩展自定义的角色和资源体系,啰嗦话不多说了,直接上代码说明</p>
+
+<h2>第一步 搭建cas服务器</h2>
+
+<p>我也不说拉,这个大家用现有的cas服务就行了</p>
+
+<h2>第二步 加入相应的jar包</h2>
+
+<p>先加入cas-client的包到我们的项目 然后再下载个shiro-cas.jar也放到项目里</p>
+
+<blockquote>
+<p>&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&lt;!-- cas集成相关依赖 --&gt;</p>
+
+<p>&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&lt;dependency&gt;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp; &nbsp; &nbsp;&lt;groupId&gt;cas&lt;/groupId&gt;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp; &nbsp; &nbsp;&lt;artifactId&gt;casclient&lt;/artifactId&gt;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp; &nbsp; &nbsp;&lt;version&gt;2.1.1&lt;/version&gt;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&lt;/dependency&gt;<br />
+&nbsp;&nbsp; &nbsp; &nbsp; &nbsp;<br />
+&nbsp;&nbsp; &nbsp; &nbsp; &nbsp;&lt;dependency&gt;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &lt;groupId&gt;org.apache.shiro&lt;/groupId&gt;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &lt;artifactId&gt;shiro-cas&lt;/artifactId&gt;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &lt;version&gt;1.2.2&lt;/version&gt;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &lt;/dependency&gt;</p>
+</blockquote>
+
+<h2>第三步 配置shiro中的cas设置</h2>
+
+<blockquote>
+<p>&lt;description&gt;shiro安全配置&lt;/description&gt;</p>
+
+<p>&nbsp; &nbsp; &lt;!-- 权限管理器 --&gt;<br />
+&nbsp;&nbsp; &nbsp;&lt;bean id=&quot;securityManager&quot; class=&quot;org.apache.shiro.web.mgt.DefaultWebSecurityManager&quot;&gt;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; <strong>&lt;!-- Realm：域，Shiro从Realm获取安全数据（如用户、角色、权限） 通过查询源码可以看到下面这些设置的&nbsp;--&gt;</strong><br />
+<strong>&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&lt;property name=&quot;realms&quot;&gt; &nbsp;<br />
+&nbsp;&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;&lt;list&gt; &nbsp;<br />
+&nbsp;&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;&lt;!-- 数据库认证的实现 org.springrain.frame.shiro.ShiroDbRealm --&gt;<br />
+&nbsp;&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;&lt;ref bean=&quot;shiroDbRealm&quot;/&gt; &nbsp;<br />
+&nbsp;&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;&lt;!-- CAS认证的实现 org.springrain.frame.shiro.ShiroCasRealm --&gt;<br />
+&nbsp;&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;&lt;ref bean=&quot;shiroCasRealm&quot;/&gt; &nbsp;<br />
+&nbsp;&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;&lt;/list&gt; &nbsp;</strong><br />
+&nbsp;&nbsp; &nbsp; &nbsp; &nbsp;&lt;/property&gt; &nbsp;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&lt;!-- session 管理器 --&gt;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&lt;property name=&quot;sessionManager&quot; ref=&quot;sessionManager&quot; /&gt;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&lt;!-- 记住密码管理 --&gt;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&lt;property name=&quot;rememberMeManager&quot; ref=&quot;rememberMeManager&quot;/&gt;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&lt;!-- 缓存管理器 --&gt;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&lt;property name=&quot;cacheManager&quot; ref=&quot;shiroSpringCacheManager&quot; /&gt;<br />
+&nbsp;&nbsp; &nbsp;&lt;/bean&gt;<br />
+&nbsp;&nbsp; &nbsp;<br />
+&nbsp;&nbsp; &nbsp;&lt;!-- 項目自定义的基于数据库的 Realm --&gt;<br />
+&nbsp; &nbsp; &lt;bean id=&quot;shiroDbRealm&quot; class=&quot;com.wh.eas.manage.base.shiro.ShiroDbRealm&quot;&gt;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &lt;constructor-arg name=&quot;cacheManager&quot; ref=&quot;shiroSpringCacheManager&quot;/&gt;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &lt;!-- 启用身份验证缓存，即缓存AuthenticationInfo信息，默认false --&gt;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &lt;property name=&quot;authenticationCachingEnabled&quot; value=&quot;true&quot;/&gt;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &lt;!-- 缓存AuthenticationInfo信息的缓存名称 --&gt;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &lt;property name=&quot;authenticationCacheName&quot; value=&quot;authenticationCache&quot;/&gt;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &lt;!-- 缓存AuthorizationInfo信息的缓存名称 --&gt;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &lt;property name=&quot;authorizationCacheName&quot; value=&quot;authorizationCache&quot;/&gt;<br />
+&nbsp; &nbsp; &lt;/bean&gt;<br />
+&nbsp; &nbsp;&nbsp;<br />
+&nbsp; &nbsp; &lt;!-- 項目自定义的基于cas的 Realm --&gt;<br />
+&nbsp; &nbsp; &lt;bean id=&quot;shiroCasRealm&quot; class=&quot;com.wh.eas.manage.base.shiro.ShiroCasRealm&quot;&gt;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &lt;constructor-arg name=&quot;cacheManager&quot; ref=&quot;shiroSpringCacheManager&quot;/&gt;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &lt;!-- 启用身份验证缓存，即缓存AuthenticationInfo信息，默认false --&gt;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &lt;property name=&quot;authenticationCachingEnabled&quot; value=&quot;true&quot;/&gt;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &lt;!-- 缓存AuthenticationInfo信息的缓存名称 --&gt;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &lt;property name=&quot;authenticationCacheName&quot; value=&quot;authenticationCache&quot;/&gt;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &lt;!-- 缓存AuthorizationInfo信息的缓存名称 --&gt;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &lt;property name=&quot;authorizationCacheName&quot; value=&quot;authorizationCache&quot;/&gt;<br />
+&nbsp; &nbsp; &lt;/bean&gt;<br />
+&nbsp;&nbsp; &nbsp;<br />
+&nbsp;&nbsp; &nbsp;&lt;!-- 记住密码Cookie --&gt;<br />
+&nbsp;&nbsp; &nbsp;&lt;bean id=&quot;rememberMeCookie&quot; class=&quot;org.apache.shiro.web.servlet.SimpleCookie&quot;&gt;<br />
+&nbsp;&nbsp; &nbsp; &nbsp;&lt;constructor-arg value=&quot;rememberMe&quot;/&gt;<br />
+&nbsp;&nbsp; &nbsp; &nbsp;&lt;property name=&quot;httpOnly&quot; value=&quot;true&quot;/&gt;<br />
+&nbsp;&nbsp; &nbsp; &nbsp;&lt;!-- 7天，采用spring el计算方便修改 --&gt;<br />
+&nbsp;&nbsp; &nbsp; &nbsp;&lt;property name=&quot;maxAge&quot; value=&quot;#{7 * 24 * 60 * 60}&quot;/&gt;<br />
+&nbsp;&nbsp; &nbsp;&lt;/bean&gt;<br />
+&nbsp;&nbsp; &nbsp;<br />
+&nbsp;&nbsp; &nbsp;&lt;!-- rememberMe管理器，cipherKey生成com/wh/eas/manage/test/Base64Test.java --&gt;<br />
+&nbsp;&nbsp; &nbsp;&lt;bean id=&quot;rememberMeManager&quot; class=&quot;org.apache.shiro.web.mgt.CookieRememberMeManager&quot;&gt;<br />
+&nbsp;&nbsp; &nbsp; &nbsp;&lt;property name=&quot;cipherKey&quot; value=&quot;#{T(org.apache.shiro.codec.Base64).decode(&#39;5rGf5byA5pWZ5Yqh566h5w==&#39;)}&quot;/&gt;<br />
+&nbsp;&nbsp; &nbsp; &nbsp;&lt;property name=&quot;cookie&quot; ref=&quot;rememberMeCookie&quot;/&gt;<br />
+&nbsp;&nbsp; &nbsp;&lt;/bean&gt;<br />
+&nbsp;&nbsp; &nbsp;<br />
+&nbsp;&nbsp; &nbsp;&lt;!-- session管理器 --&gt;<br />
+&nbsp;&nbsp; &nbsp;&lt;bean id=&quot;sessionManager&quot;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;class=&quot;org.apache.shiro.web.session.mgt.DefaultWebSessionManager&quot;&gt;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&lt;!-- URL重写中去掉jsessionId --&gt;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &lt;property name=&quot;sessionIdUrlRewritingEnabled&quot; &nbsp;value=&quot;false&quot; &nbsp;/&gt;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&lt;!-- 超时时间 --&gt;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&lt;property name=&quot;globalSessionTimeout&quot; value=&quot;#{30 * 60 * 1000}&quot; /&gt;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&lt;!-- 定时检查失效的session,默认true --&gt;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&lt;property name=&quot;sessionValidationSchedulerEnabled&quot; value=&quot;true&quot; /&gt;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&lt;!-- 删除过期的session,默认true --&gt;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&lt;property name=&quot;deleteInvalidSessions&quot; value=&quot;true&quot; /&gt;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&lt;!-- 相隔多久检查一次session的有效性,使用默认的60分钟 &nbsp;--&gt;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&lt;!-- &nbsp;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&lt;property name=&quot;sessionValidationInterval&quot; value=&quot;${cache.timeout}000&quot; /&gt;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;--&gt;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&lt;!-- session存储的实现 --&gt;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&lt;property name=&quot;sessionDAO&quot; ref=&quot;shiroSessionDao&quot; /&gt;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&lt;!-- sessionIdCookie的实现,用于重写覆盖容器默认的JSESSIONID --&gt;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&lt;property name=&quot;sessionIdCookie&quot; ref=&quot;shareSessionCookie&quot; /&gt;<br />
+&nbsp;&nbsp; &nbsp;&lt;/bean&gt;<br />
+&nbsp;&nbsp; &nbsp;<br />
+&nbsp; &nbsp; &lt;!-- sessionIdCookie的实现,用于重写覆盖容器默认的JSESSIONID --&gt;<br />
+&nbsp;&nbsp; &nbsp;&lt;bean id=&quot;shareSessionCookie&quot; class=&quot;org.apache.shiro.web.servlet.SimpleCookie&quot;&gt;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&lt;!-- cookie的name,对应的默认是 JSESSIONID --&gt;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&lt;constructor-arg name=&quot;name&quot; value=&quot;SHAREJSESSIONID&quot; /&gt;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&lt;!-- jsessionId的path为 / 用于多个系统共享jsessionId --&gt;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&lt;property name=&quot;path&quot; value=&quot;/&quot; /&gt;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&lt;!-- more secure, protects against XSS attacks --&gt;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&lt;property name=&quot;httpOnly&quot; value=&quot;true&quot; /&gt;<br />
+&nbsp;&nbsp; &nbsp;&lt;/bean&gt; &nbsp;<br />
+&nbsp;&nbsp; &nbsp;<br />
+&nbsp;&nbsp; &nbsp;&lt;!-- session存储的实现 --&gt;<br />
+&nbsp;&nbsp; &nbsp;&lt;bean id=&quot;shiroSessionDao&quot; class=&quot;com.wh.eas.manage.base.shiro.cache.RedisShiroSessionDao&quot;&gt;<br />
+&nbsp;&nbsp; &nbsp; &nbsp; &lt;property name=&quot;sessionKeyPrefix&quot; value=&quot;web-session-&quot;/&gt;<br />
+&nbsp;&nbsp; &nbsp; &nbsp; &lt;property name=&quot;timeOut&quot; value=&quot;#{30 * 60 * 1000}&quot;/&gt;<br />
+&nbsp;&nbsp; &nbsp;&lt;/bean&gt;<br />
+&nbsp;&nbsp; &nbsp;<br />
+&nbsp; &nbsp; &lt;!-- 启用shrio 控制器授权注解拦截方式 --&gt;<br />
+&nbsp; &nbsp; &lt;bean class=&quot;org.apache.shiro.spring.security.interceptor.AuthorizationAttributeSourceAdvisor&quot;&gt;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &lt;property name=&quot;securityManager&quot; ref=&quot;securityManager&quot;/&gt;<br />
+&nbsp; &nbsp; &lt;/bean&gt;<br />
+&nbsp; &nbsp;&nbsp;<br />
+&nbsp;&nbsp; &nbsp;&lt;!-- 单机session --&gt;<br />
+&nbsp; &lt;!-- &nbsp;&lt;bean id=&quot;shiroSpringCacheManager&quot; class=&quot;org.apache.shiro.cache.MemoryConstrainedCacheManager&quot; /&gt; --&gt;<br />
+&nbsp; &nbsp;&nbsp;<br />
+&nbsp;&nbsp; &nbsp;&lt;!-- session 集群 --&gt;<br />
+&nbsp; &nbsp; &lt;!-- 用户授权信息Cache, 采用spring-cache, 具体请查看spring-redis.xml --&gt;<br />
+&nbsp; &nbsp; &lt;bean id=&quot;shiroSpringCacheManager&quot; class=&quot;com.wh.eas.manage.base.shiro.cache.ShiroSpringCacheManager&quot;&gt;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &lt;!-- &lt;property name=&quot;cacheManager&quot; ref=&quot;cacheManager&quot;/&gt; --&gt;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &lt;property name=&quot;cacheKeyPrefix&quot; value=&quot;web-cache-&quot;/&gt;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &lt;property name=&quot;timeOut&quot; value=&quot;#{30 * 60 * 1000}&quot;/&gt;<br />
+&nbsp; &nbsp; &lt;/bean&gt;&nbsp;<br />
+&nbsp;&nbsp; &nbsp;<br />
+&nbsp; &nbsp; &lt;!-- Shiro Filter --&gt;<br />
+&nbsp; &nbsp; &lt;bean id=&quot;shiroFilter&quot; class=&quot;org.apache.shiro.spring.web.ShiroFilterFactoryBean&quot;&gt;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &lt;!-- 安全管理器 --&gt;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &lt;property name=&quot;securityManager&quot; ref=&quot;securityManager&quot;/&gt;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &lt;!-- 默认的登陆访问url --&gt;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &lt;property name=&quot;loginUrl&quot; value=&quot;/login&quot;/&gt;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &lt;!-- 登陆成功后跳转的url --&gt;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &lt;property name=&quot;successUrl&quot; value=&quot;/index.do&quot;/&gt;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &lt;!-- 没有权限跳转的url --&gt;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &lt;property name=&quot;unauthorizedUrl&quot; value=&quot;/errorView/403&quot;/&gt;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &lt;property name=&quot;filterChainDefinitions&quot;&gt;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &lt;value&gt;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; /getCaptcha = anon<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; /static/** = anon,noSessionCreation<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; /template/** = anon,noSessionCreation<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; /temp/** = anon,noSessionCreation<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; /druid/** = anon,noSessionCreation<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; /upload/** = anon<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; /login* = anon<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; /errorView/* = anon<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; /manage/** = manageuser<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; /index* = manageuser<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &lt;/value&gt;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &lt;/property&gt;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &lt;property name=&quot;filters&quot;&gt;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &lt;map&gt;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &lt;entry key=&quot;manageuser&quot; value-ref=&quot;manageuser&quot; /&gt;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &lt;/map&gt;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &lt;/property&gt;<br />
+&nbsp; &nbsp; &lt;/bean&gt;</p>
+</blockquote>
+
+<p>关于这一个步骤的配置里面注释写的比较清楚了,至于一些类是自己重写的,可以自己参考前面的文章,/mh/cas/login.do其实就是cas拦截器的指定路径,如果想登录就请求这个路径即可,如果没有登录他会跳转cas的login页面</p>
+
+<h2>第四步 重写casrealm</h2>
+
+<p>第四步就是需要重写我们的casrealm,你可以看到上面的配置有SimpleCasRealm,这个类是我自己重写的,是为了方便分配自己本地系统的权限体系,因为shiro-cas提供的默认CasRealm功能比较有限,不能动态角色体系,下面可以看看这个原始的CasRealm源码</p>
+
+<blockquote>public&nbsp;class&nbsp;CasRealm&nbsp;extends&nbsp;AuthorizingRealm&nbsp;&nbsp;<br />
+{&nbsp;&nbsp;<br />
+&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;CasRealm()&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;{&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;validationProtocol&nbsp;=&nbsp;&quot;CAS&quot;;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;rememberMeAttributeName&nbsp;=&nbsp;&quot;longTermAuthenticationRequestTokenUsed&quot;;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;setAuthenticationTokenClass(org/apache/shiro/cas/CasToken);&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;<br />
+&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;protected&nbsp;void&nbsp;onInit()&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;{&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;super.onInit();&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ensureTicketValidator();&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;<br />
+&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;protected&nbsp;TicketValidator&nbsp;ensureTicketValidator()&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;{&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if(ticketValidator&nbsp;==&nbsp;null)&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ticketValidator&nbsp;=&nbsp;createTicketValidator();&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return&nbsp;ticketValidator;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;<br />
+&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;protected&nbsp;TicketValidator&nbsp;createTicketValidator()&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;{&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;String&nbsp;urlPrefix&nbsp;=&nbsp;getCasServerUrlPrefix();&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if(&quot;saml&quot;.equalsIgnoreCase(getValidationProtocol()))&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return&nbsp;new&nbsp;Saml11TicketValidator(urlPrefix);&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;else&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return&nbsp;new&nbsp;Cas20ServiceTicketValidator(urlPrefix);&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;<br />
+&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;protected&nbsp;AuthenticationInfo&nbsp;doGetAuthenticationInfo(AuthenticationToken&nbsp;token)&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;throws&nbsp;AuthenticationException&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;{&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;CasToken&nbsp;casToken&nbsp;=&nbsp;(CasToken)token;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if(token&nbsp;==&nbsp;null)&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return&nbsp;null;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;String&nbsp;ticket&nbsp;=&nbsp;(String)casToken.getCredentials();&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if(!StringUtils.hasText(ticket))&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return&nbsp;null;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;TicketValidator&nbsp;ticketValidator&nbsp;=&nbsp;ensureTicketValidator();&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;try&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Assertion&nbsp;casAssertion&nbsp;=&nbsp;ticketValidator.validate(ticket,&nbsp;getCasService());&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;AttributePrincipal&nbsp;casPrincipal&nbsp;=&nbsp;casAssertion.getPrincipal();&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;String&nbsp;userId&nbsp;=&nbsp;casPrincipal.getName();&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;log.debug(&quot;Validate&nbsp;ticket&nbsp;:&nbsp;{}&nbsp;in&nbsp;CAS&nbsp;server&nbsp;:&nbsp;{}&nbsp;to&nbsp;retrieve&nbsp;user&nbsp;:&nbsp;{}&quot;,&nbsp;new&nbsp;Object[]&nbsp;{&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ticket,&nbsp;getCasServerUrlPrefix(),&nbsp;userId&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;});&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Map&nbsp;attributes&nbsp;=&nbsp;casPrincipal.getAttributes();&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;casToken.setUserId(userId);&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;String&nbsp;rememberMeAttributeName&nbsp;=&nbsp;getRememberMeAttributeName();&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;String&nbsp;rememberMeStringValue&nbsp;=&nbsp;(String)attributes.get(rememberMeAttributeName);&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;boolean&nbsp;isRemembered&nbsp;=&nbsp;rememberMeStringValue&nbsp;!=&nbsp;null&nbsp;&amp;&amp;&nbsp;Boolean.parseBoolean(rememberMeStringValue);&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if(isRemembered)&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;casToken.setRememberMe(true);&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;List&nbsp;principals&nbsp;=&nbsp;CollectionUtils.asList(new&nbsp;Object[]&nbsp;{&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;userId,&nbsp;attributes&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;});&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;PrincipalCollection&nbsp;principalCollection&nbsp;=&nbsp;new&nbsp;SimplePrincipalCollection(principals,&nbsp;getName());&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return&nbsp;new&nbsp;SimpleAuthenticationInfo(principalCollection,&nbsp;ticket);&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;catch(TicketValidationException&nbsp;e)&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;throw&nbsp;new&nbsp;CasAuthenticationException((new&nbsp;StringBuilder()).append(&quot;Unable&nbsp;to&nbsp;validate&nbsp;ticket&nbsp;[&quot;).append(ticket).append(&quot;]&quot;).toString(),&nbsp;e);&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;<br />
+&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;protected&nbsp;AuthorizationInfo&nbsp;doGetAuthorizationInfo(PrincipalCollection&nbsp;principals)&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;{&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;SimplePrincipalCollection&nbsp;principalCollection&nbsp;=&nbsp;(SimplePrincipalCollection)principals;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;List&nbsp;listPrincipals&nbsp;=&nbsp;principalCollection.asList();&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Map&nbsp;attributes&nbsp;=&nbsp;(Map)listPrincipals.get(1);&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;SimpleAuthorizationInfo&nbsp;simpleAuthorizationInfo&nbsp;=&nbsp;new&nbsp;SimpleAuthorizationInfo();&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;addRoles(simpleAuthorizationInfo,&nbsp;split(defaultRoles));&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;addPermissions(simpleAuthorizationInfo,&nbsp;split(defaultPermissions));&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;List&nbsp;attributeNames&nbsp;=&nbsp;split(roleAttributeNames);&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;String&nbsp;value;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;for(Iterator&nbsp;i$&nbsp;=&nbsp;attributeNames.iterator();&nbsp;i$.hasNext();&nbsp;addRoles(simpleAuthorizationInfo,&nbsp;split(value)))&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;String&nbsp;attributeName&nbsp;=&nbsp;(String)i$.next();&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;value&nbsp;=&nbsp;(String)attributes.get(attributeName);&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;<br />
+&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;attributeNames&nbsp;=&nbsp;split(permissionAttributeNames);&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;String&nbsp;value;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;for(Iterator&nbsp;i$&nbsp;=&nbsp;attributeNames.iterator();&nbsp;i$.hasNext();&nbsp;addPermissions(simpleAuthorizationInfo,&nbsp;split(value)))&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;String&nbsp;attributeName&nbsp;=&nbsp;(String)i$.next();&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;value&nbsp;=&nbsp;(String)attributes.get(attributeName);&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;<br />
+&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return&nbsp;simpleAuthorizationInfo;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;<br />
+&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;private&nbsp;List&nbsp;split(String&nbsp;s)&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;{&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;List&nbsp;list&nbsp;=&nbsp;new&nbsp;ArrayList();&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;String&nbsp;elements[]&nbsp;=&nbsp;StringUtils.split(s,&nbsp;&#39;,&#39;);&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if(elements&nbsp;!=&nbsp;null&nbsp;&amp;&amp;&nbsp;elements.length&nbsp;&gt;&nbsp;0)&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;String&nbsp;arr$[]&nbsp;=&nbsp;elements;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;int&nbsp;len$&nbsp;=&nbsp;arr$.length;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;for(int&nbsp;i$&nbsp;=&nbsp;0;&nbsp;i$&nbsp;&lt;&nbsp;len$;&nbsp;i$++)&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;String&nbsp;element&nbsp;=&nbsp;arr$[i$];&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if(StringUtils.hasText(element))&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;list.add(element.trim());&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;<br />
+&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return&nbsp;list;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;<br />
+&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;private&nbsp;void&nbsp;addRoles(SimpleAuthorizationInfo&nbsp;simpleAuthorizationInfo,&nbsp;List&nbsp;roles)&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;{&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;String&nbsp;role;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;for(Iterator&nbsp;i$&nbsp;=&nbsp;roles.iterator();&nbsp;i$.hasNext();&nbsp;simpleAuthorizationInfo.addRole(role))&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;role&nbsp;=&nbsp;(String)i$.next();&nbsp;&nbsp;<br />
+&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;<br />
+&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;private&nbsp;void&nbsp;addPermissions(SimpleAuthorizationInfo&nbsp;simpleAuthorizationInfo,&nbsp;List&nbsp;permissions)&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;{&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;String&nbsp;permission;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;for(Iterator&nbsp;i$&nbsp;=&nbsp;permissions.iterator();&nbsp;i$.hasNext();&nbsp;simpleAuthorizationInfo.addStringPermission(permission))&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;permission&nbsp;=&nbsp;(String)i$.next();&nbsp;&nbsp;<br />
+&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;<br />
+&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;String&nbsp;getCasServerUrlPrefix()&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;{&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return&nbsp;casServerUrlPrefix;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;<br />
+&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;void&nbsp;setCasServerUrlPrefix(String&nbsp;casServerUrlPrefix)&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;{&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;this.casServerUrlPrefix&nbsp;=&nbsp;casServerUrlPrefix;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;<br />
+&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;String&nbsp;getCasService()&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;{&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return&nbsp;casService;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;<br />
+&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;void&nbsp;setCasService(String&nbsp;casService)&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;{&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;this.casService&nbsp;=&nbsp;casService;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;<br />
+&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;String&nbsp;getValidationProtocol()&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;{&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return&nbsp;validationProtocol;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;<br />
+&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;void&nbsp;setValidationProtocol(String&nbsp;validationProtocol)&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;{&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;this.validationProtocol&nbsp;=&nbsp;validationProtocol;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;<br />
+&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;String&nbsp;getRememberMeAttributeName()&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;{&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return&nbsp;rememberMeAttributeName;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;<br />
+&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;void&nbsp;setRememberMeAttributeName(String&nbsp;rememberMeAttributeName)&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;{&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;this.rememberMeAttributeName&nbsp;=&nbsp;rememberMeAttributeName;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;<br />
+&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;String&nbsp;getDefaultRoles()&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;{&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return&nbsp;defaultRoles;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;<br />
+&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;void&nbsp;setDefaultRoles(String&nbsp;defaultRoles)&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;{&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;this.defaultRoles&nbsp;=&nbsp;defaultRoles;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;<br />
+&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;String&nbsp;getDefaultPermissions()&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;{&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return&nbsp;defaultPermissions;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;<br />
+&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;void&nbsp;setDefaultPermissions(String&nbsp;defaultPermissions)&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;{&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;this.defaultPermissions&nbsp;=&nbsp;defaultPermissions;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;<br />
+&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;String&nbsp;getRoleAttributeNames()&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;{&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return&nbsp;roleAttributeNames;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;<br />
+&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;void&nbsp;setRoleAttributeNames(String&nbsp;roleAttributeNames)&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;{&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;this.roleAttributeNames&nbsp;=&nbsp;roleAttributeNames;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;<br />
+&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;String&nbsp;getPermissionAttributeNames()&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;{&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return&nbsp;permissionAttributeNames;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;<br />
+&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;void&nbsp;setPermissionAttributeNames(String&nbsp;permissionAttributeNames)&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;{&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;this.permissionAttributeNames&nbsp;=&nbsp;permissionAttributeNames;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;<br />
+&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;static&nbsp;final&nbsp;String&nbsp;DEFAULT_REMEMBER_ME_ATTRIBUTE_NAME&nbsp;=&nbsp;&quot;longTermAuthenticationRequestTokenUsed&quot;;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;static&nbsp;final&nbsp;String&nbsp;DEFAULT_VALIDATION_PROTOCOL&nbsp;=&nbsp;&quot;CAS&quot;;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;private&nbsp;static&nbsp;Logger&nbsp;log&nbsp;=&nbsp;LoggerFactory.getLogger(org/apache/shiro/cas/CasRealm);&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;private&nbsp;String&nbsp;casServerUrlPrefix;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;private&nbsp;String&nbsp;casService;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;private&nbsp;String&nbsp;validationProtocol;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;private&nbsp;String&nbsp;rememberMeAttributeName;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;private&nbsp;TicketValidator&nbsp;ticketValidator;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;private&nbsp;String&nbsp;defaultRoles;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;private&nbsp;String&nbsp;defaultPermissions;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;private&nbsp;String&nbsp;roleAttributeNames;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;private&nbsp;String&nbsp;permissionAttributeNames;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;<br />
+}&nbsp;&nbsp;</blockquote>
+
+<p>其实跟我们普通用的UserRealm或者是JdbcRealm差别不大,但是里面增加了casToken的验证,所以我们应该直接拿过来用,下面再加载出我们的自己的逻辑即可,所以我们可以选择继承当前的CasRealm重载一下他的两个方法</p>
+
+<blockquote>/**&nbsp;&nbsp;<br />
+&nbsp;*&nbsp;&nbsp;&nbsp;<br />
+&nbsp;*&nbsp;扩展CAS桥接器,订制角色体系和资源体系&nbsp;&nbsp;<br />
+&nbsp;*&nbsp;&nbsp;&nbsp;<br />
+&nbsp;*&nbsp;@author&nbsp;shadow&nbsp;&nbsp;<br />
+&nbsp;*&nbsp;&nbsp;&nbsp;<br />
+&nbsp;*/&nbsp;&nbsp;<br />
+public&nbsp;class&nbsp;SimpleCasRealm&nbsp;extends&nbsp;CasRealm&nbsp;{&nbsp;&nbsp;<br />
+&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;@Autowired&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;private&nbsp;CacheManager&nbsp;cacheManager;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;private&nbsp;final&nbsp;static&nbsp;Logger&nbsp;log&nbsp;=&nbsp;LoggerFactory.getLogger(SimpleCasRealm.class);&nbsp;&nbsp;<br />
+&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;SimpleCasRealm()&nbsp;{&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;super();&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;setCacheManager(cacheManager);&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;<br />
+&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;protected&nbsp;AuthenticationInfo&nbsp;doGetAuthenticationInfo(AuthenticationToken&nbsp;token)&nbsp;throws&nbsp;AuthenticationException&nbsp;{&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;CasToken&nbsp;casToken&nbsp;=&nbsp;(CasToken)&nbsp;token;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if&nbsp;(token&nbsp;==&nbsp;null)&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return&nbsp;null;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;String&nbsp;ticket&nbsp;=&nbsp;(String)&nbsp;casToken.getCredentials();&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if&nbsp;(!StringUtils.hasText(ticket))&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return&nbsp;null;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;TicketValidator&nbsp;ticketValidator&nbsp;=&nbsp;ensureTicketValidator();&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;try&nbsp;{&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Assertion&nbsp;casAssertion&nbsp;=&nbsp;ticketValidator.validate(ticket,&nbsp;getCasService());&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;AttributePrincipal&nbsp;casPrincipal&nbsp;=&nbsp;casAssertion.getPrincipal();&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;String&nbsp;userId&nbsp;=&nbsp;casPrincipal.getName();&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;log.debug(&quot;Validate&nbsp;ticket&nbsp;:&nbsp;{}&nbsp;in&nbsp;CAS&nbsp;server&nbsp;:&nbsp;{}&nbsp;to&nbsp;retrieve&nbsp;user&nbsp;:&nbsp;{}&quot;,&nbsp;new&nbsp;Object[]&nbsp;{&nbsp;ticket,&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;getCasServerUrlPrefix(),&nbsp;userId&nbsp;});&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Map&nbsp;attributes&nbsp;=&nbsp;casPrincipal.getAttributes();&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;casToken.setUserId(userId);&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;String&nbsp;rememberMeAttributeName&nbsp;=&nbsp;getRememberMeAttributeName();&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;String&nbsp;rememberMeStringValue&nbsp;=&nbsp;(String)&nbsp;attributes.get(rememberMeAttributeName);&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;boolean&nbsp;isRemembered&nbsp;=&nbsp;rememberMeStringValue&nbsp;!=&nbsp;null&nbsp;&amp;&amp;&nbsp;Boolean.parseBoolean(rememberMeStringValue);&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if&nbsp;(isRemembered)&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;casToken.setRememberMe(true);&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;List&nbsp;principals&nbsp;=&nbsp;CollectionUtils.asList(new&nbsp;Object[]&nbsp;{&nbsp;userId,&nbsp;attributes&nbsp;});&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;PrincipalCollection&nbsp;principalCollection&nbsp;=&nbsp;new&nbsp;SimplePrincipalCollection(principals,&nbsp;getName());&nbsp;&nbsp;<br />
+&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//&nbsp;这里可以拿到Cas的登录账号信息,加载到对应权限体系信息放到缓存中...&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return&nbsp;new&nbsp;SimpleAuthenticationInfo(principalCollection,&nbsp;ticket);&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;catch&nbsp;(TicketValidationException&nbsp;e)&nbsp;{&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;throw&nbsp;new&nbsp;CasAuthenticationException((new&nbsp;StringBuilder()).append(&quot;Unable&nbsp;to&nbsp;validate&nbsp;ticket&nbsp;[&quot;)&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;.append(ticket).append(&quot;]&quot;).toString(),&nbsp;e);&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;<br />
+&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;protected&nbsp;AuthorizationInfo&nbsp;doGetAuthorizationInfo(PrincipalCollection&nbsp;principals)&nbsp;{&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;SimplePrincipalCollection&nbsp;principalCollection&nbsp;=&nbsp;(SimplePrincipalCollection)&nbsp;principals;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;List&nbsp;listPrincipals&nbsp;=&nbsp;principalCollection.asList();&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Map&nbsp;attributes&nbsp;=&nbsp;(Map)&nbsp;listPrincipals.get(1);&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;SimpleAuthorizationInfo&nbsp;simpleAuthorizationInfo&nbsp;=&nbsp;new&nbsp;SimpleAuthorizationInfo();&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//&nbsp;这里可以加载缓存的中的数据到认证实体...&nbsp;&nbsp;<br />
+&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;addRoles(simpleAuthorizationInfo,&nbsp;split(getDefaultRoles()));&nbsp;&nbsp;<br />
+&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return&nbsp;simpleAuthorizationInfo;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;<br />
+&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;protected&nbsp;List&nbsp;split(String&nbsp;s)&nbsp;{&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;List&nbsp;list&nbsp;=&nbsp;new&nbsp;ArrayList();&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;String&nbsp;elements[]&nbsp;=&nbsp;StringUtils.split(s,&nbsp;&#39;,&#39;);&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if&nbsp;(elements&nbsp;!=&nbsp;null&nbsp;&amp;&amp;&nbsp;elements.length&nbsp;&gt;&nbsp;0)&nbsp;{&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;String&nbsp;arr$[]&nbsp;=&nbsp;elements;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;int&nbsp;len$&nbsp;=&nbsp;arr$.length;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;for&nbsp;(int&nbsp;i$&nbsp;=&nbsp;0;&nbsp;i$&nbsp;&lt;&nbsp;len$;&nbsp;i$++)&nbsp;{&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;String&nbsp;element&nbsp;=&nbsp;arr$[i$];&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if&nbsp;(StringUtils.hasText(element))&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;list.add(element.trim());&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;<br />
+&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return&nbsp;list;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;<br />
+&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;protected&nbsp;void&nbsp;addRoles(SimpleAuthorizationInfo&nbsp;simpleAuthorizationInfo,&nbsp;List&nbsp;roles)&nbsp;{&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;String&nbsp;role;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;for&nbsp;(Iterator&nbsp;i$&nbsp;=&nbsp;roles.iterator();&nbsp;i$.hasNext();&nbsp;simpleAuthorizationInfo.addRole(role))&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;role&nbsp;=&nbsp;(String)&nbsp;i$.next();&nbsp;&nbsp;<br />
+&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;<br />
+&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;protected&nbsp;void&nbsp;addPermissions(SimpleAuthorizationInfo&nbsp;simpleAuthorizationInfo,&nbsp;List&nbsp;permissions)&nbsp;{&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;String&nbsp;permission;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;for&nbsp;(Iterator&nbsp;i$&nbsp;=&nbsp;permissions.iterator();&nbsp;i$.hasNext();&nbsp;simpleAuthorizationInfo&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;.addStringPermission(permission))&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;permission&nbsp;=&nbsp;(String)&nbsp;i$.next();&nbsp;&nbsp;<br />
+&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;<br />
+&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;/**&nbsp;重写退出时缓存处理方法&nbsp;*/&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;protected&nbsp;void&nbsp;doClearCache(PrincipalCollection&nbsp;principals)&nbsp;{&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Object&nbsp;principal&nbsp;=&nbsp;principals.getPrimaryPrincipal();&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;try&nbsp;{&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;getCache().remove(principal);&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;log.debug(new&nbsp;StringBuffer().append(principal).append(&quot;&nbsp;on&nbsp;logout&nbsp;to&nbsp;remove&nbsp;the&nbsp;cache&nbsp;[&quot;).append(principal)&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;.append(&quot;]&quot;).toString());&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;catch&nbsp;(CacheException&nbsp;e)&nbsp;{&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;log.error(e.getMessage());&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;<br />
+&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;/**&nbsp;获取缓存管理器的缓存堆实例&nbsp;*/&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;protected&nbsp;Cache&lt;Object,&nbsp;Object&gt;&nbsp;getCache()&nbsp;throws&nbsp;CacheException&nbsp;{&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return&nbsp;cacheManager.getCache(CacheEmnu.MEMCACHED_DATA_CACHE);&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;<br />
+&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;CacheManager&nbsp;getCacheManager()&nbsp;{&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return&nbsp;cacheManager;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;<br />
+&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;void&nbsp;setCacheManager(CacheManager&nbsp;cacheManager)&nbsp;{&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;this.cacheManager&nbsp;=&nbsp;cacheManager;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;<br />
+&nbsp;&nbsp;<br />
+}&nbsp;&nbsp;</blockquote>
+
+<p>值得提醒大家的一个关键点,如何获取cas返回过来的对象信息呢?</p>
+
+<blockquote>Subject&nbsp;subject&nbsp;=&nbsp;SecurityUtils.getSubject();&nbsp;&nbsp;<br />
+Object&nbsp;principal&nbsp;=&nbsp;subject.getPrincipal();&nbsp;&nbsp;<br />
+PrincipalCollection&nbsp;principals&nbsp;=&nbsp;subject.getPrincipals();</blockquote>
+
+<p>第一个对象是可以获取到当前登录账号</p>
+
+<p>第二个对象是一个List集合其中0元素是当前登录账号,1元素是一个map集合,这里就存放了我们cas服务给我返回的用户信息</p>
+
+<p>我们写的拦截器判断是否有登录就用第一个Object判断是否有null即可</p>
+
+<p>第五步既然有登录了,那就必须有退出功能,那如何才能完整退出呢?流程应该是先执行当前系统的注销,然后再执行cas的logout,这样就比较完整了,不会出现莫名其妙的问题</p>
+
+<p>调用当前的shiro的subject.logout();注销当前系统的对象,然后返回到页面</p>
+
+<blockquote>@RequestMapping(&quot;/mh/cas/logout.do&quot;)&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;ModelAndView&nbsp;casLogout(HttpServletRequest&nbsp;request,&nbsp;HttpServletResponse&nbsp;response,&nbsp;UserDetailsVo&nbsp;vo)&nbsp;{&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;SimpleUtils.getSubject().logout();&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return&nbsp;createModelAndView(&quot;/mh/logout&quot;);&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</blockquote>
+
+<p>页面再重定向到cas的logout,这样就把cas的ticket也注销成功</p>
+
+<ol start="1">
+	<li>&lt;!DOCTYPE&nbsp;html&nbsp;PUBLIC&nbsp;&quot;-//W3C//DTD&nbsp;XHTML&nbsp;1.0&nbsp;Strict//EN&quot;&nbsp;&quot;http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd&quot;&gt;&nbsp;&nbsp;</li>
+	<li>&lt;html&nbsp;xmlns=&quot;http://www.w3.org/1999/xhtml&quot;&gt;&nbsp;&nbsp;</li>
+	<li>&lt;head&gt;&nbsp;&nbsp;</li>
+	<li>&lt;meta&nbsp;http-equiv=&quot;Content-Type&quot;&nbsp;content=&quot;text/html;&nbsp;charset=UTF-8&quot;&gt;&nbsp;&nbsp;</li>
+	<li>&lt;title&gt;正在注销...&lt;/title&gt;&nbsp;&nbsp;</li>
+	<li>&lt;script&nbsp;type=&quot;text/javascript&quot;&nbsp;src=&quot;${staticHost}/static/plugin/jquery/core.js&quot;&gt;&lt;/script&gt;&nbsp;&nbsp;</li>
+	<li>&lt;script&nbsp;type=&quot;text/javascript&quot;&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;location.href=&quot;https://cas.test.com:8443/logout?service=http://test.com/mh/index.do&quot;;&nbsp;&nbsp;</li>
+	<li>&lt;/script&gt;&nbsp;&nbsp;</li>
+	<li>&lt;/head&gt;&nbsp;&nbsp;</li>
+	<li>&lt;body&gt;&nbsp;&nbsp;</li>
+	<li>&lt;/body&gt;&nbsp;&nbsp;</li>
+	<li>&lt;/html&gt;&nbsp;&nbsp;</li>
+</ol>
+
+<p>我想改造大概很明白了,其实shiro-cas.jar已经大部分拦截处理已经帮我们做好了,所以我们很安心地按照以往的方式来操控shiro的登录方式,希望对还没爬过这个坑的同学有帮助</p>

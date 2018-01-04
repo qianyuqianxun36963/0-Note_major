@@ -1,0 +1,162 @@
+<h1>Shiro中多Realm的配置</h1>
+
+<p><strong>项目结构：</strong></p>
+
+<p><strong><img alt="" src="http://img.blog.csdn.net/20161221114123704?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQvcXFfMzEwODAwODk=/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70/gravity/Center" style="height:295px; width:200px" /></strong></p>
+
+<p>学习了前几节，只是知道了验证的一个流程和一些其他的原理等。</p>
+
+<p>那么Realm我们该怎么去理解呢？</p>
+
+<p>首先得知道Realm是什么？怎么操作？为什么要使用Realm?</p>
+
+<p>①：Realm：域，&nbsp;Shiro&nbsp;从&nbsp;Realm&nbsp;获取安全数据&nbsp;（如用户、&nbsp;角色、&nbsp;权限）&nbsp;，&nbsp;就是说&nbsp;SecurityManager要验证用户身份，&nbsp;那么它需要从&nbsp;Realm&nbsp;获取相应的用户进行比较以确定用户身份是否合法；也需要从&nbsp;Realm&nbsp;得到用户相应的角色/权限进行验证用户是否能进行操作；&nbsp;可以把&nbsp;Realm&nbsp;看成&nbsp;DataSource&nbsp;，&nbsp;即&nbsp;安&nbsp;全&nbsp;数&nbsp;据&nbsp;源&nbsp;。</p>
+
+<p>②：多Realm的配置：</p>
+
+<p>在创建一个java类：</p>
+
+<p>youRealm.java:</p>
+
+<blockquote>package&nbsp;com.yiyi.realm;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;<br />
+import&nbsp;org.apache.shiro.authc.AuthenticationException;&nbsp;&nbsp;<br />
+import&nbsp;org.apache.shiro.authc.AuthenticationInfo;&nbsp;&nbsp;<br />
+import&nbsp;org.apache.shiro.authc.AuthenticationToken;&nbsp;&nbsp;<br />
+import&nbsp;org.apache.shiro.authc.LockedAccountException;&nbsp;&nbsp;<br />
+import&nbsp;org.apache.shiro.authc.SimpleAuthenticationInfo;&nbsp;&nbsp;<br />
+import&nbsp;org.apache.shiro.authc.UnknownAccountException;&nbsp;&nbsp;<br />
+import&nbsp;org.apache.shiro.authc.UsernamePasswordToken;&nbsp;&nbsp;<br />
+import&nbsp;org.apache.shiro.crypto.hash.SimpleHash;&nbsp;&nbsp;<br />
+import&nbsp;org.apache.shiro.realm.AuthenticatingRealm;&nbsp;&nbsp;<br />
+import&nbsp;org.apache.shiro.util.ByteSource;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;<br />
+public&nbsp;class&nbsp;youRealm&nbsp;extends&nbsp;AuthenticatingRealm&nbsp;{&nbsp;&nbsp;<br />
+&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;@Override&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;protected&nbsp;AuthenticationInfo&nbsp;doGetAuthenticationInfo(&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;AuthenticationToken&nbsp;token)&nbsp;throws&nbsp;AuthenticationException&nbsp;{&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;System.out.println(&quot;2-----------&gt;&quot;+token);&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//&nbsp;将AuthenticationToken对象转换成UsernamePasswordToken对象&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;UsernamePasswordToken&nbsp;upToken&nbsp;=&nbsp;(UsernamePasswordToken)&nbsp;token;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//&nbsp;获取UsernamePasswordToken中的用户名&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;String&nbsp;username&nbsp;=&nbsp;upToken.getUsername();&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//&nbsp;从数据库中查询&nbsp;username&nbsp;对应的用户记录&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;System.out.println(&quot;从数据库中查找&quot;&nbsp;+&nbsp;username&nbsp;+&nbsp;&quot;的信息&quot;);&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//&nbsp;若用户的信息不存在，则抛出UnknownAccountException异常。&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if&nbsp;(&quot;unknown&quot;.equals(username))&nbsp;{&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;throw&nbsp;new&nbsp;UnknownAccountException(&quot;用户不存在&quot;);&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//&nbsp;根据用户的信息进行反馈，则抛出LockedAccountException异常。&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if&nbsp;(&quot;han&quot;.equals(username))&nbsp;{&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;throw&nbsp;new&nbsp;LockedAccountException(&quot;用户被锁定&quot;);&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//&nbsp;根据用户的信息来封装SimpleAuthenticationInfo对象。&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//&nbsp;当前&nbsp;realm&nbsp;对象的&nbsp;name&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;String&nbsp;realmName&nbsp;=&nbsp;getName();&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//&nbsp;认证的实体信息。&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Object&nbsp;principal&nbsp;=&nbsp;username;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//&nbsp;密码&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Object&nbsp;hashedCredentials&nbsp;=&nbsp;null;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if(&quot;admin&quot;.equals(username)){&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;hashedCredentials&nbsp;=&nbsp;&quot;8a498a5ee7fe22bfdde8db4c1158f98c1fb2c2bc--&quot;;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}else&nbsp;if(&quot;zhao&quot;.equals(username)){&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;hashedCredentials&nbsp;=&nbsp;&quot;84a31ffdbfda46f13709f4a7e69e2f1a91334c87--&quot;;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//盐值&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ByteSource&nbsp;credentialsSalt&nbsp;=&nbsp;ByteSource.Util.bytes(username);&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;SimpleAuthenticationInfo&nbsp;info=new&nbsp;SimpleAuthenticationInfo(principal,&nbsp;hashedCredentials,&nbsp;credentialsSalt,&nbsp;realmName);&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return&nbsp;info;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;/**&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;*&nbsp;明文进行谜面进行加密&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;*&nbsp;@param&nbsp;args&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;*/&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;static&nbsp;void&nbsp;main(String[]&nbsp;args)&nbsp;{&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;int&nbsp;hashIterations&nbsp;=&nbsp;10000;//加密的次数&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Object&nbsp;salt&nbsp;=&nbsp;&quot;admin&quot;;//盐值&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Object&nbsp;credentials&nbsp;=&nbsp;&quot;123456&quot;;//密码&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;String&nbsp;hashAlgorithmName&nbsp;=&nbsp;&quot;SHA1&quot;;//加密方式&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Object&nbsp;simpleHash&nbsp;=&nbsp;new&nbsp;SimpleHash(hashAlgorithmName,&nbsp;credentials,&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;salt,&nbsp;hashIterations);&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;System.out.println(&quot;加密后的值-----&gt;&quot;&nbsp;+&nbsp;simpleHash);&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;<br />
+&nbsp;&nbsp;<br />
+}&nbsp;&nbsp;</blockquote>
+
+<p>注意：第一个realm中采用的是MD5加密，第二个我们就采用SHA1的加密方式。配置同MD5.</p>
+
+<p>那么我们该怎么去配置多个renalm呢,那么它配置的时候有没有先后顺序呢？若有先后顺序是怎么执行的呢？</p>
+
+<p>applicationContext.xml：</p>
+
+<blockquote>&lt;!--&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;1.securityManager：shiro&nbsp;的主营业务&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;2.三个属性：&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;cacheManager：缓存用来提高性能。&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;sessionMode：可以先不管。&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;realm：Shiro&nbsp;从&nbsp;Realm&nbsp;获取安全数据（如用户、角色、权限），就是说&nbsp;&nbsp;<br />
+SecurityManager&nbsp;要验证用户身份，那么它需要从&nbsp;Realm&nbsp;获取相应的用户&nbsp;&nbsp;<br />
+进行比较以确定用户身份是否合法；也需要从&nbsp;Realm&nbsp;得到用户相应的角色/&nbsp;&nbsp;<br />
+权限进行验证用户是否能进行操作。&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;--&gt;&nbsp;&nbsp;<br />
+&lt;bean&nbsp;id=&quot;securityManager&quot;&nbsp;class=&quot;org.apache.shiro.web.mgt.DefaultWebSecurityManager&quot;&gt;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&lt;property&nbsp;name=&quot;cacheManager&quot;&nbsp;ref=&quot;cacheManager&quot;/&gt;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&lt;!--&nbsp;Single&nbsp;realm&nbsp;app.&nbsp;&nbsp;If&nbsp;you&nbsp;have&nbsp;multiple&nbsp;realms,&nbsp;use&nbsp;the&nbsp;&#39;realms&#39;&nbsp;property&nbsp;instead.&nbsp;--&gt;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&lt;property&nbsp;name=&quot;sessionMode&quot;&nbsp;value=&quot;native&quot;/&gt;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&lt;property&nbsp;name=&quot;authenticator&quot;&nbsp;ref=&quot;authenticator&quot;&gt;&lt;/property&gt;&nbsp;&nbsp;<br />
+lt;/bean&gt;&nbsp;&nbsp;<br />
+&lt;!--多个realm的配置--&gt;&nbsp;&nbsp;<br />
+&lt;bean&nbsp;id=&quot;authenticator&quot;&nbsp;class=&quot;org.apache.shiro.authc.pam.ModularRealmAuthenticator&quot;&gt;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&lt;property&nbsp;name=&quot;realms&quot;&gt;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;list&gt;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;ref&nbsp;bean=&quot;jdbcRealm&quot;/&gt;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;ref&nbsp;bean=&quot;jdbcRealm2&quot;/&gt;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/list&gt;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&lt;/property&gt;&nbsp;&nbsp;<br />
+&lt;/bean&gt;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;<br />
+&nbsp;&lt;!--&nbsp;实现Realm接口即可。&nbsp;--&gt;&nbsp;&nbsp;<br />
+&lt;bean&nbsp;id=&quot;jdbcRealm&quot;&nbsp;class=&quot;com.yiyi.realm.MyRealm&quot;&gt;&nbsp;&nbsp;<br />
+&lt;!--验证方式--&gt;&nbsp;&nbsp;<br />
+&lt;property&nbsp;name=&quot;credentialsMatcher&quot;&nbsp;&gt;&nbsp;&nbsp;<br />
+&nbsp;&lt;bean&nbsp;class=&quot;org.apache.shiro.authc.credential.HashedCredentialsMatcher&quot;&gt;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&lt;property&nbsp;name=&quot;hashAlgorithmName&quot;&nbsp;value=&quot;MD5&quot;&gt;&lt;/property&gt;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&lt;property&nbsp;name=&quot;hashIterations&quot;&nbsp;value=&quot;10000&quot;&gt;&lt;/property&gt;&nbsp;&nbsp;<br />
+&nbsp;&lt;/bean&gt;&nbsp;&nbsp;<br />
+&lt;/property&gt;&nbsp;&nbsp;<br />
+&lt;/bean&gt;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;<br />
+&lt;bean&nbsp;id=&quot;jdbcRealm2&quot;&nbsp;class=&quot;com.yiyi.realm.youRealm&quot;&gt;&nbsp;&nbsp;<br />
+&lt;!--验证方式--&gt;&nbsp;&nbsp;<br />
+&lt;property&nbsp;name=&quot;credentialsMatcher&quot;&nbsp;&gt;&nbsp;&nbsp;<br />
+&nbsp;&lt;bean&nbsp;class=&quot;org.apache.shiro.authc.credential.HashedCredentialsMatcher&quot;&gt;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&lt;property&nbsp;name=&quot;hashAlgorithmName&quot;&nbsp;value=&quot;SHA1&quot;&gt;&lt;/property&gt;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&lt;property&nbsp;name=&quot;hashIterations&quot;&nbsp;value=&quot;10000&quot;&gt;&lt;/property&gt;&nbsp;&nbsp;<br />
+&nbsp;&lt;/bean&gt;&nbsp;&nbsp;<br />
+&lt;/property&gt;&nbsp;&nbsp;<br />
+&lt;/bean&gt;&nbsp;&nbsp;</blockquote>
+
+<p>那我们可以来验证下配置realm的有没有先后顺序以及先后顺序的执行流程。</p>
+
+<p>代码如下：</p>
+
+<blockquote>&lt;!--多个realm的配置--&gt;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&lt;bean&nbsp;id=&quot;authenticator&quot;&nbsp;class=&quot;org.apache.shiro.authc.pam.ModularRealmAuthenticator&quot;&gt;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;property&nbsp;name=&quot;realms&quot;&gt;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;list&gt;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;ref&nbsp;bean=&quot;jdbcRealm2&quot;/&gt;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;ref&nbsp;bean=&quot;jdbcRealm&quot;/&gt;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/list&gt;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/property&gt;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&lt;/bean&gt;&nbsp;</blockquote>
+
+<p>引用Relam的话，先进行引用第二个，再引用第一个，则在控制台可以看到打印的信息：</p>
+
+<p><img alt="" src="http://img.blog.csdn.net/20161221125022391?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQvcXFfMzEwODAwODk=/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70/gravity/Center" style="height:272px; width:600px" /></p>
+
+<p>通过验证发现，realm配置在前面的话，先执行那个。</p>
+
+<p>③：如果我们用一个项目中使用了俩种数据库，比如说mysql和Oracle,那么他们加密过的密码是不一样，所以需要配置多个realm来进行区分。</p>

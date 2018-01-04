@@ -1,0 +1,239 @@
+<h1>CAS实现SSO单点登录原理</h1>
+
+<h2>1.&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;CAS&nbsp;简介</h2>
+
+<h3>1.1.&nbsp;&nbsp;What is CAS&nbsp;？</h3>
+
+<p>CAS&nbsp;（&nbsp;Central Authentication Service&nbsp;） 是&nbsp;Yale&nbsp;大学发起的一个企业级的、开源的项目，旨在为&nbsp;Web&nbsp;应用系统提供一种可靠的单点登录解决方法（属于&nbsp;Web SSO&nbsp;）。</p>
+
+<p>CAS&nbsp;开始于&nbsp;2001&nbsp;年， 并在&nbsp;2004&nbsp;年&nbsp;12&nbsp;月正式成为&nbsp;JA-SIG&nbsp;的一个项目。</p>
+
+<h3>1.2.&nbsp;&nbsp;主要特性</h3>
+
+<p>1、&nbsp;&nbsp;&nbsp;开源的、多协议的&nbsp;SSO&nbsp;解决方案；&nbsp;Protocols&nbsp;：&nbsp;Custom Protocol&nbsp;、&nbsp;CAS&nbsp;、&nbsp;OAuth&nbsp;、&nbsp;OpenID&nbsp;、&nbsp;RESTful API&nbsp;、&nbsp;SAML1.1&nbsp;、&nbsp;SAML2.0&nbsp;等。</p>
+
+<p>2、&nbsp;&nbsp;&nbsp;支持多种认证机制：&nbsp;Active Directory&nbsp;、&nbsp;JAAS&nbsp;、&nbsp;JDBC&nbsp;、&nbsp;LDAP&nbsp;、&nbsp;X.509 Certificates&nbsp;等；</p>
+
+<p>3、&nbsp;&nbsp;&nbsp;安全策略：使用票据（&nbsp;Ticket&nbsp;）来实现支持的认证协议；</p>
+
+<p>4、&nbsp;&nbsp;&nbsp;支持授权：可以决定哪些服务可以请求和验证服务票据（&nbsp;Service Ticket&nbsp;）；</p>
+
+<p>5、&nbsp;&nbsp;&nbsp;提供高可用性：通过把认证过的状态数据存储在&nbsp;TicketRegistry&nbsp;组件中，这些组件有很多支持分布式环境的实现，如：&nbsp;BerkleyDB&nbsp;、&nbsp;Default&nbsp;、&nbsp;EhcacheTicketRegistry&nbsp;、&nbsp;JDBCTicketRegistry&nbsp;、&nbsp;JBOSS TreeCache&nbsp;、&nbsp;JpaTicketRegistry&nbsp;、&nbsp;MemcacheTicketRegistry&nbsp;等；</p>
+
+<p>6、&nbsp;&nbsp;&nbsp;支持多种客户端：&nbsp;Java&nbsp;、&nbsp;.Net&nbsp;、&nbsp;PHP&nbsp;、&nbsp;Perl&nbsp;、&nbsp;Apache, uPortal&nbsp;等。</p>
+
+<p>&nbsp;</p>
+
+<h2>2.&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;SSO&nbsp;单点登录原理</h2>
+
+<p>本文内容主要针对&nbsp;Web SSO&nbsp;。</p>
+
+<h3>2.1.&nbsp;&nbsp;什么是SSO</h3>
+
+<p>单点登录（&nbsp;Single Sign-On ,&nbsp;简称&nbsp;SSO&nbsp;）是目前比较流行的服务于企业业务整合的解决方案之一，&nbsp;SSO&nbsp;使得在多个应用系统中，用户只需要&nbsp;<strong>登录一次&nbsp;</strong>就可以访问所有相互信任的应用系统。</p>
+
+<h3>2.2.&nbsp;&nbsp;SSO&nbsp;原理</h3>
+
+<h4>2.2.1.&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;SSO&nbsp;体系中的角色</h4>
+
+<p>一般&nbsp;SSO&nbsp;体系主要角色有三种：</p>
+
+<p>1、&nbsp;User&nbsp;（多个）</p>
+
+<p>2、&nbsp;Web&nbsp;应用（多个）</p>
+
+<p>3、&nbsp;SSO&nbsp;认证中心（&nbsp;<strong>1&nbsp;个&nbsp;</strong>）</p>
+
+<h4>2.2.2.&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;SSO&nbsp;实现模式的原则</h4>
+
+<p>SSO&nbsp;实现模式一般包括以下三个原则：</p>
+
+<p>1、&nbsp;&nbsp;&nbsp;所有的认证登录都在&nbsp;SSO&nbsp;认证中心进行；</p>
+
+<p>2、&nbsp;&nbsp;&nbsp;SSO&nbsp;认证中心通过一些方法来告诉&nbsp;Web&nbsp;应用当前访问用户究竟是不是已通过认证的用户；</p>
+
+<p>3、&nbsp;&nbsp;&nbsp;SSO&nbsp;认证中心和所有的&nbsp;Web&nbsp;应用建立一种信任关系，也就是说&nbsp;web&nbsp;应用必须信任认证中心。（单点信任）</p>
+
+<h4>2.2.3.&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;SSO&nbsp;主要实现方式</h4>
+
+<p>SSO&nbsp;的主要实现方式有：</p>
+
+<p>1、&nbsp;&nbsp;&nbsp;共享&nbsp;cookies</p>
+
+<p>基于共享同域的&nbsp;cookie&nbsp;是&nbsp;Web&nbsp;刚开始阶段时使用的一种方式，它利用浏览同域名之间自动传递&nbsp;cookies&nbsp;机制，实现两个域名之间系统令牌传递问题；另外，关于跨域问题，虽然&nbsp;cookies本身不跨域，但可以利用它实现跨域的&nbsp;SSO&nbsp;。如：代理、暴露&nbsp;SSO&nbsp;令牌值等。</p>
+
+<p>缺点：不灵活而且有不少安全隐患，已经被抛弃。</p>
+
+<p>2、&nbsp;&nbsp;&nbsp;Broker-based(&nbsp;基于经纪人&nbsp;)</p>
+
+<p>这种技术的特点就是，有一个集中的认证和用户帐号管理的服务器。经纪人给被用于进一步请求的电子身份存取。中央数据库的使用减少了管理的代价，并为认证提供一个公共和独立的&nbsp;&quot;第三方&nbsp;&quot;&nbsp;。例如&nbsp;Kerberos&nbsp;、&nbsp;Sesame&nbsp;、&nbsp;IBM KryptoKnight&nbsp;（凭证库思想&nbsp;)&nbsp;等。&nbsp;Kerberos是由麻省理工大学发明的安全认证服务，已经被&nbsp;UNIX&nbsp;和&nbsp;Windows&nbsp;作为默认的安全认证服务集成进操作系统。</p>
+
+<p>3、&nbsp;&nbsp;&nbsp;Agent-based&nbsp;（基于代理人）</p>
+
+<p>在这种解决方案中，有一个自动地为不同的应用程序认证用户身份的代理程序。这个代理程序需要设计有不同的功能。比如，它可以使用口令表或加密密钥来自动地将认证的负担从用户移开。代理人被放在服务器上面，在服务器的认证系统和客户端认证方法之间充当一个&nbsp;&quot;&nbsp;翻译&nbsp;&quot;。例如&nbsp;SSH&nbsp;等。</p>
+
+<p>4、&nbsp;&nbsp;&nbsp;Token-based</p>
+
+<p>例如&nbsp;SecureID,WebID&nbsp;，现在被广泛使用的口令认证，比如&nbsp;FTP&nbsp;、邮件服务器的登录认证，这是一种简单易用的方式，实现一个口令在多种应用当中使用。</p>
+
+<p>5、&nbsp;&nbsp;&nbsp;基于网关</p>
+
+<p>6、&nbsp;&nbsp;&nbsp;基于&nbsp;SAML</p>
+
+<p>SAML(Security Assertion Markup Language&nbsp;，安全断言标记语言）的出现大大简化了&nbsp;SSO&nbsp;，并被&nbsp;OASIS&nbsp;批准为&nbsp;<strong>SSO&nbsp;的执行标准&nbsp;</strong>。开源组织&nbsp;OpenSAML&nbsp;实现了&nbsp;SAML&nbsp;规范。</p>
+
+<h2>3.&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;CAS&nbsp;的基本原理</h2>
+
+<h3>3.1.&nbsp;&nbsp;结构体系</h3>
+
+<p>从结构体系看，&nbsp;CAS&nbsp;包括两部分：&nbsp;CAS Server&nbsp;和&nbsp;CAS Client&nbsp;。</p>
+
+<h4>3.1.1.&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;CAS Server</h4>
+
+<p>CAS Server&nbsp;负责完成对用户的认证工作&nbsp;,&nbsp;需要独立部署&nbsp;,&nbsp;CAS Server&nbsp;会处理用户名&nbsp;/&nbsp;密码等凭证(Credentials)&nbsp;。</p>
+
+<h4>3.1.2.&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;CAS Client</h4>
+
+<p>负责处理对客户端受保护资源的访问请求，需要对请求方进行身份认证时，重定向到&nbsp;CAS Server&nbsp;进行认证。（原则上，客户端应用不再接受任何的用户名密码等&nbsp;Credentials&nbsp;）。</p>
+
+<p>CAS Client&nbsp;与受保护的客户端应用部署在一起，以&nbsp;Filter&nbsp;方式保护受保护的资源。</p>
+
+<h3>3.2.&nbsp;&nbsp;CAS&nbsp;原理和协议</h3>
+
+<h4>3.2.1.&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;基础模式</h4>
+
+<p>基础模式&nbsp;SSO&nbsp;访问流程主要有以下步骤：</p>
+
+<p>1.&nbsp;访问服务：&nbsp;SSO&nbsp;客户端发送请求访问应用系统提供的服务资源。</p>
+
+<p>2.&nbsp;定向认证：&nbsp;SSO&nbsp;客户端会重定向用户请求到&nbsp;SSO&nbsp;服务器。</p>
+
+<p>3.&nbsp;用户认证：用户身份认证。</p>
+
+<p>4.&nbsp;发放票据：&nbsp;SSO&nbsp;服务器会产生一个随机的&nbsp;Service Ticket&nbsp;。</p>
+
+<p>5.&nbsp;验证票据：&nbsp;SSO&nbsp;服务器验证票据&nbsp;Service Ticket&nbsp;的合法性，验证通过后，允许客户端访问服务。</p>
+
+<p>6.&nbsp;传输用户信息：&nbsp;SSO&nbsp;服务器验证票据通过后，传输用户认证结果信息给客户端。</p>
+
+<p>下面是&nbsp;CAS&nbsp;最基本的协议过程：</p>
+
+<p>&nbsp;</p>
+
+<p><img alt="cas基础协议图" src="http://www.coin163.com/java/cas/images/cas_clip_image001.jpg" /></p>
+
+<p>基础协议图</p>
+
+<p>如上图：&nbsp;CAS Client&nbsp;与受保护的客户端应用部署在一起，以&nbsp;Filter&nbsp;方式保护&nbsp;Web&nbsp;应用的受保护资源，过滤从客户端过来的每一个&nbsp;Web&nbsp;请求，同时，&nbsp;CAS Client&nbsp;会分析&nbsp;HTTP&nbsp;请求中是否包含请求&nbsp;Service Ticket( ST&nbsp;上图中的&nbsp;Ticket)&nbsp;，如果没有，则说明该用户是没有经过认证的；于是&nbsp;CAS Client&nbsp;会重定向用户请求到&nbsp;CAS Server&nbsp;（&nbsp;Step 2&nbsp;），并传递&nbsp;Service&nbsp;（要访问的目的资源地址）。&nbsp;Step 3&nbsp;是用户认证过程，如果用户提供了正确的&nbsp;Credentials&nbsp;，&nbsp;CAS Server&nbsp;随机产生一个相当长度、唯一、不可伪造的&nbsp;Service Ticket&nbsp;，并缓存以待将来验证，并且重定向用户到&nbsp;Service&nbsp;所在地址（附带刚才产生的&nbsp;Service Ticket&nbsp;）&nbsp;,&nbsp;<strong>并为客户端浏览器设置一个&nbsp;Ticket Granted Cookie&nbsp;（&nbsp;TGC&nbsp;）&nbsp;</strong>；&nbsp;CAS Client&nbsp;在拿到&nbsp;Service&nbsp;和新产生的&nbsp;Ticket&nbsp;过后，在&nbsp;Step 5&nbsp;和&nbsp;Step6&nbsp;中与&nbsp;CAS Server&nbsp;进行身份核实，以确保&nbsp;Service Ticket&nbsp;的合法性。</p>
+
+<p>在该协议中，所有与&nbsp;CAS Server&nbsp;的交互均采用&nbsp;SSL&nbsp;协议，以确保&nbsp;ST&nbsp;和&nbsp;TGC&nbsp;的安全性。协议工作过程中会有&nbsp;<strong>2&nbsp;次重定向&nbsp;</strong>的过程。但是&nbsp;CAS Client&nbsp;与&nbsp;CAS Server&nbsp;之间进行&nbsp;Ticket&nbsp;验证的过程对于用户是透明的（使用&nbsp;HttpsURLConnection&nbsp;）。</p>
+
+<p>&nbsp;&nbsp;&nbsp;&nbsp;CAS&nbsp;请求认证时序图如下：</p>
+
+<p>&nbsp;</p>
+
+<p><img alt="cas认证时序图" src="http://www.coin163.com/java/cas/images/cas_clip_image003.gif" />&nbsp;&nbsp;</p>
+
+<h4>3.2.1.&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;CAS&nbsp;如何实现&nbsp;SSO</h4>
+
+<p>当用户访问另一个应用的服务再次被重定向到&nbsp;CAS Server&nbsp;的时候，&nbsp;CAS Server&nbsp;会主动获到这个&nbsp;TGC cookie&nbsp;，然后做下面的事情：</p>
+
+<p>1)&nbsp;如果&nbsp;User&nbsp;持有&nbsp;TGC&nbsp;且其还没失效，那么就走基础协议图的&nbsp;Step4&nbsp;，达到了&nbsp;SSO&nbsp;的效果；</p>
+
+<p>2)&nbsp;如果&nbsp;TGC&nbsp;失效，那么用户还是要重新认证&nbsp;(&nbsp;走基础协议图的&nbsp;Step3)&nbsp;。</p>
+
+<h4>3.2.2.&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;CAS&nbsp;代理模式</h4>
+
+<p>该模式形式为用户访问&nbsp;App1&nbsp;，&nbsp;App1&nbsp;又依赖于&nbsp;App2&nbsp;来获取一些信息，如：&nbsp;User --&gt;App1 --&gt;App2。</p>
+
+<p>这种情况下，假设&nbsp;App2&nbsp;也是需要对&nbsp;User&nbsp;进行身份验证才能访问，那么，为了不影响用户体验（过多的重定向导致&nbsp;User&nbsp;的&nbsp;IE&nbsp;窗口不停地闪动&nbsp;)&nbsp;，&nbsp;CAS&nbsp;引入了一种&nbsp;Proxy&nbsp;认证机制，即&nbsp;CAS Client&nbsp;可以代理用户去访问其它&nbsp;Web&nbsp;应用。</p>
+
+<p>代理的前提是需要&nbsp;CAS Client&nbsp;拥有用户的身份信息&nbsp;(&nbsp;类似凭据&nbsp;)&nbsp;。之前我们提到的&nbsp;TGC&nbsp;是用户持有对自己身份信息的一种凭据，这里的&nbsp;PGT&nbsp;就是&nbsp;CAS Client&nbsp;端持有的对用户身份信息的一种凭据。凭借TGC&nbsp;，&nbsp;User&nbsp;可以免去输入密码以获取访问其它服务的&nbsp;Service Ticket&nbsp;，所以，这里凭借&nbsp;PGT&nbsp;，&nbsp;Web应用可以代理用户去实现后端的认证，而&nbsp;<strong>无需前端用户的参与&nbsp;</strong>。</p>
+
+<p>下面为代理应用（&nbsp;helloService&nbsp;）获取&nbsp;PGT&nbsp;的过程：&nbsp;（注：&nbsp;PGTURL&nbsp;用于表示一个&nbsp;Proxy&nbsp;服务，是一个回调链接；&nbsp;PGT&nbsp;相当于代理证；&nbsp;PGTIOU&nbsp;为取代理证的钥匙，用来与&nbsp;PGT&nbsp;做关联关系；）</p>
+
+<p>&nbsp;</p>
+
+<p><img alt="cas代理PGT获取" src="http://www.coin163.com/java/cas/images/cas_clip_image004.jpg" />&nbsp;&nbsp;</p>
+
+<p>如上面的&nbsp;CAS Proxy&nbsp;图所示，&nbsp;<strong>CAS Client&nbsp;</strong>在基础协议之上，在验证&nbsp;ST&nbsp;时提供了一个额外的PGT URL(&nbsp;而且是&nbsp;SSL&nbsp;的入口&nbsp;)&nbsp;给&nbsp;CAS Server&nbsp;，使得&nbsp;CAS Server&nbsp;可以通过&nbsp;PGT URL&nbsp;提供一个&nbsp;PGT&nbsp;给&nbsp;CAS Client&nbsp;。</p>
+
+<p>CAS Client&nbsp;拿到了&nbsp;PGT(PGTIOU-85&nbsp;&hellip;&nbsp;..ti2td)&nbsp;，就可以通过&nbsp;PGT&nbsp;向后端&nbsp;Web&nbsp;应用进行认证。</p>
+
+<p>下面是代理认证和提供服务的过程：</p>
+
+<p><img alt="" src="http://www.coin163.com/java/cas/images/cas_clip_image005.jpg" /></p>
+
+<p>&nbsp;</p>
+
+<p>如上图所示，&nbsp;Proxy&nbsp;认证与普通的认证其实差别不大，&nbsp;Step1&nbsp;，&nbsp;2&nbsp;与基础模式的&nbsp;Step1,2&nbsp;几乎一样，唯一不同的是，&nbsp;Proxy&nbsp;模式用的是&nbsp;PGT&nbsp;而不是&nbsp;TGC&nbsp;，是&nbsp;Proxy Ticket&nbsp;（&nbsp;PT&nbsp;）而不是&nbsp;Service Ticket&nbsp;。</p>
+
+<h4>3.2.3.&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;辅助说明</h4>
+
+<p>CAS&nbsp;的&nbsp;SSO&nbsp;实现方式可简化理解为：&nbsp;1&nbsp;个&nbsp;Cookie&nbsp;和&nbsp;N&nbsp;个&nbsp;Session&nbsp;。&nbsp;CAS Server&nbsp;创建&nbsp;cookie，在所有应用认证时使用，各应用通过创建各自的&nbsp;Session&nbsp;来标识用户是否已登录。</p>
+
+<p>用户在一个应用验证通过后，以后用户在同一浏览器里访问此应用时，客户端应用中的过滤器会在&nbsp;session&nbsp;里读取到用户信息，所以就不会去&nbsp;CAS Server&nbsp;认证。如果在此浏览器里访问别的&nbsp;web&nbsp;应用时，客户端应用中的过滤器在&nbsp;session&nbsp;里读取不到用户信息，就会去&nbsp;CAS Server&nbsp;的&nbsp;login&nbsp;接口认证，但这时CAS Server&nbsp;会读取到浏览器传来的&nbsp;cookie&nbsp;（&nbsp;TGC&nbsp;），所以&nbsp;CAS Server&nbsp;不会要求用户去登录页面登录，只是会根据&nbsp;service&nbsp;参数生成一个&nbsp;Ticket&nbsp;，然后再和&nbsp;web&nbsp;应用做一个验证&nbsp;ticket&nbsp;的交互而已。</p>
+
+<h3>3.3.&nbsp;&nbsp;术语解释</h3>
+
+<p>CAS&nbsp;系统中设计了&nbsp;5&nbsp;中票据：&nbsp;TGC&nbsp;、&nbsp;ST&nbsp;、&nbsp;PGT&nbsp;、&nbsp;PGTIOU&nbsp;、&nbsp;PT&nbsp;。</p>
+
+<p>&Oslash;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Ticket-granting cookie(TGC)&nbsp;：存放用户身份认证凭证的&nbsp;cookie&nbsp;，在浏览器和&nbsp;CAS Server&nbsp;间通讯时使用，并且只能基于安全通道传输（&nbsp;Https&nbsp;），是&nbsp;CAS Server&nbsp;用来明确用户身份的凭证；</p>
+
+<p>&Oslash;&nbsp;&nbsp;&nbsp;Service ticket(ST)&nbsp;：服务票据，服务的惟一标识码&nbsp;,&nbsp;由&nbsp;CAS Server&nbsp;发出（&nbsp;Http&nbsp;传送），通过客户端浏览器到达业务服务器端；一个特定的服务只能有一个惟一的&nbsp;ST&nbsp;；</p>
+
+<p>&Oslash;&nbsp;&nbsp;&nbsp;Proxy-Granting ticket&nbsp;（&nbsp;PGT&nbsp;）：由&nbsp;CAS Server&nbsp;颁发给拥有&nbsp;ST&nbsp;凭证的服务，&nbsp;PGT&nbsp;绑定一个用户的特定服务，使其拥有向&nbsp;CAS Server&nbsp;申请，获得&nbsp;PT&nbsp;的能力；</p>
+
+<p>&Oslash;&nbsp;&nbsp;&nbsp;Proxy-Granting Ticket I Owe You&nbsp;（&nbsp;PGTIOU&nbsp;）&nbsp;:&nbsp;作用是将通过凭证校验时的应答信息由&nbsp;CAS Server&nbsp;返回给&nbsp;CAS Client&nbsp;，同时，与该&nbsp;PGTIOU&nbsp;对应的&nbsp;PGT&nbsp;将通过回调链接传给&nbsp;Web&nbsp;应用。&nbsp;Web&nbsp;应用负责维护&nbsp;PGTIOU&nbsp;与&nbsp;PGT&nbsp;之间映射关系的内容表；</p>
+
+<p>&Oslash;&nbsp;&nbsp;&nbsp;Proxy Ticket (PT)&nbsp;：是应用程序代理用户身份对目标程序进行访问的凭证；</p>
+
+<p>其它说明如下：</p>
+
+<p>&Oslash;&nbsp;&nbsp;&nbsp;Ticket Granting ticket(TGT)&nbsp;：票据授权票据，由&nbsp;KDC&nbsp;的&nbsp;AS&nbsp;发放。即获取这样一张票据后，以后申请各种其他服务票据&nbsp;(ST)&nbsp;便不必再向&nbsp;KDC&nbsp;提交身份认证信息&nbsp;(Credentials)&nbsp;；</p>
+
+<p>&Oslash;&nbsp;&nbsp;&nbsp;Authentication service(AS) ---------&nbsp;认证用服务，索取&nbsp;Credentials&nbsp;，发放&nbsp;TGT&nbsp;；</p>
+
+<p>&Oslash;&nbsp;&nbsp;&nbsp;Ticket-granting service (TGS) ---------&nbsp;票据授权服务，索取&nbsp;TGT&nbsp;，发放&nbsp;ST&nbsp;；</p>
+
+<p>&Oslash;&nbsp;&nbsp;&nbsp;KDC( Key Distribution Center ) ----------&nbsp;密钥发放中心；</p>
+
+<h2>4.&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;CAS&nbsp;安全性</h2>
+
+<p>CAS&nbsp;的安全性仅仅依赖于&nbsp;SSL&nbsp;。使用的是&nbsp;secure cookie&nbsp;。</p>
+
+<h3>4.1.&nbsp;&nbsp;TGC/PGT&nbsp;安全性</h3>
+
+<p>对于一个&nbsp;CAS&nbsp;用户来说，最重要是要保护它的&nbsp;TGC&nbsp;，如果&nbsp;TGC&nbsp;不慎被&nbsp;CAS Server&nbsp;以外的实体获得，&nbsp;Hacker&nbsp;能够找到该&nbsp;TGC&nbsp;，然后冒充&nbsp;CAS&nbsp;用户访问&nbsp;<strong>所有&nbsp;</strong>授权资源。&nbsp;PGT&nbsp;的角色跟&nbsp;TGC&nbsp;是一样的。</p>
+
+<p>从基础模式可以看出，&nbsp;TGC&nbsp;是&nbsp;CAS Server&nbsp;通过&nbsp;SSL&nbsp;方式发送给终端用户，因此，要截取&nbsp;TGC&nbsp;难度非常大，从而确保&nbsp;CAS&nbsp;的安全性。</p>
+
+<p>TGT&nbsp;的存活周期默认为&nbsp;120&nbsp;分钟。</p>
+
+<h3>4.2.&nbsp;&nbsp;ST/PT&nbsp;安全性</h3>
+
+<p>ST&nbsp;（&nbsp;Service Ticket&nbsp;）是通过&nbsp;Http&nbsp;传送的，因此网络中的其他人可以&nbsp;Sniffer&nbsp;到其他人的&nbsp;Ticket&nbsp;。&nbsp;CAS&nbsp;通过以下几方面来使&nbsp;ST&nbsp;变得更加安全（事实上都是可以配置的）：</p>
+
+<p>1、&nbsp;&nbsp;&nbsp;ST&nbsp;只能使用一次</p>
+
+<p>CAS&nbsp;协议规定，无论&nbsp;Service Ticket&nbsp;验证是否成功，&nbsp;CAS Server&nbsp;都会清除服务端缓存中的该Ticket&nbsp;，从而可以确保一个&nbsp;Service Ticket&nbsp;不被使用两次。</p>
+
+<p>2、&nbsp;&nbsp;&nbsp;ST&nbsp;在一段时间内失效</p>
+
+<p>CAS&nbsp;规定&nbsp;ST&nbsp;只能存活一定的时间，然后&nbsp;CAS Server&nbsp;会让它失效。默认有效时间为&nbsp;5&nbsp;分钟。</p>
+
+<p>3、&nbsp;&nbsp;&nbsp;ST&nbsp;是基于随机数生成的</p>
+
+<p>ST&nbsp;必须足够随机，如果&nbsp;ST&nbsp;生成规则被猜出，&nbsp;Hacker&nbsp;就等于绕过&nbsp;CAS&nbsp;认证，直接访问&nbsp;<strong>对应的</strong>服务。</p>
+
+<h2>5.&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;参考资料</h2>
+
+<p><strong>1、&nbsp;https://wiki.jasig.org/display/CASUM/Introduction</strong></p>
+
+<p><strong>2、&nbsp;http://www.jasig.org/cas/protocol/</strong></p>
+
+<p><strong>3、&nbsp;http://www.ibm.com/developerworks/cn/opensource/os-cn-cas/index.html</strong></p>
+
+<p><strong>4、&nbsp;http://www.blogjava.net/security/archive/2006/10/02/sso_in_action.html</strong></p>
+
+<p><strong>5、&nbsp;http://baike.baidu.com/view/190743.htm</strong></p>

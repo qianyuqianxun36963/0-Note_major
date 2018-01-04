@@ -1,0 +1,157 @@
+<h1 style="margin-left:0px; margin-right:0px">cas client端实现</h1>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:10.5pt"><span style="font-family:&quot;Times New Roman&quot;,serif">1</span></span><span style="font-size:10.5pt"><span style="font-family:宋体">、首先使用</span></span><span style="font-size:10.5pt"><span style="font-family:&quot;Times New Roman&quot;,serif">localhost.keystore</span></span><span style="font-size:10.5pt"><span style="font-family:宋体">导出数字证书（公钥）到</span></span><span style="font-size:10.5pt"><span style="font-family:&quot;Times New Roman&quot;,serif">D:\localhost.cer</span></span></span></span></p>
+
+<div class="dp-highlighter" id="" style="-webkit-text-stroke-width:0px; margin-left:9px; padding:1px; text-align:left; width:679px">
+<ol start="1" style="margin-left:0px; margin-right:0px">
+	<li><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">keytool&nbsp;-export&nbsp;-alias&nbsp;localhost&nbsp;-file&nbsp;D:\localhost.cer&nbsp;-keystore&nbsp;D:\localhost.keystore&nbsp;&nbsp;&nbsp;</span></span></li>
+</ol>
+</div>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:10.5pt"><span style="font-family:&quot;Times New Roman&quot;,serif"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif">2</span><span style="font-family:宋体">、因为</span><span style="font-family:Helvetica,Tahoma,Arial,sans-serif">CAS client</span><span style="font-family:宋体">需要使用该证书进行验证，需要将证书导入到</span><span style="font-family:Helvetica,Tahoma,Arial,sans-serif">JDK</span><span style="font-family:宋体">中：</span>&nbsp;</span></span></span></span></p>
+
+<div class="dp-highlighter" id="" style="-webkit-text-stroke-width:0px; margin-left:9px; padding:1px; text-align:left; width:679px">
+<ol start="1" style="margin-left:0px; margin-right:0px">
+	<li><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">cd&nbsp;D:\jdk1.7.0_21\jre\lib\security&nbsp;&nbsp;</span></span></li>
+	<li><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">keytool&nbsp;-<strong>import</strong>&nbsp;-alias&nbsp;localhost&nbsp;-file&nbsp;D:\localhost.cer&nbsp;-noprompt&nbsp;-trustcacerts&nbsp;-storetype&nbsp;jks&nbsp;-keystore&nbsp;cacerts&nbsp;-storepass&nbsp;123456&nbsp;&nbsp;&nbsp;</span></span></li>
+</ol>
+</div>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:10.5pt"><span style="font-family:&quot;Times New Roman&quot;,serif"><span style="font-family:宋体">如果导入失败，可以先把</span><span style="font-family:Helvetica,Tahoma,Arial,sans-serif">security&nbsp;</span><span style="font-family:宋体">目录下的</span><span style="font-family:Helvetica,Tahoma,Arial,sans-serif">cacerts</span><span style="font-family:宋体">删掉；</span>&nbsp;</span></span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif">3<span style="font-family:宋体">、按照服务器端的</span>Jetty Maven<span style="font-family:宋体">插件的配置方式配置</span>Jetty<span style="font-family:宋体">插件；</span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif">4、在shiro-example-chapter15-client模块中导入shiro-cas依赖，具体请参考其pom.xml；&nbsp;</span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif">5<span style="font-family:宋体">、自定义</span>CasRealm<span style="font-family:宋体">：</span></span></span></p>
+
+<div class="dp-highlighter" id="" style="-webkit-text-stroke-width:0px; margin-left:9px; padding:1px; text-align:left; width:679px">
+<ol start="1" style="margin-left:0px; margin-right:0px">
+	<li><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace"><strong>public</strong>&nbsp;<strong>class</strong>&nbsp;MyCasRealm&nbsp;<strong>extends</strong>&nbsp;CasRealm&nbsp;{&nbsp;&nbsp;</span></span></li>
+	<li><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;<strong>private</strong>&nbsp;UserService&nbsp;userService;&nbsp;&nbsp;</span></span></li>
+	<li><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;<strong>public</strong>&nbsp;<strong>void</strong>&nbsp;setUserService(UserService&nbsp;userService)&nbsp;{&nbsp;&nbsp;</span></span></li>
+	<li><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<strong>this</strong>.userService&nbsp;=&nbsp;userService;&nbsp;&nbsp;</span></span></li>
+	<li><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</span></span></li>
+	<li><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;@Override&nbsp;&nbsp;</span></span></li>
+	<li><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;<strong>protected</strong>&nbsp;AuthorizationInfo&nbsp;doGetAuthorizationInfo(PrincipalCollection&nbsp;principals)&nbsp;{&nbsp;&nbsp;</span></span></li>
+	<li><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;String&nbsp;username&nbsp;=&nbsp;(String)principals.getPrimaryPrincipal();&nbsp;&nbsp;</span></span></li>
+	<li><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;SimpleAuthorizationInfo&nbsp;authorizationInfo&nbsp;=&nbsp;<strong>new</strong>&nbsp;SimpleAuthorizationInfo();&nbsp;&nbsp;</span></span></li>
+	<li><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;authorizationInfo.setRoles(userService.findRoles(username));&nbsp;&nbsp;</span></span></li>
+	<li><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;authorizationInfo.setStringPermissions(userService.findPermissions(username));&nbsp;&nbsp;</span></span></li>
+	<li><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<strong>return</strong>&nbsp;authorizationInfo;&nbsp;&nbsp;</span></span></li>
+	<li><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</span></span></li>
+	<li><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">}&nbsp;&nbsp;&nbsp;</span></span></li>
+</ol>
+</div>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif">CasRealm<span style="font-family:宋体">根据</span>CAS<span style="font-family:宋体">服务器端返回的用户身份获取相应的角色</span>/<span style="font-family:宋体">权限信息。&nbsp;</span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif">6<span style="font-family:宋体">、</span>spring-shiro-web.xml<span style="font-family:宋体">配置：</span></span></span></p>
+
+<div class="dp-highlighter" id="" style="-webkit-text-stroke-width:0px; margin-left:9px; padding:1px; text-align:left; width:679px">
+<ol start="1" style="margin-left:0px; margin-right:0px">
+	<li><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&lt;bean&nbsp;id=&quot;casRealm&quot;&nbsp;<strong>class</strong>=&quot;com.github.zhangkaitao.shiro.chapter13.realm.MyCasRealm&quot;&gt;&nbsp;&nbsp;</span></span></li>
+	<li><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;&lt;property&nbsp;name=&quot;userService&quot;&nbsp;ref=&quot;userService&quot;/&gt;&nbsp;&nbsp;</span></span></li>
+	<li><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;&hellip;&hellip;&nbsp;&nbsp;</span></span></li>
+	<li><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;&lt;property&nbsp;name=&quot;casServerUrlPrefix&quot;&nbsp;value=&quot;https://localhost:8443/chapter14-server&quot;/&gt;&nbsp;&nbsp;</span></span></li>
+	<li><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;&lt;property&nbsp;name=&quot;casService&quot;&nbsp;value=&quot;https://localhost:9443/chapter14-client/cas&quot;/&gt;&nbsp;&nbsp;</span></span></li>
+	<li><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&lt;/bean&gt;&nbsp;&nbsp;&nbsp;</span></span></li>
+</ol>
+</div>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif">casServerUrlPrefix：是CAS Server服务器端地址；</span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif">casService：是当前应用CAS服务URL，即用于接收并处理登录成功后的Ticket的；</span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif">如果角色/权限信息是由服务器端提供的话，我们可以直接使用CasRealm：&nbsp;</span></span></p>
+
+<div class="dp-highlighter" id="" style="-webkit-text-stroke-width:0px; margin-left:9px; padding:1px; text-align:left; width:679px">
+<ol start="1" style="margin-left:0px; margin-right:0px">
+	<li><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&lt;bean&nbsp;id=&quot;casRealm&quot;&nbsp;<strong>class</strong>=&quot;org.apache.shiro.cas.CasRealm&quot;&gt;&nbsp;&nbsp;</span></span></li>
+	<li><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;&hellip;&hellip;&nbsp;&nbsp;</span></span></li>
+	<li><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;&lt;property&nbsp;name=&quot;defaultRoles&quot;&nbsp;value=&quot;admin,user&quot;/&gt;&nbsp;&nbsp;</span></span></li>
+	<li><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;&lt;property&nbsp;name=&quot;defaultPermissions&quot;&nbsp;value=&quot;user:create,user:update&quot;/&gt;&nbsp;&nbsp;</span></span></li>
+	<li><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;&lt;property&nbsp;name=&quot;roleAttributeNames&quot;&nbsp;value=&quot;roles&quot;/&gt;&nbsp;&nbsp;</span></span></li>
+	<li><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;&lt;property&nbsp;name=&quot;permissionAttributeNames&quot;&nbsp;value=&quot;permissions&quot;/&gt;&nbsp;&nbsp;</span></span></li>
+	<li><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;&lt;property&nbsp;name=&quot;casServerUrlPrefix&quot;&nbsp;value=&quot;https://localhost:8443/chapter14-server&quot;/&gt;&nbsp;&nbsp;</span></span></li>
+	<li><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;&lt;property&nbsp;name=&quot;casService&quot;&nbsp;value=&quot;https://localhost:9443/chapter14-client/cas&quot;/&gt;&nbsp;&nbsp;</span></span></li>
+	<li><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&lt;/bean&gt;&nbsp;&nbsp;&nbsp;</span></span></li>
+</ol>
+</div>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif">defaultRoles/ defaultPermissions：默认添加给所有CAS登录成功用户的角色和权限信息；</span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif">roleAttributeNames/ permissionAttributeNames：角色属性/权限属性名称，如果用户的角色/权限信息是从服务器端返回的（即返回的CAS Principal中除了Principal之外还有如一些Attributes），此时可以使用roleAttributeNames/ permissionAttributeNames得到Attributes中的角色/权限数据；请自行查询CAS获取用户更多信息。</span></span></p>
+
+<div class="dp-highlighter" id="" style="-webkit-text-stroke-width:0px; margin-left:9px; padding:1px; text-align:left; width:679px">
+<ol start="1" style="margin-left:0px; margin-right:0px">
+	<li><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&lt;bean&nbsp;id=&quot;casFilter&quot;&nbsp;<strong>class</strong>=&quot;org.apache.shiro.cas.CasFilter&quot;&gt;&nbsp;&nbsp;</span></span></li>
+	<li><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;&lt;property&nbsp;name=&quot;failureUrl&quot;&nbsp;value=&quot;/casFailure.jsp&quot;/&gt;&nbsp;&nbsp;</span></span></li>
+	<li><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&lt;/bean&gt;&nbsp;&nbsp;&nbsp;</span></span></li>
+</ol>
+</div>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif">CasFilter<span style="font-family:宋体">类似于</span>FormAuthenticationFilter<span style="font-family:宋体">，只不过其验证服务器端返回的</span>CAS Service Ticket<span style="font-family:宋体">。&nbsp;</span></span></span></p>
+
+<div class="dp-highlighter" id="" style="-webkit-text-stroke-width:0px; margin-left:9px; padding:1px; text-align:left; width:679px">
+<ol start="1" style="margin-left:0px; margin-right:0px">
+	<li><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&lt;bean&nbsp;id=&quot;shiroFilter&quot;&nbsp;<strong>class</strong>=&quot;org.apache.shiro.spring.web.ShiroFilterFactoryBean&quot;&gt;&nbsp;&nbsp;</span></span></li>
+	<li><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;&lt;property&nbsp;name=&quot;securityManager&quot;&nbsp;ref=&quot;securityManager&quot;/&gt;&nbsp;&nbsp;</span></span></li>
+	<li><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;&lt;property&nbsp;name=&quot;loginUrl&quot;&nbsp;value=&quot;https://localhost:8443/chapter14-server/login?service=https://localhost:9443/chapter14-client/cas&quot;/&gt;&nbsp;&nbsp;</span></span></li>
+	<li><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;&lt;property&nbsp;name=&quot;successUrl&quot;&nbsp;value=&quot;/&quot;/&gt;&nbsp;&nbsp;</span></span></li>
+	<li><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;&lt;property&nbsp;name=&quot;filters&quot;&gt;&nbsp;&nbsp;</span></span></li>
+	<li><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;util:map&gt;&nbsp;&nbsp;</span></span></li>
+	<li><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;entry&nbsp;key=&quot;cas&quot;&nbsp;value-ref=&quot;casFilter&quot;/&gt;&nbsp;&nbsp;</span></span></li>
+	<li><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/util:map&gt;&nbsp;&nbsp;</span></span></li>
+	<li><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;&lt;/property&gt;&nbsp;&nbsp;</span></span></li>
+	<li><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;&lt;property&nbsp;name=&quot;filterChainDefinitions&quot;&gt;&nbsp;&nbsp;</span></span></li>
+	<li><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;value&gt;&nbsp;&nbsp;</span></span></li>
+	<li><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/casFailure.jsp&nbsp;=&nbsp;anon&nbsp;&nbsp;</span></span></li>
+	<li><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/cas&nbsp;=&nbsp;cas&nbsp;&nbsp;</span></span></li>
+	<li><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/logout&nbsp;=&nbsp;logout&nbsp;&nbsp;</span></span></li>
+	<li><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/**&nbsp;=&nbsp;user&nbsp;&nbsp;</span></span></li>
+	<li><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/value&gt;&nbsp;&nbsp;</span></span></li>
+	<li><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&nbsp;&nbsp;&nbsp;&nbsp;&lt;/property&gt;&nbsp;&nbsp;</span></span></li>
+	<li><span style="font-size:12px"><span style="font-family:Monaco,&quot;DejaVu Sans Mono&quot;,&quot;Bitstream Vera Sans Mono&quot;,Consolas,&quot;Courier New&quot;,monospace">&lt;/bean&gt;&nbsp;&nbsp;&nbsp;</span></span></li>
+</ol>
+</div>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif">loginUrl：https://localhost:8443/chapter15-server/login表示服务端端登录地址，登录成功后跳转到?service参数对于的地址进行客户端验证及登录；</span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif">&ldquo;/cas=cas&rdquo;：即/cas地址是服务器端回调地址，使用CasFilter获取Ticket进行登录。</span></span></p>
+
+<h2><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif">7、测试</span></span></h2>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif">输入http://localhost:9080/chapter15-client地址进行测试即可，可以使用如Chrome开这debug观察网络请求的变化。</span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif">&nbsp;</span></span><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif">如果遇到以下异常，一般是证书导入错误造成的，请尝试重新导入，如果还是不行，有可能是运行应用的JDK和安装数字证书的JDK不是同一个造成的：</span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif">Caused by: sun.security.validator.ValidatorException: PKIX path building failed: sun.security.provider.certpath.SunCertPathBuilderException: unable to find valid certification path to requested target</span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; at sun.security.validator.PKIXValidator.doBuild(PKIXValidator.java:385)</span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; at sun.security.validator.PKIXValidator.engineValidate(PKIXValidator.java:292)</span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; at sun.security.validator.Validator.validate(Validator.java:260)</span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; at sun.security.ssl.X509TrustManagerImpl.validate(X509TrustManagerImpl.java:326)</span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; at sun.security.ssl.X509TrustManagerImpl.checkTrusted(X509TrustManagerImpl.java:231)</span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; at sun.security.ssl.X509TrustManagerImpl.checkServerTrusted(X509TrustManagerImpl.java:126)</span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; at sun.security.ssl.ClientHandshaker.serverCertificate(ClientHandshaker.java:1323)</span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ... 67 more</span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif">Caused by: sun.security.provider.certpath.SunCertPathBuilderException: unable to find valid certification path to requested target</span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; at sun.security.provider.certpath.SunCertPathBuilder.engineBuild(SunCertPathBuilder.java:196)</span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; at java.security.cert.CertPathBuilder.build(CertPathBuilder.java:268)</span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; at sun.security.validator.PKIXValidator.doBuild(PKIXValidator.java:380)</span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ... 73 more</span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif">示例源代码：<a href="https://github.com/zhangkaitao/shiro-example" style="color:#e9650e; text-decoration:underline" target="_blank">https://github.com/zhangkaitao/shiro-example</a>；</span></span></p>
