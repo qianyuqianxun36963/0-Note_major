@@ -1,0 +1,214 @@
+<h1>sso-shiro-cas</h1>
+
+<p>spring下使用shiro+cas配置单点登录，多个系统之间的访问，每次只需要登录一次，<a href="https://github.com/coder-huang/sso-shiro-cas" target="_blank">项目源码</a></p>
+
+<h2>系统模块说明</h2>
+
+<ol>
+	<li>cas： 单点登录模块，这里直接拿的是cas的项目改了点样式而已</li>
+	<li>doc： 文档目录，里面有数据库生成语句，采用的是MySQL5.0，数据库名为db_test</li>
+	<li>spring-node-1： 应用1</li>
+	<li>spring-node-2： 应用2</li>
+</ol>
+
+<p>其中node1跟node2都是采用spring + springMVC + mybatis 框架，使用maven做项目管理</p>
+
+<h2>cas集成说明</h2>
+
+<p>1.首先采用的是查数据库的方式来校验用户身份的，在cas/WEB-INF/deployerConfigContext.xml中第135行构建了这个类型</p>
+
+<pre>
+<code>&lt;!-- 设置密码的加密方式，这里使用的是MD5加密 --&gt;
+    &lt;bean id=&quot;passwordEncoder&quot;
+      class=&quot;org.jasig.cas.authentication.handler.DefaultPasswordEncoder&quot;
+      c:encodingAlgorithm=&quot;MD5&quot;
+      p:characterEncoding=&quot;UTF-8&quot; /&gt;
+
+  &lt;!-- 通过数据库验证身份，这个得自己去实现 --&gt;
+    &lt;bean id=&quot;primaryAuthenticationHandler&quot;
+      class=&quot;com.distinct.cas.jdbc.QueryDatabaseAuthenticationHandler&quot;
+      p:dataSource-ref=&quot;dataSource&quot;
+      p:passwordEncoder-ref=&quot;passwordEncoder&quot;
+      p:sql=&quot;select password from t_user where account=? and status = &#39;active&#39;&quot; /&gt;
+      
+  &lt;!-- 设置数据源 --&gt;
+     &lt;bean id=&quot;dataSource&quot; class=&quot;org.springframework.jdbc.datasource.DriverManagerDataSource&quot;&gt;
+          &lt;property name=&quot;driverClassName&quot; value=&quot;com.mysql.jdbc.Driver&quot;&gt;&lt;/property&gt;
+          &lt;property name=&quot;url&quot; value=&quot;jdbc:mysql://127.0.0.1:3306/db_test?useUnicode=true&amp;amp;characterEncoding=utf8&quot;&gt;&lt;/property&gt;
+          &lt;property name=&quot;username&quot; value=&quot;root&quot;&gt;&lt;/property&gt;
+          &lt;property name=&quot;password&quot; value=&quot;123456&quot;&gt;&lt;/property&gt;  
+  &lt;/bean&gt;</code></pre>
+
+<p>其中QueryDatabaseAuthenticationHandler这个类是自定义构建的，在cas/WEB-INF/lib/cas-jdbc-1.0.0.jar里面，有兴趣的同学可以发编译看下，关于几个属性的说明</p>
+
+<ol>
+	<li>dataSource： 数据源，配置MySQL的连接信息</li>
+	<li>passwordEncoder： 加密方式，这里用的是MD5</li>
+	<li>sql： sql查询语句，这个语句就是根据用户输入的账号查询其密码</li>
+</ol>
+
+<h4>以上就是单点登录管理的主要配置</h4>
+
+<h2>应用系统的配置node1</h2>
+
+<ol>
+	<li>应用系统采用shiro做权限控制，并且跟cas集成</li>
+	<li>在/spring-node-1/src/main/resources/conf/shiro.properties 文件中<br />
+	``` properties<br />
+	shiro.loginUrl=<a href="http://127.0.0.1:8080/cas/login?service=http://127.0.0.1:8081/node1/shiro-cas">http://127.0.0.1:8080/cas/login?service=http://127.0.0.1:8081/node1/shiro-cas</a></li>
+</ol>
+
+<p>shiro.logoutUrl=<a href="http://127.0.0.1:8080/cas/logout?service=http://127.0.0.1:8081/node1/shiro-cas">http://127.0.0.1:8080/cas/logout?service=http://127.0.0.1:8081/node1/shiro-cas</a></p>
+
+<p>shiro.cas.serverUrlPrefix=<a href="http://127.0.0.1:8080/cas">http://127.0.0.1:8080/cas</a></p>
+
+<p>shiro.cas.service=<a href="http://127.0.0.1:8081/node1/shiro-cas">http://127.0.0.1:8081/node1/shiro-cas</a></p>
+
+<p>shiro.failureUrl=/users/loginSuccess</p>
+
+<p>shiro.successUrl=/users/loginSuccess</p>
+
+<p>```<br />
+其中shiro.loginUrl 跟 shiro.logoutUrl的前面是cas验证的地址，后面的是我们应用系统的地址，这样配置的方式是为了在访问我们的应用系统的时候，先到cas进行验证，如果验证成功了，cas将重定向到shiro.successUrl 所表示的地址</p>
+
+<p>3.在/spring-node-1/src/main/resources/conf/shiro.xml 文件中</p>
+
+<pre>
+<code>&lt;!-- Shiro Filter --&gt;
+    &lt;bean id=&quot;shiroFilter&quot; class=&quot;org.apache.shiro.spring.web.ShiroFilterFactoryBean&quot;&gt;
+        &lt;property name=&quot;securityManager&quot; ref=&quot;securityManager&quot; /&gt;
+        &lt;!-- 设定用户的登录链接，这里为cas登录页面的链接地址可配置回调地址 --&gt;
+        &lt;property name=&quot;loginUrl&quot; value=&quot;${shiro.loginUrl}&quot; /&gt;
+        &lt;property name=&quot;filters&quot;&gt;
+            &lt;map&gt;
+                &lt;!-- 添加casFilter到shiroFilter --&gt;
+                &lt;entry key=&quot;casFilter&quot; value-ref=&quot;casFilter&quot; /&gt;
+                &lt;entry key=&quot;logoutFilter&quot; value-ref=&quot;logoutFilter&quot; /&gt;
+            &lt;/map&gt;
+        &lt;/property&gt;
+        &lt;property name=&quot;filterChainDefinitions&quot;&gt;
+            &lt;value&gt;
+                /shiro-cas = casFilter
+                /logout = logoutFilter
+                /users/** = user
+            &lt;/value&gt;
+        &lt;/property&gt;
+    &lt;/bean&gt;
+
+    &lt;bean id=&quot;casFilter&quot; class=&quot;org.apache.shiro.cas.CasFilter&quot;&gt;
+        &lt;!-- 配置验证错误时的失败页面 --&gt;
+        &lt;property name=&quot;failureUrl&quot; value=&quot;${shiro.failureUrl}&quot; /&gt;
+        &lt;property name=&quot;successUrl&quot; value=&quot;${shiro.successUrl}&quot; /&gt;
+    &lt;/bean&gt;
+
+    &lt;bean id=&quot;logoutFilter&quot; class=&quot;org.apache.shiro.web.filter.authc.LogoutFilter&quot;&gt;
+        &lt;!-- 配置验证错误时的失败页面 --&gt;
+        &lt;property name=&quot;redirectUrl&quot; value=&quot;${shiro.logoutUrl}&quot; /&gt;
+    &lt;/bean&gt;
+
+    &lt;bean id=&quot;casRealm&quot; class=&quot;com.spring.mybatis.realm.UserRealm&quot;&gt;
+        &lt;!-- 认证通过后的默认角色 --&gt;
+        &lt;property name=&quot;defaultRoles&quot; value=&quot;ROLE_USER&quot; /&gt;
+        &lt;!-- cas服务端地址前缀 --&gt;
+        &lt;property name=&quot;casServerUrlPrefix&quot; value=&quot;${shiro.cas.serverUrlPrefix}&quot; /&gt;
+        &lt;!-- 应用服务地址，用来接收cas服务端票据 --&gt;
+        &lt;property name=&quot;casService&quot; value=&quot;${shiro.cas.service}&quot; /&gt;
+    &lt;/bean&gt;
+
+    &lt;!-- Shiro&#39;s main business-tier object for web-enabled applications --&gt;
+    &lt;bean id=&quot;securityManager&quot; class=&quot;org.apache.shiro.web.mgt.DefaultWebSecurityManager&quot;&gt;
+        &lt;property name=&quot;subjectFactory&quot; ref=&quot;casSubjectFactory&quot;&gt;&lt;/property&gt;
+        &lt;property name=&quot;realm&quot; ref=&quot;casRealm&quot; /&gt;
+    &lt;/bean&gt;
+
+    &lt;bean id=&quot;casSubjectFactory&quot; class=&quot;org.apache.shiro.cas.CasSubjectFactory&quot;&gt;&lt;/bean&gt;
+
+    &lt;bean
+        class=&quot;org.apache.shiro.spring.security.interceptor.AuthorizationAttributeSourceAdvisor&quot;&gt;
+        &lt;property name=&quot;securityManager&quot; ref=&quot;securityManager&quot; /&gt;
+    &lt;/bean&gt;
+
+    &lt;bean id=&quot;lifecycleBeanPostProcessor&quot; class=&quot;org.apache.shiro.spring.LifecycleBeanPostProcessor&quot;&gt;&lt;/bean&gt;
+    &lt;bean
+        class=&quot;org.springframework.beans.factory.config.MethodInvokingFactoryBean&quot;&gt;
+        &lt;property name=&quot;staticMethod&quot;
+            value=&quot;org.apache.shiro.SecurityUtils.setSecurityManager&quot;&gt;&lt;/property&gt;
+        &lt;property name=&quot;arguments&quot; ref=&quot;securityManager&quot;&gt;&lt;/property&gt;
+    &lt;/bean&gt;</code></pre>
+
+<blockquote>
+<p>其中shiroFilter这个类主要用于需要拦截的url请求，需要注意的是这个是shiro的拦截，我们还需要配置cas的过滤配置casFilter</p>
+</blockquote>
+
+<blockquote>
+<p>casRealm这个类是需要我们自己实现的，主要用于shiro的权限验证，里面的属性说明如下</p>
+</blockquote>
+
+<ol>
+	<li>defaultRoles： 默认的角色</li>
+	<li>casServerUrlPrefix： cas地址</li>
+	<li>casService： 系统应用地址</li>
+</ol>
+
+<p>最后我们还需要在/spring-node-1/src/main/webapp/WEB-INF/web.xml 文件中配置相关的过滤器拦截全部请求</p>
+
+<pre>
+<code>&lt;filter&gt;
+        &lt;filter-name&gt;shiroFilter&lt;/filter-name&gt;
+        &lt;filter-class&gt;org.springframework.web.filter.DelegatingFilterProxy&lt;/filter-class&gt;
+        &lt;init-param&gt;
+            &lt;param-name&gt;targetFilterLifecycle&lt;/param-name&gt;
+            &lt;param-value&gt;true&lt;/param-value&gt;
+        &lt;/init-param&gt;
+    &lt;/filter&gt;
+    &lt;filter-mapping&gt;
+        &lt;filter-name&gt;shiroFilter&lt;/filter-name&gt;
+        &lt;url-pattern&gt;/*&lt;/url-pattern&gt;
+    &lt;/filter-mapping&gt;</code></pre>
+
+<h2>系统运行</h2>
+
+<ol>
+	<li>
+	<p>端口说明，cas：8080，node1：8081，node2:8082，大家可以采用maven提供的tomcat7插件，配置如下：</p>
+
+	<pre>
+<code>&lt;plugin&gt;
+        &lt;groupId&gt;org.apache.tomcat.maven&lt;/groupId&gt;
+        &lt;artifactId&gt;tomcat7-maven-plugin&lt;/artifactId&gt;
+        &lt;version&gt;2.1&lt;/version&gt;
+        &lt;configuration&gt;
+            &lt;port&gt;8081&lt;/port&gt;
+            &lt;uriEncoding&gt;UTF-8&lt;/uriEncoding&gt;
+            &lt;server&gt;tomcat7&lt;/server&gt;
+            &lt;path&gt;/node1&lt;/path&gt;
+        &lt;/configuration&gt;
+    &lt;/plugin&gt;</code></pre>
+
+	<p>这样的配置，我们甚至都不需要配置tomcat服务器了，建议这种方式</p>
+	</li>
+</ol>
+
+<p>2.各个模块的访问地址</p>
+
+<blockquote>
+<p>cas：<a href="http://127.0.0.1:8080/cas">http://127.0.0.1:8080/cas</a></p>
+</blockquote>
+
+<blockquote>
+<p>node1：<a href="http://127.0.0.1:8081/node1">http://127.0.0.1:8081/node1</a></p>
+</blockquote>
+
+<blockquote>
+<p>node2：<a href="http://127.0.0.1:8082/node2">http://127.0.0.1:8082/node2</a></p>
+</blockquote>
+
+<p>3.访问系统</p>
+
+<blockquote>
+<p>输入&nbsp;<a href="http://127.0.0.1:8081/node1/shiro-cas">http://127.0.0.1:8081/node1/shiro-cas</a>&nbsp;，进入cas验证</p>
+</blockquote>
+
+<blockquote>
+<p>输入用户名 admin，密码&nbsp;<a href="mailto:admin@2015">admin@2015</a>，验证成功后将会重定向到http://127.0.0.1:8081/node1//users/loginSuccess ，也就是node1系统的主页，里面的节点2代表的是node2系统的主页，你会发现我们不需要登录到node2系统就能访问其中的系统了</p>
+</blockquote>

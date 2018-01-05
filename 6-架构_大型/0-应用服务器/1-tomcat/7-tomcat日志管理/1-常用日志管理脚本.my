@@ -1,0 +1,65 @@
+<h1>tomcat日志文件定时清理备份</h1>
+
+<p>以下脚本主要备份的日志文件为tomcat的catalina.out、localhost_access_log.yyyy-mm-dd.log日志和项目的日志文件，其中项目的日志文件格式为&quot;projectname-yyyy-mm-dd.log&quot;，以下为备份脚本，具体的操作都有相应的注释，供大家参考，具体情况请根据日志文件的格式和要求来使用本脚本。</p>
+
+<pre>
+
+#!/bin/sh
+
+######################################################################
+# 日志定时运行时间为每天0点1分
+# 删除20天之前的日志文件，压缩一周之前的日志文件
+# 日志文件时间是根据日志名称后面的日期来计算
+# 运行脚本注意日志文件中是否有其他相同后缀的非日志文件和日志文件名称是否符合要求
+######################################################################
+
+#日志文件所在目录
+path=/home/tomcat/apache-tomcat-project/logs
+
+#进入日志目录
+cd $path
+
+#catalina.out日志文件备份
+#获取前一天的日期
+bak_date=`date +%Y-%m-%d -d &quot;1 days ago&quot;`
+#备份catalina.out日志，后面添加日期
+cp catalina.out catalina.out.$bak_date.log
+#清空catalina.out日志文件
+echo &gt; catalina.out
+
+
+#20天之前的日志文件删除
+#获取20天之前的日期
+del_date=`date +%Y-%m-%d -d &quot;20 days ago&quot;`
+#获取文件名中的日期字符串，然后对比时间进行相应的操作，localhost_access_log的后缀文件名一般是txt，这里包括txt文件
+for n in `ls *.log *.txt -1`;do
+    m=`echo $n | awk -F. &#39;{print $(NF-1)}&#39;`
+    m=`echo ${m:0-10}`
+    if [ ! $m ]; then
+        echo &quot;IS NULL&quot;
+        continue
+    fi
+    if [[ $m &lt; $del_date || $m = $del_date ]];then
+        echo file $n will be deleted.
+        rm -rf $n
+    fi
+done
+
+#一周之前的文件压缩
+#获取一周之前的日期
+zip_date=`date +%Y-%m-%d -d &quot;7 days ago&quot;`
+#获取文件名中的日期字符串，然后对比时间进行相应的操作
+for n in `ls *.log *.txt -1`;do
+    m=`echo $n | awk -F. &#39;{print $(NF-1)}&#39;`
+    m=`echo ${m:0-10}`
+    echo $n $m
+    if [ ! $m ]; then
+        echo &quot;IS NULL&quot;
+        continue
+    fi
+    if [[ $m &lt; $zip_date || $m = $zip_date ]];then
+        echo file $n will be zip.
+        zip $n.zip $n
+        rm -rf $n
+    fi
+done</pre>

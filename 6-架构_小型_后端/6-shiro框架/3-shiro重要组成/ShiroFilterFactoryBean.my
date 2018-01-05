@@ -1,0 +1,474 @@
+<h1>ShiroFilterFactoryBean源码及拦截原理深入分析</h1>
+
+<p>本篇文章篇幅比较长，但是细看下去相信对学习<strong>Shiro</strong>应该会有帮助。好了，闲话不多说，直接进入正题：</p>
+
+<p><strong>Shiro</strong>提供了与Web集成的支持，其通过一个<code>ShiroFilter</code>入口来拦截需要安全控制的URL，然后进行相应的控制，<strong>ShiroFilter</strong>类似于如<strong>Strut2</strong>/<strong>SpringMVC</strong>这种web框架的前端控制器，其是安全控制的入口点，其负责读取配置（如ini配置文件），然后判断URL是否需要登录/权限等工作。</p>
+
+<p>而要在<code>Spring</code>中使用<code>Shiro</code>的话，可在<code>web.xml</code>中配置一个<code>DelegatingFilterProxy</code>，<code>DelegatingFilterProxy</code>作用是自动到<code>Spring</code>容器查找名字为<code>shiroFilter</code>（<code>filter-name</code>）的<code>bean</code>并把所有<code>Filter</code>的操作委托给它。</p>
+
+<p>首先是在<code>web.xml</code>中配置<code>DelegatingFilterProxy</code></p>
+
+<pre>
+<code>&lt;filter&gt;
+    &lt;filter-name&gt;shiroFilter&lt;/filter-name&gt;
+    &lt;filter-class&gt;org.springframework.web.filter.DelegatingFilterProxy&lt;/filter-class&gt;
+    &lt;init-param&gt;
+        &lt;param-name&gt;targetFilterLifecycle&lt;/param-name&gt;
+        &lt;param-value&gt;true&lt;/param-value&gt;
+    &lt;/init-param&gt;
+&lt;/filter&gt;
+&lt;filter-mapping&gt;
+    &lt;filter-name&gt;shiroFilter&lt;/filter-name&gt;
+    &lt;url-pattern&gt;/*&lt;/url-pattern&gt;
+&lt;/filter-mapping&gt;</code></pre>
+
+<p>配置好<code>DelegatingFilterProxy</code>后，下面只要再把<code>ShiroFilter</code>配置到<code>Spring</code>容器（此处为<code>Spring</code>的配置文件）即可：</p>
+
+<pre>
+<code>&lt;bean id=&quot;shiroFilter&quot; class=&quot;org.apache.shiro.spring.web.ShiroFilterFactoryBean&quot;&gt;
+    &lt;property name=&quot;securityManager&quot; ref=&quot;securityManager&quot;/&gt;
+&lt;/bean&gt;</code></pre>
+
+<p>可以看到我们使用了<code>ShiroFilterFactoryBean</code>来创建<code>shiroFilter</code>，这里用到了<code>Spring</code>中一种特殊的Bean&mdash;&mdash;<code>FactoryBean</code>。当需要得到名为&rdquo;<strong>shiroFilter</strong>&ldquo;的bean时，会调用其<code>getObject()</code>来获取实例。下面我们通过分析<code>ShiroFilterFactoryBean</code>创建实例的过程来探究<strong>Shiro</strong>是如何实现安全拦截的：</p>
+
+<pre>
+<code>    public Object getObject() throws Exception {
+        if (instance == null) {
+            instance = createInstance();
+        }
+        return instance;
+    }</code></pre>
+
+<p>其中调用了<code>createInstance()</code>来创建实例：</p>
+
+<pre>
+<code>  protected AbstractShiroFilter createInstance() throws Exception {
+
+        // 这里是通过FactoryBean注入的SecurityManager（必须）
+        SecurityManager securityManager = getSecurityManager();
+        if (securityManager == null) {
+            String msg = &quot;SecurityManager property must be set.&quot;;
+            throw new BeanInitializationException(msg);
+        }
+
+        if (!(securityManager instanceof WebSecurityManager)) {
+            String msg = &quot;The security manager does not implement the WebSecurityManager interface.&quot;;
+            throw new BeanInitializationException(msg);
+        }
+
+        FilterChainManager manager = createFilterChainManager();
+
+        PathMatchingFilterChainResolver chainResolver = new PathMatchingFilterChainResolver();
+        chainResolver.setFilterChainManager(manager);
+
+        return new SpringShiroFilter((WebSecurityManager) securityManager, chainResolver);
+    }</code></pre>
+
+<p>可以看到创建<code>SpringShiroFilter</code>时用到了两个组件：<code>SecurityManager</code>和<code>ChainResolver</code>。</p>
+
+<ul>
+	<li><code>SecurityManager</code>：我们知道其在<strong>Shiro</strong>中的地位，类似于一个&ldquo;安全大管家&rdquo;，相当于<strong>SpringMVC</strong>中的<code>DispatcherServlet</code>或者<strong>Struts2</strong>中的<code>FilterDispatcher</code>，是<strong>Shiro</strong>的心脏，所有具体的交互都通过<code>SecurityManager</code>进行控制，它管理着所有<code>Subject</code>、且负责进行认证和授权、及会话、缓存的管理。</li>
+	<li><code>ChainResolver：Filter</code>链解析器，用来解析出该次请求需要执行的Filter链。</li>
+	<li><code>PathMatchingFilterChainResolver</code>：<code>ChainResolver</code>的实现类，其中还包含了两个重要组件<code>FilterChainManager</code>、<code>PatternMatcher</code></li>
+	<li><code>FilterChainManager</code>：管理着Filter和Filter链，配合<code>PathMatchingFilterChainResolver</code>解析出Filter链</li>
+	<li><code>PatternMatcher</code>：用来进行请求路径匹配，默认为Ant风格的路径匹配</li>
+</ul>
+
+<p>先有一个大体的了解，那么对于源码分析会有不少帮助。下面会对以上两个重要的组件进行分析，包括<code>PathMatchingFilterChainResolver</code>和<code>FilterChainManager</code>。首先贴一段<code>ShiroFilter</code>的在配置文件中的定义：</p>
+
+<pre>
+<code>&lt;!-- Shiro的Web过滤器 --&gt;
+    &lt;bean id=&quot;shiroFilter&quot; class=&quot;org.apache.shiro.spring.web.ShiroFilterFactoryBean&quot;&gt;
+        &lt;property name=&quot;securityManager&quot; ref=&quot;securityManager&quot; /&gt;
+        &lt;property name=&quot;loginUrl&quot; value=&quot;/login&quot; /&gt;
+        &lt;property name=&quot;unauthorizedUrl&quot; value=&quot;/special/unauthorized&quot; /&gt;
+        &lt;property name=&quot;filters&quot;&gt;
+            &lt;util:map&gt;
+                &lt;entry key=&quot;authc&quot; value-ref=&quot;formAuthenticationFilter&quot; /&gt;
+                &lt;entry key=&quot;logout&quot; value-ref=&quot;logoutFilter&quot; /&gt;
+                &lt;entry key=&quot;ssl&quot; value-ref=&quot;sslFilter&quot;&gt;&lt;/entry&gt;
+            &lt;/util:map&gt;
+        &lt;/property&gt;
+        &lt;property name=&quot;filterChainDefinitions&quot;&gt;
+            &lt;value&gt;
+                /resources/** = anon
+                /plugin/** = anon
+                /download/** = anon
+                /special/unauthorized = anon
+                /register = anon
+                /login = ssl,authc
+                /logout = logout
+                /admin/** = roles[admin]
+
+                /** = user
+            &lt;/value&gt;
+        &lt;/property&gt;
+    &lt;/bean&gt;
+</code></pre>
+
+<p>再来看看<code>PathMatchingFilterChainResolver</code>和<code>FilterChainManager</code>的创建过程：</p>
+
+<pre>
+<code>  protected FilterChainManager createFilterChainManager() {
+
+        // 默认使用的FilterChainManager是DefaultFilterChainManager
+        DefaultFilterChainManager manager = new DefaultFilterChainManager();
+        // DefaultFilterChainManager默认会注册的filters(后面会列出)
+        Map&lt;String, Filter&gt; defaultFilters = manager.getFilters();
+
+        // 将ShiroFilterFactoryBean配置的一些公共属性(上面配置的loginUrl,successUrl,unauthorizeUrl)应用到默认注册的filter上去
+        for (Filter filter : defaultFilters.values()) {
+            applyGlobalPropertiesIfNecessary(filter);
+        }
+
+        // 处理自定义的filter（上面配置的filters属性），步骤类似上面
+        Map&lt;String, Filter&gt; filters = getFilters();
+        if (!CollectionUtils.isEmpty(filters)) {
+            for (Map.Entry&lt;String, Filter&gt; entry : filters.entrySet()) {
+                String name = entry.getKey();
+                Filter filter = entry.getValue();
+                applyGlobalPropertiesIfNecessary(filter);
+                if (filter instanceof Nameable) {
+                    ((Nameable) filter).setName(name);
+                }
+                // 将Filter添加到manager中去，可以看到对于Filter的管理是依赖于FilterChainManager的
+                manager.addFilter(name, filter, false);
+            }
+        }
+
+        // 根据FilterChainDefinition的配置来构建Filter链（上面配置的filterChainDefinitions属性）
+        Map&lt;String, String&gt; chains = getFilterChainDefinitionMap();
+        if (!CollectionUtils.isEmpty(chains)) {
+            for (Map.Entry&lt;String, String&gt; entry : chains.entrySet()) {
+                String url = entry.getKey();
+                String chainDefinition = entry.getValue();
+                // 后面会分析该步的源码，功能上就是创建Filter链
+                manager.createChain(url, chainDefinition);
+            }
+        }
+
+        return manager;
+    }</code></pre>
+
+<p>下面有必要来看看<code>DefaultFilterChainManager</code>的源码，分析一下上面调用到的方法。先来看看他的几个重要的属性：</p>
+
+<pre>
+<code>    private FilterConfig filterConfig;
+
+    private Map&lt;String, Filter&gt; filters; //pool of filters available for creating chains
+
+    private Map&lt;String, NamedFilterList&gt; filterChains; //key: chain name, value: chain</code></pre>
+
+<p>其中<code>filterConfig</code>仅在初始化Filter时有效，而我们自定义的Filter都不是init的，所以该属性可以暂时忽略（）。&nbsp;<br />
+而后面两张map就重要了：filters中缓存了所有添加的<code>filter</code>，filterChains则缓存了所有的<code>filterChain</code>。其中前者的key是filter name，value是<code>Filter</code>。而后者的key是chain name，value是<code>NamedFilterList</code>。&nbsp;<br />
+有的童鞋可能会问<code>NamedFilterList</code>是怎么样的结构呢，你可以把它当成<code>List&lt;Filter&gt;</code>，这样就好理解了吧。下面再分析刚才<code>createFilterChainManager()</code>中调用过的<code>manager</code>的几个方法：</p>
+
+<ul>
+	<li>addFilter（缓存filter让manager来管理）</li>
+</ul>
+
+<pre>
+<code>    public void addFilter(String name, Filter filter, boolean init) {
+        addFilter(name, filter, init, true);
+    }
+
+    protected void addFilter(String name, Filter filter, boolean init, boolean overwrite) {
+        Filter existing = getFilter(name);
+        if (existing == null || overwrite) {
+            if (filter instanceof Nameable) {
+                ((Nameable) filter).setName(name);
+            }
+            if (init) {
+                initFilter(filter);
+            }
+            this.filters.put(name, filter);
+        }
+    }</code></pre>
+
+<p>将<code>filter</code>缓存到<code>filters</code>这张<code>map</code>里，不管是默认注册的还是自定义的都需要<code>FilterChainManager</code>来统一管理。</p>
+
+<ul>
+	<li>createChain：创建filterChain并将定义的filter都加进去</li>
+</ul>
+
+<pre>
+<code>    // chainName就是拦截路径&quot;/resources/**&quot;，chainDefinition就是多个过滤器名的字符串
+    public void createChain(String chainName, String chainDefinition) {
+        if (!StringUtils.hasText(chainName)) {
+            throw new NullPointerException(&quot;chainName cannot be null or empty.&quot;);
+        }
+        if (!StringUtils.hasText(chainDefinition)) {
+            throw new NullPointerException(&quot;chainDefinition cannot be null or empty.&quot;);
+        }
+
+        if (log.isDebugEnabled()) {
+            log.debug(&quot;Creating chain [&quot; + chainName + &quot;] from String definition [&quot; + chainDefinition + &quot;]&quot;);
+        }
+
+        // 先分离出配置的各个filter，比如 
+        // &quot;authc, roles[admin,user], perms[file:edit]&quot; 分离后的结果是：
+        // { &quot;authc&quot;, &quot;roles[admin,user]&quot;, &quot;perms[file:edit]&quot; }
+        String[] filterTokens = splitChainDefinition(chainDefinition);
+
+        // 进一步分离出&quot;[]&quot;内的内容，其中nameConfigPair是一个长度为2的数组
+        // 比如 roles[admin,user] 经过解析后的nameConfigPair 为{&quot;roles&quot;, &quot;admin,user&quot;}
+        for (String token : filterTokens) {
+            String[] nameConfigPair = toNameConfigPair(token);
+
+            // 得到了 拦截路径、filter以及可能的&quot;[]&quot;中的值，那么执行addToChain
+            addToChain(chainName, nameConfigPair[0], nameConfigPair[1]);
+        }
+    }</code>
+</pre>
+
+<ul>
+	<li>addToChain</li>
+</ul>
+
+<pre>
+<code>   public void addToChain(String chainName, String filterName, String chainSpecificFilterConfig) {
+        if (!StringUtils.hasText(chainName)) {
+            throw new IllegalArgumentException(&quot;chainName cannot be null or empty.&quot;);
+        }
+        Filter filter = getFilter(filterName);
+        if (filter == null) {
+            throw new IllegalArgumentException(&quot;There is no filter with name &#39;&quot; + filterName + &quot;&#39; to apply to chain [&quot; + chainName + &quot;] in the pool of available Filters.  Ensure a &quot; + &quot;filter with that name/path has first been registered with the addFilter method(s).&quot;);
+        }
+
+        // 将匹配关系注册到filter中，后续会提到
+        applyChainConfig(chainName, filter, chainSpecificFilterConfig);
+
+        // 确保chain已经被加到filterChains这张map中了
+        NamedFilterList chain = ensureChain(chainName);
+        // 将该filter加入当前chain
+        chain.add(filter);
+    }</code></pre>
+
+<p>至此，<code>FilterChainManager</code>就创建完了，它无非就是缓存了两张<code>map</code>，没有什么逻辑上的操作。下面将<code>FilterChainManager</code>设置到<code>PathMatchingFilterChainResolver</code>中。<code>PathMatchingFilterChainResolver</code>实现了<code>FilterChainResolver</code>接口，该接口中只定义了一个方法：</p>
+
+<pre>
+<code>FilterChain getChain(ServletRequest request, ServletResponse response, FilterChain originalChain);</code></pre>
+
+<p>&nbsp;</p>
+
+<p>通过解析请求来得到一个新的<code>FilterChain</code>。而<code>PathMatchingFilterChainResolver</code>实现了该接口，依靠了<code>FilterChainManager</code>中保存的<code>chainFilters</code>和<code>filters</code>这两张map来根据请求路径解析出相应的<code>filterChain</code>，并且和<code>originalChain</code>组合起来使用。下面具体看看<code>PathMatchingFilterChainResolver</code>中的实现：</p>
+
+<pre>
+<code>   public FilterChain getChain(ServletRequest request, ServletResponse response, FilterChain originalChain) {
+        // 得到 FilterChainManager 
+        FilterChainManager filterChainManager = getFilterChainManager();
+        if (!filterChainManager.hasChains()) {
+            return null;
+        }
+
+        String requestURI = getPathWithinApplication(request);
+
+        // chainNames就是刚定义的filterChains的keySet，也就是所有的路径集合(比如：[&quot;/resources/**&quot;,&quot;/login&quot;])
+        for (String pathPattern : filterChainManager.getChainNames()) {
+
+            // 请求路径是否匹配某个 定义好的路径:
+            if (pathMatches(pathPattern, requestURI)) {
+                if (log.isTraceEnabled()) {
+                    log.trace(&quot;Matched path pattern [&quot; + pathPattern + &quot;] for requestURI [&quot; + requestURI + &quot;].  &quot; + &quot;Utilizing corresponding filter chain...&quot;);
+                }
+                // 找到第一个匹配的Filter链，那么就返回一个ProxiedFilterChain
+                return filterChainManager.proxy(originalChain, pathPattern);
+            }
+        }
+
+        return null;
+    }</code></pre>
+
+<p>&nbsp;</p>
+
+<p>这里返回只有两种情况，要么是<code>null</code>，要么就是一个<code>ProxiedFilterChain</code>。返回<code>null</code>并不表示中断<code>FilterChain</code>，而是只用<code>originChain</code>。而关于<code>ProxiedFilterChain</code>，它实现了<code>FilterChain</code>，内部维护了两份<code>FilterChain</code>（其实一个是<code>FilterChain</code>，另一个是<code>List&lt;Filter&gt;</code>）&nbsp;<br />
+<code>FilterChain</code>也就是<code>web.xml</code>中注册的<code>Filter</code>形成的<code>FilterChain</code>，我们称之为<code>originChain</code>。而另一个<code>List&lt;Filter&gt;</code>则是我们在<strong>Shiro</strong>中注册的Filter链了，下面看看<code>ProxiedFilterChain</code>中关于<code>doFilter(...)</code>的实现：</p>
+
+<pre>
+<code> public void doFilter(ServletRequest request, ServletResponse response) throws IOException, ServletException {
+        if (this.filters == null || this.filters.size() == this.index) {
+            //we&#39;ve reached the end of the wrapped chain, so invoke the original one:
+            if (log.isTraceEnabled()) {
+                log.trace(&quot;Invoking original filter chain.&quot;);
+            }
+            this.orig.doFilter(request, response);
+        } else {
+            if (log.isTraceEnabled()) {
+                log.trace(&quot;Invoking wrapped filter at index [&quot; + this.index + &quot;]&quot;);
+            }
+            this.filters.get(this.index++).doFilter(request, response, this);
+        }
+    }</code></pre>
+
+<p>可以看到，它会先执行<strong>Shiro</strong>中执行的<code>filter</code>，然后再执行<code>web.xml</code>中的<code>Filter</code>。不过要注意的是，需要等到<code>originChain</code>执行到<code>ShiroFilter</code>之后才会执行<strong>Shiro</strong>中的Filter链。&nbsp;<br />
+至此，两个组件的创建过程差不多都介绍完了，那么当这两个组件创建完毕后，是如何工作的呢？&nbsp;<br />
+先从<code>ShiroFilter</code>入手，因为它是总的拦截器，看看其中的<code>doFilterInternal(...)</code>方法：</p>
+
+<pre>
+<code>  protected void doFilterInternal(ServletRequest servletRequest, ServletResponse servletResponse, final FilterChain chain)
+            throws ServletException, IOException {
+
+        Throwable t = null;
+
+        try {
+            final ServletRequest request = prepareServletRequest(servletRequest, servletResponse, chain);
+            final ServletResponse response = prepareServletResponse(request, servletResponse, chain);
+
+            final Subject subject = createSubject(request, response);
+
+            //noinspection unchecked
+            subject.execute(new Callable() {
+                public Object call() throws Exception {
+                    // 其实需要关心的就在这里
+                    // touch一下session
+                    updateSessionLastAccessTime(request, response);
+                    // 执行Filter链
+                    executeChain(request, response, chain);
+                    return null;
+                }
+            });
+        } catch (ExecutionException ex) {
+            t = ex.getCause();
+        } catch (Throwable throwable) {
+            t = throwable;
+        }
+
+        if (t != null) {
+            if (t instanceof ServletException) {
+                throw (ServletException) t;
+            }
+            if (t instanceof IOException) {
+                throw (IOException) t;
+            }
+            //otherwise it&#39;s not one of the two exceptions expected by the filter method signature - wrap it in one:
+            String msg = &quot;Filtered request failed.&quot;;
+            throw new ServletException(msg, t);
+        }
+    }</code></pre>
+
+<p>跟进<code>executeChain(...)</code>方法：</p>
+
+<pre>
+<code>    protected void executeChain(ServletRequest request, ServletResponse response, FilterChain origChain)
+            throws IOException, ServletException {
+        FilterChain chain = getExecutionChain(request, response, origChain);
+        chain.doFilter(request, response);
+    }</code></pre>
+
+<p>如何得到<code>FilterChain</code>的呢？如果你认真的看到这里，那么你应该不难想到其中肯定利用了刚才注册的<code>ChainResolver</code>：</p>
+
+<pre>
+<code>   protected FilterChain getExecutionChain(ServletRequest request, ServletResponse response, FilterChain origChain) {
+        FilterChain chain = origChain;
+
+        FilterChainResolver resolver = getFilterChainResolver();
+        if (resolver == null) {
+            log.debug(&quot;No FilterChainResolver configured.  Returning original FilterChain.&quot;);
+            return origChain;
+        }
+
+        FilterChain resolved = resolver.getChain(request, response, origChain);
+        if (resolved != null) {
+            log.trace(&quot;Resolved a configured FilterChain for the current request.&quot;);
+            chain = resolved;
+        } else {
+            log.trace(&quot;No FilterChain configured for the current request.  Using the default.&quot;);
+        }
+
+        return chain;
+    }</code></pre>
+
+<p>猜对了~并且也验证了当<code>resolver.getChain(...)</code>返回<code>null</code>时，直接使用<code>originChain</code>了。然后执行返回的<code>FilterChain</code>的<code>doFilter(...)</code>方法。这个过程我们再脱离代码来分析一下：当我们从浏览器发出一个请求，究竟发生了什么？&nbsp;<br />
+这里只站在<code>Filter</code>的层面来分析。服务器启动后，读取<code>web.xml</code>中的<code>filter</code>、<code>filter-mapping</code>节点后组成<code>FilterChain</code>，对请求进行拦截。拦截的顺序按照filter节点的定义顺序，<strong>Shiro</strong>利用<code>ShiroFilter</code>来充当一个总的拦截器来分发所有需要被<strong>Shiro</strong>拦截的请求，所以我们看到在<strong>Shiro</strong>中我们还可以自定义拦截器。<code>ShiroFilter</code>根据它在拦截器中的位置，只要执行到了那么就会暂时中断原<code>FilterChain</code>的执行，先执行<strong>Shiro</strong>中定义的<code>Filter</code>，最后再执行原<code>FilterChian</code>。可以打个比方，比如说本来有一条铁链，一直蚂蚁从铁链的开端往末端爬，其中某一环叫<code>ShiroFilter</code>，那么当蚂蚁爬到<code>ShiroFilter</code>这一环时，将铁链打断，并且接上另一端铁链（<strong>Shiro</strong>中自定义的<code>Filter</code>），这样就构成了一条新的铁链。然后蚂蚁继续爬行（后续的执行过程）。</p>
+
+<p>到这里，我们已经根据请求路径找到了一条<code>Filter</code>链（<code>originChain</code>&nbsp;+&nbsp;<code>shiroChain</code>），之后就是对链上的<code>Filter</code>做<code>doFilter</code>，其中关于如何&nbsp;<br />
+就是<code>filter</code>后配置的<code>[]</code>部分是如何生效的，我们可以看<code>PathMatchingFilter</code>中的<code>Prehandle(...)</code>方法：</p>
+
+<pre>
+<code>    protected boolean preHandle(ServletRequest request, ServletResponse response) throws Exception {
+
+        if (this.appliedPaths == null || this.appliedPaths.isEmpty()) {
+            if (log.isTraceEnabled()) {
+                log.trace(&quot;appliedPaths property is null or empty.  This Filter will passthrough immediately.&quot;);
+            }
+            return true;
+        }
+
+        // appliedPaths中保存了该filter中能拦截的路径和该路径配置的key-value对，比如{key=&quot;/admin/**&quot;, value=&quot;[admin]&quot;}
+        for (String path : this.appliedPaths.keySet()) {
+            // 首先是匹配路径
+            if (pathsMatch(path, request)) {
+                log.trace(&quot;Current requestURI matches pattern &#39;{}&#39;.  Determining filter chain execution...&quot;, path);
+                // 然后开始验证&ldquo;[]&rdquo;中的字符串
+                Object config = this.appliedPaths.get(path);
+                return isFilterChainContinued(request, response, path, config);
+            }
+        }
+
+        //no path matched, allow the request to go through:
+        return true;
+    }</code></pre>
+
+<p>下面跟踪<code>isFilterChainContinued(...)</code>：</p>
+
+<pre>
+<code> private boolean isFilterChainContinued(ServletRequest request, ServletResponse response,
+                                           String path, Object pathConfig) throws Exception {
+
+        if (isEnabled(request, response, path, pathConfig)) { //isEnabled check added in 1.2
+            if (log.isTraceEnabled()) {
+                 // log
+            }
+            return onPreHandle(request, response, pathConfig);
+        }
+
+        if (log.isTraceEnabled()) {
+            // log
+        }
+        return true;
+    }</code></pre>
+
+<p>基本也就是交给<code>onPreHandle(...)</code>来处理，所以一般需要验证&rdquo;<code>[]</code>&ldquo;中字符串的<code>filter</code>都会扩展这个方法，比如<code>AccessControlFilter</code>：</p>
+
+<pre>
+<code>    public boolean onPreHandle(ServletRequest request, ServletResponse response, Object mappedValue) throws Exception {
+        return isAccessAllowed(request, response, mappedValue) || onAccessDenied(request, response, mappedValue);
+    }</code></pre>
+
+<p>而<code>RolesAuthorizationFilter</code>中：</p>
+
+<pre>
+<code>    public boolean isAccessAllowed(ServletRequest request, ServletResponse response, Object mappedValue) throws IOException {
+
+        Subject subject = getSubject(request, response);
+        String[] rolesArray = (String[]) mappedValue;
+
+        if (rolesArray == null || rolesArray.length == 0) {
+            //no roles specified, so nothing to check - allow access.
+            return true;
+        }
+
+        Set&lt;String&gt; roles = CollectionUtils.asSet(rolesArray);
+        return subject.hasAllRoles(roles);
+    }</code>
+</pre>
+
+<p>最后附上默认注册的<code>filters</code>：</p>
+
+<pre>
+<code>public enum DefaultFilter {
+
+    anon(AnonymousFilter.class),
+    authc(FormAuthenticationFilter.class),
+    authcBasic(BasicHttpAuthenticationFilter.class),
+    logout(LogoutFilter.class),
+    noSessionCreation(NoSessionCreationFilter.class),
+    perms(PermissionsAuthorizationFilter.class),
+    port(PortFilter.class),
+    rest(HttpMethodPermissionFilter.class),
+    roles(RolesAuthorizationFilter.class),
+    ssl(SslFilter.class),
+    user(UserFilter.class);
+}</code></pre>
+
+<p>平有限，写得蛮不容易，看源码加写花了整整2天。希望对大家能有帮助~</p>

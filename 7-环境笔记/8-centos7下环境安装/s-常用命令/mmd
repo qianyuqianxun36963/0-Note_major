@@ -1,0 +1,216 @@
+#!/bin/bash
+
+echo myCmd
+
+#执行出错： bash:$'\r': command not found 的问题
+#原因：win下的回车'\n\r'与Unix下的回车'\n'不一样，
+#dos2unix [脚本名]  进行转换
+#yum install dos2unix -y
+
+#all
+if [ $1 = "a" -o $1 = "all" ]; then
+
+	echo "-->"  tar -zxvf jdk-8u151-linux-x64.tar.gz  -C /usr/local
+
+	echo "-->"  rpm -qa \| grep mysql								#查看是否已安装
+	echo "-->"  yum list installed \| grep mysql
+
+	echo "-->"  ps -ef \| grep redis								#查看是否有某程序在运行
+	echo "-->"  netstat -ln |grep 9080								#查看端口情况
+
+	echo "-->"  whereis nginx										#查看安装位置
+
+	echo "-->"  vi /etc/profile										#设置环境变量
+	echo "-->"  source /etc/profile
+	echo "-->"  vi /etc/rc.local									#设置开机自启动
+
+fi
+
+#java
+if [ $1 = "j" -o $1 = "ja" -o $1 = "jav" -o $1 = "java" ]; then
+
+	echo "-->"  tar -zxvf jdk-8u151-linux-x64.tar.gz -C /usr/local
+
+	echo "-->"  mv jdk1.8.0_151 jdk1.8
+
+	echo "-->"  vi /etc/profile										#配置环境变量 JAVA_HOME/PATH/CLASSPATH
+	echo "-->"  source /etc/profile									#环境变量生效
+
+fi
+
+#tomcat
+if [ $1 = "t" -o $1 = "to" -o $1 = "tom" -o $1 = "tomc" -o $1 = "tomca" -o $1 = "tomcat" ]; then
+
+	echo "-->"  tar -zxvf apache-tomcat-8.5.23.tar.gz -C /usr/local
+
+	echo "-->"  mv apache-tomcat-8.5.23 tomcat8
+
+	echo "-->"  vi /etc/profile										#配置环境变量 TOMCAT_HOME/PATH
+	echo "-->"  source /etc/profile									#环境变量生效
+
+	echo "-->"  vi $TOMCAT_HOME/conf/tomcat-users.xml					#配置用户
+	echo "-->"  vi $TOMCAT_HOME/webapps/manager/META-INF/context.xml	#配置可以访问的ip
+
+	echo "-->"  cd $TOMCAT_HOME/bin/									#启动服务
+	echo "-->"  ./startup.sh
+
+	echo "-->"  cd $TOMCAT_HOME/logs									#动态的查看tomcat执行日志。
+	echo "-->"  tail -f catalina.out
+
+fi
+
+#redis
+if [ $1 = "r" -o $1 = "re" -o $1 = "red" -o $1 = "redi" -o $1 = "redis" ]; then
+
+	echo "-->"  tar -zxvf redis-4.0.1.tar.gz -C /usr/local
+
+	echo "-->"  mv redis-4.0.1 redis401
+	echo "-->"  make install
+
+#	echo "-->"  vi /etc/profile										配置环境变量 JAVA_HOME/PATH/CLASSPATH
+#	echo "-->"  source /etc/profile									环境变量生效
+
+	echo "-->"  cp redis-server /sbin/redis-server					#将常用的两个脚本放在系统脚本sbin目录下。
+	echo "-->"  cp redis-cli /sbin/redis-cli						#其实也是想配置环境变量的，不过不方便
+
+	echo "-->"  redis-server										#启动redis服务
+	echo "-->"  redis-cli -p 6379 shutdown							#停止redis服务
+	echo "-->"  redis-cli -h localhost -p 6379 						#使用redis服务
+
+	echo "-->"  vim $REDIS_HOME/redis.conf							#修改配置文件
+	echo "-->"  cheng conffile : requirepass [myPassword]			#修改原来的密码
+	echo "-->"  redis-cli -h 127.0.0.1 -p 6379 -a myRedis 
+
+fi
+
+#nginx
+if [ $1 = "n" -o $1 = "ng" -o $1 = "ngi" -o $1 = "ngin" -o $1 = "nginx" ]; then
+
+	echo "-->"  yum list installed \| grep gcc/pcre/zlib/ssl		#查看必要的软件安装情况
+
+	echo "-->"  yum install -y pcre pcre-devel						#缺哪个软件就安装哪个文件
+	echo "-->"  yum install gcc-c++
+	echo "-->"  yum install -y zlib zlib-devel
+	echo "-->"  yum install -y openssl openssl-devel
+
+	echo "-->"wget http://nginx.org/download/nginx-1.10.1.tar.gz		#处理安装文件	
+	echo "-->"  tar -zxvf nginx-1.12.1.tar.gz -C /usr/local
+	echo "-->"  mv nginx-1.12.1 nginx1.12
+
+	echo "-->"  ./configure											#使用默认配置
+	echo "-->"  make												#编译安装
+	echo "-->"  make install
+
+	echo "-->"  whereis nginx										#查看安装位置
+
+	echo "-->"  vi /etc/profile										#配置环境变量 JAVA_HOME/PATH/CLASSPATH
+	echo "-->"  source /etc/profile									#环境变量生效
+
+	echo "-->"  vi $NGINX_HOME/conf/nginx.conf						#配置主配置文件
+
+fi
+
+#nfs
+if [ $1 = "n" -o $1 = "nf" -o $1 = "nfs" ]; then
+
+	echo "-->"  master
+	
+	echo "-->"  yum -y install nfs-utils rpcbind
+	echo "-->"  mkdir /mnt/nfs_data									#创建共享文件夹
+
+	echo "-->"  vi /etc/exports										#配置共享目录，外ip权限等。
+	echo "-->"  exportfs -r											#环境变量生效
+	echo "-->"  exportfs											#查看配置是否生效
+
+	echo "-->"  systemctl enable rpcbind.service					#配置启动系统服务
+	echo "-->"  systemctl enable nfs-server.service
+
+	echo "-->"  systemctl start rpcbind.service						#启动系统服务
+	echo "-->"  systemctl start nfs-server.service
+
+	echo "-->"  rpcinfo -p											#确认NFS服务器启动成功
+	echo "-->"  showmount -e localhost								#NFS 的连线观察
+
+	echo "-->"  slave
+
+	echo "-->"  yum install nfs-utils
+	echo "-->"  mkdir /mnt/nfs_data										#创建共享文件夹
+	echo "-->"  mount -t nfs 210.28.216.100:/mnt/nfs_data /mnt/nfs_data	#挂载共享文件夹
+
+	echo "-->"  showmount -e 210.28.216.100									#查看文件服务主机提供的挂载点
+
+	echo "-->"  vi /etc/rc.local												#配置系统自启动打开挂载
+	echo "-->"  sudo mount -t nfs 210.28.216.100:/mnt/nfs_data /mnt/nfs_data	#加入这句
+
+fi
+
+#mysql
+if [ $1 = "m" -o $1 = "my" -o $1 = "mys" -o $1 = "mysq" -o $1 = "mysql" ]; then
+
+	echo "-->"  tar -zxvf mysql-5.7.20-x86_64.tar.gz   -C /usr/local
+
+	echo "-->"  mv mysql-5.7.20-linux-glibc2.12-x86_64 mysql57
+
+	echo "-->"  cp /usr/local/mysql57/support-files/mysql.server /etc/init.d/mysqld	#配置系统启动脚本
+	echo "-->"  cp /usr/local/mysql57/support-files/my-default.cnf /etc/my.conf		#配置软件配置信息（安装包没有的话，忽略用系统自带的）
+
+	echo "-->"  vi /etc/init.d/mysqld
+	echo "-->"  vi /etc/my.cnf
+
+	echo "-->"  [mysql]
+	echo "-->"  default-character-set=utf8
+	echo "-->"  
+	echo "-->"  [mysqld]
+	echo "-->"  default-storage-engine=INNODB
+	echo "-->"  character_set_server=utf8
+	echo "-->"  lower_case_table_names=1
+	echo "-->"  sql_mode = "STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_AUTO_CREATE_USER,NO_ENGINE_SUBSTITUTION"
+	echo "-->"  
+	echo "-->"  basedir = /usr/local/mysql57
+	echo "-->"  datadir = /usr/local/mysql57/data
+
+
+	echo "-->"  vi /etc/profile
+	echo "-->"  source /etc/profile
+
+	echo "-->"  groupadd mysql
+	echo "-->"  useradd -r -g mysql mysql
+	echo "-->"  passwd mysql       密码: wenhua123
+	echo "-->"  chown -R mysql:mysql /usr/local/mysql57/
+	echo "-->"  chmod -R 755 /usr/local/mysql57
+	echo "-->"  chown -R mysql:mysql /usr/local/mysql57/data
+	echo "-->"  chmod -R 755 /usr/local/mysql57/data
+
+	echo "-->"  cd /usr/local/mysql57/bin/
+	echo "-->"  ./mysqld --initialize --user=mysql --basedir=/usr/local/mysql57 --datadir=/usr/local/mysql57/data
+	echo "-->"  after cmd beffore your will get a default passwd, note it !  etc: host-102 [ 1oP,bo7t-f_1 ]  host-100  [ sCJitvPc+0vk ]
+
+	echo "-->"  创建 mysqld_safe 运行需要的一些文件、文件夹：
+
+#	echo "-->"  "echo \"\" > /usr/local/mysql57/mysqld.log"
+#	echo "-->"  chown -R mysql:mysql /usr/local/mysql57/mysqld.log
+
+	echo "-->"  mkdir /var/log/mariadb
+	echo "-->"  chown -R mysql:mysql /var/log/mariadb
+	echo "-->"  chmod -R 755 /var/log/mariadb
+
+	echo "-->"  mkdir /var/run/mariadb
+	echo "-->"  chown -R mysql:mysql /var/run/mariadb
+	echo "-->"  chmod -R 755 /var/run/mariadb
+
+	echo "-->"  ./mysqld_safe --user=mysql --basedir=/usr/local/mysql57 --datadir=/usr/local/mysql57/data
+
+	echo "-->"  service mysqld start
+	echo "-->"  ps -ef \|grep mysql
+	echo "-->"  kill pid
+
+	echo "-->"  mysql -u root -p [default password]
+	echo "-->"  set password=password\('wenhua123'\);
+
+	#设置语法检查 首先看系统里有哪些语法检查，本例中去掉第一个 ' ONLY_FULL_GROUP_BY ' 。
+	echo "-->"  select @@sql_mode #ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_AUTO_CREATE_USER,NO_ENGINE_SUBSTITUTION
+	echo "-->"  set @@sql_mode='STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_AUTO_CREATE_USER,NO_ENGINE_SUBSTITUTION'
+
+	echo "-->"  $MYSQL_HOME/bin/mysqldump -uroot -pwenhua123 --all-databases |gzip > /data/db_backup/db_`date +%Y-%m-%d-%T`.sql.gz
+
+fi

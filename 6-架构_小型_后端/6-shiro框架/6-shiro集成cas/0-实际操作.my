@@ -8,40 +8,159 @@
 
 <h2>第二步 加入相应的jar包</h2>
 
-<p>先加入cas-client的包到我们的项目 然后再下载个shiro-cas.jar也放到项目里</p>
+<p>加入shiro-cas 依赖的jar包。</p>
 
 <blockquote>
-<p>&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&lt;!-- cas集成相关依赖 --&gt;</p>
+<p>&nbsp; &nbsp; &lt;shiro.version&gt;1.2.2&lt;/shiro.version&gt;&nbsp; &nbsp;&nbsp; &nbsp; &lt;!-- cas集成相关依赖 --&gt;<br />
+&nbsp; &nbsp; &lt;dependency&gt;<br />
+&nbsp; &nbsp; &lt;groupId&gt;org.apache.shiro&lt;/groupId&gt;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &lt;artifactId&gt;shiro-cas&lt;/artifactId&gt;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &lt;version&gt;${shiro.version}&lt;/version&gt;<br />
+&nbsp; &nbsp; &lt;/dependency&gt;</p>
 
-<p>&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&lt;dependency&gt;<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp; &nbsp; &nbsp;&lt;groupId&gt;cas&lt;/groupId&gt;<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp; &nbsp; &nbsp;&lt;artifactId&gt;casclient&lt;/artifactId&gt;<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp; &nbsp; &nbsp;&lt;version&gt;2.1.1&lt;/version&gt;<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&lt;/dependency&gt;<br />
-&nbsp;&nbsp; &nbsp; &nbsp; &nbsp;<br />
-&nbsp;&nbsp; &nbsp; &nbsp; &nbsp;&lt;dependency&gt;<br />
-&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &lt;groupId&gt;org.apache.shiro&lt;/groupId&gt;<br />
-&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &lt;artifactId&gt;shiro-cas&lt;/artifactId&gt;<br />
-&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &lt;version&gt;1.2.2&lt;/version&gt;<br />
-&nbsp; &nbsp; &nbsp; &nbsp; &lt;/dependency&gt;</p>
+<p>&nbsp; &nbsp; &lt;dependency&gt;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &lt;groupId&gt;org.apache.shiro&lt;/groupId&gt;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &lt;artifactId&gt;shiro-spring&lt;/artifactId&gt;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &lt;version&gt;${shiro.version}&lt;/version&gt;<br />
+&nbsp; &nbsp; &lt;/dependency&gt;</p>
+</blockquote>
+
+<p><strong>下面两个一开始没加，不行。报错：Error creating bean with name &#39;securityManager&#39; defined in class path resource [springConfig/spring-shiro.xml]</strong></p>
+
+<p><strong>后来删了不加又行...无语。项目启动报错的时候可以考虑加上试试。</strong></p>
+
+<blockquote>
+<p>&nbsp; &nbsp; &lt;dependency&gt;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &lt;groupId&gt;org.apache.shiro&lt;/groupId&gt;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &lt;artifactId&gt;shiro-core&lt;/artifactId&gt;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &lt;version&gt;${shiro.version}&lt;/version&gt;<br />
+&nbsp; &nbsp; &lt;/dependency&gt;</p>
+
+<p>&nbsp; &nbsp; &lt;dependency&gt;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &lt;groupId&gt;org.apache.shiro&lt;/groupId&gt;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &lt;artifactId&gt;shiro-ehcache&lt;/artifactId&gt;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &lt;version&gt;${shiro.version}&lt;/version&gt;<br />
+&nbsp; &nbsp; &lt;/dependency&gt;</p>
 </blockquote>
 
 <h2>第三步 配置shiro中的cas设置</h2>
 
+<p>为添加cas，修改如下：</p>
+
+<h3>1、配置多realms</h3>
+
+<h4>方式一：</h4>
+
+<blockquote>配置多个 realms<br />
+&lt;property name=&quot;realms&quot;&gt;<br />
+&nbsp; &nbsp; &lt;list&gt;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &lt;!-- 数据库认证的实现 org.springrain.frame.shiro.ShiroDbRealm --&gt;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &lt;ref bean=&quot;shiroDbRealm&quot;/&gt;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &lt;!-- CAS认证的实现 org.springrain.frame.shiro.ShiroCasRealm --&gt;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &lt;!-- &lt;ref bean=&quot;shiroCasRealm&quot;/&gt; --&gt;<br />
+&nbsp; &nbsp; &lt;/list&gt;<br />
+&lt;/property&gt;</blockquote>
+
+<h4>方式二：</h4>
+
+<blockquote>&lt;bean&nbsp;id=&quot;securityManager&quot;&nbsp;class=&quot;org.apache.shiro.web.mgt.DefaultWebSecurityManager&quot;&gt;&nbsp;&nbsp;<br />
+&nbsp; &nbsp; &nbsp;...<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&lt;property&nbsp;name=&quot;authenticator&quot;&nbsp;ref=&quot;authenticator&quot;&gt;&lt;/property&gt;&nbsp;&nbsp;<br />
+&lt;/bean&gt;&nbsp;</blockquote>
+
+<blockquote>&lt;!--多个realm的配置--&gt;&nbsp;&nbsp;<br />
+&lt;bean&nbsp;id=&quot;authenticator&quot;&nbsp;class=&quot;org.apache.shiro.authc.pam.ModularRealmAuthenticator&quot;&gt;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&lt;property&nbsp;name=&quot;realms&quot;&gt;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;list&gt;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;ref&nbsp;bean=&quot;shiroDbRealm&quot;/&gt;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;ref&nbsp;bean=&quot;shiroCasRealm&quot;/&gt;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/list&gt;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&lt;/property&gt;&nbsp;&nbsp;<br />
+&lt;/bean&gt;&nbsp;&nbsp;</blockquote>
+
+<h3>2、添加自定义的Realm：</h3>
+
+<blockquote>&nbsp; &nbsp; &lt;!-- 项目自定义的基于cas的Realm --&gt;<br />
+&nbsp; &nbsp; &lt;bean id=&quot;<strong>shiroCasRealm</strong>&quot; class=&quot;com.wh.eas.manage.base.shiro.ShiroCasRealm&quot;&gt;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &lt;constructor-arg name=&quot;cacheManager&quot; ref=&quot;shiroSpringCacheManager&quot;/&gt;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &lt;!-- 启用身份验证缓存，即缓存AuthenticationInfo信息，默认false --&gt;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &lt;property name=&quot;authenticationCachingEnabled&quot; value=&quot;true&quot;/&gt;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &lt;!-- 缓存AuthenticationInfo信息的缓存名称 --&gt;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &lt;property name=&quot;authenticationCacheName&quot; value=&quot;authenticationCache&quot;/&gt;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &lt;!-- 缓存AuthorizationInfo信息的缓存名称 --&gt;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &lt;property name=&quot;authorizationCacheName&quot; value=&quot;authorizationCache&quot;/&gt;<br />
+<strong>&nbsp; &nbsp; &nbsp; &nbsp; &lt;!-- 配置cas服务器地址 --&gt;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &lt;property name=&quot;casServerUrlPrefix&quot; value=&quot;https://ids3.jsou.cn&quot; /&gt;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &lt;!-- 客户端的回调地址设置，必须和下面的shiro-cas过滤器casFilter拦截的地址一致 --&gt;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &lt;property name=&quot;casService&quot; value=&quot;http://210.28.216.100:8080/jwpt-web/shiro-cas&quot; /&gt;</strong><br />
+&nbsp; &nbsp; &lt;/bean&gt;</blockquote>
+
+<h3>3、修改Shiro Filter，给shiro过滤器添加过滤项，如加黑部分：</h3>
+
+<blockquote>&nbsp; &nbsp;&lt;!-- Shiro Filter --&gt;<br />
+&nbsp; &nbsp; &lt;bean id=&quot;shiroFilter&quot; class=&quot;org.apache.shiro.spring.web.ShiroFilterFactoryBean&quot;&gt;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &lt;!-- 安全管理器 --&gt;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &lt;property name=&quot;securityManager&quot; ref=&quot;securityManager&quot;/&gt;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &lt;!-- 默认的登陆访问url --&gt;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &lt;property name=&quot;loginUrl&quot; value=&quot;/login&quot;/&gt;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &lt;!-- 登陆成功后跳转的url --&gt;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &lt;property name=&quot;successUrl&quot; value=&quot;/index.do&quot;/&gt;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &lt;!-- 没有权限跳转的url --&gt;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &lt;property name=&quot;unauthorizedUrl&quot; value=&quot;/errorView/403&quot;/&gt;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &lt;property name=&quot;filterChainDefinitions&quot;&gt;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &lt;value&gt;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; ...<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; /index* = manageuser<br />
+<strong>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; /shiro-cas = <u>casFilter</u>&nbsp; &nbsp;&lt;!-- 与下面的过滤器名称对应 --&gt; &lt;!-- 注意，这里两句话顺序会有影响，logout放在shiro-cas 前面&nbsp;不行--&gt;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; /logout &nbsp; = <u>logout</u>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &lt;!-- 与下面的过滤器名称对应 --&gt;</strong><br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &lt;/value&gt;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &lt;/property&gt;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &lt;property name=&quot;filters&quot;&gt;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &lt;map&gt;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &lt;entry key=&quot;manageuser&quot; value-ref=&quot;manageuser&quot; /&gt;<br />
+<strong>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &lt;!-- 添加casFilter,logoutFilter到shiroFilter --&gt;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &lt;entry key=&quot;casFilter&quot; value-ref=&quot;casFilter&quot; /&gt;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &lt;entry key=&quot;logoutFilter&quot; value-ref=&quot;logoutFilter&quot; /&gt;</strong><br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &lt;/map&gt;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &lt;/property&gt;<br />
+&nbsp; &nbsp; &lt;/bean&gt;</blockquote>
+
+<h3>4、对应上面添加的过滤规则，配置对应的过滤器：</h3>
+
+<blockquote>&nbsp; &nbsp; &nbsp;&lt;!-- shiro-cas登录过滤器 --&gt;<br />
+&nbsp; &nbsp; &lt;bean id=&quot;<strong>casFilter</strong>&quot; class=&quot;org.apache.shiro.cas.CasFilter&quot;&gt;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &lt;!-- 配置验证错误时的失败页面 ，这里配置为登录页面 --&gt;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &lt;property name=&quot;failureUrl&quot; value=&quot;https://ids3.jsou.cn/login?service=http://210.28.216.100:8080/jwpt-web/shiroCas&quot; /&gt;<br />
+&nbsp; &nbsp; &lt;/bean&gt;<br />
+&nbsp; &nbsp; &lt;!-- 退出登录过滤器 --&gt;<br />
+&nbsp; &nbsp; &lt;bean id=&quot;<strong>logout</strong>&quot; class=&quot;org.apache.shiro.web.filter.authc.LogoutFilter&quot;&gt;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &lt;property name=&quot;redirectUrl&quot; value=&quot;https://ids3.jsou.cn/logout?service=http://210.28.216.100:8080/jwpt-web/login&quot; /&gt;<br />
+&nbsp; &nbsp; &lt;/bean&gt;</blockquote>
+
+<h3>5、添加cas集成之前的配置：</h3>
+
 <blockquote>
-<p>&lt;description&gt;shiro安全配置&lt;/description&gt;</p>
+<p>&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot;?&gt;<br />
+&lt;beans xmlns=&quot;http://www.springframework.org/schema/beans&quot;<br />
+&nbsp;&nbsp; &nbsp;xmlns:xsi=&quot;http://www.w3.org/2001/XMLSchema-instance&quot; xmlns:tx=&quot;http://www.springframework.org/schema/tx&quot;<br />
+&nbsp;&nbsp; &nbsp;xmlns:context=&quot;http://www.springframework.org/schema/context&quot;<br />
+&nbsp;&nbsp; &nbsp;xmlns:aop=&quot;http://www.springframework.org/schema/aop&quot;<br />
+&nbsp;&nbsp; &nbsp;xsi:schemaLocation=&quot;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;http://www.springframework.org/schema/beans&nbsp;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;http://www.springframework.org/schema/beans/spring-beans.xsd&nbsp;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;http://www.springframework.org/schema/tx&nbsp;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;http://www.springframework.org/schema/tx/spring-tx.xsd&nbsp;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;http://www.springframework.org/schema/context&nbsp;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;http://www.springframework.org/schema/context/spring-context.xsd<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;http://www.springframework.org/schema/aop<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;http://www.springframework.org/schema/aop/spring-aop.xsd&quot;<br />
+&nbsp;&nbsp; &nbsp;default-lazy-init=&quot;false&quot;&gt;<br />
+&nbsp; &nbsp; &lt;description&gt;shiro安全配置&lt;/description&gt;</p>
 
 <p>&nbsp; &nbsp; &lt;!-- 权限管理器 --&gt;<br />
 &nbsp;&nbsp; &nbsp;&lt;bean id=&quot;securityManager&quot; class=&quot;org.apache.shiro.web.mgt.DefaultWebSecurityManager&quot;&gt;<br />
-&nbsp; &nbsp; &nbsp; &nbsp; <strong>&lt;!-- Realm：域，Shiro从Realm获取安全数据（如用户、角色、权限） 通过查询源码可以看到下面这些设置的&nbsp;--&gt;</strong><br />
-<strong>&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&lt;property name=&quot;realms&quot;&gt; &nbsp;<br />
-&nbsp;&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;&lt;list&gt; &nbsp;<br />
-&nbsp;&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;&lt;!-- 数据库认证的实现 org.springrain.frame.shiro.ShiroDbRealm --&gt;<br />
-&nbsp;&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;&lt;ref bean=&quot;shiroDbRealm&quot;/&gt; &nbsp;<br />
-&nbsp;&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;&lt;!-- CAS认证的实现 org.springrain.frame.shiro.ShiroCasRealm --&gt;<br />
-&nbsp;&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;&lt;ref bean=&quot;shiroCasRealm&quot;/&gt; &nbsp;<br />
-&nbsp;&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;&lt;/list&gt; &nbsp;</strong><br />
-&nbsp;&nbsp; &nbsp; &nbsp; &nbsp;&lt;/property&gt; &nbsp;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&lt;!-- 数据库认证的实现 org.springrain.frame.shiro.ShiroDbRealm --&gt;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&lt;property name=&quot;realm&quot; ref=&quot;shiroDbRealm&quot; /&gt;<br />
 &nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&lt;!-- session 管理器 --&gt;<br />
 &nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&lt;property name=&quot;sessionManager&quot; ref=&quot;sessionManager&quot; /&gt;<br />
 &nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&lt;!-- 记住密码管理 --&gt;<br />
@@ -50,19 +169,8 @@
 &nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&lt;property name=&quot;cacheManager&quot; ref=&quot;shiroSpringCacheManager&quot; /&gt;<br />
 &nbsp;&nbsp; &nbsp;&lt;/bean&gt;<br />
 &nbsp;&nbsp; &nbsp;<br />
-&nbsp;&nbsp; &nbsp;&lt;!-- 項目自定义的基于数据库的 Realm --&gt;<br />
+&nbsp;&nbsp; &nbsp; &lt;!-- 項目自定义的Realm --&gt;<br />
 &nbsp; &nbsp; &lt;bean id=&quot;shiroDbRealm&quot; class=&quot;com.wh.eas.manage.base.shiro.ShiroDbRealm&quot;&gt;<br />
-&nbsp; &nbsp; &nbsp; &nbsp; &lt;constructor-arg name=&quot;cacheManager&quot; ref=&quot;shiroSpringCacheManager&quot;/&gt;<br />
-&nbsp; &nbsp; &nbsp; &nbsp; &lt;!-- 启用身份验证缓存，即缓存AuthenticationInfo信息，默认false --&gt;<br />
-&nbsp; &nbsp; &nbsp; &nbsp; &lt;property name=&quot;authenticationCachingEnabled&quot; value=&quot;true&quot;/&gt;<br />
-&nbsp; &nbsp; &nbsp; &nbsp; &lt;!-- 缓存AuthenticationInfo信息的缓存名称 --&gt;<br />
-&nbsp; &nbsp; &nbsp; &nbsp; &lt;property name=&quot;authenticationCacheName&quot; value=&quot;authenticationCache&quot;/&gt;<br />
-&nbsp; &nbsp; &nbsp; &nbsp; &lt;!-- 缓存AuthorizationInfo信息的缓存名称 --&gt;<br />
-&nbsp; &nbsp; &nbsp; &nbsp; &lt;property name=&quot;authorizationCacheName&quot; value=&quot;authorizationCache&quot;/&gt;<br />
-&nbsp; &nbsp; &lt;/bean&gt;<br />
-&nbsp; &nbsp;&nbsp;<br />
-&nbsp; &nbsp; &lt;!-- 項目自定义的基于cas的 Realm --&gt;<br />
-&nbsp; &nbsp; &lt;bean id=&quot;shiroCasRealm&quot; class=&quot;com.wh.eas.manage.base.shiro.ShiroCasRealm&quot;&gt;<br />
 &nbsp; &nbsp; &nbsp; &nbsp; &lt;constructor-arg name=&quot;cacheManager&quot; ref=&quot;shiroSpringCacheManager&quot;/&gt;<br />
 &nbsp; &nbsp; &nbsp; &nbsp; &lt;!-- 启用身份验证缓存，即缓存AuthenticationInfo信息，默认false --&gt;<br />
 &nbsp; &nbsp; &nbsp; &nbsp; &lt;property name=&quot;authenticationCachingEnabled&quot; value=&quot;true&quot;/&gt;<br />
@@ -170,17 +278,31 @@
 &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &lt;/map&gt;<br />
 &nbsp; &nbsp; &nbsp; &nbsp; &lt;/property&gt;<br />
 &nbsp; &nbsp; &lt;/bean&gt;</p>
+
+<p>&nbsp; &nbsp; &lt;!-- shiro密码加密配置 --&gt;<br />
+&lt;!-- &nbsp; &nbsp; &lt;bean id=&quot;passwordHash&quot; class=&quot;com.wh.eas.manage.base.shiro.PasswordHash&quot;&gt;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; 密码加密 1次md5,增强密码可修改此处<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &lt;property name=&quot;algorithmName&quot; value=&quot;md5&quot;/&gt;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &lt;property name=&quot;hashIterations&quot; value=&quot;1&quot;/&gt;<br />
+&nbsp; &nbsp; &lt;/bean&gt; --&gt;<br />
+&nbsp; &nbsp;&nbsp;<br />
+&nbsp; &nbsp; &lt;!-- 密码错误5次锁定半小时 --&gt;<br />
+&lt;!-- &nbsp; &nbsp; &lt;bean id=&quot;credentialsMatcher&quot; class=&quot;com.wh.eas.manage.base.shiro.RetryLimitCredentialsMatcher&quot;&gt;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &lt;constructor-arg ref=&quot;shiroSpringCacheManager&quot;/&gt;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &lt;property name=&quot;retryLimitCacheName&quot; value=&quot;halfHour&quot;/&gt;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &lt;property name=&quot;passwordHash&quot; ref=&quot;passwordHash&quot;/&gt;<br />
+&nbsp; &nbsp; &lt;/bean&gt; --&gt;<br />
+&lt;/beans&gt;</p>
 </blockquote>
 
 <p>关于这一个步骤的配置里面注释写的比较清楚了,至于一些类是自己重写的,可以自己参考前面的文章,/mh/cas/login.do其实就是cas拦截器的指定路径,如果想登录就请求这个路径即可,如果没有登录他会跳转cas的login页面</p>
 
-<h2>第四步 重写casrealm</h2>
+<h2>第四步 重写cas realm</h2>
 
 <p>第四步就是需要重写我们的casrealm,你可以看到上面的配置有SimpleCasRealm,这个类是我自己重写的,是为了方便分配自己本地系统的权限体系,因为shiro-cas提供的默认CasRealm功能比较有限,不能动态角色体系,下面可以看看这个原始的CasRealm源码</p>
 
 <blockquote>public&nbsp;class&nbsp;CasRealm&nbsp;extends&nbsp;AuthorizingRealm&nbsp;&nbsp;<br />
 {&nbsp;&nbsp;<br />
-&nbsp;&nbsp;<br />
 &nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;CasRealm()&nbsp;&nbsp;<br />
 &nbsp;&nbsp;&nbsp;&nbsp;{&nbsp;&nbsp;<br />
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;validationProtocol&nbsp;=&nbsp;&quot;CAS&quot;;&nbsp;&nbsp;<br />
@@ -553,20 +675,18 @@ PrincipalCollection&nbsp;principals&nbsp;=&nbsp;subject.getPrincipals();</blockq
 
 <p>页面再重定向到cas的logout,这样就把cas的ticket也注销成功</p>
 
-<ol start="1">
-	<li>&lt;!DOCTYPE&nbsp;html&nbsp;PUBLIC&nbsp;&quot;-//W3C//DTD&nbsp;XHTML&nbsp;1.0&nbsp;Strict//EN&quot;&nbsp;&quot;http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd&quot;&gt;&nbsp;&nbsp;</li>
-	<li>&lt;html&nbsp;xmlns=&quot;http://www.w3.org/1999/xhtml&quot;&gt;&nbsp;&nbsp;</li>
-	<li>&lt;head&gt;&nbsp;&nbsp;</li>
-	<li>&lt;meta&nbsp;http-equiv=&quot;Content-Type&quot;&nbsp;content=&quot;text/html;&nbsp;charset=UTF-8&quot;&gt;&nbsp;&nbsp;</li>
-	<li>&lt;title&gt;正在注销...&lt;/title&gt;&nbsp;&nbsp;</li>
-	<li>&lt;script&nbsp;type=&quot;text/javascript&quot;&nbsp;src=&quot;${staticHost}/static/plugin/jquery/core.js&quot;&gt;&lt;/script&gt;&nbsp;&nbsp;</li>
-	<li>&lt;script&nbsp;type=&quot;text/javascript&quot;&gt;&nbsp;&nbsp;</li>
-	<li>&nbsp;&nbsp;&nbsp;&nbsp;location.href=&quot;https://cas.test.com:8443/logout?service=http://test.com/mh/index.do&quot;;&nbsp;&nbsp;</li>
-	<li>&lt;/script&gt;&nbsp;&nbsp;</li>
-	<li>&lt;/head&gt;&nbsp;&nbsp;</li>
-	<li>&lt;body&gt;&nbsp;&nbsp;</li>
-	<li>&lt;/body&gt;&nbsp;&nbsp;</li>
-	<li>&lt;/html&gt;&nbsp;&nbsp;</li>
-</ol>
+<blockquote>&lt;!DOCTYPE&nbsp;html&nbsp;PUBLIC&nbsp;&quot;-//W3C//DTD&nbsp;XHTML&nbsp;1.0&nbsp;Strict//EN&quot;&nbsp;&quot;http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd&quot;&gt;&nbsp;&nbsp;<br />
+&lt;html&nbsp;xmlns=&quot;http://www.w3.org/1999/xhtml&quot;&gt;&nbsp;&nbsp;<br />
+&lt;head&gt;&nbsp;&nbsp;<br />
+&lt;meta&nbsp;http-equiv=&quot;Content-Type&quot;&nbsp;content=&quot;text/html;&nbsp;charset=UTF-8&quot;&gt;&nbsp;&nbsp;<br />
+&lt;title&gt;正在注销...&lt;/title&gt;&nbsp;&nbsp;<br />
+&lt;script&nbsp;type=&quot;text/javascript&quot;&nbsp;src=&quot;${staticHost}/static/plugin/jquery/core.js&quot;&gt;&lt;/script&gt;&nbsp;&nbsp;<br />
+&lt;script&nbsp;type=&quot;text/javascript&quot;&gt;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;location.href=&quot;https://cas.test.com:8443/logout?service=http://test.com/mh/index.do&quot;;&nbsp;&nbsp;<br />
+&lt;/script&gt;&nbsp;&nbsp;<br />
+&lt;/head&gt;&nbsp;&nbsp;<br />
+&lt;body&gt;&nbsp;&nbsp;<br />
+&lt;/body&gt;&nbsp;&nbsp;<br />
+&lt;/html&gt;&nbsp;&nbsp;</blockquote>
 
 <p>我想改造大概很明白了,其实shiro-cas.jar已经大部分拦截处理已经帮我们做好了,所以我们很安心地按照以往的方式来操控shiro的登录方式,希望对还没爬过这个坑的同学有帮助</p>
