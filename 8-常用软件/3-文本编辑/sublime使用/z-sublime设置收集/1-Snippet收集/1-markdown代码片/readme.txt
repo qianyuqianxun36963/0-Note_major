@@ -1,0 +1,1 @@
+将它放到：%SUBLIME_HOME%\Data\Packages\User\snippnets
