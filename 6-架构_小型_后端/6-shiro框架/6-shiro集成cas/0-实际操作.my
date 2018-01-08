@@ -297,11 +297,11 @@
 
 <p>关于这一个步骤的配置里面注释写的比较清楚了,至于一些类是自己重写的,可以自己参考前面的文章,/mh/cas/login.do其实就是cas拦截器的指定路径,如果想登录就请求这个路径即可,如果没有登录他会跳转cas的login页面</p>
 
-<h2>第四步 重写cas realm</h2>
+<h2>第四步 重写casRealm</h2>
 
 <p>第四步就是需要重写我们的casrealm,你可以看到上面的配置有SimpleCasRealm,这个类是我自己重写的,是为了方便分配自己本地系统的权限体系,因为shiro-cas提供的默认CasRealm功能比较有限,不能动态角色体系</p>
 
-<h3>原始的CasRealm源码</h3>
+<h3>1、原始的CasRealm源码</h3>
 
 <blockquote>public&nbsp;class&nbsp;CasRealm&nbsp;extends&nbsp;AuthorizingRealm&nbsp;&nbsp;<br />
 {&nbsp;&nbsp;<br />
@@ -528,7 +528,7 @@
 &nbsp;&nbsp;<br />
 }&nbsp;&nbsp;</blockquote>
 
-<h3>继承当前的CasRealm重载一下他的两个方法</h3>
+<h3>2、重载CasRealm的两个方法</h3>
 
 <p>其实跟我们普通用的UserRealm或者是JdbcRealm差别不大,但是里面增加了casToken的验证,所以我们应该直接拿过来用,下面再加载出我们的自己的逻辑即可,所以我们可以选择继承当前的CasRealm重载一下他的两个方法</p>
 
@@ -697,4 +697,111 @@ PrincipalCollection&nbsp;principals&nbsp;=&nbsp;subject.getPrincipals();</blockq
 &lt;/body&gt;&nbsp;&nbsp;<br />
 &lt;/html&gt;&nbsp;&nbsp;</blockquote>
 
+<h2>第六步 编写登录的controller层代码</h2>
+
+<blockquote>
+<p>&nbsp;&nbsp; &nbsp;/**<br />
+&nbsp;&nbsp; &nbsp; * 处理登录提交的方法<br />
+&nbsp;&nbsp; &nbsp; * @param request<br />
+&nbsp;&nbsp; &nbsp; * @param response<br />
+&nbsp;&nbsp; &nbsp; * @param userName<br />
+&nbsp;&nbsp; &nbsp; * @param password<br />
+&nbsp;&nbsp; &nbsp; * @param rememberMe<br />
+&nbsp;&nbsp; &nbsp; * @param model<br />
+&nbsp;&nbsp; &nbsp; * @return<br />
+&nbsp;&nbsp; &nbsp; */<br />
+&nbsp;&nbsp; &nbsp;@RequestMapping(value=&quot;/login&quot;,method=RequestMethod.POST)<br />
+&nbsp;&nbsp; &nbsp;@ResponseBody<br />
+&nbsp;&nbsp; &nbsp;public Object sysLogin(HttpServletRequest request,HttpServletResponse response,HttpSession session,<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;@RequestParam(value=&quot;userName&quot;) String userName,<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;@RequestParam(value=&quot;password&quot;) String password,<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;@RequestParam(value=&quot;rememberMe&quot;,defaultValue=&quot;0&quot;) Integer rememberMe,Model model){<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;if(StringUtils.isBlank(userName)) {<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;throw new RuntimeException(&quot;用户名不能为空&quot;);<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;}<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;if(StringUtils.isBlank(password)) {<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;throw new RuntimeException(&quot;密码不能为空&quot;);<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;}<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;//用户输入的验证码<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;String submitCode = org.apache.shiro.web.util.WebUtils.getCleanParam(request, GlobalConstant.DEFAULT_CAPTCHA_PARAM);<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;//回话中存储的验证码<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;String secCode = (String) session.getAttribute(GlobalConstant.DEFAULT_CAPTCHA_PARAM);<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;session.removeAttribute(GlobalConstant.DEFAULT_CAPTCHA_PARAM);<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;if(StringUtils.isNotBlank(secCode)) {<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;secCode = secCode.toUpperCase();<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;}<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;</p>
+
+<p>&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;if(StringUtils.isNotBlank(submitCode)) {<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;submitCode = submitCode.toUpperCase();<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;}&nbsp;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;if(StringUtils.isBlank(submitCode) || StringUtils.isBlank(secCode) || !secCode.equals(submitCode)) {<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;throw new RuntimeException(&quot;验证码错误&quot;);<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;}<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;String gotoUrl=request.getParameter(GlobalConstant.GOTOURL);<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;Subject user = SecurityUtils.getSubject();<br />
+&nbsp; &nbsp; &nbsp; &nbsp;&nbsp;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;//对密码进行解密<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;RSAPrivateKey privateKey = (RSAPrivateKey) request.getSession().getAttribute(GlobalConstant.LOGIN_RSA_PRIVATE_KEY);<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;String pwd = &quot;&quot;;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;try {<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp; pwd = RSAUtils.decrypt(privateKey, password);<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;} catch (Exception e) {<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;throw new RuntimeException(&quot;解密失败&quot;);<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;}<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; UsernamePasswordToken token = new UsernamePasswordToken(userName, pwd);<br />
+&nbsp; &nbsp; &nbsp; &nbsp; // 设置记住密码<br />
+&nbsp; &nbsp; &nbsp; &nbsp; token.setRememberMe(1 == rememberMe);<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;try{<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;//会调用 shiroDbRealm 的认证方法<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;//org.springrain.frame.shiro.ShiroDbRealm.doGetAuthenticationInfo(AuthenticationToken)<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;user.login(token);<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;//设置tokenkey<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;String accessTokenId = &quot;sys_&quot;+StringUtils.getUUId();<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;session.setAttribute(GlobalConstant.ACCESSTOKEN, accessTokenId);<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;WebUtils.setCookie(response, GlobalConstant.ACCESSTOKEN, accessTokenId, -1);<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;if(StringUtils.isBlank(gotoUrl)){<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;gotoUrl = &nbsp;&quot;/index?ACCESSTOKEN=&quot;+accessTokenId;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;} else {<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;gotoUrl &nbsp;= &quot;/index?ACCESSTOKEN=&quot;+accessTokenId + gotoUrl;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;}<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;model.addAttribute(GlobalConstant.ACCESSTOKEN, accessTokenId);<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;Map&lt;String,Object&gt; data = new HashMap&lt;String,Object&gt;();<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;data.put(&quot;status&quot;, &quot;success&quot;);<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;data.put(&quot;gotoUrl&quot;, gotoUrl);<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;data.put(GlobalConstant.ACCESSTOKEN, accessTokenId);<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;data.put(&quot;msg&quot;, &quot;登录成功&quot;);<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;return data;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;}catch(UnknownAccountException e){<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;throw new RuntimeException(&quot;账户不存在&quot;);<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;}catch(IncorrectCredentialsException e){<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;throw new RuntimeException(&quot;密码错误&quot;,e);<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;}catch(LockedAccountException e){<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;throw new RuntimeException(&quot;账户被锁定&quot;,e);<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;}catch(Exception e){<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;throw new RuntimeException(&quot;未知错误，请联系管理员&quot;,e);<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;}<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;<br />
+&nbsp;&nbsp; &nbsp;}&nbsp;&nbsp; &nbsp;<br />
+&nbsp;&nbsp; &nbsp;<br />
+&nbsp;&nbsp; &nbsp;@RequestMapping(value=&quot;/logout&quot;)<br />
+&nbsp;&nbsp; &nbsp;public String logout(HttpServletRequest request,HttpServletResponse response) {<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;WebUtils.removeCookie(response, GlobalConstant.ACCESSTOKEN);<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;Subject subject = SecurityUtils.getSubject();<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;if(subject != null) {<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;subject.logout();<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;}<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;return REDIRECT + &quot;/login&quot;;<br />
+&nbsp;&nbsp; &nbsp;}</p>
+</blockquote>
+
 <p>我想改造大概很明白了,其实shiro-cas.jar已经大部分拦截处理已经帮我们做好了,所以我们很安心地按照以往的方式来操控shiro的登录方式,希望对还没爬过这个坑的同学有帮助</p>
+
+<p>&nbsp;</p>
