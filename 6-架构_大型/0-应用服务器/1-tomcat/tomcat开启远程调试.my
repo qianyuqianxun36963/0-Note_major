@@ -1,0 +1,85 @@
+<h1>tomcat如何正确的开启远程调试功能</h1>
+
+<p>在日常开发中，有时需要对远程服务器上的应用进行远程调试，对于tomcat，要进行远程调试其实很简单，只需要在启动tomcat时开启jpda服务即可。</p>
+
+<h2>什么是JPDA呢？</h2>
+
+<p>JPDA(Java Platform Debugger Architecture) 是 Java 平台调试体系结构的缩写，通过 JPDA 提供的 API，开发人员可以方便灵活的搭建 Java 调试应用程序。JPDA 主要由三个部分组成：Java 虚拟机工具接口（JVMTI），Java 调试线协议（JDWP），以及 Java 调试接口（JDI）。而像Eclipse和IDEA这种开发工具提供的图形界面的调试工具，其实就是实现了JDI。关于JPDA的详细信息，可以查看developerWorks上的系列文章&mdash;&mdash;<a href="http://www.ibm.com/developerworks/cn/views/java/libraryview.jsp?search_by=%E6%B7%B1%E5%85%A5+Java+%E8%B0%83%E8%AF%95%E4%BD%93%E7%B3%BB" target="_blank">深入Java调试体系</a></p>
+
+<p>tomcat使用如下方式进行启动jpda：</p>
+
+<ol start="1">
+	<li>./catalina.sh&nbsp;jpda&nbsp;start&nbsp;&nbsp;</li>
+</ol>
+
+<p>默认情况下，远程调试的默认端口为8000，可以通过JPDA_ADDRESS进行配置，指定自定义的端口，另外，还有两个可以配置的参数</p>
+
+<ul>
+	<li>JPDA_TRANSPORT：即调试器和虚拟机之间数据的传输方式，默认值是dt_socket</li>
+	<li>JPDA_SUSPEND：即JVM启动后是否立即挂起，默认是n</li>
+</ul>
+
+<p>可以在catalina.sh中进行配置：</p>
+
+<ol start="1">
+	<li>JPDA_TRANSPORT=dt_socket&nbsp;&nbsp;</li>
+	<li>JPDA_ADDRESS=5005&nbsp;&nbsp;</li>
+	<li>JPAD_SUSPEND=n&nbsp;&nbsp;</li>
+</ol>
+
+<p>或者通过JPDA_OPTS进行配置：</p>
+
+<ol start="1">
+	<li>JPDA_OPTS=&#39;-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=5005&rsquo;&nbsp;&nbsp;</li>
+</ol>
+
+<p>这样启动之后 ，就可以通过Eclise或IDEA进行远程调试了，IDEA具体如何进行远程调试，请参考<a href="http://blog.csdn.net/mhmyqn/article/details/49160339" target="_blank">另一篇文章</a>。</p>
+
+<p>&nbsp;</p>
+
+<p>网上有很多文章提供了另一种开启远程调试功能的方式，即通过JAVA_OPTS指定相应的JPDA参数：</p>
+
+<ol start="1">
+	<li>JAVA_OPTS=&quot;$JAVA_OPTS&nbsp;-Xrunjdwp:transport=dt_socket,server=y,suspend=n,address=5005&rdquo;&nbsp;&nbsp;</li>
+</ol>
+
+<p>使用这种方式开启远程调试功能，在启动时没有什么问题，也能够正常的进行远程调试，但是在停止tomcat时：</p>
+
+<ol start="1">
+	<li>./catalina.sh&nbsp;stop&nbsp;&nbsp;</li>
+</ol>
+
+<p>会出现如下错误：</p>
+
+<ol start="1">
+	<li>ERROR:&nbsp;transport&nbsp;error&nbsp;202:&nbsp;bind&nbsp;failed:&nbsp;Address&nbsp;already&nbsp;in&nbsp;use&nbsp;&nbsp;</li>
+	<li>ERROR:&nbsp;JDWP&nbsp;Transport&nbsp;dt_socket&nbsp;failed&nbsp;to&nbsp;initialize,&nbsp;TRANSPORT_INIT(510)&nbsp;&nbsp;</li>
+	<li>JDWP&nbsp;exit&nbsp;error&nbsp;AGENT_ERROR_TRANSPORT_INIT(197):&nbsp;No&nbsp;transports&nbsp;initialized&nbsp;[debugInit.c:750]&nbsp;&nbsp;</li>
+	<li>FATAL&nbsp;ERROR&nbsp;in&nbsp;native&nbsp;method:&nbsp;JDWP&nbsp;No&nbsp;transports&nbsp;initialized,&nbsp;jvmtiError=AGENT_ERROR_TRANSPORT_INIT(197)&nbsp;&nbsp;</li>
+</ol>
+
+<p>导致不能正常终止java进程，需要手动的kill掉，所以还是应该使用前面的方式开启远程调试功能。</p>
+
+<p>&nbsp;</p>
+
+<h2>实际操作</h2>
+
+<h3>服务器端配置</h3>
+
+<p>服务器上的tomcat仅仅就是加了下面一句话就好了。</p>
+
+<p>catalina.sh 里面加：</p>
+
+<p>linux：CATALINA_OPTS=&quot;-server -Xdebug -Xnoagent -Djava.compiler=NONE -Xrunjdwp:transport=dt_socket,server=y,suspend=n,address=8899&quot;&nbsp;</p>
+
+<p>catalina.bat 里面加：</p>
+
+<p>windows: SET CATALINA_OPTS=-server -Xdebug -Xnoagent -Djava.compiler=NONE -Xrunjdwp:transport=dt_socket,server=y,suspend=n,address=8899&nbsp;</p>
+
+<p>&nbsp;</p>
+
+<h3>IDE 开发环境配置</h3>
+
+<p>点击配置运行环境 -&gt; + Remote -&gt; 远程服务名 -&gt; 主机ip 和 端口 -&gt; 配置应用。</p>
+
+<p><img alt="" src="http://notebook-1255399141.cossh.myqcloud.com/%E4%B8%93%E4%B8%9A%E7%AC%94%E8%AE%B0%E5%9B%BE/6-%E6%A1%86%E6%9E%B6_%E5%A4%A7%E5%9E%8B/0-%E5%BA%94%E7%94%A8%E6%9C%8D%E5%8A%A1%E5%99%A8/1-tomcat/9-tomcat%E8%BF%9C%E7%A8%8B%E8%B0%83%E8%AF%95/tomcat%E8%BF%9C%E7%A8%8B%E8%B0%83%E8%AF%951.png" style="height:315px; width:600px" /></p>
