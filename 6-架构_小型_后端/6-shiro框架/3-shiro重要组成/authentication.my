@@ -1,0 +1,235 @@
+<h1>Authentication概述</h1>
+
+<h2>概述</h2>
+
+<p>&nbsp; Authentication 是指身份验证的过程&mdash;&mdash;即证明一个用户实际上是不是他们所说的他们是谁。也就是说通过提交用户的身份和凭证给Shiro，以判断它们是否和应用程序预期的相匹配。</p>
+
+<h2>基本概念</h2>
+
+<p>1：Principals(身份)：是Subject 的&lsquo;identifying attributes(标识属性)&rsquo;。比如我们登录提交的用户名。</p>
+
+<p>2：Credentials(凭证)：通常是只被Subject 知道的秘密值，它用来作为一种起支持作用的证据，此证据事实上包含着所谓的身份证明。比如我们登录提供的密码</p>
+
+<h2>认证的基本步骤</h2>
+
+<p>1. 收集Subjects 提交的Principals(身份)和Credentials(凭证)；</p>
+
+<p>2. 提交Principals(身份)和Credentials(凭证)进行身份验证；</p>
+
+<p>3. 如果提交成功，则允许访问，否则重新进行身份验证或者阻止访问。</p>
+
+<h2>认证样例</h2>
+
+<h3>使用用户名/密码的样例</h3>
+
+<p>UsernamePasswordToken token = new UsernamePasswordToken(username, password);</p>
+
+<p>token.setRememberMe(true);</p>
+
+<p>样例使用UsernamePasswordToken 来支持最常见的用户名/密码的身份验证方法。这是Shiro的org.apache.shiro.authc.AuthenticationToken 的接口，是Shiro 代表提交的Principals(身份)和Credentials(凭证)的身份验证系统所使用的基本接口的一个实现。</p>
+
+<p>提交用户名/密码进行认证</p>
+
+<p>Subject currentUser = SecurityUtils.getSubject();</p>
+
+<p>currentUser.login(token);</p>
+
+<p>处理认证成功和失败</p>
+
+<p>&nbsp; 如果认证成功，会没有返回，也没有例外，通过。</p>
+
+<p>&nbsp; 如果认证失败，会拋出例外，你可以在程序中捕获并处理，如下示例：</p>
+
+<p>try {</p>
+
+<p>&nbsp; currentUser.login(token);</p>
+
+<p>} catch ( UnknownAccountException uae ) { &hellip;</p>
+
+<p>} catch ( IncorrectCredentialsException ice ) { &hellip;</p>
+
+<p>} catch (LockedAccountException lae ) { &hellip;</p>
+
+<p>} catch (ExcessiveAttemptsException eae ) { &hellip;</p>
+
+<p>} &hellip; catch your own &hellip;</p>
+
+<p>nlogout(注销)</p>
+
+<p>&nbsp; currentUser.logout();</p>
+
+<p>&nbsp; 当你调用logout，任何现有的Session 都将会失效，而且任何身份都将会失去关联（例如，在Web 应用程序中，RememberMe cookie 也将被删除）。在Subject 注销后，该Subject的实例被再次认为是匿名的，当然，除了Web 应用程序。</p>
+
+<p>&nbsp; 注意：由于在Web 应用程序记住身份往往是依靠Cookies，然而Cookies 只能在Response 被committed 之前被删除，所以强烈建议在调用subject.logout()后立即将终端用户重定向到一个新的视图或页面。</p>
+
+<p>&nbsp; 这样能够保证任何与安全相关的Cookies 都能像预期的一样被删除。这是HTTP cookies 的功能限制，而不是Shiro的。</p>
+
+<p>Remembered和Authenticated</p>
+
+<p>Remembered(记住我)</p>
+
+<p>&nbsp; 一个记住我的Subject 不是匿名的，是有一个已知的身份ID（也就是subject.getPrincipals()是非空的）。但是这个被记住的身份ID 是在之前的session 中被认证的。如果subject.isRemembered()返回true，则Subject 被认为是被记住的。</p>
+
+<p>&nbsp;</p>
+
+<p>Authenticated(已认证)</p>
+
+<p>&nbsp; 一个已认证的Subject 是指在当前Session 中被成功地验证过了（也就是说，login方法被调用并且没有抛出异常）。如果subject.isAuthenticated()返回true 则认为Subject 已通过验证。</p>
+
+<p>&nbsp;</p>
+
+<p>注意他们是互斥的</p>
+
+<p>&nbsp; Remembered 和Authenticated 是互斥的&mdash;&mdash;若其中一个为真则另一个为假，反之亦然</p>
+
+<p>认证顺序</p>
+
+<p><img alt="" src="http://sishuok.com/forum/upload/2013/11/12/030c9ce227c935bba17a73db92cde092__3.JPG" /></p>
+
+<p>Step 1：应用程序代码调用Subject.login 方法，传递创建好的包含终端用户的Principals(身份)和Credentials(凭证)的AuthenticationToken 实例。</p>
+
+<p>Step 2：Subject实例，通常是DelegatingSubject（或子类）委托应用程序的SecurityManager通过调用securityManager.login(token)开始真正的验证。</p>
+
+<p>Step3：SubjectManager 接收token 以及简单地委托给内部的Authenticator 实例通过调用authenticator.authenticate(token)。这通常是一个ModularRealmAuthenticator 实例，支持在身份验证中协调一个或多个Realm 实例。</p>
+
+<p>Step 4：如果应用程序中配置了一个以上的Realm，ModularRealmAuthenticator 实例将利用配置好的AuthenticationStrategy 来启动Multi-Realm 认证尝试。在Realms 被身份验证调用之前，期间和以后，AuthenticationStrategy 被调用使其能够对每个Realm 的结果作出反应。</p>
+
+<p>Step 5：每个配置的Realm 用来帮助看它是否支持提交的AuthenticationToken。如果支持，那么支持Realm 的getAuthenticationInfo 方法将会伴随着提交的token 被调用。getAuthenticationInfo 方法有效地代表一个特定Realm 的单一的身份验证尝试。</p>
+
+<h2>初识自定义&nbsp;Realm</h2>
+
+<p>这里先来个例子，认识一下：</p>
+
+<p>public class MyRealm extends AuthorizingRealm{</p>
+
+<p>&nbsp; protected AuthorizationInfo doGetAuthorizationInfo(PrincipalCollection principals) {</p>
+
+<p>&nbsp; String userName = (String) getAvailablePrincipal(principals);</p>
+
+<p>&nbsp; //通过用户名去获得用户的所有资源，并把资源存入info中</p>
+
+<p>&nbsp; SimpleAuthorizationInfo info = new SimpleAuthorizationInfo();</p>
+
+<p>&nbsp; Set&lt;String&gt; s = new HashSet&lt;String&gt;();</p>
+
+<p>&nbsp; s.add(&quot;p1&quot;);&nbsp; s.add(&quot;p2&quot;); info.setStringPermissions(s);</p>
+
+<p>&nbsp; Set&lt;String&gt; r = new HashSet&lt;String&gt;();</p>
+
+<p>&nbsp; r.add(&quot;r1&quot;); r.add(&quot;r2&quot;); info.setRoles(r);</p>
+
+<p>&nbsp; return info;}</p>
+
+<p>&nbsp; protected AuthenticationInfo doGetAuthenticationInfo(</p>
+
+<p>&nbsp; AuthenticationToken token) throws AuthenticationException {</p>
+
+<p>&nbsp; //token中储存着输入的用户名和密码</p>
+
+<p>&nbsp; UsernamePasswordToken upToken = (UsernamePasswordToken)token;</p>
+
+<p>&nbsp; String username = upToken.getUsername();</p>
+
+<p>&nbsp; String password = String.valueOf(upToken.getPassword());</p>
+
+<p>&nbsp; //通常是与数据库中用户名和密码进行比对，这里就省略了</p>
+
+<p>&nbsp; //比对成功则返回info，比对失败则抛出对应信息的异常AuthenticationException</p>
+
+<p>&nbsp; SimpleAuthenticationInfo info = new SimpleAuthenticationInfo(username, password .toCharArray(),getName());</p>
+
+<p>&nbsp; return info;&nbsp; }}</p>
+
+<h2>配置多个Realm</h2>
+
+<p>上面的例子可以作为第一个Realm</p>
+
+<p>再复制一份，定义为MyRealm2，在返回user前添加抛出一个例外，表示认真没有通过，如下：</p>
+
+<p>if(username.equals(&quot;javass&quot;)){</p>
+
+<p>&nbsp; throw new AuthenticationException(&quot;MyRealm2 认证失败&quot;);</p>
+
+<p>}</p>
+
+<p>SimpleAuthenticationInfo info = new SimpleAuthenticationInfo(username, password .toCharArray(),getName());</p>
+
+<p>n在配置文件里面添加Realm的定义</p>
+
+<p>myRealm1=cn.javass.hello.MyRealm</p>
+
+<p>myRealm2=cn.javass.hello.MyRealm2</p>
+
+<p>由于有多个realm，一般就需要配置AuthenticationStrategy了，而AuthenticationStrategy是跟Authenticator（认证器）相关的。</p>
+
+<h2>配置Authenticator和AuthenticationStrategy</h2>
+
+<p>authenticator = org.apache.shiro.authc.pam.ModularRealmAuthenticator</p>
+
+<p>authcStrategy = org.apache.shiro.authc.pam.AllSuccessfulStrategy</p>
+
+<p>authenticator.authenticationStrategy = $authcStrategy</p>
+
+<p>authenticator.realms=$myRealm2,$myRealm1</p>
+
+<p>当然，你可以扩展并实现自己的Authenticator，一般没有必要</p>
+
+<p>最后把Authenticator设置给securityManager</p>
+
+<p>securityManager.authenticator = $authenticator</p>
+
+<p>关于AuthenticationStrategy的配置，有三种：</p>
+
+<p>AtLeastOneSuccessfulStrategy ：如果一个（或更多）Realm 验证成功，则整体的尝试被认为是成功的。如果没有一个验证成功，则整体尝试失败。</p>
+
+<p>FirstSuccessfulStrategy 只有第一个成功地验证的Realm 返回的信息将被使用。所有进一步的Realm 将被忽略。如果没有一个验证成功，则整体尝试失败</p>
+
+<p>AllSucessfulStrategy 为了整体的尝试成功，所有配置的Realm 必须验证成功。如果没有一个验证成功，则整体尝试失败。</p>
+
+<p>&nbsp;</p>
+
+<p>ModularRealmAuthenticator 默认的是AtLeastOneSuccessfulStrategy</p>
+
+<p>自定义自己的AuthenticationStrategy，通常是扩展自AbstractAuthenticationStrategy，示例如下：</p>
+
+<p>public class MyAuthenticationStrategy extends AbstractAuthenticationStrategy{</p>
+
+<p>&nbsp; public AuthenticationInfo afterAttempt(Realm realm, AuthenticationToken token, AuthenticationInfo singleRealmInfo, AuthenticationInfo aggregateInfo, Throwable t) throws AuthenticationException {</p>
+
+<p>&nbsp; if(realm.getName().equals(&quot;myRealm2&quot;)){</p>
+
+<p>&nbsp; if(singleRealmInfo==null || singleRealmInfo.getPrincipals()==null){</p>
+
+<p>&nbsp; throw new AuthenticationException(&quot;主战认证未通过&quot;);</p>
+
+<p>&nbsp; }</p>
+
+<p>&nbsp; }</p>
+
+<p>return super.afterAttempt(realm, token, singleRealmInfo, aggregateInfo, t);</p>
+
+<p>&nbsp; }</p>
+
+<p>}</p>
+
+<p>至于具体覆盖扩展什么方法，需要根据你具体的策略来定。</p>
+
+<h2>多个Realm的验证顺序</h2>
+
+<p>概述</p>
+
+<p>&nbsp; 非常重要的一点是：ModularRealmAuthenticator 将与Realm 实例以迭代的顺序进行交互。</p>
+
+<p>&nbsp; 在SecurityManager 中已经配置好了ModularRealmAuthenticator 对Realm实例的访问。当执行一个认证尝试时，它将会遍历该集合，并对每一个支持提交AuthenticationToken 的Realm 调用Realm 的getAuthenticationInfo 方法</p>
+
+<p>隐式排列</p>
+
+<p>&nbsp; 当你配置多个realm的时候，处理的顺序默认就是你配置的顺序。</p>
+
+<p>&nbsp; 这种情况通常就是只定义了realm，而没有配置securityManager的realms</p>
+
+<p>显示排列</p>
+
+<p>&nbsp; 也就是显示的配置securityManager.realms，那么执行的顺序就是你配置该值的realm的顺序。</p>
+
+<p>&nbsp; 通常更推荐显示排列。</p>
