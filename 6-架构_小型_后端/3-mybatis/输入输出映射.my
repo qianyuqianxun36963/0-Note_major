@@ -1,0 +1,348 @@
+<h1>MyBatis输入映射与输出映射</h1>
+
+<h2>1. 输入映射</h2>
+
+<p>通过parameterType指定输入参数的类型，类型可以是简单类型、hashmap、pojo的包装类型。</p>
+
+<h3>1.0 实际问题-引例</h3>
+
+<p>实际中遇到的问题： 在维护数据库中has_used字段的时候，使用如下的update，但是要前台传表名过去。</p>
+
+<blockquote>&nbsp; &nbsp; &lt;!-- 更新数据表的has_used字段 --&gt;<br />
+&nbsp; &nbsp; &lt;update id=&quot;updateHasUsed&quot; parameterType=&quot;java.util.Map&quot;&gt;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; UPDATE ${tableName}<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; SET has_used = #{hasUsed}<br />
+&nbsp; &nbsp; &nbsp; &nbsp; WHERE id = #{id}<br />
+&nbsp; &nbsp; &lt;/update&gt;</blockquote>
+
+<p>其中，表名要作为参数传递给sql。这时，使用#{} 不可以，会拼成&quot;update &#39;tableName&#39; set column = &#39;1&#39;&nbsp;where id = &#39;1&#39; &quot;这里table的名字被放在了引号里面。</p>
+
+<p>此时，只能使用${}符号，会将表名直接拼在sql 中，不加引号。但是此时就要想到放置sql注入的风险（非万不得已，少用${}方式）。</p>
+
+<p><strong>防止sql注入：将参数的传递写在代码里，不能是前台传过来的！</strong></p>
+
+<h3>1.1 #{}与${}</h3>
+
+<p>#{}实现的是向prepareStatement中的预处理语句设置参数值，sql语句中#{}表示一个占位符即?</p>
+
+<pre>
+&lt;select id=&quot;findUserById&quot; parameterType=&quot;int&quot; resultType=&quot;user&quot;&gt;
+   select * from user where id=#{id}
+&lt;/select&gt;</pre>
+
+<p>使用占位符#{}可以有效防止sql注入，在使用时不需要关系参数值的类型，mybatis会自动进行java类型和jdbc类型的转换。#{}可以接收简单类型值或pojo属性值，如果parameterType传输单个类型值，#{}括号可以是value或其它名称。</p>
+
+<p>${}和#{}不同，通过${}可以将parameterType传入的内容拼接在sql中且不进行jdbc类型转换，${}可以接收简单类型值或pojo属性值，如果parameterType传输单个简单类型值，${}括号中只能是value。使用${}不能防止sql注入，但是有时用${}会非常方便，如下例子：</p>
+
+<pre>
+    &lt;select id=&quot;findUserByName&quot; parameterType=&quot;java.lang.String&quot; resultType=&quot;joanna.yan.mybatis.entity.User&quot;&gt;
+        select * from user where username LIKE &#39;%${value}%&#39;
+    &lt;/select&gt;</pre>
+
+<p>如果本例子使用#{}则传入的字符串中必须要有%，而%是人为拼接在参数中，显然有点麻烦，如果采用${}在sql中拼接为%的方式则在调用mapper接口传递参数就方便很多。</p>
+
+<pre>
+//如果使用占位符号则必须人为在传参数中加%
+List&lt;User&gt; list = userMapper.selectUserByName(&quot;%管理员%&quot;);</pre>
+
+<pre>
+//如果使用${}原始符号则不用人为在参数中加%
+List&lt;User&gt;list = userMapper.selectUserByName(&quot;管理员&quot;);</pre>
+
+<p>再比如order by排序，如果将列名通过参数传入sql，根据传的列名进行排序，应该写为：ORDER BY ${columnName}</p>
+
+<p>如果使用#{}将无法实现此功能。</p>
+
+<h3>1.2 传递简单类型</h3>
+
+<p>参考上边的例子。</p>
+
+<h3>1.3 传递pojo对象</h3>
+
+<p>mybatis使用ognl表达式解析对象字段的值，如下例子：</p>
+
+<pre>
+     &lt;!--传递pojo对象综合查询用户信息  --&gt;
+     &lt;select id=&quot;findUserByUser&quot; parameterType=&quot;user&quot; resultType=&quot;user&quot;&gt;
+         select * from user where id=#{id} and username like &#39;%${username}%&#39;
+     &lt;/select&gt;</pre>
+
+<p>sql中红色标注的是user对象中的字段名称。</p>
+
+<p>测试：</p>
+
+<pre>
+    @Test
+    public void findUserByUserTest() throws Exception{
+        SqlSession sqlSession=sqlSessionFactory.openSession();
+        UserMapper userMapper=sqlSession.getMapper(UserMapper.class);
+        User user=new User();
+        user.setId(10);
+        user.setUsername(&quot;张三&quot;);
+        List&lt;User&gt; list=userMapper.findUserByUser(user);
+        System.out.println(list);
+        sqlSession.close();
+    }
+</pre>
+
+<h3>1.4 传递pojo包装对象</h3>
+
+<p>开发中通过pojo传递查询条件，查询条件是综合的查询条件，不仅包括用户查询条件，还包括其它的查询条件（比如将用户购买的商品信息也作为查询条件），这时可以使用包装对象传递输入参数。</p>
+
+<h4>1.4.1 需求</h4>
+
+<p>完成用户信息的综合查询，需要传入查询条件很复杂（可能包括用户信息、其它信息，比如商品、订单等）</p>
+
+<h4>1.4.2 定义包装类型pojo</h4>
+
+<p>针对上边需求，建议使用自定义的包装类型的pojo，在包装类型的pojo中将复杂的查询条件包装进去。</p>
+
+<pre>
+/**
+ * 包装类型
+ * @author Joanna.Yan
+ *
+ */
+public class UserQueryVo {
+    //在这里包装所需要的查询条件
+    
+    //用户查询条件
+    private UserCustom userCustom;
+
+    public UserCustom getUserCustom() {
+        return userCustom;
+    }
+
+    public void setUserCustom(UserCustom userCustom) {
+        this.userCustom = userCustom;
+    }
+    
+    //可以包装其它的查询条件，订单、商品
+    //......
+}
+</pre>
+
+<h4>1.4.3 mapper.xml</h4>
+
+<p>&nbsp;在UserMapper.xml中定义用户信息综合查询（查询条件复杂，通过高级查询进行复杂关联查询）</p>
+
+<pre>
+    &lt;!--用户信息综合查询 
+    UserQueryVo中定义了userCustom属性
+    #{userCustom.sex}:取出pojo包装对象中性别值
+    ${userCustom.username}:取出pojo包装对象中用户名称
+     --&gt;
+    &lt;select id=&quot;findUserList&quot; parameterType=&quot;joanna.yan.mybatis.entity.UserQueryVo&quot; resultType=&quot;joanna.yan.mybatis.entity.UserCustom&quot;&gt;
+        SELECT * FROM USER WHERE user.sex=#{userCustom.sex} AND user.username LIKE &#39;%${userCustom.username}%&#39;
+    &lt;/select&gt;
+</pre>
+
+<h4>1.4.4 mapper.java</h4>
+
+<pre>
+//用户信息综合查询
+public List&lt;UserCustom&gt; findUserList(UserQueryVo userQueryVo) throws Exception;</pre>
+
+<h4>1.4.5 测试代码</h4>
+
+<pre>
+    @Test
+    public void findUserListTest() throws Exception{
+        SqlSession sqlSession=sqlSessionFactory.openSession();
+        UserMapper userMapper=sqlSession.getMapper(UserMapper.class);
+        //创建包装对象，设置查询条件
+        UserQueryVo userQueryVo=new UserQueryVo();
+        UserCustom userCustom=new UserCustom();
+        userCustom.setSex(&quot;1&quot;);
+        userCustom.setUsername(&quot;张三丰&quot;);
+        userQueryVo.setUserCustom(userCustom);
+        List&lt;UserCustom&gt; list=userMapper.findUserList(userQueryVo);
+        System.out.println(list);
+    }
+</pre>
+
+<h3>1.5 传递hashmap</h3>
+
+<p>sql映射文件定义如下：</p>
+
+<pre>
+    &lt;!--传递hashmap综合查询用户信息  --&gt;
+    &lt;select id=&quot;findUserByHashmap&quot; parameterType=&quot;hashmap&quot; resultType=&quot;user&quot;&gt;
+        select * from user where id=#{id} and username like &#39;%${username}%&#39;
+    &lt;/select&gt;</pre>
+
+<p>sql中红的标注的是hashmap的key。</p>
+
+<p>mapper.java:</p>
+
+<pre>
+//传递hashmap综合查询用户信息
+ public List&lt;User&gt; findUserByHashmap(HashMap&lt;String, Object&gt; map) throws Exception;</pre>
+
+<p>测试：</p>
+
+<pre>
+    @Test
+    public void findUserByHashmapTest() throws Exception{
+        SqlSession sqlSession=sqlSessionFactory.openSession();
+        UserMapper userMapper=sqlSession.getMapper(UserMapper.class);
+        //构造查询条件HashMap对象
+        HashMap&lt;String, Object&gt; map=new HashMap&lt;&gt;();
+        map.put(&quot;id&quot;, 10);
+        map.put(&quot;username&quot;, &quot;张三&quot;);
+        //传递HashMap对象查询用户列表
+        List&lt;User&gt; list=userMapper.findUserByHashmap(map);
+        System.out.println(list);
+        sqlSession.close();
+    }
+</pre>
+
+<p>传递的map中的key和sql中解析的key不一致时，不会报错，只是通过key获取的值为空。</p>
+
+<h2>2. 输出映射</h2>
+
+<h3>2.1 输出简单类型</h3>
+
+<p>看下边的例子，输出整型，mapper.xml文件：</p>
+
+<pre>
+    &lt;!--获取用户列表总数  --&gt;
+    &lt;select id=&quot;findUserCount&quot; parameterType=&quot;user&quot; resultType=&quot;int&quot;&gt;
+        select count(*) from user
+    &lt;/select&gt;</pre>
+
+<p>mapper接口：</p>
+
+<pre>
+public interface UserMapper {
+    //获取用户列表总数
+    public int findUserCount(User user) throws Exception;
+}</pre>
+
+<p>测试：</p>
+
+<pre>
+　　@Test
+    public void findUserCountTest() throws Exception{
+        SqlSession sqlSession=sqlSessionFactory.openSession();
+        //创建UserMapper对象，mybatis自动生成mapper代理对象
+        UserMapper userMapper=sqlSession.getMapper(UserMapper.class);
+        User user=new User();
+        user.setUsername(&quot;yan&quot;);
+        //调用userMapper的方法
+        int count=userMapper.findUserCount(user);
+        System.out.println(count);
+        sqlSession.close();
+    }
+</pre>
+
+<p>总结：</p>
+
+<p>查询出来的结果集只有一行且一列，可以使用简单类型进行输出映射。</p>
+
+<h3>2.2 输出pojo对象和pojo列表</h3>
+
+<p>不管是输出的pojo单个对象还是一个列表（list中包括pojo），在mapper.xml中resultType指定的类型是一样的。</p>
+
+<p><img alt="" src="https://images2015.cnblogs.com/blog/746143/201705/746143-20170525155413310-1010951905.png" style="height:77px; width:500px" /></p>
+
+<p>在mapper.java指定的方法返回值类型不一样：</p>
+
+<p>（1）输出单个pojo对象，方法返回值是单个对象类型。</p>
+
+<p><img alt="" src="https://images2015.cnblogs.com/blog/746143/201705/746143-20170525155518935-801201726.png" style="height:44px; width:500px" /></p>
+
+<p>（2）输出pojo对象list，方法返回值是List&lt;POJO&gt;</p>
+
+<p><img alt="" src="https://images2015.cnblogs.com/blog/746143/201705/746143-20170525155529419-454344859.png" style="height:33px; width:500px" /></p>
+
+<p>生成的动态代理对象中是根据mapper方法的返回值类型确定是调用session.selectOne（返回单个对象调用）还是session.selectList（返回集合对象调用）。</p>
+
+<h3>2.3 resultType总结</h3>
+
+<p><strong>使用resultType进行输出映射，只有查询出来的列名和pojo中的属性名一致，该列才可以映射成功。</strong></p>
+
+<p>如果查询出来的列名和pojo中的属性名全部不一致，则不会创建pojo对象。</p>
+
+<p>只要查询出来的列名和pojo中的属性有一个一致，就会创建pojo对象。</p>
+
+<h3>2.4 输出hashmap</h3>
+
+<p>输出pojo对象可以改用hashmap输出类型，将输出的字段名称作为map的key，value为字段值。</p>
+
+<h3>2.5 resultMap</h3>
+
+<p>resultType可以指定将查询结果映射为pojo，但需要pojo的属性名和sql查询的列名一致才可映射成功。</p>
+
+<p>如果sql查询字段名和pojo的属性名不一致，可以通过resultMap将字段名和属性名作一个对应关系，resultMap实质上还需要将查询结果映射到pojo对象中。</p>
+
+<p>resultMap可以实现将查询结果映射为复杂类型的pojo，比如在查询结果映射对象中包括pojo和list实现实现一对一查询和一对多查询。</p>
+
+<h4>2.5.1 resultMap使用方法</h4>
+
+<p>如果查询出来的列名和pojo的属性名不一致，通过定义一个resultMap对列名和pojo属性名之间作一个映射关系。</p>
+
+<p>（1）定义resultMap</p>
+
+<p>（2）使用resultMap作为statement的输出映射类型。</p>
+
+<h4>2.5.2 将下边的sql使用User完成映射</h4>
+
+<p>SELECT id id_,username username_ FROM USER WHERE id=#{value}</p>
+
+<p>改sql对查询结果的列名进行了重新命名:</p>
+
+<p><img alt="" src="https://images2015.cnblogs.com/blog/746143/201705/746143-20170526115446497-2012225713.png" /></p>
+
+<p>User类中属性名和上边查询列名不一致。</p>
+
+<h5>2.5.2.1 定义resultMap</h5>
+
+<pre>
+    &lt;!--定义resultMap
+        将SELECT id id_,username username_ FROM USER和User类中的属性作一个映射关系。
+          type:resultMap最终映射的java对象类型，可以使用别名
+          id:对resultMap的唯一标识
+      --&gt;
+    &lt;resultMap type=&quot;user&quot; id=&quot;userResultMap&quot;&gt;
+        &lt;!--id表示查询结果集中唯一标识
+            column：查询出来的列名
+            property：type指定的pojo类型中的属性名
+                    最终resultMap对column和property作一个映射关系（对应关系）
+          --&gt;
+        &lt;id column=&quot;id_&quot; property=&quot;id&quot;/&gt;
+        &lt;!--result:对普通名映射定义
+            column:查询出来的列名
+            property：type指定的pojo类型中的属性名
+                    最终resultMap对column和property作一个映射关系（对应关系）
+          --&gt;
+        &lt;result column=&quot;username_&quot; property=&quot;username&quot;/&gt;
+    &lt;/resultMap&gt;</pre>
+
+<h5>2.5.2.2 使用resultMap作为statement的输出映射类型</h5>
+
+<pre>
+    &lt;!--使用resultMap进行输出映射
+        resultMap：指定定义的resultMap的id,如果这个resultMap在其它的mapper文件，前边需要加namespace
+      --&gt;
+    &lt;select id=&quot;findUserByIdResultMap&quot; parameterType=&quot;int&quot; resultMap=&quot;userResultMap&quot;&gt;
+        SELECT id id_,username username_ FROM USER WHERE id=#{value}
+    &lt;/select&gt;</pre>
+
+<h5>2.5.2.3 mapper.java</h5>
+
+<pre>
+    //根据id查询用户信息，使用resultMap输出
+    public User findUserByIdResultMap(int id) throws Exception;</pre>
+
+<h5>2.5.2.4 测试</h5>
+
+<p>@Test public void findUserByIdResultMapTest() throws Exception{ SqlSession sqlSession=sqlSessionFactory.openSession(); UserMapper userMapper=sqlSession.getMapper(UserMapper.class); User user=userMapper.findUserByIdResultMap(1); System.out.println(user); sqlSession.close(); }</p>
+
+<h3>2.6 小结</h3>
+
+<p>使用resultType进行输出映射，只有查询出来的列名和pojo中的属性名一致，该列才可以映射成功。</p>
+
+<p>如果查询出来的列名和pojo的属性名不一致，通过定义一个resultMap对列名和pojo属性名之间作一个映射关系。</p>
+
+<p>如果此文对您有帮助，微信打赏我一下吧~&nbsp;</p>
