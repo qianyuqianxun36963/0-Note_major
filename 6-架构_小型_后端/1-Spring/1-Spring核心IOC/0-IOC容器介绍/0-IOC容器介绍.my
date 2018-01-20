@@ -1,0 +1,87 @@
+<h1>Spring IoC容器结构</h1>
+
+<h2>一、IOC容器作用</h2>
+
+<p>IoC容器主要作用就是创建并管理Bean对象以及Bean属性注入。如何创建Bean对象？是通过读取Bean配置文件生成相应对象。这些配置文件格式可能多种多样，xml、properties等格式，所以需要将其转换（ResourceLoader/Resolver）成统一资源对象（Resource），存储的位置也不一样，可能是ClassPath，可能是FileSystem，也可能是URL路径，路径的不一样，说明的是应用环境可能不一样。获得Resource对象，还要将其转换成（BeanDefinitionReader）Spring内部对Bean的描述对象（BeanDefinition），然后，将其注册（BeanRegister）到容器中（BeanFactory），供以后转换成Bean对象使用。</p>
+
+<h2>二、IoC容器六个组件：</h2>
+
+<p>1.资源组件：Resource，对资源文件的描述，不同资源文件如xml、properties文件等，格式不同，最终都将被ResourceLoader加载获得相应的Resource对象；</p>
+
+<p>2.资源加载组件：ResourceLoader：加载xml、properties等各类格式文件，解析文件，并生成Resource对象。</p>
+
+<p>3.Bean容器组件：BeanFactory体系：IoC容器的核心，其他组件都是为它工作的（但不是仅仅为其服务）.</p>
+
+<p>4.Bean注册组件：SingletonBeanRegister/AliasRegister：将BeanDefinition对象注册到BeanFactory（BeanDefinition Map）中去。</p>
+
+<p>5.Bean描述组件：BeanDefinition体系，Spring内部对Bean描述的基本数据结构</p>
+
+<p>6.Bean构造组件：BeanDefinitionReader体系，读取Resource并将其数据转换成一个个BeanDefinition对象。</p>
+
+<p>这里组件的定义是相对于IoC容器而言，一般这里的组件设计包括一组接口、一组抽象类、一组实现类、异常类、工具类组成，至于为什么要这么设计，可以参考下设计模式的七大原则。</p>
+
+<p>这些组件并不是互相独立的，而是相互联系形成一个极其复杂的类关系网，下图摘取的组件类关系图只是摘取比较纯粹（比较高层）的那一部分（比如，就ApplicationContext这种比较中层的对象而言，既是ResourceLoader组件，也是BeanFactory组件一部分，还有其他的，越底层其成分越复杂，功能对应的也越具体，其实质就是一个抽象到具体的过程，但这种抽象不是纯粹的抽象到具体，更掺杂有多种抽象的结合。另外，摘取的图来源Spring 3.2.7）。</p>
+
+<h2>三、各个组件详细说明：</h2>
+
+<h3>1.资源组件</h3>
+
+<p>Resource体系，信息的载体，如各类型的文件，二进制流数据都是资源，是Spring内部对资源的一种统一描述，整个体系类图网如下：(图中名称前面 I 代表是接口，C表示实体类，C中左上角有四分之一扇形绿色的表示是抽象类，虚线表示实现，实线表示继承，下同)</p>
+
+<p><img alt="" src="http://img.blog.csdn.net/20160811143637370?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQv/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70/gravity/Center" style="height:475px; width:800px" /></p>
+
+<p>每一个实体类代表一种资源类型，比如ClassPathResource表示类加载路径上的资源，FileSystemResource表示文件系统上的资源，UrlResource则是表示网络资源。这是Spring对资源访问策略的一种实现，更加详细内容可以参考：<a href="http://www.ibm.com/developerworks/cn/java/j-lo-spring-resource/index.html" target="_blank">Spring资源文件剖析和策略模式应用（李刚）</a>。</p>
+
+<p>总的来说，Java有自己的对资源访问策略的实现，比如Path，File，URI/URL类等，但有缺点或有不足，Spring就自己弄了一套，可以粗略的认为Spring在Java基础上封装了一层（就像UrlResource，其源码内部就是通过URI/URL实现的），增加了一些功能，更加方便点。</p>
+
+<h3>2.资源加载组件</h3>
+
+<p>ResourceLoader/Resolver体系，负责资源的加载，这里的资源指的是xml、properties等文件资源，返回一个对应类型的Resource对象。</p>
+
+<p><img alt="" src="http://img.blog.csdn.net/20160811143809821?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQv/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70/gravity/Center" style="height:213px; width:800px" /></p>
+
+<p>同Resource对应，不同的实现类加载不同的Resource，返回对应的Resource对象，针对这一部分，现在有兴趣的可以参考：<a href="http://www.blogjava.net/DLevin/archive/2012/12/01/392337.html" target="_blank">深入Spring IoC源码之ResourceLoader（上善若水）</a>。</p>
+
+<h3>3.Bean描述组件</h3>
+
+<p>BeanDefinition体系，是对bean对象描述的基本数据结构。<img alt="" src="http://img.blog.csdn.net/20160811143849775?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQv/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70/gravity/Center" style="height:487px; width:800px" /></p>
+
+<h3>4.Bean构造组件</h3>
+
+<p>BeanDefinitionReader体系，将Resource对象，转换成BeanDefinition对象，就是将内部资源数据转换成Spring Bean描述数据。其实这种读取数据转换成内部对象的，不仅仅是Spring专有的，比如：Dom4j解析器</p>
+
+<p>SAXReader reader = new SAXReader(); Document doc = reader.read(ur.getFile());//ur是一个URLResource对象</p>
+
+<p>严格来说，都是Reader体系吧，就是将统一资源数据对象读取转换成相应内部对象。<img alt="" src="http://img.blog.csdn.net/20160811144010766?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQv/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70/gravity/Center" style="height:314px; width:600px" /></p>
+
+<h3>5.Bean注册组件</h3>
+
+<p>将BeanDefinition对象注册到BeanFactory中去。<img alt="" src="http://img.blog.csdn.net/20160811144039744?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQv/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70/gravity/Center" style="height:419px; width:800px" /></p>
+
+<h3>6.Bean容器组件</h3>
+
+<p>整个IoC容器核心，所谓Bean容器，就是这里装着Bean对象以及所需要的各种数据。其中BeanFactory是纯粹的Bean容器，用来存储描述Bean，无关其他环境，而像ApplicationContext，也是Bean容器，但它和应用环境息息相关，所以被称为应用上下文（环境）更恰当，从图中也能看出来，ApplicationContext不仅有着BeanFactory&ldquo;血统&rdquo;，同时也继承了EnvironmentCapable、MessageSource、ApplicationEventPublisher，即扩展了其许多额外功能，而其实现类则是和具体应用相关了，比如ClassPathXmlApplicationContext、FileSystemXmlApplicationContext、WebApplicationContext，从字面上就不难理解其作用。BeanFactory和ApplicationContext的详细区别，可以自行查询。</p>
+
+<p><img alt="" src="http://img.blog.csdn.net/20160811144115877?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQv/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70/gravity/Center" style="height:428px; width:800px" /></p>
+
+<h2>四、整个流程介绍</h2>
+
+<p>这里下面这句代码为例子，描述整个工作流程。</p>
+
+<p>ApplicationContext context = new ClassPathXmlApplicationContext(path);</p>
+
+<p>0.新建ApplicationContext容器对象（并没有初始化）；</p>
+
+<p>1.ResourceLoader加载并解析资源文件 &mdash;&mdash;&mdash;&gt; 获得Resource对象；</p>
+
+<p>2.BeanDefinitionReader读取Resource对象，将其读到的bean元素数据封装到BeanDefinition组件中；</p>
+
+<p>3.BeanDefinitionRegister将所有的BeanDefinition注册到BeanFactory中（BeanDefinition是容器内部Bean的基本数据结构，BeanFactory维持着一个BeanDefinition Map）；</p>
+
+<p>4.容器初始化开始，容器初始化工作由AbstractApplicationContext提供的refresh()方法完成，具体初始化步骤可以参考下一节：Spring IoC容器初始化。</p>
+
+<p>整个流程大体概括如下：</p>
+
+<p><img alt="" src="http://img.blog.csdn.net/20160811144233848?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQv/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70/gravity/Center" /></p>
+
+<p>至此，context作为应用环境上下文功能完成，程序此后就可以通过context的geBean(String beanName)方法获得path文件声明定义的bean对象。</p>

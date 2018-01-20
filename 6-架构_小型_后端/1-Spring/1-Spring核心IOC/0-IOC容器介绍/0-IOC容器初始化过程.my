@@ -1,0 +1,61 @@
+<h1>IOC容器的初始化过程</h1>
+
+<h2>初始化举例</h2>
+
+<p>这里我们以FileSystemXmlApplicationContext为例，</p>
+
+<pre>
+    public FileSystemXmlApplicationContext(String[] configLocations, boolean refresh, ApplicationContext parent) throws BeansException {
+        super(parent);
+        setConfigLocations(configLocations);
+        if (refresh) {
+            refresh();
+        }
+    }
+</pre>
+
+<p>简单来说IOC容器的初始化是通过refresh()方法来启动的，这个方法标志着IOC容器的正式启动。具体来说，这个启动包括BeanDefinition的Resource的定位、载人和注册三个基本过程。在分析之前，Spring把这三个过程分开，并使用不同的模块来完成，如使用相应的ResourceLoader、BeanDefinitionReader等模块，通过这样的设计方式，可以让用户更加灵活地对这三个过程进行裁剪和扩展，定义出最适合自己的IOC容器的初始化过程。</p>
+
+<h2>初始化的三个步骤</h2>
+
+<h3>第一个过程Resource定位。</h3>
+
+<p>这个Resource指的是BeanDefinition的资源定位，它由ResourceLoader统一的Resource接口来完成，这个Resource对各种形式的BeanDefinition的使用都提供了统一的接口。下面清单为ResourceLoader接口定义代码：</p>
+
+<pre>
+public interface ResourceLoader {
+    String CLASSPATH_URL_PREFIX = ResourceUtils.CLASSPATH_URL_PREFIX;
+    Resource getResource(String location);
+    ClassLoader getClassLoader();
+}
+</pre>
+
+<p>对于BeanDefinition的存在形式，比如在文件系统中的Bean定义信息可以使用FileSystemResource进行抽象；在类路径中的Bean定义信息可以使用ClassPathResource来使用。</p>
+
+<h3>第二个过程是BeanDefinition的载入。</h3>
+
+<p>这个载入过程是把用户定义好的Bean表示成IOC容器内部的数据结构，而这个容器内部的数据结构就是BeanDefinition。具体来说。这个BeanDefinition实际上就是POJO对象在IOC容器中的抽象，通过这个BeanDefinition定义的数据结构，使IOC容器能够方便地对POJO对象也就是Bean进行管理。</p>
+
+<h3>第三个过程是向IOC容器注册这些BeanDefinition的过程。</h3>
+
+<p>这个过程是通过调用BeanDefinitionRegistry接口的实现来完成的。这个注册过程中把载入过程中解析到的</p>
+
+<p>BeanDefinition向IOC容器进行注册。通过分析，在IOC容器内部将BeanDefinition注入到一个HashMap中去，IOC容器就是通过这个HashMap来持有这些BeanDefinition数据的。下面为BeanDefinitionRegistry代码清单：</p>
+
+<pre>
+public interface BeanDefinitionRegistry extends AliasRegistry {
+
+    void registerBeanDefinition(String beanName, BeanDefinition beanDefinition)throws BeanDefinitionStoreException;
+    void removeBeanDefinition(String beanName) throws NoSuchBeanDefinitionException;
+    BeanDefinition getBeanDefinition(String beanName) throws NoSuchBeanDefinitionException;
+    boolean containsBeanDefinition(String beanName);
+    String[] getBeanDefinitionNames();
+    int getBeanDefinitionCount();
+    boolean isBeanNameInUse(String beanName);
+
+}
+</pre>
+
+<p>值得注意的是，这里谈的是IOC容器初始化过程，在这个过程中，一般不包含Bean依赖注入实现，在IOC设计中，Bean定义的载入和依赖注入是两个独立的过程。<strong>依赖注入一般发生在应用第一次通过getBean向容器索取Bean的时候。</strong>但有一个例外，在IOC容器时有一个预实例化的配置，通过这个预实例化的配置（可以通过bean定义信息的lazyinit，实际应用中也就是spring ioc配置文件的&lt;bean lazyinit=&quot;true&quot;&gt;这种配置），用户可以对容器初始化过程作一个微小的控制，从而改变这个被设置lazyinit属性的Bean的依赖注入过程。比如，如果我们对某个Bean设置了lazyinit属性，那么这个Bean的依赖注入在IOC容器初始化时就预先完成了，而不需要等到整个初始化完成以后，第一次使用getBean时才会触发。</p>
+
+<p>关于定位、载入、注册的详细分析，后面会对此阐述，这里只是让需要的人了解下基本过程。</p>
