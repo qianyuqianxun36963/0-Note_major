@@ -1,0 +1,39 @@
+<h1>记一次MySQL中Waiting for table metadata lock的解决方法</h1>
+
+<p>最近项目中的数据库查询经常挂起，应用程序启动后也报操作超时。测试人员就说数据库又挂了（貌似他们眼中的连接失败，查询无果都是挂了），通过&nbsp;<code>show processlist</code>&nbsp;一看，满屏都是&nbsp;<code>Waiting for table metadata lock</code>&nbsp;状态的连接。第一反应就是kill掉这些连接，奈何连接实在太多，实在kill不过来，于是重启服务，貌似重启果真能解决90%的问题，但如果不找到问题原因，问题也肯定会再次出现。</p>
+
+<p>在网上查询得知MySQL在进行一些alter table等DDL操作时，如果该表上有未提交的事务则会出现&nbsp;<code>Waiting for table metadata lock</code>&nbsp;，而一旦出现metadata lock，该表上的后续操作都会被阻塞（详见&nbsp;<a href="http://www.bubuko.com/infodetail-1151112.html" target="_blank">http://www.bubuko.com/infodetail-1151112.html</a>）。所以这个问题需从两方面解决：</p>
+
+<h3>1. 查看未提交事务</h3>
+
+<p>从 information_schema.innodb_trx 表中查看当前未提交的事务</p>
+
+<pre>
+<code>select trx_state, trx_started, trx_mysql_thread_id, trx_query from information_schema.innodb_trx\G</code>
+</pre>
+
+<p>（\G作为结束符时，MySQL Client会把结果以列模式展示，对于列比较长的表，展示更直观）</p>
+
+<p>字段意义：</p>
+
+<ul>
+	<li>trx_state: 事务状态，一般为RUNNING</li>
+	<li>trx_started: 事务执行的起始时间，若时间较长，则要分析该事务是否合理</li>
+	<li>trx_mysql_thread_id: MySQL的线程ID，用于kill</li>
+	<li>trx_query: 事务中的sql</li>
+</ul>
+
+<p>一般只要kill掉这些线程，DDL操作就不会Waiting for table metadata lock。</p>
+
+<p><strong>直接在mysql 命令模式输入kill +&nbsp;trx_mysql_thread_id；就可以杀掉这条线程了。</strong></p>
+
+<h3>2. 调整锁超时阈值</h3>
+
+<p><code>lock_wait_timeout</code>&nbsp;表示获取metadata lock的超时（单位为秒），允许的值范围为1到31536000（1年）。 默认值为31536000。详见&nbsp;<a href="https://dev.mysql.com/doc/refman/5.6/en/server-system-variables.html#sysvar_lock_wait_timeout" target="_blank">https://dev.mysql.com/doc/refman/5.6/en/server-system-variables.html#sysvar_lock_wait_timeout</a>&nbsp;。默认值为一年！！！已哭瞎！将其调整为30分钟</p>
+
+<pre>
+<code>set session lock_wait_timeout = 1800;
+set global lock_wait_timeout = 1800;</code>
+</pre>
+
+<p>好让出现该问题时快速故障（failfast）</p>
