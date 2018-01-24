@@ -1,0 +1,142 @@
+<h1>mysql 慢查询日志</h1>
+
+<h2>实际经验</h2>
+
+<p>centos 下 mysql 57配置：</p>
+
+<p>log-slow-queries = /usr/local/mysql57/logs/mysql-slow.log<br />
+long-query-time&nbsp;= 2<br />
+slow_query_log = on<br />
+log-queries-not-using-indexes = on</p>
+
+<h2>他人配置经验</h2>
+
+<p>下面是我的配置，只需要几个简单的配置就OK了</p>
+
+<p>[mysqld]</p>
+
+<p>// 开启慢查询<br />
+slow_query_log = on</p>
+
+<p>// 设置慢查询时间 1 s<br />
+long_query_time=1</p>
+
+<p>// 慢查询日志保存路径<br />
+slow_query_log_file=&quot;D:/soft/xampp/mysql/logs/slow_query.log&quot;&nbsp;</p>
+
+<p>// 开启 记录没有使用索引查询语句<br />
+log-queries-not-using-indexes = on</p>
+
+<p>log-bin=D:/soft/xampp/mysql/logs</p>
+
+<p>至于 怎么把&nbsp;log-queries-not-using-indexes 和&nbsp;slow_query_log_file 内容分来存在不同的文件里面，还没有找到方案，希望大家有知道的，烦请告知我，谢谢</p>
+
+<h2>慢查询定义及作用</h2>
+
+<p>慢查询日志，顾名思义，就是查询慢的日志，是指mysql记录所有执行超过long_query_time参数设定的时间阈值的SQL语句的日志。该日志能为SQL语句的优化带来很好的帮助。默认情况下，慢查询日志是关闭的，要使用慢查询日志功能，首先要开启慢查询日志功能。</p>
+
+<h2>开启慢查询日志</h2>
+
+<p>在mysql的配置文件中的mysqld下方添加以下参数</p>
+
+<ol start="1">
+	<li>log-slow-queries = /usr/local/mysql57/logs/mysql-slow.log</li>
+	<li>long-query-time&nbsp;= 2</li>
+	<li>#log-long-format&nbsp;&nbsp;</li>
+	<li>#log-slow-admin-statements&nbsp;&nbsp;</li>
+	<li>log-queries-not-using-indexes&nbsp;&nbsp;</li>
+</ol>
+
+<p>有关慢查询日志功能的相关参数说明：</p>
+
+<p><strong>log-slow-queries</strong></p>
+
+<p>指定日志文件存放位置，该目录文件一定要有写的权限。可以不用设置，系统会给一个缺省的文件host_name-slow.log</p>
+
+<p><strong>long_query_time</strong></p>
+
+<p>SQL执行时间阈值，默认为10秒。</p>
+
+<p>注意以下三点：</p>
+
+<p>1、设置long_query_time这个阈值后，mysql数据库会记录运行时间超过该值的所有SQL语句，但对于运行时间正好等于long_query_time的情况，并不会被记录下来。也就是说，在mysql源码里是判断大于long_query_time，而非大于等于。</p>
+
+<p>2、从mysql 5.1开始，long_query_time开始以微秒记录SQL语句运行时间，之前仅用秒为单位记录。这样可以更精确地记录SQL的运行时间，供DBA分析。</p>
+
+<p>3、建议该时间不应太小或太大，最好在5-10秒之间。当然可以根据自己情况决定。</p>
+
+<p><strong>log-queries-not-using-indexes</strong></p>
+
+<p>如果运行的SQL语句没有使用索引，则mysql数据库同样会将这条SQL语句记录到慢查询日志文件中。</p>
+
+<p><strong>log-long-format</strong></p>
+
+<p>这里需要注意这个参数，不要被网上一些关于mysql慢查询的相关文章所迷惑&mdash;&mdash;他们对此参数的解释是（如果设置了，所有没有使用索引的查询也将被记录），我看了就奇怪了，这不和参数log-queries-not-using-indexes的功能是一样的么，于是百度之，可笑的是，即然有很多文章都是类似描述，这些只知道copy的站长或那些只顾转载的朋友，你要我怎么说你们呢。。。。</p>
+
+<p>与这个参数对应的是另一个参数：log-short-format</p>
+
+<p>简单的说log-long-format选项是用来设置日志的格式，它是以扩展方式记录有关事件。扩展方式可记录谁发出查询和什么时候发出查询的信息。可使我们更好地掌握客户端的操作情况。</p>
+
+<p>准确的说，它是记录激活的更新日志、二进制更新日志、和慢查询日志的大量信息。例如，所有查询的用户名和时间戳将记录下来。不赞成选用该选项，因为它现在代表 默认记录行为。</p>
+
+<p><strong>log-short-format</strong></p>
+
+<p>记录激活的更新日志、二进制更新日志、和慢查询日志的少量信息。例如，用户名和时间戳不记录下来。</p>
+
+<p><strong>log-slow-admin-statements</strong></p>
+
+<p>将慢管理语句例如OPTIMIZE TABLE、ANALYZE TABLE和ALTER TABLE记入慢查询日志。</p>
+
+<h2>慢查询日志分析</h2>
+
+<p>我们可以通过慢查询日志来找出有问题的SQL语句，对其进行优化。随着mysql数据库服务器运行时间的增加，可能会有越来越多的SQL查询被记录到了慢查询日志文件中，这时要分析该文章就显得不是很容易了。mysql提供的mysqldumpslow命令，可以很好地解决这个问题。</p>
+
+<p>使用方法如下：</p>
+
+<p>命令行下，进入 mysql/bin 目录，输入&nbsp;<strong>mysqldumpslow ?help</strong>&nbsp;或&nbsp;<strong>--help</strong>&nbsp;可以看到这个工具的参数</p>
+
+<p>mysqldumpslow -s c -t 20 host-slow.log</p>
+
+<p>mysqldumpslow -s r -t 20 host-slow.log&nbsp;</p>
+
+<p>上述命令可以看出访问次数最多的 20 个 sql 语句和返回记录集最多的 20 个 sql&nbsp;</p>
+
+<p>mysqldumpslow -t 10 -s t -g &quot;left join&quot; host-slow.log</p>
+
+<p>这个是按照时间返回前 10 条里面含有左连接的 sql 语句。</p>
+
+<p>mysqldumpslow -s c -t 10 /database/mysql/slow-log</p>
+
+<p>这会输出记录次数最多的10条SQL语句，其中：</p>
+
+<p>-s order，是表示按照何种方式排序，order值有：c、t、l、r 分别是按照记录次数、时间、查询时间、返回的记录数来排序，ac、at、al、ar，表示相应的倒序；<br />
+-t num，即为返回前面多少条的数据；<br />
+-g pattern，pattern可以写一个正则匹配模式，大小写不敏感的；</p>
+
+<p>使用mysqldumpslow命令可以非常明确的得到各种我们需要的查询语句，对MySQL查询语句的监控、分析、优化是MySQL优化的第一步，也是非常重要的一步。</p>
+
+<p>相关命令</p>
+
+<p>查看慢查询的记录数</p>
+
+<ol start="1">
+	<li>mysql&gt;&nbsp;show&nbsp;global&nbsp;status&nbsp;like&nbsp;&#39;%slow%&#39;;&nbsp;&nbsp;</li>
+</ol>
+
+<p>查看long_query_time值</p>
+
+<ol start="1">
+	<li>mysql&gt;&nbsp;show&nbsp;variables&nbsp;like&nbsp;&#39;%long%&#39;;&nbsp;&nbsp;</li>
+</ol>
+
+<p>查看是否开启慢查询</p>
+
+<ol start="1">
+	<li>mysql&gt;&nbsp;show&nbsp;variables&nbsp;like&nbsp;&#39;log_slow_queries&#39;;&nbsp;&nbsp;</li>
+</ol>
+
+<p>查看log_queries_not_using_indexes状态</p>
+
+<ol start="1">
+	<li>mysql&gt;&nbsp;show&nbsp;variables&nbsp;like&nbsp;&#39;log_queries_not_using_indexes&#39;;&nbsp;&nbsp;</li>
+</ol>
