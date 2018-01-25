@@ -1,0 +1,130 @@
+<h1>MongoDB 生态 - 官方命令行工具</h1>
+
+<p><em>摘要：</em>&nbsp;MongoDB 生态 - 官方工具篇 工欲善其事，必先利其器，我们在使用数据库时，通常需要各种工具的支持来提高效率；很多新用户在刚接触 MongoDB 时，遇到的问题是『不知道有哪些现成的工具可以使用』，本系列文章将主要介绍 MongoDB 生态在工具、driver、可视化管理等方面的支持情况。</p>
+
+<p>工欲善其事，必先利其器，我们在使用数据库时，通常需要各种工具的支持来提高效率；很多新用户在刚接触 MongoDB 时，遇到的问题是『不知道有哪些现成的工具可以使用』，本系列文章将主要介绍 MongoDB 生态在工具、driver、可视化管理等方面的支持情况。</p>
+
+<p>本文主要介绍 MongoDB 官方的命令行工具</p>
+
+<h2><a href="https://docs.mongodb.com/getting-started/shell/client/">Mongo shell</a></h2>
+
+<p>MongoDB 的命令行管理工具，也是 MongoDB 最常用的工具，功能非常丰富，比如常用的</p>
+
+<ul>
+	<li>show dbs / show tables / show users ...</li>
+	<li>db.stats() 查看 db 的元数据信息</li>
+	<li>db.colleciont.stats() 查看集合的元数据信息</li>
+	<li>db.serverStatus() 查看数据库状态信息</li>
+	<li>rs.conf() 查看复制集的配置信息</li>
+	<li>rs.status() 查看复制集的状态信息</li>
+	<li>rs.reconfig() 更改复制集的配置</li>
+	<li>db.printSlaveReplicationInfo() 查看主备同步延时</li>
+	<li>db.runCommand() 执行命令</li>
+	<li>...</li>
+</ul>
+
+<p>值得一提的是，Mongo shell 还能直接执行js 脚本，对于单个语句没法完成的操作，可以写个简单的 js 脚本，然后通过 mongo shell 来调用，这个功能对于日常的管理、分析等非常方便。</p>
+
+<pre>
+<code>mongo --host localhost:27017 do_something.js
+</code></pre>
+
+<p>mongo shell 还支持命令历史、命令补全等非常贴心的功能，用起来跟linux bash 的体验差不多。</p>
+
+<h2><a href="https://docs.mongodb.com/manual/reference/program/mongostat/">mongostat</a></h2>
+
+<p>mongostat 也是很常用的工具，能查看MongoDB 实时的增删改查操作的 pqs、以及内存使用、网络吞吐的信息。</p>
+
+<pre>
+<code>$mongostat --host localhost:27017
+insert query update delete getmore command % dirty % used flushes vsize  res qr|qw ar|aw netIn netOut conn                      time
+  7803 93665  15601   7803       0 15604|0     6.1   79.7       0  1.8G 1.1G   0|0  14|2   17m    31m    0 2016-11-29T16:42:00+08:00
+  7921 95062  15842   7922       0 15842|0     6.4   80.0       0  1.8G 1.1G   7|0  10|1   17m    32m    0 2016-11-29T16:42:01+08:00
+  7996 95816  15985   7995       0 15978|0     6.5   79.6       0  1.8G 1.1G   2|0  17|1   17m    29m    0 2016-11-29T16:42:02+08:00
+  7995 96038  16001   7995       0 16009|0     7.3   84.7       0  1.8G 1.1G   1|0  13|3   17m    30m    0 2016-11-29T16:42:03+08:00
+  7836 93945  15672   7836       0 15665|0     7.3   84.5       0  1.8G 1.1G   0|0  13|1   17m    29m    0 2016-11-29T16:42:04+08:00
+</code></pre>
+
+<p>mongostat 也支持按复制集的方式去连接，可以同时查看复制集多个节点的实时性能数据。</p>
+
+<p>如果使用的是MongoDB 3.2的最新版本，dirty持续超过20 或者 used 持续超过95，说明实例的访问已经超负荷了，可能 cpu 或 IO 资源已经不够用了，需要重点关注下。</p>
+
+<h2><a href="https://docs.mongodb.com/manual/reference/program/mongotop/">mongotop</a></h2>
+
+<p>mongotop 能实时查看 MongoDB 在哪些集合上花的读写时间最多，能快速找出实例里的热点集合。</p>
+
+<pre>
+<code>$mongotop --host localhost:27017
+         ns    total    read    write    2016-11-29T16:52:54+08:00
+sb.sbtest30    673ms     0ms    673ms
+sb.sbtest32    666ms     0ms    666ms
+sb.sbtest56    665ms     0ms    665ms
+sb.sbtest36    660ms     0ms    660ms
+sb.sbtest38    651ms     0ms    651ms
+sb.sbtest29    648ms     0ms    648ms
+sb.sbtest21    647ms     0ms    647ms
+ sb.sbtest5    647ms     0ms    647ms
+sb.sbtest53    647ms     0ms    647ms
+sb.sbtest28    644ms     0ms    644ms
+</code></pre>
+
+<h2><a href="https://docs.mongodb.com/manual/reference/program/mongoexport/">mongoimport/mongoexport</a></h2>
+
+<p>mongoexport 支持以 JSON 或者 CSV 的格式导出 MongoDB 存储的数据，然后使用 mongoimport 将其导入到其他的实例；mongoexport 支持导出单个集合的数据，并能指定查询条件来导出部分符合条件的数据。</p>
+
+<pre>
+<code>mongoexport --db sales --collection contacts --query &#39;{&quot;field&quot;: 1}&#39;
+</code></pre>
+
+<h2><a href="https://docs.mongodb.com/manual/reference/program/mongodump/">mongodump/mongorestore</a></h2>
+
+<p>mongodump 与 mongoexport 类似，可用于导出 MongoDB 的数据，不同的时，mongodump 导出的数据以 BSON 的格式存储（BSON 格式数据可以通过&nbsp;<a href="https://docs.mongodb.com/manual/reference/program/bsondump/">bsondump</a>&nbsp;工具来转换为 json），存储空间占用上比 JSON、CSV 更小，另外，mongodump 还支持对导出的数据进行压缩、归档，所以如果要对 MongoDB 的数据进行定期备份，推荐使用 mongodump 或 直接进行物理文件备份。</p>
+
+<pre>
+<code>mongodump --archive=test.20150715.gz --gzip --db test
+</code></pre>
+
+<h2><a href="https://docs.mongodb.com/manual/reference/program/mongooplog/">mongooplog</a></h2>
+
+<p>mongooplog 可以用于2个独立的 MongoDB 实例间的数据同步，它会不断的从源实例拉取 oplog（tailable cursor），然后重放到目标实例。</p>
+
+<pre>
+<code>mongooplog  --from mongodb0.example.net --host mongodb1.example.net
+</code></pre>
+
+<h2><a href="https://docs.mongodb.com/manual/reference/program/mongofiles/">mongofiles</a></h2>
+
+<p>mongofiles 是 gridfs 的命令行客户端，用于向 MongoDB 存储、读取文件，mongofiles 支持put、get、list等接口。</p>
+
+<pre>
+<code>$mongofiles --host localhost:27017 put hello
+$mongofiles --host localhost:27017 get hello
+</code></pre>
+
+<h2><a href="https://docs.mongodb.com/manual/reference/program/mongosniff/">mongosniff</a></h2>
+
+<p>mongosniff 是 MongoDB 的抓包工具，直接下载二进制包可能并不包含这个工具，需要下载源码编译出来，mongosniff 可以抓取某个 MongoDB 实例的所有请求及应答数据，对于 MongoDB driver 的开发者非常有帮助，也可以用于一些网络问题的定位。</p>
+
+<pre>
+<code>$sudo mongosniff --source NET bond0 27017 | head -n 10
+sniffing... 27017
+10.1.2.3.3:31405  --&gt;&gt; 10.1.2.3.4:27017   172 bytes  id:165a40    1464896
+    command: replSetHeartbeat database: admin metadata: { $replData: 1 } commandArgs: { replSetHeartbeat: &quot;mongo-9554&quot;, configVersion: 23, from: &quot;r101072137.sqa.zmf:9554&quot;, fromId: 0, term: 69 } inputDocs: [ ]
+10.1.2.3.4:27017  &lt;&lt;--  10.1.2.3.3:31405   445 bytes  id:133027    1257511
+    commandReply: { ok: 1.0, state: 2, v: 23, hbmsg: &quot;&quot;, set: &quot;mongo-9554&quot;, syncingTo: &quot;r101072137.sqa.zmf:9554&quot;, term: 69, primaryId: 0, durableOpTime: { ts: Timestamp 1480088534000|1, t: 69 }, opTime: { ts: Timestamp 1480088534000|1, t: 69 } } metadata: { $replData: { term: 69, lastOpCommitted: { ts: Timestamp 1480088534000|1, t: 69 }, lastOpVisible: { ts: Timestamp 1479887534000|1, t: 68 }, configVersion: 23, replicaSetId: ObjectId(&#39;000000000000000000000000&#39;), primaryIndex: 0, syncSourceIndex: 0 } } outputDocs: [ ]
+    </code></pre>
+
+<h2><a href="https://docs.mongodb.com/manual/reference/program/mongoperf/">mongoperf</a></h2>
+
+<p>mongoperf 的名字很容易误导人，乍一看以为是 mongodb 的性能测试工具，实际上它是用来测试磁盘 IO 性能的工具。</p>
+
+<pre>
+<code>echo &quot;{nThreads:16,fileSizeMB:1000,r:true,w:true}&quot; | mongoperf
+new thread, total running : 1
+read:1 write:1
+2958 ops/sec 11 MB/sec
+3022 ops/sec 11 MB/sec
+3023 ops/sec 11 MB/sec
+2832 ops/sec 11 MB/sec
+</code>
+</pre>
