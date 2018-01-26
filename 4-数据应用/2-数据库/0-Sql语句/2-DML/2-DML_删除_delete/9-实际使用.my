@@ -1,0 +1,67 @@
+<h1>实际使用</h1>
+
+<h2>清空错误的订单</h2>
+
+<p>&nbsp;&nbsp; &nbsp;查询学生姓名为空的所有订单</p>
+
+<p>&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;SELECT<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;fo.id id,<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;rsb.`name` stuName,<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;rs.student_no studyCode,<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;fo.pay_type_code payTypeCode,<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;fo.pay_status STATUS,<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;fo.has_genInvoice hasGenInvoice,<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;fo.schoolroll_id schoolrollId<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;FROM<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;finance_order fo<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;LEFT JOIN roll_schoolroll rs ON fo.schoolroll_id = rs.id<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;LEFT JOIN roll_stu_base rsb ON rs.stu_base_id = rsb.id<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;LEFT JOIN common_dictdata fpt ON fo.pay_type_code = fpt.data_code<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;WHERE<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;fo.has_del = 0<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;and fpt.type = &quot;PAYMENT_TYPE&quot;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;and ISNULL(rsb.`name`)<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;ORDER BY<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;fo.create_time DESC</p>
+
+<h3><strong>采用子查询方式</strong></h3>
+
+<p>采用 delete from table where id in(select id from table2) 形式</p>
+
+<p>&nbsp;&nbsp; &nbsp;练习库成功：</p>
+
+<p>&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;delete from finance_order where id in(select id from finance_invoice_order where invoice_id = &#39;001&#39;);</p>
+
+<p>&nbsp;&nbsp; &nbsp;实际库失败：</p>
+
+<p>&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;删除操作错误，子查询不可使用待删除的表。</p>
+
+<p>&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;DELETE FROM finance_order WHERE id in(<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;SELECT<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;fo.id id<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;FROM<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;finance_order fo<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;LEFT JOIN roll_schoolroll rs ON fo.schoolroll_id = rs.id<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;LEFT JOIN roll_stu_base rsb ON rs.stu_base_id = rsb.id<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;WHERE<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;fo.has_del = 0<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;and ISNULL(rsb.`name`)<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;ORDER BY<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;fo.create_time DESC<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;)</p>
+
+<p>&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;[Err] 1093 - You can&#39;t specify target table &#39;finance_order&#39; for update in FROM clause</p>
+
+<h3><strong>采用Delete from join 方式</strong></h3>
+
+<p>采用 delete a from table1 a inner join table2 b on a.id=b.id 形式</p>
+
+<p>&nbsp;&nbsp; &nbsp;练习库成功：</p>
+
+<p>&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;delete fo from finance_order fo left join finance_invoice_order fio on fo.id = fio.order_id；</p>
+
+<p>&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;delete fo from finance_order fo left join finance_invoice_order fio on fo.id = fio.order_id &nbsp;where fio.invoice_id = &#39;001&#39;</p>
+
+<p>&nbsp;&nbsp; &nbsp;实际库成功：</p>
+
+<p>&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;delete fo from finance_order fo&nbsp;&nbsp; &nbsp;LEFT JOIN roll_schoolroll rs ON fo.schoolroll_id = rs.id LEFT JOIN roll_stu_base rsb ON rs.stu_base_id = rsb.id where ISNULL(rsb.`name`)</p>
