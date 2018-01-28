@@ -1,0 +1,292 @@
+<h1>Spring对AOP的支持</h1>
+
+<p>并不是所有的AOP框架都是相同的，它们在连接点模型上可能有强弱之分。有些允许在字段修饰符级别应用通知，而另一些只支持与方法调用相关的连接点。它们织入切面的方式和时机也有所不同。但是无论如何，创建切点来定义切面所织入的连接点是AOP框架的基本功能。</p>
+
+<h2>Spring提供了4种类型的AOP支持：</h2>
+
+<p>&bull;基于代理的经典SpringAOP;<br />
+&bull;纯POJO切面；<br />
+&bull;@AspectJ注解驱动的切面；<br />
+&bull;注入式AspectJ切面（适用于Spring各版本）。</p>
+
+<p>前三种都是SpringAOP实现的变体，SpringAOP构建在动态代理基础之上，因此，Spring对AOP的支持局限于方法拦截。</p>
+
+<h3>经典SpringAOP:</h3>
+
+<p>术语&ldquo;经典&rdquo;通常意味着是很好的东西。老爷车、经典高尔夫球赛、可口可乐精品都是好东西。但是Spring的经典AOP编程模型并不怎么样。当然，曾经它的确非常棒。但是现在Spring提供了更简洁和干净的面向切面编程方式。弓丨入了简单的声明式AOP和基于注解的AOP之后，Spring经典的AOP看起来就显得非常笨重和过于复杂，直接使用ProxyFactoryBean会让人感觉厌烦。所以在本书中我不会再介绍经典的SpringAOP。</p>
+
+<h3>纯POJO切面</h3>
+
+<p>借助Spring的aop命名空间，我们可以将纯POJO转换为切面。实际上，这些POJO只是提供了满足切点条件时所要调用的方法。遗憾的是，这种技术需要XML配置，但这的确是声明式地将对象转换为切面的简便方式。</p>
+
+<h3>@AspectJ注解驱动的切面</h3>
+
+<p>Spring借鉴了AspectJ的切面，以提供注解驱动的AOP。本质上，它依然是Spring基于代理的AOP，但是编程模型几乎与编写成熟的AspectJ注解切面完全一致。这种AOP风格的好处在于能够不使用XML来完成功能。</p>
+
+<h3>注入式AspectJ切面</h3>
+
+<p>如果你的AOP需求超过了简单的方法调用（如构造器或属性拦截），那么你需要考虑使用AspectJ来实现切面。在这种情况下，上文所示的第四种类型能够帮助你将值注入到AspectJ驱动的切面中。</p>
+
+<p>我们在将在本章展示更多的SpringAOP技术，但是在开始之前，我们必须要了解SpringAOP框架的一些关键知识。</p>
+
+<h2>常见知识点</h2>
+
+<h3>Spring通知是Java编写的</h3>
+
+<p>Spring所创建的通知都是用标准的Java类编写的。这样的话，我们就可以使用与普通Java开发一样的集成开发环境（IDE)来开发切面。而且，定义通知所应用的切点通常会使用注解或在Spring配置文件里采用XML来编写，这两种语法对于Java开发者来说都是相当熟悉的。</p>
+
+<p>AspectJ与之相反。虽然AspectJ现在支持基于注解的切面，但AspectJ最初是以Java语言扩展的方式实现的。这种方式有优点也有缺点。通过特有的AOP语言，我们可以获得更强大和细粒度的控制，以及更丰富的AOP工具集，但是我们需要额外学习新的工具和语法。</p>
+
+<p>&nbsp;</p>
+
+<h3>Spring在运行时通知对象</h3>
+
+<p>通过在代理类中包裹切面， Spring在运行期把切面织入到Spring管理的bean中。如图4.3所示，代理类封装了目标类，并拦截被通知方法的调用，再把调用转发给真正的目标bean。当代理拦截到方法调用时，在调用目标bean方法之前，会执行切面逻辑。</p>
+
+<p>直到应用需要被代理的bean时，Spring才创建代理对象。如果使用的是ApplicationContext的话，在ApplicationContext从BeanFactory中加载所有bean的时候，Spring才会创建被代理的对象。因为Spring运行时才创建代理对象，所以我们不需要特殊的编译器来织入SpringAOP的切面。</p>
+
+<p><img src="https://upload-images.jianshu.io/upload_images/1802922-074925e67a34b61a.png?imageMogr2/auto-orient/" /></p>
+
+<h3>Spring只支持方法级别的连接点</h3>
+
+<p>正如前面所探讨过的，通过使用各种AOP方案可以支持多种连接点模型。因为Spring基于动态代理，所以Spring只支持方法连接点。这与一些其他的AOP框架是不同的，例如AspectJ和JBoss，除了方法切点，它们还提供了字段和构造器接入点。Spring缺少对字段连接点的支持，无法让我们创建细粒度的通知，例如拦截对象字段的修改。而且它不支持构造器连接点，我们就无法在bean创建时应用通知。</p>
+
+<p>但是方法拦截可以满足绝大部分的需求。如果需要方法拦截之外的连接点拦截功能，那么我们可以利用Aspect来补充SpringAOP的功能。</p>
+
+<p>&nbsp;</p>
+
+<p>对于什么是AOP以及Spring如何支持AOP的，我们现在已经有了一个大致的了解。现在是时候学习如何在Spring中创建切面了，让我们先从Spring的声明式AOP模型开始。</p>
+
+<h2><br />
+通过切点来选择连接点</h2>
+
+<p>正如之前所提过的，切点用于准确定位应该在什么地方应用切面的通知。通知和切点是切面的最基本元素。因此，了解如何编写切点非常重要。</p>
+
+<p>在SpringAOP中，要使用AspectJ的切点表达式语言来定义切点。如果你已经很熟悉AspectJ，那么在Spring中定义切点就感觉非常自然。但是如果你一点都不了解AspectJ的话，本小节我们将快速介绍一下如何编写AspectJ风格的切点。如果你想进一步了解AspectJ和AspectJ切点表达式语言，我强烈推荐RamnivaLaddad编写的《AspectJinAction》第二版（Manning，2009,www.manning.com/laddad2/)。</p>
+
+<p>关于SpringAOP的AspectJ切点，最重要的一点就是Spring仅支持AspectJ切点指示器（pointcutdesignator)的一个子集。让我们回顾下，Spring是基于代理的，而某些切点表达式是与基于代理的AOP无关的。表4.1列出了SpringAOP所支持的AspectJ切点指示器。</p>
+
+<table id="customers">
+	<tbody>
+		<tr>
+			<th>类型</th>
+			<th>说明</th>
+		</tr>
+		<tr>
+			<td>arg()</td>
+			<td>限制连接点匹配参数为指定类型的执行方法。</td>
+		</tr>
+		<tr>
+			<td>@args()</td>
+			<td>限制连接点匹配参数由指定注解标注的执行方法。</td>
+		</tr>
+		<tr>
+			<td>execution()</td>
+			<td>用于匹配的是连接点的执行方法。</td>
+		</tr>
+		<tr>
+			<td>this()</td>
+			<td>限制连接点匹配AOP代理的Bean引用为指定类型的类。</td>
+		</tr>
+		<tr>
+			<td>target()</td>
+			<td>限制连接点匹配目标对象为指定类型的类。</td>
+		</tr>
+		<tr>
+			<td>@target()</td>
+			<td>限制连接点匹配特定的执行对象，这些对象对应的类具备指定类型的注解。</td>
+		</tr>
+		<tr>
+			<td>within()</td>
+			<td>限制连接点匹配指定的类型。</td>
+		</tr>
+		<tr>
+			<td>@within()</td>
+			<td>限制连接点匹配指定注解所标注的类型（当使用Spring AOP时，方法定义再由指定的注解所标注的类里）。</td>
+		</tr>
+		<tr>
+			<td>@annotation</td>
+			<td>限制匹配带有指定注解连接点。</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>在Spring中尝试使用AspectJ其他指示器时，将会抛出IllegalArgumentException异常。</p>
+
+<p><strong>注意：</strong></p>
+
+<p>只有execution指示器是唯一的执行匹配，而其他的指示器都是用于限制匹配的。这说明execution指示器是我们在编写切点定义时最主要的指示器。在此基础上，我们使用其他指示器来限制所匹配的切点。</p>
+
+<h3>1. 编写切点</h3>
+
+<p>如下图所示的切点表达式表示当Singer的perform()方法执行时会触发通知。我们使用execution()指示器选择Singer的perform()方法。方法表达式以*号开始，标示了我们不关心返回值的类型。然后，我们指定了全限定类名和方法名。对于方法参数列表，我们使用（..）标示切点选择任意的perform()方法，无论该方法的参数是什么。</p>
+
+<p><img alt="\" src="https://www.2cto.com/uploadfile/Collfiles/20160215/20160215091209187.png" /></p>
+
+<p>除此之外，我们还可以对上面的匹配进行限制，可以使用within()指示器来限制匹配。</p>
+
+<p><img alt="\" src="https://www.2cto.com/uploadfile/Collfiles/20160215/20160215091209188.png" /></p>
+
+<p>我们使用&amp;&amp;操作符把execution()和within()指示器连接在一起形成and关系（切点必须匹配所有的指示器）。</p>
+
+<h3>2. 在XML中声明切面</h3>
+
+<p>Spring的AOP配置元素简化了基于POJO切面的声明：</p>
+
+<p>&nbsp;</p>
+
+<table id="customers">
+	<tbody>
+		<tr>
+			<th>类型</th>
+			<th>说明</th>
+		</tr>
+		<tr>
+			<td>&nbsp;</td>
+			<td>定义AOP通知器。</td>
+		</tr>
+		<tr>
+			<td>&nbsp;</td>
+			<td>定义AOP后置通知（不管被通知的方法是否执行成功）</td>
+		</tr>
+		<tr>
+			<td>&nbsp;</td>
+			<td>定义AOP after-returning通知。</td>
+		</tr>
+		<tr>
+			<td>&nbsp;</td>
+			<td>定义 AOP after-throwing 通知。</td>
+		</tr>
+		<tr>
+			<td>&nbsp;</td>
+			<td>定义 AOP 环绕通知。</td>
+		</tr>
+		<tr>
+			<td>aspect&gt;</td>
+			<td>定义切面。</td>
+		</tr>
+		<tr>
+			<td>&nbsp;</td>
+			<td>启用@AspectJ注解驱动的切面。</td>
+		</tr>
+		<tr>
+			<td>&nbsp;</td>
+			<td>定义 AOP前置通知。</td>
+		</tr>
+		<tr>
+			<td>&nbsp;</td>
+			<td>顶层的AOP配置元素。大多数的元素必须包含在元素内。</td>
+		</tr>
+		<tr>
+			<td>&nbsp;</td>
+			<td>为被通知的对象引入额外的接口，并透明的实现。</td>
+		</tr>
+		<tr>
+			<td>&nbsp;</td>
+			<td>定义切点。</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>为了阐述Spring AOP，我们创建一个观众类（Audience）类：</p>
+
+<p>&lt;code class=&quot;language-java&quot;&gt;package com.sjf.bean;&lt;/code&gt;</p>
+
+<p><code>/**</code></p>
+
+<p><code>* 观众类</code><code>&nbsp;* @author sjf0115</code><code>&nbsp;*</code><code>&nbsp;*/</code><code>public class Audience {</code><code>&nbsp;public void takeSeats(){</code><code>System.out.println(&quot;the audience is taking their seats...&quot;);</code><code>&nbsp;}</code><code>&nbsp;public void applaud(){</code><code>System.out.println(&quot;very good, clap clap clap...&quot;);</code><code>&nbsp;}</code><code>&nbsp;public void demandRefund(){</code><code>System.out.println(&quot;very bad, We want our money back...&quot;);</code><code>&nbsp;}</code><code>}</code></p>
+
+<p>Audience类并没有任何特别之处，她就是一个有几个方法的简单<a href="https://www.2cto.com/kf/ware/Java/" target="_blank">Java</a>类。我们可以像其他类一样，利用XML把它注册为Spring应用上下文中的一个Bean：</p>
+
+<p>&lt;code class=&quot;language-xml&quot;&gt;&lt;bean class=&quot;com.sjf.bean.Audience&quot; id=&quot;audience&quot;&gt;&lt;/bean&gt;&lt;/code&gt;</p>
+
+<p>我们需要Spring AOP就能把它成为一个切面。</p>
+
+<h4>2.1 前置声明和后置声明</h4>
+
+<p>&lt;code class=&quot;language-xml&quot;&gt;&lt;!--?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot;?--&gt;&lt;/code&gt;<br />
+<code><code>xmlns:xsi=&quot;https://www.w3.org/2001/XMLSchema-instance&quot;</code><code>xmlns:context=&quot;https://www.springframework.org/schema/context&quot;</code><code>xmlns:aop=&quot;https://www.springframework.org/schema/aop&quot;</code><code>xsi:schemaLocation=&quot;https://www.springframework.org/schema/aop https://www.springframework.org/schema/aop/spring-aop-4.2.xsd</code><code>https://www.springframework.org/schema/beans https://www.springframework.org/schema/beans/spring-beans.xsd</code><code>https://www.springframework.org/schema/context https://www.springframework.org/schema/context/spring-context.xsd&quot;&gt;</code></code></p>
+
+<p><code>大多数的AOP配置元素必须在元素的上下文内使用。这条规则有几种例外场景，但是把Bean声明为一个切面时，我们总是从元素开始配置。</code></p>
+
+<p><code>在元素内，我们可以声明一个或者多个通知器，切面或者切点。上述例子中，我们使用元素声明了一个简单的切面。ref元素引用了一个Bean（Audience），该Bean实现了切面的功能。ref元素应用的Bean提供了在切面上通知所调用的方法。</code></p>
+
+<p><code>该切面应用了3个不同的通知。元素定义了匹配切点的方法执行之前调用前置通知方法，audience Bean 的takeSeats()方法。元素定义了一个返回后（after-returning）通知，在切点所匹配的方法调用之后在执行applaud()方法。元素定义了抛出异常后通知，如果所有匹配的方法执行时抛出任何异常，都将调用demandRefund()方法。</code></p>
+
+<p><code>下面展示了通知逻辑如何嵌入到业务逻辑中：</code></p>
+
+<p><code><img alt="\" src="https://www.2cto.com/uploadfile/Collfiles/20160215/20160215091209189.png" style="height:354px; width:500px" /></code></p>
+
+<p><code>在所有的通知元素中，pointcut属性定义了通知所应用的切点。pointcut属性的值是使用AspectJ切点表达式语法所定义的切点。</code></p>
+
+<p><code>你或许注意到所有通知元素中的pointcut属性的值都是一样的，这是因为所有的通知都是应用到相同的切点上。这似乎违反了DRY（不要重复你自己）原则。我们做一下修改，可以使用元素定义一个命名切点。</code></p>
+
+<p>&lt;code class=&quot;language-xml&quot;&gt;&lt;code class=&quot;language-xml&quot;&gt;&lt;/aop:config&gt;&lt;/code&gt;&lt;/code&gt;<br />
+&nbsp;</p>
+
+<p><code>元素定义了一个id为singerPerfom的切点，同时修改所有的通知元素，用pointcut-ref属性来引用这个命名切点。</code></p>
+
+<h4><code>2.2 声明环绕通知</code></h4>
+
+<p><code>如果不适用成员变量存储信息，那么在前置通知和后置通知之间共享信息是非常麻烦的。我们希望实现这样一个功能：希望观众一直关注演出，并报告演出的演出时长。使用前置通知和后置通知实现该功能的唯一方式是：在前置通知中记录开始时间，并在某个后置通知中报告演出的时长。但这样的话，我们必须在一个成员变量中保存开始时间。因此我们可以使用环绕通知，只需在一个方法中实现即可。</code></p>
+
+<p><code>&lt;code class=&quot;language-xml&quot;&gt;&lt;code class=&quot;language-java&quot;&gt;public void PerformTime(ProceedingJoinPoint joinPoint){&lt;/code&gt;&lt;/code&gt;</code></p>
+
+<p><code><code>// 演出之前</code></code></p>
+
+<p><code><code>System.out.println(&quot;the audience is taking their seats...&quot;);</code><code>&nbsp;try {</code><code>&nbsp;long start = System.currentTimeMillis();</code><code>&nbsp;// 执行演出操作</code><code>&nbsp;joinPoint.proceed();</code><code>&nbsp;long end = System.currentTimeMillis();</code><code>&nbsp;// 演出成功</code><code>&nbsp;System.out.println(&quot;very good, clap clap clap...&quot;);</code><code>&nbsp;System.out.println(&quot;该演出共需要 &quot;+(end - start) + &quot; milliseconds&quot;);</code><code>&nbsp;} catch (Throwable e) {</code><code>&nbsp;// 演出失败</code><code>&nbsp;System.out.println(&quot;very bad, We want our money back...&quot;);</code><code>e.printStackTrace();</code><code>&nbsp;}</code><code>&nbsp;}</code></code></p>
+
+<p><code>对于这个新的通知方法，我们会注意到它使用了ProceedingJoinPoint作为方法的入参。这个对象非常重要，因为它能让我们在通知里调用被通知 的方法。如果希望把控制转给被通知的方法时，我们可以调用ProceedingJoinPoint的proceed()方法。如果忘记调用proceed()方法，通知将会阻止被通知方法的调用。我们还可以在通知里多次调用被通知方法，这样做的一个目的是实现重试逻辑，在被通知的方法执行失败时反复重试。</code></p>
+
+<p><code>PerformTime()方法包含了之前3个通知方法的所有逻辑，并且该方法还会负责自身的异常处理。声明环绕通知与声明其他类型的通知并没有太大的区别，只需要元素。</code></p>
+
+<p><code>&lt;code class=&quot;language-xml&quot;&gt;&lt;code class=&quot;language-xml&quot;&gt;&lt;/aop:config&gt;&lt;/code&gt;&lt;/code&gt;</code></p>
+
+<p><code><strong>运行结果：</strong></code></p>
+
+<table cellpadding="0" cellspacing="0">
+	<tbody>
+		<tr>
+			<td>
+			<p><code>theaudienceistakingtheirseats...</code></p>
+
+			<p><code>正在上演个人演唱会...</code></p>
+
+			<p><code>verygood,clapclapclap...</code></p>
+			<code>该演出共需要37milliseconds</code></td>
+		</tr>
+	</tbody>
+</table>
+
+<p><code>像其他通知的XML一样，指定了一个切点和一个通知方法的名字。</code></p>
+
+<h4><code>2.3 为通知传递参数</code></h4>
+
+<p><code>到目前为止，我们的切面很简单，没有任何的参数。但是有时候通知并不是仅仅是对方法进行简单包装，还需要校验传递给方法的参数值，这时候为通知传递参数就非常有用了。</code></p>
+
+<p><code>下面是歌手的实体类：</code></p>
+
+<p>&lt;code class=&quot;language-xml&quot;&gt;&lt;code class=&quot;language-java&quot;&gt;package com.sjf.bean;&lt;/code&gt;&lt;/code&gt;<br />
+<code><code>/**</code></code></p>
+
+<p><code><code>* 歌手实体类</code><code>&nbsp;* @author sjf0115</code><code>&nbsp;*</code><code>&nbsp;*/</code><code>public class Singer {</code><code>&nbsp;public void perform(String songName) {</code><code>&nbsp;System.out.println(&quot;正在上演个人演唱会，演唱曲目为 &quot; + songName);</code><code>&nbsp;}</code><code>}</code></code></p>
+
+<p><code>在这我们提供了一个Organizers（主办方）实体类，在歌手演唱之前截获歌手演唱的曲目，然后通知给大家：</code></p>
+
+<p>&lt;code class=&quot;language-xml&quot;&gt;&lt;code class=&quot;language-java&quot;&gt;package com.sjf.bean;&lt;/code&gt;&lt;/code&gt;</p>
+
+<p><code><code>/**</code></code></p>
+
+<p><code><code>* 主办方实体类</code><code>&nbsp;* @author sjf0115</code><code>&nbsp;*</code><code>&nbsp;*/</code><code>public class Organizers {</code><code>&nbsp;public void BeforeSong(String songName){</code><code>&nbsp;System.out.println(&quot;演唱会马上就开始了，演唱歌曲为 &quot; + songName);</code><code>&nbsp;}</code><code>&nbsp;public void AfterSong(){</code><code>&nbsp;System.out.println(&quot;演唱曲目结束，谢谢大家...&quot;);</code><code>&nbsp;}</code><code>}</code></code></p>
+
+<p><code>我们像以前一样使用，和元素。但是这次我们通过配置实现将被通知方法的参数传递给通知。</code></p>
+
+<p>&lt;code class=&quot;language-xml&quot;&gt;&lt;code class=&quot;language-xml&quot;&gt;&lt;!--?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot;?--&gt;&lt;/code&gt;&lt;/code&gt;</p>
+
+<p><code><code><code><span style="font-family:sans-serif,Arial,Verdana,&quot;Trebuchet MS&quot;">关键之处在于切点定义和的arg-names属性。切点标示了Singer的perform()方法，指定了String参数。然后在args参数中标示了song作为参数。同样，元素引用了切点中song参数，标示该参数必须传递给Organizers的BeforeSong()方法。</span>xmlns:xsi=&quot;https://www.w3.org/2001/XMLSchema-instance&quot;</code><code>xmlns:context=&quot;https://www.springframework.org/schema/context&quot;</code><code>xmlns:aop=&quot;https://www.springframework.org/schema/aop&quot;</code><code>xsi:schemaLocation=&quot;https://www.springframework.org/schema/aop https://www.springframework.org/schema/aop/spring-aop-4.2.xsd</code><code>https://www.springframework.org/schema/beans https://www.springframework.org/schema/beans/spring-beans.xsd</code><code>https://www.springframework.org/schema/context https://www.springframework.org/schema/context/spring-context.xsd&quot;&gt;</code></code></code></p>
+
+<p><code><code><img alt="\" src="https://www.2cto.com/uploadfile/Collfiles/20160215/20160215091209190.png" style="height:99px; width:1000px" /></code></code></p>
+
+<p><code><code><strong>运行结果：</strong></code></code></p>
+
+<p>&nbsp;</p>
