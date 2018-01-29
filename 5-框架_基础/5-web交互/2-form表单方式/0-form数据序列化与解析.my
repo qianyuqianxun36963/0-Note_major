@@ -1,0 +1,217 @@
+<h1>form表单数据的序列化</h1>
+
+<p>序列化主要就是为了传输方便，将要传输的对象序列化为二进制的数据流，效率极高，接受时通过反序列化转化为对象，从而达到一个传输的效果。<br />
+代码实现：</p>
+
+<h2>1.序列化：</h2>
+
+<p>$(&quot;#graduatedModeForm_XXOO&quot; ).serialize();<br />
+使用说明：先再ftl中定义一个Form表单，然后再取一个id名，那么使用序列化的好处就在于：再form表单中的所有数据都可以快速的转换为二进制数据流，如&ldquo;01011100111&rdquo;(java中)，在js中序列化数据将转换为String类型，如&ldquo;aaa=11&amp;bbb=22,当我们进入当前页面的时候，可以通过前台debugger进入检查模式，然后点开console，在里面输入$(&quot;#idxxx&quot;).serialize();即可看到里面包含的数据</p>
+
+<h2>2.反序列化：</h2>
+
+<p>$(&quot;#graduatedModeForm_&quot; + flag).serialize();<br />
+var params = {};<br />
+if(typeof formParam == &quot;string&quot;){<br />
+formParam.split(&#39;&amp;&#39;).forEach(function (item){<br />
+item = item.split(&#39;=&#39;);<br />
+if(params[item[0]]){<br />
+if(!params[item[0]].push){<br />
+params[item[0]] = [params[item[0]]];<br />
+}<br />
+params[item[0]].push(item[1] || &#39;&#39;);<br />
+} else{<br />
+params[item[0]] = item[1] || &#39;&#39;;<br />
+}<br />
+});<br />
+}<br />
+使用说明：序列化serialize()的数据格式中间以&amp;隔开，如aaa=11&amp;BBB=22&amp;CCC=33,反序列化是将数据进行拆分，然后将对象存到对应的集合中，<br />
+拆分分两步，先以&ldquo;&amp;&rdquo;进行拆分，再以&ldquo;=&rdquo;进行拆分</p>
+
+<p>&nbsp;</p>
+
+<p>jsonObject是json对象，map和json都是一对一的键值对，不同的是map中键值对中间使用&ldquo;=&rdquo;分开，如{age=20}，json中键值对中间是使用&ldquo;：&rdquo;分开,如{&quot;age&quot;:20}，其实json就是一种特殊形式的map。<br />
+jsonArray 是json数组，使用[]表示，里面的值是json键值对格式，json对象中添加的是键值对，而jsonArray中添加的是json对象。<br />
+代码实现：<br />
+//创建一个json对象<br />
+JSONObject json=new JSONObject();<br />
+//创建一个json数组<br />
+JSONArray jsonArray=new JSONArray();<br />
+//先将键值对添加到json对象中<br />
+json.put(&quot;key&quot;,value);<br />
+//然后再将json对象添加到json数组中<br />
+JSONArray.add(json);</p>
+
+<h2>实际例子：</h2>
+
+<h3>前端html页面：</h3>
+
+<p>&nbsp; &nbsp; &nbsp; &nbsp; &lt;!-- 导出excel form --&gt;<br />
+&nbsp;&nbsp; &nbsp; &nbsp; &nbsp;&lt;form id=&quot;exportRegFinalVerifyExcelForm&quot; method=&quot;POST&quot; style=&quot;display:none&quot;&gt;<br />
+&nbsp;&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;&lt;input type=&quot;hidden&quot; id=&quot;reRegEnrollBatchName_export&quot; name=&quot;reRegEnrollBatchName&quot; value=&quot;&quot;/&gt;<br />
+&nbsp;&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;&lt;input type=&quot;hidden&quot; id=&quot;reRegVerifyLevelId_export&quot; name=&quot;reRegVerifyLevelId&quot; value=&quot;&quot;/&gt;<br />
+&nbsp;&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;&lt;input type=&quot;hidden&quot; id=&quot;reRegVerifyStuType_export&quot; name=&quot;reRegVerifyStuType&quot; value=&quot;&quot;/&gt;<br />
+&nbsp;&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;&lt;input type=&quot;hidden&quot; id=&quot;reRegVerifyStuSource_export&quot; name=&quot;reRegVerifyStuSource&quot; value=&quot;&quot;/&gt;<br />
+&nbsp;&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;&lt;input type=&quot;hidden&quot; id=&quot;reRegVerifyMajor_export&quot; name=&quot;reRegVerifyMajor&quot; value=&quot;&quot;/&gt;<br />
+&nbsp;&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;&lt;input type=&quot;hidden&quot; id=&quot;reRegVerifyPoint_export&quot; name=&quot;reRegVerifyPoint&quot; value=&quot;&quot;/&gt;<br />
+&nbsp;&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;&lt;input type=&quot;hidden&quot; id=&quot;reRegVerifyStuStatus_export&quot; name=&quot;reRegVerifyStuStatus&quot; value=&quot;&quot;/&gt;<br />
+&nbsp;&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;&lt;input type=&quot;hidden&quot; id=&quot;edusystemId_export&quot; name=&quot;edusystemId&quot; value=&quot;&quot;/&gt;<br />
+&nbsp;&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;&lt;input type=&quot;hidden&quot; id=&quot;baseName_export&quot; name=&quot;baseName&quot; value=&quot;&quot;/&gt;<br />
+&nbsp;&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;&lt;input type=&quot;hidden&quot; id=&quot;certificateId_export&quot; name=&quot;certificateId&quot; value=&quot;&quot;/&gt;<br />
+&nbsp;&nbsp; &nbsp; &nbsp; &nbsp;&lt;/form&gt;</p>
+
+<h3>前端js脚本：</h3>
+
+<p>function exportRegFinalVerifyExcel(){<br />
+&nbsp; &nbsp; showConfirmModal(&quot;是否终审报名信息？&quot;,function(){<br />
+&nbsp; &nbsp; &nbsp;&nbsp; &nbsp;$(&quot;#reRegEnrollBatchName_export&quot;).val($(&quot;#reRegEnrollBatchName_select&quot;).val());<br />
+&nbsp; &nbsp; &nbsp;&nbsp; &nbsp;$(&quot;#reRegVerifyLevelId_export&quot;).val($(&quot;#reRegVerifyLevelId_select&quot;).val());<br />
+&nbsp; &nbsp; &nbsp;&nbsp; &nbsp;$(&quot;#reRegVerifyStuType_export&quot;).val($(&quot;#reRegVerifyStuType_select&quot;).val());<br />
+&nbsp; &nbsp; &nbsp;&nbsp; &nbsp;$(&quot;#reRegVerifyStuSource_export&quot;).val($(&quot;#reRegVerifyStuSource_select&quot;).val());<br />
+&nbsp; &nbsp; &nbsp;&nbsp; &nbsp;$(&quot;#reRegVerifyMajor_export&quot;).val($(&quot;#reRegVerifyMajor_select&quot;).val());<br />
+&nbsp; &nbsp; &nbsp;&nbsp; &nbsp;$(&quot;#reRegVerifyPoint_export&quot;).val($(&quot;#reRegVerifyPoint_select&quot;).val());<br />
+&nbsp; &nbsp; &nbsp;&nbsp; &nbsp;$(&quot;#reRegVerifyStuStatus_export&quot;).val($(&quot;#reRegVerifyStuStatus_select&quot;).val());<br />
+&nbsp; &nbsp; &nbsp;&nbsp; &nbsp;$(&quot;#edusystemId_export&quot;).val($(&quot;#edusystemId_select&quot;).val());<br />
+&nbsp; &nbsp; &nbsp;&nbsp; &nbsp;$(&quot;#baseName_export&quot;).val($(&quot;#baseName&quot;).val());<br />
+&nbsp; &nbsp; &nbsp;&nbsp; &nbsp;$(&quot;#certificateId_export&quot;).val($(&quot;#certificateId&quot;).val());<br />
+&nbsp; &nbsp; &nbsp; &nbsp;&nbsp;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; var url = &quot;manage/regCommon/exportRegFinalVerifyExcel.do?&quot;+$(&quot;#exportRegFinalVerifyExcelForm&quot;).serialize()+&quot;&amp;ACCESSTOKEN=&quot;+accessTokenId; &nbsp; &nbsp;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; $(&quot;#exportRegFinalVerifyExcelForm&quot;).attr(&#39;action&#39;,url);<br />
+&nbsp; &nbsp; &nbsp; &nbsp; $(&quot;#exportRegFinalVerifyExcelForm&quot;).attr(&#39;target&#39;,&#39;&#39;);<br />
+&nbsp; &nbsp; &nbsp; &nbsp; $(&quot;#exportRegFinalVerifyExcelForm&quot;).submit();<br />
+&nbsp; &nbsp; &nbsp; &nbsp; swal.close();<br />
+&nbsp; &nbsp; });<br />
+}</p>
+
+<h3>后台java代码：</h3>
+
+<p>@RequestMapping(value = &quot;/exportRegFinalVerifyExcel&quot;,method = RequestMethod.POST)<br />
+&nbsp; &nbsp; public ModelAndView exportInvoiceListExcel(HttpServletRequest request,HttpServletResponse response) {<br />
+&nbsp; &nbsp; &nbsp; &nbsp; ModelAndView mv = this.getModelAndView();<br />
+&nbsp; &nbsp; &nbsp; &nbsp; try{<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; Map&lt;String,Object&gt; dataMap = new HashMap&lt;String,Object&gt;();<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;&nbsp;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; Map&lt;String,Object&gt; paramMap = new HashMap&lt;String,Object&gt;();<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; paramMap.put(&quot;userId&quot;, getUserId());//操作人ID<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; paramMap.put(&quot;reRegEnrollBatchName&quot;, request.getParameter(&quot;reRegEnrollBatchName&quot;));<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; paramMap.put(&quot;reRegVerifyLevelId&quot;, request.getParameter(&quot;reRegVerifyLevelId&quot;));<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; paramMap.put(&quot;reRegVerifyStuType&quot;, request.getParameter(&quot;reRegVerifyStuType&quot;));<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; paramMap.put(&quot;reRegVerifyStuSource&quot;, request.getParameter(&quot;reRegVerifyStuSource&quot;));<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; paramMap.put(&quot;reRegVerifyMajor&quot;, request.getParameter(&quot;reRegVerifyMajor&quot;));<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; paramMap.put(&quot;reRegVerifyPoint&quot;, request.getParameter(&quot;reRegVerifyPoint&quot;));<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; paramMap.put(&quot;reRegVerifyStuStatus&quot;, request.getParameter(&quot;reRegVerifyStuStatus&quot;));<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; paramMap.put(&quot;edusystemId&quot;, request.getParameter(&quot;edusystemId&quot;));<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; paramMap.put(&quot;baseName&quot;, request.getParameter(&quot;baseName&quot;));<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; paramMap.put(&quot;certificateId&quot;, request.getParameter(&quot;certificateId&quot;));<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; List&lt;Map&lt;String,Object&gt;&gt; regInfoList = regCommonService.queryFinalRegVerifyList_export(paramMap);<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; 。。。。。。</p>
+
+<h2>实际例子2：</h2>
+
+<h3>前端html代码：</h3>
+
+<p>只有一个隐藏的表单，用来放结构复杂的对象数据。</p>
+
+<p>&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&lt;form id=&quot;addInvoiceExcelForm&quot; method=&quot;POST&quot; style=&quot;display:none&quot;&gt;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp; &nbsp;&lt;input type=&quot;hidden&quot; id=&quot;datas_export&quot; name=&quot;datas&quot; value=&quot;&quot;/&gt;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&lt;/form&gt;</p>
+
+<h3>前端js脚本：</h3>
+
+<p>// 按钮点击事件，checkbox 多条选中记录。<br />
+/**<br />
+&nbsp;* 功能描述：将选中的缴费记录导出到发票<br />
+&nbsp;*/<br />
+function generateInvoice_part() {<br />
+&nbsp;&nbsp; &nbsp;var params = {};<br />
+&nbsp;&nbsp; &nbsp;params.paymentStatus = $(&quot;#paymentStatus_ordersearch&quot;).val();<br />
+&nbsp;&nbsp; &nbsp;params.hasGenInvoice = $(&quot;#hasGenInvoice_ordersearch&quot;).val();<br />
+&nbsp;&nbsp; &nbsp;params.pointId = $(&quot;#pointId_ordersearch&quot;).val();<br />
+&nbsp;&nbsp; &nbsp;params.learningBatch = $(&quot;#learningBatch_ordersearch&quot;).val();<br />
+&nbsp;&nbsp; &nbsp;params.stuName = $(&quot;#stuName_ordersearch&quot;).val();<br />
+&nbsp;&nbsp; &nbsp;params.schoolrollNo = $(&quot;#schoolrollNo_ordersearch&quot;).val();<br />
+&nbsp;&nbsp; &nbsp;params.orderStarttime = $(&quot;#orderStarttime_ordersearch&quot;).val();<br />
+&nbsp;&nbsp; &nbsp;params.orderEndtime = $(&quot;#orderEndtime_ordersearch&quot;).val();<br />
+&nbsp;&nbsp; &nbsp;<br />
+&nbsp;&nbsp; &nbsp;var rowdatas = [];<br />
+&nbsp;&nbsp; &nbsp;$(&quot;.payCheckbox:checked&quot;).each(<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;function() {<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;debugger;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;var datas = order2InvoiceListTable.row(<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;this.parentNode.parentNode.parentNode).data();<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;var rowdata = {};<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;rowdata.studyCode = datas.studyCode;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;rowdata.amount = datas.amount;</p>
+
+<p>&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;rowdata.pointId = datas.pointId;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;rowdata.schoolrollId = datas.schoolrollId;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;rowdatas.push(rowdata);<br />
+&nbsp;&nbsp; &nbsp;});<br />
+&nbsp;&nbsp; &nbsp;if (rowdatas.length &lt; 1) {<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;showInfoModal(&quot;请选择要生成发票的缴费记录！&quot;);<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;return;<br />
+&nbsp;&nbsp; &nbsp;} else {<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;showConfirmModal(&quot;是否确认导出发票！&quot;, function() {<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; <strong>&nbsp;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;var datas = JSON.stringify({&nbsp; &nbsp; &nbsp; //这里是复杂的待传送的对象。<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&quot;flag&quot; : &quot;part&quot;,<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&quot;rowdatas&quot; : rowdatas,<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&quot;params&quot; : params<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;});</strong></p>
+
+<p><strong>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; $(&quot;#datas_export&quot;).val(datas);<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;<u>var url = encodeURI(&quot;manage/invoice/addInvoices.do?&quot;+ $(&quot;#addInvoiceExcelForm&quot;).serialize() + &quot;&amp;ACCESSTOKEN=&quot;+ accessTokenId);</u><br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; <u>&nbsp;$(&quot;#exportInvoiceExcelForm&quot;).attr(&#39;action&#39;, url);</u><br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;<u>$(&quot;#exportInvoiceExcelForm&quot;).attr(&#39;target&#39;, &#39;&#39;);</u><br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;<u>$(&quot;#exportInvoiceExcelForm&quot;).submit();</u><br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;swal.close();<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;if (swal.close()) {<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;setTimeout(function() {<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;invoiceTable.draw();<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;}, 2000);<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;}</strong><br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;<br />
+//&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;$.ajax({<br />
+//&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;url : &quot;manage/invoice/addInvoices.do&quot;,<br />
+//&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;dataType : &quot;json&quot;,<br />
+//&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;type : &quot;post&quot;,<br />
+//&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;traditional : true, // 数组格式转换 加上这个就可以了<br />
+//&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;data : {<br />
+//&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&quot;datas&quot; : JSON.stringify({<br />
+//&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&quot;flag&quot; : &quot;part&quot;,<br />
+//&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&quot;rowdatas&quot; : rowdatas,<br />
+//&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&quot;params&quot; : params<br />
+//&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;})<br />
+//&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;}, // 参数对象<br />
+//&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;success : function(data) {<br />
+//&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;if (data.status == &quot;success&quot;) {<br />
+//&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;showSuccessOrErrorModal(data.msg, &quot;success&quot;);<br />
+//&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;order2InvoiceListTable.draw(false);<br />
+//&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;} else if (data.status == &quot;fail&quot;) {<br />
+//&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;showSuccessOrErrorModal(data.msg, &quot;error&quot;);<br />
+//&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;} else {<br />
+//&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;showSuccessOrErrorModal(data.msg, &quot;error&quot;);<br />
+//&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;}<br />
+//&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;},<br />
+//&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;error : function(data) {<br />
+//&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;showSuccessOrErrorModal(data.msg, &quot;error&quot;);<br />
+//&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;}<br />
+//&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;});<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;});<br />
+&nbsp;&nbsp; &nbsp;}<br />
+}</p>
+
+<h3>后台java代码：</h3>
+
+<p>@RequestMapping(value = &quot;/addInvoices&quot;, method = RequestMethod.POST)<br />
+&nbsp; &nbsp; public ModelAndView addInvoices(HttpServletRequest request,<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; HttpServletResponse response) {<br />
+&nbsp; &nbsp; &nbsp;&nbsp; &nbsp;<br />
+&nbsp; &nbsp; &nbsp;&nbsp; &nbsp;ModelAndView mv = this.getModelAndView();&nbsp; &nbsp;</p>
+
+<p>&nbsp; &nbsp; &nbsp; &nbsp; String paramData = request.getParameter(&quot;datas&quot;); //发票ID信息<br />
+&nbsp; &nbsp; &nbsp; &nbsp; String dataStr = decodeStr(paramData);<br />
+&nbsp; &nbsp; &nbsp; &nbsp; Map datas = net.sf.json.JSONObject.fromObject(dataStr);&nbsp;</p>
+
+<p>。。。</p>
