@@ -1,0 +1,342 @@
+<h1>HTTPClient学习</h1>
+
+<h2>1、httpClient</h2>
+
+<p>HttpClient是Apache中的一个开源的项目。它实现了HTTP标准中Client端的所有功能，使用它能够很容易地进行HTTP信息的传输。它的各个版本的使用方式都不太一样，我使用的版本是4.3.5的，网上比较多的资源是3.+版本的，目前最新已经有4.4+版本了，感兴趣的都可以看一下。</p>
+
+<p><strong>HttpCLient最关键的方法是执行HTTP请求的方法execute。只要把HTTP请求传入，就可以得到HTTP响应。</strong></p>
+
+<p>使用HttpClient请求一个Http请求的步骤为：</p>
+
+<ul>
+	<li><strong>（1）创建一个HttpClient对象</strong></li>
+	<li><strong>（2）创建一个Request对象</strong></li>
+	<li><strong>（3）使用HttpClient来执行Request请求，得到对方的response</strong></li>
+	<li><strong>（4）处理response</strong></li>
+	<li><strong>（5）关闭HttpClient</strong></li>
+</ul>
+
+<p>下面就针对这几个步骤进行展开。</p>
+
+<h2>2、创建一个HttpClient对象</h2>
+
+<p>目前最新版的HttpClient的实现类为CloseableHttpClient。创建CloseableHttpClient实例有两种方式：</p>
+
+<p>（1）使用CloseableHttpClient的工厂类HttpClients的方法来创建实例。HttpClients提供了根据各种默认配置来创建CloseableHttpClient实例的快捷方法。最简单的实例化方式是调用HttpClients.createDefault()。</p>
+
+<p>（2）使用CloseableHttpClient的builder类HttpClientBuilder，先对一些属性进行配置（采用装饰者模式，不断的.setxxxxx().setxxxxxxxx()就行了），再调用build方法来创建实例。上面的HttpClients.createDefault()实际上调用的也就是HttpClientBuilder.create().build()。</p>
+
+<p>build()方法最终是根据各种配置来new一个InternalHttpClient实例（CloseableHttpClient实现类）。IternalHttpClient的定义如下：（忽略方法部分）</p>
+
+<pre>
+<code>class InternalHttpClient extends CloseableHttpClient {
+
+&nbsp; &nbsp; private final Log log = LogFactory.getLog(getClass());
+
+&nbsp; &nbsp; private final ClientExecChain execChain;
+
+&nbsp; &nbsp; private final HttpClientConnectionManager connManager;
+
+&nbsp; &nbsp; private final HttpRoutePlanner routePlanner;
+
+&nbsp; &nbsp; private final Lookup&lt;CookieSpecProvider&gt; cookieSpecRegistry;
+
+&nbsp; &nbsp; private final Lookup&lt;AuthSchemeProvider&gt; authSchemeRegistry;
+
+&nbsp; &nbsp; private final CookieStore cookieStore;
+
+&nbsp; &nbsp; private final CredentialsProvider credentialsProvider;
+
+&nbsp; &nbsp; private final RequestConfig defaultConfig;
+
+&nbsp; &nbsp; private final List&lt;Closeable&gt; closeables;
+
+}</code></pre>
+
+<p>其中需要注意的有HttpCLientConnectionManager、HttpRoutePlanner和RequestConfig。</p>
+
+<h2>(1)HttpClientConnectionManager</h2>
+
+<p>HttpClientConnectionManager是一个HTTP连接管理器。它负责新HTTP连接的创建、管理连接的生命周期还有保证一个HTTP连接在某一时刻只被一个线程使用。在内部实现的时候，manager使用一个<strong>ManagedHttpClientConnection</strong>的实例来<strong>作为一个实际connection的代理，负责管理connection的状态以及执行实际的I/O操作。</strong>如果一个被监管的connection被释放或者被明确关闭，尽管此时manager仍持有该连接的代理，但是这个connection的状态不会被改变也不能再执行任何的I/O操作。</p>
+
+<p>HttpClientConnectionManager有两种具体实现：</p>
+
+<p>a、BasicHttpClientConnectionManager</p>
+
+<p><strong>BasicHttpClientConnectionManager每次只管理一个connection</strong>。不过，虽然它是thread-safe的，但由于它只管理一个连接，所以只能被一个线程使用。它在管理连接的时候如果发现有相同route的请求，会复用之前已经创建的连接，如果新来的请求不能复用之前的连接，它会关闭现有的连接并重新打开它来响应新的请求。</p>
+
+<p>b、PoolingHttpClientConnectionManager</p>
+
+<p>PoolingHttpClientConnectionManager与BasicHttpClientConnectionManager不同，<strong>它管理着一个连接池(连接池管理部分在第7部分有详细介绍)。它可以同时为多个线程服务</strong>。每次新来一个请求，如果在连接池中已经存在route相同并且可用的connection，连接池就会直接复用这个connection；当不存在route相同的connection，就新建一个connection为之服务；如果连接池已满，则请求会等待直到被服务或者超时。</p>
+
+<p>默认不对HttpClientBuilder进行配置的话，new出来的CloeableHttpClient实例使用的是PoolingHttpClientConnectionManager，这种情况下HttpClientBuilder创建出的HttpClient实例就可以被多个连接&amp;多个线程共用，在应用容器起来的时候实例化一次，在整个应用结束的时候再调用httpClient.close()就行了。在PoolingHttpClientConnectionManager的配置中有两个最大连接数量，分别控制着总的最大连接数量和每个route的最大连接数量。如果没有显式设置，默认每个route只允许最多2个connection，总的connection数量不超过20。这个值对于很多并发度高的应用来说是不够的，必须根据实际的情况设置合适的值，思路和线程池的大小设置方式是类似的，如果所有的连接请求都是到同一个url，那可以把MaxPerRoute的值设置成和MaxTotal一致，这样就能更高效地复用连接。HttpClient 4.3.5的设置方法如下:</p>
+
+<pre>
+<code>private final static PoolingHttpClientConnectionManager poolingHttpClientConnectionManager = new PoolingHttpClientConnectionManager();
+
+poolingHttpClientConnectionManager.setMaxTotal(MAX_CONNECTION);
+
+poolingHttpClientConnectionManager.setDefaultMaxPerRoute(MAX_CONNECTION);
+
+CloseableHttpClient httpClient = HttpClientBuilder.create().setConnectionManager(poolingHttpClientConnectionManager).build();</code>
+</pre>
+
+<h2>(2)HttpRoutePlanner</h2>
+
+<p>HttpClient不仅支持简单的直连、复杂的路由策略以及代理。HttpRoutePlanner是基于http上下文情况下，客户端到服务器的路由计算策略，一般没有代理的话，就不用设置这个东西。这里有一个很关键的概念&mdash;Route：在HttpClient中，一个Route指&nbsp;运行环境机器-&gt;目标机器host的一条线路，也就是如果目标url的host是同一个，那么它们的route也是一样的。</p>
+
+<h2>(3)RequestConfig</h2>
+
+<p>RequestConfig是对request的一些配置。里面比较重要的有三个超时时间，默认的情况下这三个超时时间都为0（如果不设置request的Config，会在execute的过程中使用HttpClientParamConfig的getRequestConfig中用默认参数进行设置），这也就意味着无限等待，很容易导致所有的请求阻塞在这个地方无限期等待。这三个超时时间为：</p>
+
+<p>a、connectionRequestTimeout&mdash;从连接池中取连接的超时时间</p>
+
+<p>这个时间定义的是从ConnectionManager管理的连接池中取出连接的超时时间， 如果连接池中没有可用的连接，则request会被阻塞，最长等待connectionRequestTimeout的时间，如果还没有被服务，则抛出ConnectionPoolTimeoutException异常，不继续等待。</p>
+
+<p>b、connectTimeout&mdash;连接超时时间</p>
+
+<p>这个时间定义了通过网络与服务器建立连接的超时时间，也就是取得了连接池中的某个连接之后到接通目标url的连接等待时间。发生超时，会抛出ConnectionTimeoutException异常。</p>
+
+<p>c、socketTimeout&mdash;请求超时时间</p>
+
+<p>这个时间定义了socket读数据的超时时间，也就是连接到服务器之后到从服务器获取响应数据需要等待的时间，或者说是连接上一个url之后到获取response的返回等待时间。发生超时，会抛出SocketTimeoutException异常。</p>
+
+<p>注意，4.3.5版本超时设置方法和之前的版本不同，下面是一个设置各个超时时间的例子。注意，这样设置的是该HttpClientc处理的所有request的默认配置，如果在构造request实例的时候不特别设置，则会使用默认配置。</p>
+
+<p><code>RequestConfig requestConfig = RequestConfig.custom().setConnectionRequestTimeout(CON_RST_TIME_OUT).setConnectTimeout(CON_TIME_OUT).setSocketTimeout(SOCKET_TIME_OUT).build(); CloseableHttpClient httpClient = HttpClientBuilder.create().setDefaultRequestConfig(requestConfig).build();</code></p>
+
+<h1>3、创建一个Request对象</h1>
+
+<p>HttpClient支持所有的HTTP1.1中的所有定义的请求类型：GET、HEAD、POST、PUT、DELETE、TRACE和OPTIONS。对使用的类为HttpGet、HttpHead、HttpPost、HttpPut、HttpDelete、HttpTrace和HttpOptions。Request的对象建立很简单，一般用目标url来构造就好了。下面是一个HttpPost的创建代码：</p>
+
+<pre>
+<code>HttpPost httpPost = new HttpPost(someGwUrl);
+
+</code>一个Request还可以addHeader、setEntity、setConfig等，一般这三个用的比较多。</pre>
+
+<p>RequestConfig这个类比较关键，就是request的配置，除了上面说到的三个超时时间外，还有一些可能有助于理解处理过程的配置：</p>
+
+<p>staleConnectionCheckEnabled：这个配置默认为true，HttpClient的execute方法中有下面的代码，也就是说如果这个设置为true的话，是会自动关闭那些状态为stale的managed connection所管理的connection和socket（和remote ip）。（这里有个问题，在第7部分中再说）</p>
+
+<pre>
+<code>if (config.isStaleConnectionCheckEnabled()) {
+
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; // validate connection
+
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; if (managedConn.isOpen()) {
+
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; this.log.debug(&quot;Stale connection check&quot;);
+
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; if (managedConn.isStale()) {
+
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; this.log.debug(&quot;Stale connection detected&quot;);
+
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; managedConn.close();
+
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; }
+
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; }
+
+&nbsp; &nbsp; &nbsp; &nbsp; }
+</code>
+</pre>
+
+<h1>4、执行Request请求</h1>
+
+<p>执行Request请求就是调用HttpClient的execute方法。最简单的使用方法是调用execute(final HttpUriRequest request)。</p>
+
+<p>HttpClient允许http连接在特定的Http上下文中执行，HttpContext是跟一个连接相关联的，所以它也只能属于一个线程，如果没有特别设定，在execute的过程中，HttpClient会自动为每一个connection&nbsp;&nbsp;new一个HttpClientHttpContext。</p>
+
+<pre>
+<code>HttpClientContext localcontext = HttpClientContext.adapt(context != null ? context : new BasicHttpContext());</code></pre>
+
+<p>整个execute执行的常规流程为：</p>
+
+<p>new一个http context</p>
+
+<p>|</p>
+
+<p>取出Request和URL</p>
+
+<p>|</p>
+
+<p>根据HttpRoute的配置看是否需要重写URL</p>
+
+<p>|</p>
+
+<p>根据URL的host、port和scheme设置target</p>
+
+<p>|</p>
+
+<p>在发送前用http协议拦截器处理request的各个部分</p>
+
+<p>|</p>
+
+<p>取得验证状态、user token来验证身份</p>
+
+<p>|</p>
+
+<p>从连接池中取一个可用的连接</p>
+
+<p>|</p>
+
+<p>根据request的各种配置参数以及取得的connection构造一个connManaged</p>
+
+<p>|</p>
+
+<p>打开managed的connection（包括创建route、dns解析、绑定socket、socket连接等）</p>
+
+<p>|</p>
+
+<p>请求数据（包括发送请求和接收response两个阶段）</p>
+
+<p>|</p>
+
+<p>查看keepAlive策略，判断连接是否要复用，并设置相应标识</p>
+
+<p>|</p>
+
+<p>返回response</p>
+
+<p>|</p>
+
+<p>用http协议拦截器处理response的各个部分</p>
+
+<h1>5、处理response</h1>
+
+<p>HttpReaponse是将服务端发回的Http响应解析后的对象。CloseableHttpClient的execute方法返回的response都是CloseableHttpResponse类型。可以getFirstHeader(String)、getLastHeader(String)、headerIterator（String）取得某个Header name对应的迭代器、getAllHeaders()、getEntity、getStatus等，一般这几个方法比较常用。</p>
+
+<p>在这个部分中，对于entity的处理需要特别注意一下。</p>
+
+<p>一般来说一个response中的entity只能被使用一次，它是一个流，这个流被处理完就不再存在了。</p>
+
+<p>先response.getEntity()再使用HttpEntity#getContent()来得到一个java.io.InputStream，然后再对内容进行相应的处理。</p>
+
+<p>有一点非常重要，想要复用一个connection就必须要让它占有的系统资源得到正确释放。释放资源有两种方法：</p>
+
+<p>a、关闭和entity相关的content stream</p>
+
+<p>如果是使用outputStream就要保证整个entity都被write out，如果是inputStream，则再最后要记得调用inputStream.close()。或者使用EntityUtils.consume(entity)或EntityUtils.consumeQuietly(entity)来让entity被完全耗尽（后者不抛异常）来做这一工作。EntityUtils中有个toString方法也很方便的（调用这个方法最后也会自动把inputStream close掉的），不过只有在可以确定收到的entity不是特别大的情况下才能使用。</p>
+
+<p>做过实验，如果没有让整个entity被fully consumed，则该连接是不能被复用的，很快就会因为在连接池中取不到可用的连接超时或者阻塞在这里（因为该连接的状态将会一直是leased的，即正在被使用的状态）。所以如果想要复用connection，一定一定要记得把entity fully consume掉，只要检测到stream的eof，是会自动调用ConnectionHolder的releaseConnection方法进行处理的（注意，ConnectionHolder并不是一个public class，虽然里面有一些跟释放连接相关的重要操作，但是却无法直接调用）。</p>
+
+<p>b、关闭response</p>
+
+<p>执行response.close()虽然会正确释放掉该connection占用的所有资源，但是这是一种比较暴力的方式，采用这种方式之后，这个connection就不能被重复使用了。</p>
+
+<p>从源代码中可以看出，response.close()调用了connectionHolder的abortConnection方法，它会close底层的socket，并且release当前的connection，并把reuse的时间设为0。这种情况下的connection称为expired connection，也就是client端单方面把连接关闭。还要等待closeExpiredConnections方法将它从连接池中清除掉（从连接池中清除掉的含义是把它所对应的连接池的entry置为无效，并且关掉对应的connection，shutdown对应socket的输入和输出流。这个方法的调用时间是需要设置的）。</p>
+
+<p>关闭stream和response的区别在于前者会尝试保持底层的连接alive，而后者会直接shut down并且丢弃connection。</p>
+
+<p>socket是和ip以及port绑定的，但是host相同的请求会尽量复用连接池里已经存在的connection（因为在连接池里会另外维护一个route的子连接池，这个子连接池中每个connection的状态有三种：leased、available和pending，只有available状态的connection才能被使用，而fully consume entity就可以让该连接变为available状态），如果host地址一样，则优先使用该connection。</p>
+
+<p>如果希望重复读取entity中的内容，就需要把entity缓存下来。最简单的方式是用entity来new一个BufferedHttpEntity，这一操作会把内容拷贝到内存中，之后使用这个BufferedHttpEntity就可以了。</p>
+
+<p>&nbsp;</p>
+
+<h1>6、关闭HttpClient</h1>
+
+<p>&nbsp;</p>
+
+<p>调用httpClient.close()会先shut down connection manager，然后再释放该HttpClient所占用的所有资源，关闭所有在使用或者空闲的connection包括底层socket。由于这里把它所使用的connection manager关闭了，所以在下次还要进行http请求的时候，要重新new一个connection manager来build一个HttpClient（也就是在需要关闭和新建Client的情况下，connection manager不能是单例的）。</p>
+
+<p>&nbsp;</p>
+
+<h1>7、其他一些东西</h1>
+
+<h2>（1）关于keep-alive</h2>
+
+<p>在HttpClient.execute得到response之后的相关代码中，它会先取出response的keep-alive头来设置connection是否resuable以及存活的时间。如果服务器返回的响应中包含了Connection:Keep-Alive（默认有的），但没有包含Keep-Alive时长的头消息，HttpClient认为这个连接可以永远保持。</p>
+
+<p>不过，很多服务器都会在不通知客户端的情况下，关闭一定时间内不活动的连接，来节省服务器资源。在这种情况下默认的策略显得太乐观，我们可能需要自定义连接存活策略，也就是在创建HttpClient的实例的时候用下面的代码。（xxx为自己写的保活策略）</p>
+
+<p><code>ClosableHttpClient client = HttpClients.custom().setKeepAliveStrategy(xxx).build();</code></p>
+
+<h2>（2）连接池管理</h2>
+
+<p>前面也有说到关于从连接池中取可用连接的部分逻辑。完整的逻辑是：在每收到一个route请求后，连接池都会建立一个以这个route为key的子连接池，当有一个新的连接请求到来的时候，它会优先匹配已经存在的子连接池们，如果之前已经有过以这个route为key的子连接池，那么就会去试图取这个子连接池中状态为available的连接，如果此时有可用的连接，则将取得的available连接状态改为leased的，取连接成功。如果此时子连接池没有可用连接，那再看是否达到了所设置的最大连接数和每个route所允许的最大连接数的上限，如果还有余量则new一个新的连接，或者取得lastUsedConnection，关闭这个连接、把连接从原来所在的子连接池删除，再lease取连接成功。如果此时的情况不允许再new一个新的连接，就把这个请求连接的请求放入一个queue中排队等待，直到得到一个连接或者超时才会从queue中删去。</p>
+
+<p>一个连接被release之后，会从等待连接的queue中唤醒等待连接的服务进行处理。</p>
+
+<h2>（3）连接回收策略</h2>
+
+<p>当连接被管理器收回后，这个连接仍然存活，但是却无法监控socket的状态，也无法对I/O事件做出反馈。如果连接被服务器端关闭了，客户端监测不到连接的状态变化（也就无法根据连接状态的变化，关闭本地的socket）。</p>
+
+<p>HttpClient为了缓解这一问题造成的影响，会在使用某个连接前，监测这个连接是否已经过时，如果服务器端关闭了连接，那么连接就会失效。前面提到的RequestConfig中的staleConnectionCheckEnabled就是用来控制是否进行上述操作，相关代码：</p>
+
+<pre>
+<code>if (config.isStaleConnectionCheckEnabled()) {
+
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; // validate connection
+
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; if (managedConn.isOpen()) {
+
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; this.log.debug(&quot;Stale connection check&quot;);
+
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; if (managedConn.isStale()) {
+
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; this.log.debug(&quot;Stale connection detected&quot;);
+
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; managedConn.close();
+
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; }
+
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; }
+
+&nbsp; &nbsp; &nbsp; &nbsp; }
+</code></pre>
+
+<p>&nbsp;</p>
+
+<p>&nbsp;</p>
+
+<p>其中的managedConn.isStale()就是检查取出的连接是否失效，需要注意的是这种过时检查并不是100%有效，并且会给每个请求增加10到30毫秒额外开销。isStale()有一点比较奇怪的是，如果抛出SocketTimeoutException的时候会返回false，即意味着此managedConn并不是失效的（如果此managedConn是长连接的，那么没失效是可理解的，但为什么会抛SocketTimeoutException异常就不懂了）。而这里SocketTimeoutException的发生与我们前面设置的RequestConfig.sotimeout是没有关系的，它实现的机制是先设置1ms的超时时间，看在这1ms内是否能从inputBuffer里面读到数据，如果读到的数据长度为-1（即没有数据），说明此连接失效。但是很经常随机会发生SocketTimeoutException，这时会返回false，并且此时managedConn是open的状态，这样就会跳过后面的dns解析及socket重新建立和绑定的过程，直接再次重用之前的connection以及它绑定的socket。</p>
+
+<p>在这里遇到的一个很纠结的问题：<br />
+<br />
+Http1.1默认进行的长连接并不适用于我们的应用场景，我们的httpClient是用在服务端代替客户端sdk &nbsp;去请求另一个应用的服务端，并且调用量非常大，在这种情况下，如果使用默认的长连接就会一直只去请求对方的某一台服务器，不管怎么说，虽然调用的确实是相同host的主机对功能来说是没有问题的，但万一对方服务器被这样弄挂了呢？并且这种情况下要是使用了dns负载均衡技术，那么dns的负载均衡将不能被执行到！这显然不是我们所希望的。<br />
+并且通过测试发现，只要是长连接的connection，在代码中调用各种close或者release方法都不能把connection真正关掉，除非把整个httpClient.close。</p>
+
+<p>对于这个问题查了一些资料，里面提到的一个可行的解决办法，是建立一个监控线程，来专门回收由于长时间不活动而被判定为失效的连接。这个监控线程可以周期性的调用ClientConnectionManager类的closeExpiredConnections()方法来关闭过期的连接，回收连接池中被关闭的连接。它也可以选择性的调用ClientConnectionManager类的closeIdleConnections()方法来关闭一段时间内不活动的连接。由于这个解决方案对于我们的应用来说太复杂了，所以这个方案的有效性没有验证过。</p>
+
+<p>我原先采用的解决方式是：在每次连接请求到来的时候都build一个新的HttpClient对象，并且使用BasicHttpClientConnectionManager作为connectionManager。然后在处理完http response之后 close掉这个HttpClient。目前本地自测来看，这种做法不会出现上面的奇怪问题。但是很忧伤的是，新建一个HttpClient的逻辑很重，并且连接不能复用，会浪费很多时间。<br />
+<br />
+由于这个日常需求本身做的就是优化性质的工作，加上每个请求都新建HttpClient这一大坨代码，心里总是有点难受。继续找解决办法。<br />
+<br />
+在尝试了改系统的各种tcp配置参数还有其他的socket、系统配置无果后，最终找到的解决方式却异常简单。简单来说，其实我们的应用场景下需要的是短连接，这样只要在request中添加Connection:close的头部，就可以保证这个链接在这次请求完成之后就被关掉，只用一次。同时发现，如果头中既有Connection:Keep-Alive又有Connection:close的话，Connection:close并不会有更高的优先级，依旧会保持长连。</p>
+
+<h1>8、总结</h1>
+
+<p>使用HttpClient的时候特别需要注意的有下面几个地方：</p>
+
+<ul>
+	<li>(1)连接池最大连接数，不配置为20</li>
+	<li>(2)同个route的最大连接数，不配置为2</li>
+	<li>(3)去连接池中取连接的超时时间，不配置则无限期等待</li>
+	<li>(4)与目标服务器建立连接的超时时间，不配置则无限期等待</li>
+	<li>(5)去目标服务器取数据的超时时间，不配置则无限期等待</li>
+	<li>(6)要fully consumed entity，才能正确释放底层资源</li>
+	<li>(7)同个host但ip有多个的情况，请谨慎使用单例的HttpClient和连接池</li>
+	<li>(8)HTTP1.1默认支持的是长连接，如果想使用短连接，要在request上加Connection:close的header，不然长连接是不可能自动被关掉的！</li>
+</ul>
+
+<p>一定要结合实际情况来看是否需要设置，不然可能导致严重的问题。</p>
+
+<p>&nbsp;HttpClient的内容远不止我上面说到的这些，还包括Cookie管理，Fluent API等内容，由于没有实际使用，理解的并不透彻，后续继续学习后再来补充。<br />
+&nbsp;</p>
+
+<p>下面是回复里提到的一个问题：</p>
+
+<p>连接池里的连接是长连接吗？还是说调用方拿到这个连接还要与server三次握手？</p>
+
+<p>&nbsp;TCP的三次握手是发生在socket的connect方法被调用的时候，从代码里看，这部分的调用链路是MainClientExec#execute-&gt;（条件if (!managedConn.isOpen()) ）MainClientExec#establishRoute-&gt;PoolingHttpClientConnectionManager#connect-&gt;HttpClientConnectionOperator#connect-&gt;PlainConnectionSocketFactory#connectSocket-&gt;Socket#connect。也就是文中第四点讲的&ldquo;打开managed的connection（包括创建route、dns解析、绑定socket、socket连接等）&rdquo;这部分实现。</p>
+
+<p>如果某个连接在response的header中带了keep-alive，那么它是以长连接的形式存在的，下次有相同目标host的请求，它会优先取得这个连接（包括底层socket的ip和post），如果底层的socket依然可用，那么就用它直接进行通信，不会再进行三次握手的过程。</p>
+
+<p>关于如何让一个放回pool的connection以长连接存在，这是在MainClientExec#execute中有if (reuseStrategy.keepAlive(response, context)) 里的相关逻辑给connection打上reusable的标并设置有效时间。然后在response.entity被fully consumed之后，会自动调用EofSensorInputStream#close，这个方法中惠对connection进行release操作，最终会调用到ConnectionHolder#releaseConnection()，在这个方法中对是否reusable的连接进行不同的release操作，对于reusable的类型，并不会去close底层的socket。所以它就一直保持长连接。</p>
+
+<p>不过为什么会出现明明是长连接，间隔时间较长的话调用isStable()却返回true，然后把socket关掉呢？个人猜测有可能是由于链接空闲了一段时间对方把长连接关掉了，这种情况下是会重新进行三次握手的。</p>
+
+<p>当然短连接的情况下，socket也是关掉了的。</p>
+
+<p><img alt="" src="http://img.blog.csdn.net/20160115094652611?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQv/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70/gravity/Center" style="height:564px; width:1200px" /></p>

@@ -1,0 +1,304 @@
+<h1>短信网关http调用问题解决</h1>
+
+<p>cp jwpt-web.war ../../tomcat8_jwpt/webapps</p>
+
+<h2>尝试解决方案：​​</h2>
+
+<h3>1、放大http超时时间</h3>
+
+<p>private static RequestConfig requestConfig = RequestConfig.custom().setSocketTimeout(<strong>15000</strong>).setConnectTimeout(<strong>15000</strong>)<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;.setConnectionRequestTimeout(13000).build();</p>
+
+<h3>2、关闭定时任务</h3>
+
+<p>&nbsp; &nbsp; &nbsp; &nbsp;&lt;!-- 延时启动 --&gt;<br />
+&nbsp; &nbsp; &nbsp; &nbsp;&lt;property name=&quot;startupDelay&quot; value=&quot;30&quot;/&gt;<br />
+&nbsp; &nbsp; &nbsp; &nbsp;<br />
+&nbsp; &nbsp; &nbsp; &nbsp;&lt;property name=&quot;applicationContextSchedulerContextKey&quot; value=&quot;applicationContextKey&quot;/&gt;<br />
+&nbsp; &nbsp; &nbsp; &nbsp;<br />
+&nbsp; &nbsp; &nbsp; &nbsp;&lt;!-- 可选，quartzScheduler启动是更新已存在的job，这样就不用每次修改targetObject后删除qrtz_job_details表对应的记录 --&gt;<br />
+&nbsp; &nbsp; &nbsp; &nbsp;&lt;property name=&quot;overwriteExistingJobs&quot; value=&quot;true&quot;/&gt;<br />
+&nbsp; &nbsp; &nbsp; &nbsp;<br />
+&nbsp; &nbsp; &nbsp; &nbsp;&lt;!-- 设置自动启动，默认自动启动 &nbsp;--&gt;<br />
+&nbsp; &nbsp; &nbsp; &nbsp;&lt;property name=&quot;autoStartup&quot; value=&quot;<strong>false</strong>&quot;/&gt;</p>
+
+<p>修改了配置任务自启动设置，没解决。。</p>
+
+<h3>3、添加代理</h3>
+
+<p>private HttpHost proxy = new HttpHost(&quot;127.0.0.1&quot;, 8888);<br />
+private RequestConfig requestProxyConfig = RequestConfig.custom().setSocketTimeout(15000).setConnectTimeout(15000)<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; .setConnectionRequestTimeout(15000).setProxy(proxy).build(); //设置代理fiddle 抓包</p>
+
+<p>&nbsp;</p>
+
+<h2>经整理后的调试信息分析：</h2>
+
+<p>一开始以为是<u><em>[read] I/O error: Connection reset&nbsp;</em></u>和<em><u>CPool - Connection</u></em>问题引起的，但是多次的调试信息之后并不是。</p>
+
+<p>于是提出这些无关信息，对比发送成功和失败的信息：</p>
+
+<h3>发送失败：</h3>
+
+<p>[16:37:36:135] [DEBUG] - RequestAddCookies - CookieSpec selected: default<br />
+[16:37:36:136] [DEBUG] - RequestAuthCache - Auth cache not set in the context<br />
+[16:37:36:137] [DEBUG] - PoolingHttpClientConnectionManager - Connection request: [route: {}-&gt;http://ems.smsway.com.cn:80][total kept alive: 1; route allocated: 1 of 200; total allocated: 1 of 1000]</p>
+
+<p>[16:37:36:142] [DEBUG] - PoolingHttpClientConnectionManager - Connection leased: [id: 20][route: {}-&gt;http://ems.smsway.com.cn:80][total kept alive: 0; route allocated: 1 of 200; total allocated: 1 of 1000]</p>
+
+<p>[16:37:36:143] [DEBUG] - MainClientExec - Opening connection {}-&gt;http://ems.smsway.com.cn:80<br />
+[16:37:36:149] [DEBUG] - DefaultHttpClientConnectionOperator - Connecting to ems.smsway.com.cn/121.201.38.146:80</p>
+
+<p><strong>[16:37:51:165] [DEBUG] - DefaultManagedHttpClientConnection - http-outgoing-20: Shutdown connection<br />
+[16:37:51:167] [DEBUG] - MainClientExec - Connection discarded</strong></p>
+
+<p>[16:37:51:169] [DEBUG] - PoolingHttpClientConnectionManager - Connection released: [id: 20][route: {}-&gt;http://ems.smsway.com.cn:80][total kept alive: 0; route allocated: 0 of 200; total allocated: 0 of 1000]<br />
+[16:37:51:172] [ERROR] - HttpUtils - Connect to ems.smsway.com.cn:80 [ems.smsway.com.cn/121.201.38.146] failed: connect timed out</p>
+
+<h3>发送成功：</h3>
+
+<p>[16:36:24:342] [DEBUG] - RequestAddCookies - CookieSpec selected: default<br />
+[16:36:24:343] [DEBUG] - RequestAuthCache - Auth cache not set in the context<br />
+[16:36:24:344] [DEBUG] - PoolingHttpClientConnectionManager - Connection request: [route: {}-&gt;http://ems.smsway.com.cn:80][total kept alive: 0; route allocated: 0 of 200; total allocated: 0 of 1000]</p>
+
+<p>[16:36:24:345] [DEBUG] - PoolingHttpClientConnectionManager - Connection leased: [id: 19][route: {}-&gt;http://ems.smsway.com.cn:80][total kept alive: 0; route allocated: 1 of 200; total allocated: 1 of 1000]</p>
+
+<p>[16:36:24:346] [DEBUG] - MainClientExec - Opening connection {}-&gt;http://ems.smsway.com.cn:80<br />
+[16:36:24:351] [DEBUG] - DefaultHttpClientConnectionOperator - Connecting to ems.smsway.com.cn/121.201.38.146:80</p>
+
+<p><strong>[16:36:24:401] [DEBUG] - DefaultHttpClientConnectionOperator - Connection established 210.28.216.100:36226&lt;-&gt;121.201.38.146:80<br />
+[16:36:24:402] [DEBUG] - DefaultManagedHttpClientConnection - http-outgoing-19: set socket timeout to 15000<br />
+[16:36:24:403] [DEBUG] - MainClientExec - Executing request POST /sendSMS.action HTTP/1.1<br />
+[16:36:24:404] [DEBUG] - MainClientExec - Target auth state: UNCHALLENGED<br />
+[16:36:24:405] [DEBUG] - MainClientExec - Proxy auth state: UNCHALLENGED<br />
+------------------wire：报文-----------------<br />
+[16:36:24:490] [DEBUG] - MainClientExec - Connection can be kept alive for 120000 MILLISECONDS<br />
+[16:36:24:491] [DEBUG] - ResponseProcessCookies - Cookie accepted [JSESSIONID=&quot;68466A02E4A43FA7E039862006326623.smswayjvm1&quot;, version:0, domain:ems.smsway.com.cn, path:/, expiry:null]<br />
+[16:36:24:493] [DEBUG] - PoolingHttpClientConnectionManager - Connection [id: 19][route: {}-&gt;http://ems.smsway.com.cn:80] can be kept alive for 120.0 seconds</strong></p>
+
+<p>[16:36:24:493] [DEBUG] - PoolingHttpClientConnectionManager - Connection released: [id: 19][route: {}-&gt;http://ems.smsway.com.cn:80][total kept alive: 1; route allocated: 1 of 200; total allocated: 1 of 1000]</p>
+
+<h2>附件：成功的调试信息</h2>
+
+<h3>几个单词解释：</h3>
+
+<p>leased 出租；租得(过去式) &nbsp;released 释放(过去式)。<br />
+discarded 丢弃的；废弃的(过去式)</p>
+
+<h3>发送成功一：</h3>
+
+<p>[16:36:24:342] [DEBUG] - RequestAddCookies - CookieSpec selected: default<br />
+[16:36:24:343] [DEBUG] - RequestAuthCache - Auth cache not set in the context<br />
+[16:36:24:344] [DEBUG] - PoolingHttpClientConnectionManager - Connection request: [route: {}-&gt;http://ems.smsway.com.cn:80][total kept alive: 0; route allocated: 0 of 200; total allocated: 0 of 1000]</p>
+
+<p>[16:36:24:345] [DEBUG] - PoolingHttpClientConnectionManager - Connection leased: [id: 19][route: {}-&gt;http://ems.smsway.com.cn:80][total kept alive: 0; route allocated: 1 of 200; total allocated: 1 of 1000]</p>
+
+<p>[16:36:24:346] [DEBUG] - MainClientExec - Opening connection {}-&gt;http://ems.smsway.com.cn:80<br />
+[16:36:24:351] [DEBUG] - DefaultHttpClientConnectionOperator - Connecting to ems.smsway.com.cn/121.201.38.146:80<br />
+[16:36:24:401] [DEBUG] - DefaultHttpClientConnectionOperator - Connection established 210.28.216.100:36226&lt;-&gt;121.201.38.146:80</p>
+
+<p>[16:36:24:402] [DEBUG] - DefaultManagedHttpClientConnection - http-outgoing-19: set socket timeout to 15000<br />
+[16:36:24:403] [DEBUG] - MainClientExec - Executing request POST /sendSMS.action HTTP/1.1<br />
+[16:36:24:404] [DEBUG] - MainClientExec - Target auth state: UNCHALLENGED<br />
+[16:36:24:405] [DEBUG] - MainClientExec - Proxy auth state: UNCHALLENGED<br />
+------------------wire：报文-----------------<br />
+[16:36:24:490] [DEBUG] - MainClientExec - Connection can be kept alive for 120000 MILLISECONDS<br />
+[16:36:24:491] [DEBUG] - ResponseProcessCookies - Cookie accepted [JSESSIONID=&quot;68466A02E4A43FA7E039862006326623.smswayjvm1&quot;, version:0, domain:ems.smsway.com.cn, path:/, expiry:null]<br />
+[16:36:24:493] [DEBUG] - PoolingHttpClientConnectionManager - Connection [id: 19][route: {}-&gt;http://ems.smsway.com.cn:80] can be kept alive for 120.0 seconds<br />
+[16:36:24:493] [DEBUG] - PoolingHttpClientConnectionManager - Connection released: [id: 19][route: {}-&gt;http://ems.smsway.com.cn:80][total kept alive: 1; route allocated: 1 of 200; total allocated: 1 of 1000]</p>
+
+<h3>发送成功二：</h3>
+
+<p>第一次发送成功后，立马发送，这时 Connection leased 后面。不需要再建立连接。</p>
+
+<p>[15:58:32:444] [DEBUG] - RequestAddCookies - CookieSpec selected: default<br />
+[15:58:32:445] [DEBUG] - RequestAuthCache - Auth cache not set in the context<br />
+[15:58:32:445] [DEBUG] - PoolingHttpClientConnectionManager - Connection request: [route: {}-&gt;http://ems.smsway.com.cn:80][total kept alive: 1; route allocated: 1 of 200; total allocated: 1 of 1000]</p>
+
+<p><em>[15:58:32:447] [DEBUG] - wire - http-outgoing-8 &lt;&lt; &quot;[read] I/O error: Read timed out&quot;</em></p>
+
+<p>[15:58:32:448] [DEBUG] - PoolingHttpClientConnectionManager - Connection leased: [id: 8][route: {}-&gt;http://ems.smsway.com.cn:80][total kept alive: 0; route allocated: 1 of 200; total allocated: 1 of 1000]</p>
+
+<p><strong>【此处少了建立连接的代码】</strong></p>
+
+<p>[15:58:32:449] [DEBUG] - DefaultManagedHttpClientConnection - http-outgoing-8: set socket timeout to 15000<br />
+[15:58:32:449] [DEBUG] - MainClientExec - Executing request POST /sendSMS.action HTTP/1.1<br />
+[15:58:32:450] [DEBUG] - MainClientExec - Target auth state: UNCHALLENGED<br />
+[15:58:32:450] [DEBUG] - MainClientExec - Proxy auth state: UNCHALLENGED<br />
+------------------wire：报文-----------------<br />
+[15:58:32:535] [DEBUG] - MainClientExec - Connection can be kept alive for 120000 MILLISECONDS<br />
+[15:58:32:537] [DEBUG] - ResponseProcessCookies - Cookie accepted [JSESSIONID=&quot;F4D16499EC498F5EB1E92AFF87E64FDE.smswayjvm1&quot;, version:0, domain:ems.smsway.com.cn, path:/, expiry:null]<br />
+[15:58:34:551] [DEBUG] - PoolingHttpClientConnectionManager - Connection [id: 8][route: {}-&gt;http://ems.smsway.com.cn:80] can be kept alive for 120.0 seconds<br />
+[15:58:34:553] [DEBUG] - PoolingHttpClientConnectionManager - Connection released: [id: 8][route: {}-&gt;http://ems.smsway.com.cn:80][total kept alive: 1; route allocated: 1 of 200; total allocated: 1 of 1000]</p>
+
+<h3>发送成功三：</h3>
+
+<p>一开始以为是<em>[read] I/O error: Connection reset 引起的错误，可是这里也出现了，但是还是发送成功。下划线部分似乎没影响。</em></p>
+
+<p>[17:41:14:265] [DEBUG] - RequestAddCookies - CookieSpec selected: default<br />
+[17:41:14:266] [DEBUG] - RequestAuthCache - Auth cache not set in the context<br />
+[17:41:14:267] [DEBUG] - PoolingHttpClientConnectionManager - Connection request: [route: {}-&gt;http://ems.smsway.com.cn:80][total kept alive: 1; route allocated: 1 of 200; total allocated: 1 of 1000]</p>
+
+<p><u><em>[17:41:14:269] [DEBUG] - wire - http-outgoing-17 &lt;&lt; &quot;[read] I/O error: Connection reset&quot;<br />
+[17:41:14:270] [DEBUG] - DefaultManagedHttpClientConnection - http-outgoing-17: Close connection</em></u></p>
+
+<p>[17:41:14:271] [DEBUG] - PoolingHttpClientConnectionManager - Connection leased: [id: 18][route: {}-&gt;http://ems.smsway.com.cn:80][total kept alive: 0; route allocated: 1 of 200; total allocated: 1 of 1000]<br />
+[17:41:14:272] [DEBUG] - MainClientExec - Opening connection {}-&gt;http://ems.smsway.com.cn:80<br />
+[17:41:14:330] [DEBUG] - DefaultHttpClientConnectionOperator - Connecting to ems.smsway.com.cn/121.201.38.146:80<br />
+[17:41:14:386] [DEBUG] - DefaultHttpClientConnectionOperator - Connection established 210.28.216.100:56510&lt;-&gt;121.201.38.146:80</p>
+
+<p>[17:41:14:387] [DEBUG] - DefaultManagedHttpClientConnection - http-outgoing-18: set socket timeout to 15000<br />
+[17:41:14:388] [DEBUG] - MainClientExec - Executing request POST /sendSMS.action HTTP/1.1<br />
+[17:41:14:389] [DEBUG] - MainClientExec - Target auth state: UNCHALLENGED<br />
+[17:41:14:391] [DEBUG] - MainClientExec - Proxy auth state: UNCHALLENGED<br />
+------------------wire：报文-----------------<br />
+[17:41:14:483] [DEBUG] - MainClientExec - Connection can be kept alive for 120000 MILLISECONDS<br />
+[17:41:14:485] [DEBUG] - ResponseProcessCookies - Cookie accepted [JSESSIONID=&quot;EF568233E6E7D7CBDF0E69D3F7DE77E5.smswayjvm1&quot;, version:0, domain:ems.smsway.com.cn, path:/, expiry:null]<br />
+[15:58:34:551] [DEBUG] - PoolingHttpClientConnectionManager - Connection [id: 8][route: {}-&gt;http://ems.smsway.com.cn:80] can be kept alive for 120.0 seconds<br />
+[15:58:34:553] [DEBUG] - PoolingHttpClientConnectionManager - Connection released: [id: 8][route: {}-&gt;http://ems.smsway.com.cn:80][total kept alive: 1; route allocated: 1 of 200; total allocated: 1 of 1000]</p>
+
+<h3>发送成功四：</h3>
+
+<p>一开始以为是<em>&nbsp;CPool - Connection</em> <em>引起的错误，可是这里也出现了，但是还是发送成功。下划线部分似乎没影响。</em></p>
+
+<p>[20:07:32:898] [DEBUG] - RequestAddCookies - CookieSpec selected: default<br />
+[20:07:32:898] [DEBUG] - RequestAuthCache - Auth cache not set in the context<br />
+[20:07:32:898] [DEBUG] - PoolingHttpClientConnectionManager - Connection request: [route: {}-&gt;http://ems.smsway.com.cn:80][total kept alive: 1; route allocated: 1 of 200; total allocated: 1 of 1000]</p>
+
+<p><u><em>[20:07:32:898] [DEBUG] - CPool - Connection [id:37][route:{}-&gt;http://ems.smsway.com.cn:80][state:null] expired @ Wed Jan 31 20:04:41 CST 2018<br />
+[20:07:32:898] [DEBUG] - DefaultManagedHttpClientConnection - http-outgoing-37: Close connection</em></u></p>
+
+<p>[20:07:32:898] [DEBUG] - PoolingHttpClientConnectionManager - Connection leased: [id: 38][route: {}-&gt;http://ems.smsway.com.cn:80][total kept alive: 0; route allocated: 1 of 200; total allocated: 1 of 1000]<br />
+[20:07:32:898] [DEBUG] - MainClientExec - Opening connection {}-&gt;http://ems.smsway.com.cn:80<br />
+[20:07:32:919] [DEBUG] - DefaultHttpClientConnectionOperator - Connecting to ems.smsway.com.cn/121.201.38.146:80<br />
+[20:07:32:965] [DEBUG] - DefaultHttpClientConnectionOperator - Connection established 210.28.216.100:60888&lt;-&gt;121.201.38.146:80</p>
+
+<p>[20:07:32:965] [DEBUG] - DefaultManagedHttpClientConnection - http-outgoing-38: set socket timeout to 15000<br />
+[20:07:32:965] [DEBUG] - MainClientExec - Executing request POST /sendSMS.action HTTP/1.1<br />
+[20:07:32:965] [DEBUG] - MainClientExec - Target auth state: UNCHALLENGED<br />
+[20:07:32:965] [DEBUG] - MainClientExec - Proxy auth state: UNCHALLENGED<br />
+------------------wire：报文-----------------<br />
+[20:07:33:019] [DEBUG] - MainClientExec - Connection can be kept alive for 120000 MILLISECONDS<br />
+[20:07:33:019] [DEBUG] - ResponseProcessCookies - Cookie accepted [JSESSIONID=&quot;DC6DFCB03F74AC8E1A52B035FE23CDC8.smswayjvm1&quot;, version:0, domain:ems.smsway.com.cn, path:/, expiry:null]<br />
+[20:07:33:020] [DEBUG] - PoolingHttpClientConnectionManager - Connection [id: 38][route: {}-&gt;http://ems.smsway.com.cn:80] can be kept alive for 120.0 seconds<br />
+[20:07:33:020] [DEBUG] - PoolingHttpClientConnectionManager - Connection released: [id: 38][route: {}-&gt;http://ems.smsway.com.cn:80][total kept alive: 1; route allocated: 1 of 200; total allocated: 1 of 1000]</p>
+
+<h3>发送报文体：</h3>
+
+<p>------------------wire：报文-----------------<br />
+[16:36:24:407] [DEBUG] - headers - http-outgoing-19 &gt;&gt; POST /sendSMS.action HTTP/1.1<br />
+[16:36:24:408] [DEBUG] - headers - http-outgoing-19 &gt;&gt; Content-Length: 454<br />
+[16:36:24:409] [DEBUG] - headers - http-outgoing-19 &gt;&gt; Content-Type: application/x-www-form-urlencoded<br />
+[16:36:24:410] [DEBUG] - headers - http-outgoing-19 &gt;&gt; Host: ems.smsway.com.cn<br />
+[16:36:24:411] [DEBUG] - headers - http-outgoing-19 &gt;&gt; Connection: Keep-Alive<br />
+[16:36:24:412] [DEBUG] - headers - http-outgoing-19 &gt;&gt; User-Agent: Apache-HttpClient/4.5.3 (Java/1.8.0_151)<br />
+[16:36:24:413] [DEBUG] - headers - http-outgoing-19 &gt;&gt; Accept-Encoding: gzip,deflate<br />
+[16:36:24:413] [DEBUG] - wire - http-outgoing-19 &gt;&gt; &quot;POST /sendSMS.action HTTP/1.1[\r][\n]&quot;<br />
+[16:36:24:414] [DEBUG] - wire - http-outgoing-19 &gt;&gt; &quot;Content-Length: 454[\r][\n]&quot;<br />
+[16:36:24:414] [DEBUG] - wire - http-outgoing-19 &gt;&gt; &quot;Content-Type: application/x-www-form-urlencoded[\r][\n]&quot;<br />
+[16:36:24:415] [DEBUG] - wire - http-outgoing-19 &gt;&gt; &quot;Host: ems.smsway.com.cn[\r][\n]&quot;<br />
+[16:36:24:415] [DEBUG] - wire - http-outgoing-19 &gt;&gt; &quot;Connection: Keep-Alive[\r][\n]&quot;<br />
+[16:36:24:416] [DEBUG] - wire - http-outgoing-19 &gt;&gt; &quot;User-Agent: Apache-HttpClient/4.5.3 (Java/1.8.0_151)[\r][\n]&quot;<br />
+[16:36:24:417] [DEBUG] - wire - http-outgoing-19 &gt;&gt; &quot;Accept-Encoding: gzip,deflate[\r][\n]&quot;<br />
+[16:36:24:417] [DEBUG] - wire - http-outgoing-19 &gt;&gt; &quot;[\r][\n]&quot;<br />
+[16:36:24:418] [DEBUG] - wire - http-outgoing-19 &gt;&gt; &quot;enterpriseID=16413&amp;loginName=jsedu&amp;password=afdd74c9f3a6edd5bbd8757fd699dc83&amp;smsId=&amp;subPort=&amp;content=%E6%82%A8%E5%B7%B2%E6%88%90%E4%B8%BA%E6%95%99%E5%8A%A1%E5%B9%B3%E5%8F%B0%E7%94%A8%E6%88%B7%EF%BC%8C%E9%BB%98%E8%AE%A4%E5%AF%86%E7%A0%81%E4%B8%BA77636502%EF%BC%8C%E8%AF%B7%E8%AE%B0%E5%BD%95%E5%AF%86%E7%A0%81%EF%BC%8C%E5%B9%B6%E5%8F%8A%E6%97%B6%E7%99%BB%E5%BD%95%E5%B9%B3%E5%8F%B0%E4%BF%AE%E6%94%B9%E5%AF%86%E7%A0%81%E3%80%82&amp;mobiles=18756095356&amp;sendTime=&quot;<br />
+[16:36:24:472] [DEBUG] - wire - http-outgoing-19 &lt;&lt; &quot;HTTP/1.1 200 OK[\r][\n]&quot;<br />
+[16:36:24:473] [DEBUG] - wire - http-outgoing-19 &lt;&lt; &quot;Server: nginx[\r][\n]&quot;<br />
+[16:36:24:474] [DEBUG] - wire - http-outgoing-19 &lt;&lt; &quot;Date: Tue, 30 Jan 2018 08:36:25 GMT[\r][\n]&quot;<br />
+[16:36:24:475] [DEBUG] - wire - http-outgoing-19 &lt;&lt; &quot;Transfer-Encoding: chunked[\r][\n]&quot;<br />
+[16:36:24:476] [DEBUG] - wire - http-outgoing-19 &lt;&lt; &quot;Connection: keep-alive[\r][\n]&quot;<br />
+[16:36:24:477] [DEBUG] - wire - http-outgoing-19 &lt;&lt; &quot;Keep-Alive: timeout=120[\r][\n]&quot;<br />
+[16:36:24:479] [DEBUG] - wire - http-outgoing-19 &lt;&lt; &quot;Set-Cookie: JSESSIONID=68466A02E4A43FA7E039862006326623.smswayjvm1; Path=/[\r][\n]&quot;<br />
+[16:36:24:480] [DEBUG] - wire - http-outgoing-19 &lt;&lt; &quot;Content-Language: utf-8[\r][\n]&quot;<br />
+[16:36:24:481] [DEBUG] - wire - http-outgoing-19 &lt;&lt; &quot;[\r][\n]&quot;<br />
+[16:36:24:482] [DEBUG] - wire - http-outgoing-19 &lt;&lt; &quot;71[\r][\n]&quot;<br />
+[16:36:24:483] [DEBUG] - wire - http-outgoing-19 &lt;&lt; &quot;&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot;?&gt;[\n]&quot;<br />
+[16:36:24:483] [DEBUG] - wire - http-outgoing-19 &lt;&lt; &quot;&lt;Response&gt;&lt;Result&gt;0&lt;/Result&gt;&lt;SmsId&gt;31613031517301385927&lt;/SmsId&gt;&lt;/Response&gt;[\r][\n]&quot;<br />
+[16:36:24:484] [DEBUG] - wire - http-outgoing-19 &lt;&lt; &quot;0[\r][\n]&quot;<br />
+[16:36:24:484] [DEBUG] - wire - http-outgoing-19 &lt;&lt; &quot;[\r][\n]&quot;<br />
+[16:36:24:485] [DEBUG] - headers - http-outgoing-19 &lt;&lt; HTTP/1.1 200 OK<br />
+[16:36:24:486] [DEBUG] - headers - http-outgoing-19 &lt;&lt; Server: nginx<br />
+[16:36:24:486] [DEBUG] - headers - http-outgoing-19 &lt;&lt; Date: Tue, 30 Jan 2018 08:36:25 GMT<br />
+[16:36:24:486] [DEBUG] - headers - http-outgoing-19 &lt;&lt; Transfer-Encoding: chunked<br />
+[16:36:24:487] [DEBUG] - headers - http-outgoing-19 &lt;&lt; Connection: keep-alive<br />
+[16:36:24:487] [DEBUG] - headers - http-outgoing-19 &lt;&lt; Keep-Alive: timeout=120<br />
+[16:36:24:488] [DEBUG] - headers - http-outgoing-19 &lt;&lt; Set-Cookie: JSESSIONID=68466A02E4A43FA7E039862006326623.smswayjvm1; Path=/<br />
+[16:36:24:488] [DEBUG] - headers - http-outgoing-19 &lt;&lt; Content-Language: utf-8<br />
+------------------wire：报文-----------------</p>
+
+<h2>附件：失败的调试信息</h2>
+
+<h3>发送失败一：</h3>
+
+<p>[17:17:32:667] [DEBUG] - RequestAddCookies - CookieSpec selected: default<br />
+[17:17:32:669] [DEBUG] - RequestAuthCache - Auth cache not set in the context<br />
+[17:17:32:669] [DEBUG] - PoolingHttpClientConnectionManager - Connection request: [route: {}-&gt;http://ems.smsway.com.cn:80][total kept alive: 0; route allocated: 0 of 200; total allocated: 0 of 1000]</p>
+
+<p>[17:17:32:670] [DEBUG] - PoolingHttpClientConnectionManager - Connection leased: [id: 13][route: {}-&gt;http://ems.smsway.com.cn:80][total kept alive: 0; route allocated: 1 of 200; total allocated: 1 of 1000]</p>
+
+<p>[17:17:32:671] [DEBUG] - MainClientExec - Opening connection {}-&gt;http://ems.smsway.com.cn:80<br />
+[17:17:32:684] [DEBUG] - DefaultHttpClientConnectionOperator - Connecting to ems.smsway.com.cn/121.201.38.146:80<br />
+[17:17:47:697] [DEBUG] - DefaultManagedHttpClientConnection - http-outgoing-13: Shutdown connection<br />
+[17:17:47:699] [DEBUG] - MainClientExec - Connection discarded<br />
+[17:17:47:700] [DEBUG] - PoolingHttpClientConnectionManager - Connection released: [id: 13][route: {}-&gt;http://ems.smsway.com.cn:80][total kept alive: 0; route allocated: 0 of 200; total allocated: 0 of 1000]<br />
+[17:17:59:163] [ERROR] - HttpUtils - Connect to ems.smsway.com.cn:80 [ems.smsway.com.cn/121.201.38.146] failed: connect timed out</p>
+
+<h3>发送失败二：</h3>
+
+<p>[16:37:36:135] [DEBUG] - RequestAddCookies - CookieSpec selected: default<br />
+[16:37:36:136] [DEBUG] - RequestAuthCache - Auth cache not set in the context<br />
+[16:37:36:137] [DEBUG] - PoolingHttpClientConnectionManager - Connection request: [route: {}-&gt;http://ems.smsway.com.cn:80][total kept alive: 1; route allocated: 1 of 200; total allocated: 1 of 1000]</p>
+
+<p><u><em>[16:37:36:139] [DEBUG] - wire - http-outgoing-19 &lt;&lt; &quot;[read] I/O error: Connection reset&quot;<br />
+[16:37:36:140] [DEBUG] - DefaultManagedHttpClientConnection - http-outgoing-19: Close connection</em></u></p>
+
+<p>[16:37:36:142] [DEBUG] - PoolingHttpClientConnectionManager - Connection leased: [id: 20][route: {}-&gt;http://ems.smsway.com.cn:80][total kept alive: 0; route allocated: 1 of 200; total allocated: 1 of 1000]</p>
+
+<p>[16:37:36:143] [DEBUG] - MainClientExec - Opening connection {}-&gt;http://ems.smsway.com.cn:80<br />
+[16:37:36:149] [DEBUG] - DefaultHttpClientConnectionOperator - Connecting to ems.smsway.com.cn/121.201.38.146:80<br />
+[16:37:51:165] [DEBUG] - DefaultManagedHttpClientConnection - http-outgoing-20: Shutdown connection<br />
+[16:37:51:167] [DEBUG] - MainClientExec - Connection discarded<br />
+[16:37:51:169] [DEBUG] - PoolingHttpClientConnectionManager - Connection released: [id: 20][route: {}-&gt;http://ems.smsway.com.cn:80][total kept alive: 0; route allocated: 0 of 200; total allocated: 0 of 1000]<br />
+[16:37:51:172] [ERROR] - HttpUtils - Connect to ems.smsway.com.cn:80 [ems.smsway.com.cn/121.201.38.146] failed: connect timed out</p>
+
+<h3>发送失败三：</h3>
+
+<p>[16:08:43:936] [DEBUG] - RequestAddCookies - CookieSpec selected: default<br />
+[16:08:43:938] [DEBUG] - RequestAuthCache - Auth cache not set in the context<br />
+[16:08:43:939] [DEBUG] - PoolingHttpClientConnectionManager - Connection request: [route: {}-&gt;http://ems.smsway.com.cn:80][total kept alive: 1; route allocated: 1 of 200; total allocated: 1 of 1000]</p>
+
+<p><em><u>[16:08:43:941] [DEBUG] - CPool - Connection [id:8][route:{}-&gt;http://ems.smsway.com.cn:80][state:null] expired @ Wed Jan 31 16:00:34 CST 2018<br />
+[16:08:43:942] [DEBUG] - DefaultManagedHttpClientConnection - http-outgoing-8: Close connection</u></em></p>
+
+<p>[16:08:43:945] [DEBUG] - PoolingHttpClientConnectionManager - Connection leased: [id: 9][route: {}-&gt;http://ems.smsway.com.cn:80][total kept alive: 0; route allocated: 1 of 200; total allocated: 1 of 1000]</p>
+
+<p>[16:08:43:946] [DEBUG] - MainClientExec - Opening connection {}-&gt;http://ems.smsway.com.cn:80<br />
+[16:08:43:994] [DEBUG] - DefaultHttpClientConnectionOperator - Connecting to ems.smsway.com.cn/121.201.38.146:80<br />
+[16:08:58:998] [DEBUG] - DefaultManagedHttpClientConnection - http-outgoing-9: Shutdown connection<br />
+[16:08:58:999] [DEBUG] - MainClientExec - Connection discarded<br />
+[16:08:59:000] [DEBUG] - PoolingHttpClientConnectionManager - Connection released: [id: 9][route: {}-&gt;http://ems.smsway.com.cn:80][total kept alive: 0; route allocated: 0 of 200; total allocated: 0 of 1000]<br />
+[16:09:14:591] [ERROR] - HttpUtils - Connect to ems.smsway.com.cn:80 [ems.smsway.com.cn/121.201.38.146] failed: connect timed out</p>
+
+<h2>附件：出错时的执行过程信息：</h2>
+
+<p>小面标黑粗的是报错信息中的<strong>类名，方法名，和行号</strong>。调试的时候可以据此设置断点！</p>
+
+<p>[19:55:07:290] [ERROR] - HttpUtils - Connect to ems.smsway.com.cn:80 [ems.smsway.com.cn/121.201.38.146] failed: connect timed out<br />
+org.apache.http.conn.ConnectTimeoutException: Connect to ems.smsway.com.cn:80 [ems.smsway.com.cn/121.201.38.146] failed: connect timed out<br />
+&nbsp;&nbsp; &nbsp;at org.apache.http.impl.conn.<strong>DefaultHttpClientConnectionOperator</strong>.<strong>connect</strong>(DefaultHttpClientConnectionOperator.java:<strong>151</strong>) ~[httpclient-4.5.3.jar:4.5.3]<br />
+&nbsp;&nbsp; &nbsp;at org.apache.http.impl.conn.<strong>PoolingHttpClientConnectionManager</strong>.<strong>connect</strong>(PoolingHttpClientConnectionManager.java:<strong>359</strong>) ~[httpclient-4.5.3.jar:4.5.3]<br />
+&nbsp;&nbsp; &nbsp;at org.apache.http.impl.execchain.<strong>MainClientExec</strong>.<strong>establishRoute</strong>(MainClientExec.java:<strong>381</strong>) ~[httpclient-4.5.3.jar:4.5.3]<br />
+&nbsp;&nbsp; &nbsp;at org.apache.http.impl.execchain.MainClientExec.execute(MainClientExec.java:237) ~[httpclient-4.5.3.jar:4.5.3]<br />
+&nbsp;&nbsp; &nbsp;at org.apache.http.impl.execchain.ProtocolExec.execute(ProtocolExec.java:185) ~[httpclient-4.5.3.jar:4.5.3]<br />
+&nbsp;&nbsp; &nbsp;at org.apache.http.impl.execchain.RetryExec.execute(RetryExec.java:89) ~[httpclient-4.5.3.jar:4.5.3]<br />
+&nbsp;&nbsp; &nbsp;at org.apache.http.impl.execchain.RedirectExec.execute(RedirectExec.java:111) ~[httpclient-4.5.3.jar:4.5.3]<br />
+&nbsp;&nbsp; &nbsp;at org.apache.http.impl.client.InternalHttpClient.doExecute(InternalHttpClient.java:185) ~[httpclient-4.5.3.jar:4.5.3]<br />
+&nbsp;&nbsp; &nbsp;at org.apache.http.impl.client.CloseableHttpClient.execute(CloseableHttpClient.java:83) ~[httpclient-4.5.3.jar:4.5.3]<br />
+&nbsp;&nbsp; &nbsp;at org.apache.http.impl.client.CloseableHttpClient.execute(CloseableHttpClient.java:108) ~[httpclient-4.5.3.jar:4.5.3]<br />
+&nbsp;&nbsp; &nbsp;at com.wh.eas.manage.base.utils.HttpUtils.sendPost(HttpUtils.java:228) [classes/:?]<br />
+&nbsp;&nbsp; &nbsp;at com.wh.eas.manage.base.utils.HttpUtils.doPost(HttpUtils.java:187) [classes/:?]<br />
+&nbsp;&nbsp; &nbsp;at com.wh.eas.manage.base.utils.SMUtils.sendSM(SMUtils.java:46) [classes/:?]<br />
+&nbsp;&nbsp; &nbsp;at com.wh.eas.manage.controller.sys.SchoolUsersController.saveSchoolUser(SchoolUsersController.java:157) [classes/:?]<br />
+&nbsp;</p>
+
+<p>&nbsp;</p>

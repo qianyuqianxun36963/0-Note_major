@@ -1,0 +1,675 @@
+<h1>一次SocketException：Connection reset 异常排查</h1>
+
+<h2>问题描述</h2>
+
+<p>上一期的需求上线之后，线上多了一个异常：Connection reset。如下：</p>
+
+<pre>
+<code>[2017-03-22 00:45:00 ERROR] [creativeAuditTaskScheduler_Worker-9] (cn.com.ServiceImpl:169) - getAuditResult exception, call adx api failed. msg:I/O error on GET request for &quot;https://biz/getAuditInfo?dspId=13&quot;:Connection reset; nested exception is java.net.SocketException: Connection reset
+org.springframework.web.client.ResourceAccessException: I/O error on GET request for &quot;https://biz/getAuditInfo?dspId=13&quot;:Connection reset; nested exception is java.net.SocketException: Connection reset
+    at org.springframework.web.client.RestTemplate.doExecute(RestTemplate.java:558)
+    at org.springframework.web.client.RestTemplate.execute(RestTemplate.java:511)
+    at org.springframework.web.client.RestTemplate.getForObject(RestTemplate.java:248)
+    at cn.com.ServiceImpl.java:136)
+    at sun.reflect.GeneratedMethodAccessor66.invoke(Unknown Source)
+    at sun.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43)
+    at java.lang.reflect.Method.invoke(Method.java:606)
+    at org.springframework.aop.support.AopUtils.invokeJoinpointUsingReflection(AopUtils.java:317)
+    at org.springframework.aop.framework.ReflectiveMethodInvocation.invokeJoinpoint(ReflectiveMethodInvocation.java:190)
+    at org.springframework.aop.framework.ReflectiveMethodInvocation.proceed(ReflectiveMethodInvocation.java:157)
+    at org.springframework.transaction.interceptor.TransactionInterceptor$1.proceedWithInvocation(TransactionInterceptor.java:98)
+    at org.springframework.transaction.interceptor.TransactionAspectSupport.invokeWithinTransaction(TransactionAspectSupport.java:262)
+    at org.springframework.transaction.interceptor.TransactionInterceptor.invoke(TransactionInterceptor.java:95)
+    at org.springframework.aop.framework.ReflectiveMethodInvocation.proceed(ReflectiveMethodInvocation.java:179)
+    at org.springframework.aop.framework.JdkDynamicAopProxy.invoke(JdkDynamicAopProxy.java:207)
+    at com.sun.proxy.$Proxy28.getAuditResult(Unknown Source)
+    at cn.com.QueryAuditResultTask.queryAuditResult(QueryAuditResultTask.java:117)
+    at cn.com.QueryAuditResultTask.execute(QueryAuditResultTask.java:88)
+    at org.quartz.core.JobRunShell.run(JobRunShell.java:202)
+    at org.quartz.simpl.SimpleThreadPool$WorkerThread.run(SimpleThreadPool.java:573)
+Caused by: java.net.SocketException: Connection reset
+    at java.net.SocketInputStream.read(SocketInputStream.java:196)
+    at java.net.SocketInputStream.read(SocketInputStream.java:122)
+    at sun.security.ssl.InputRecord.readFully(InputRecord.java:442)
+    at sun.security.ssl.InputRecord.read(InputRecord.java:480)
+    at sun.security.ssl.SSLSocketImpl.readRecord(SSLSocketImpl.java:927)
+    at sun.security.ssl.SSLSocketImpl.readDataRecord(SSLSocketImpl.java:884)
+    at sun.security.ssl.AppInputStream.read(AppInputStream.java:102)
+    at org.apache.http.impl.conn.LoggingInputStream.read(LoggingInputStream.java:87)
+    at org.apache.http.impl.io.SessionInputBufferImpl.streamRead(SessionInputBufferImpl.java:139)
+    at org.apache.http.impl.io.SessionInputBufferImpl.fillBuffer(SessionInputBufferImpl.java:155)
+    at org.apache.http.impl.io.SessionInputBufferImpl.readLine(SessionInputBufferImpl.java:284)
+    at org.apache.http.impl.conn.DefaultHttpResponseParser.parseHead(DefaultHttpResponseParser.java:140)
+    at org.apache.http.impl.conn.DefaultHttpResponseParser.parseHead(DefaultHttpResponseParser.java:57)
+    at org.apache.http.impl.io.AbstractMessageParser.parse(AbstractMessageParser.java:261)
+    at org.apache.http.impl.DefaultBHttpClientConnection.receiveResponseHeader(DefaultBHttpClientConnection.java:165)
+    at org.apache.http.impl.conn.CPoolProxy.receiveResponseHeader(CPoolProxy.java:167)
+    at org.apache.http.protocol.HttpRequestExecutor.doReceiveResponse(HttpRequestExecutor.java:272)
+    at org.apache.http.protocol.HttpRequestExecutor.execute(HttpRequestExecutor.java:124)
+    at org.apache.http.impl.execchain.MainClientExec.execute(MainClientExec.java:271)
+    at org.apache.http.impl.execchain.ProtocolExec.execute(ProtocolExec.java:184)
+    at org.apache.http.impl.execchain.RetryExec.execute(RetryExec.java:88)
+    at org.apache.http.impl.execchain.RedirectExec.execute(RedirectExec.java:110)
+    at org.apache.http.impl.client.InternalHttpClient.doExecute(InternalHttpClient.java:184)
+    at org.apache.http.impl.client.CloseableHttpClient.execute(CloseableHttpClient.java:82)
+    at org.springframework.http.client.HttpComponentsClientHttpRequest.executeInternal(HttpComponentsClientHttpRequest.java:87)
+    at org.springframework.http.client.AbstractBufferingClientHttpRequest.executeInternal(AbstractBufferingClientHttpRequest.java:48)
+    at org.springframework.http.client.AbstractClientHttpRequest.execute(AbstractClientHttpRequest.java:52)
+    at org.springframework.web.client.RestTemplate.doExecute(RestTemplate.java:542)
+    ... 19 more</code></pre>
+
+<p>这里使用Spring RestTemplate调外部接口查询结果。Spring RestTemplate 配置如下：</p>
+
+<pre>
+<code>    &lt;bean id=&quot;ky.pollingConnectionManager&quot; class=&quot;org.apache.http.impl.conn.PoolingHttpClientConnectionManager&quot;&gt;
+        &lt;!--整个连接池的并发--&gt;
+        &lt;property name=&quot;maxTotal&quot; value=&quot;1000&quot; /&gt;
+        &lt;!--每个路由的并发--&gt;
+        &lt;property name=&quot;defaultMaxPerRoute&quot; value=&quot;32&quot; /&gt;
+    &lt;/bean&gt;
+
+    &lt;bean id=&quot;ky.httpClientBuilder&quot; class=&quot;org.apache.http.impl.client.HttpClientBuilder&quot; factory-method=&quot;create&quot;&gt;
+        &lt;property name=&quot;connectionManager&quot; ref=&quot;ky.pollingConnectionManager&quot; /&gt;
+        &lt;!--开启重试--&gt;
+        &lt;property name=&quot;retryHandler&quot;&gt;
+        &lt;!--新加的异常处理，只处理ConnectTimeoutException和UnknownHostException异常--&gt;
+        &lt;!--上一版本使用的是org.apache.http.impl.client.DefaultHttpRequestRetryHandler--&gt;
+        &lt;!--默认处理InterruptedIOException、UnknownHostException、ConnectException、SSLException 4种异常--&gt;
+            &lt;bean class=&quot;cn.com.autodx.common.http.CustomRequestRetryHandler&quot;&gt;
+                &lt;constructor-arg value=&quot;3&quot;/&gt;
+                &lt;constructor-arg value=&quot;true&quot;/&gt;
+                &lt;constructor-arg value=&quot;200&quot;/&gt;
+            &lt;/bean&gt;
+        &lt;/property&gt;
+        &lt;!--开启keep-Alive--&gt;
+        &lt;property name=&quot;keepAliveStrategy&quot;&gt;
+            &lt;bean class=&quot;org.apache.http.impl.client.DefaultConnectionKeepAliveStrategy&quot; /&gt;
+        &lt;/property&gt;
+        &lt;property name=&quot;defaultHeaders&quot;&gt;
+            &lt;list&gt;
+                &lt;bean class=&quot;org.apache.http.message.BasicHeader&quot;&gt;
+                    &lt;constructor-arg value=&quot;User-Agent&quot;/&gt;
+                    &lt;constructor-arg value=&quot;Mozilla/5.0 (Windows NT 6.1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/31.0.1650.16 Safari/537.36&quot;/&gt;
+                &lt;/bean&gt;
+                &lt;bean class=&quot;org.apache.http.message.BasicHeader&quot;&gt;
+                    &lt;constructor-arg value=&quot;Accept-Encoding&quot;/&gt;
+                    &lt;constructor-arg value=&quot;gzip,deflate&quot;/&gt;
+                &lt;/bean&gt;
+                &lt;bean class=&quot;org.apache.http.message.BasicHeader&quot;&gt;
+                    &lt;constructor-arg value=&quot;Accept-Language&quot;/&gt;
+                    &lt;constructor-arg value=&quot;zh-CN&quot;/&gt;
+                &lt;/bean&gt;
+                &lt;bean class=&quot;org.apache.http.message.BasicHeader&quot;&gt;
+                    &lt;constructor-arg value=&quot;Connection&quot;/&gt;
+                    &lt;constructor-arg value=&quot;keep-alive&quot;/&gt;
+                &lt;/bean&gt;
+            &lt;/list&gt;
+        &lt;/property&gt;
+    &lt;/bean&gt;
+
+    &lt;bean id=&quot;ky.httpClient&quot; factory-bean=&quot;ky.httpClientBuilder&quot; factory-method=&quot;build&quot; /&gt;
+
+    &lt;bean id=&quot;ky.clientHttpRequestFactory&quot; class=&quot;org.springframework.http.client.HttpComponentsClientHttpRequestFactory&quot;&gt;
+        &lt;constructor-arg ref=&quot;ky.httpClient&quot;/&gt;
+        &lt;!--连接超时时间，毫秒--&gt;
+        &lt;property name=&quot;connectTimeout&quot; value=&quot;2000&quot;/&gt;
+        &lt;!--读写超时时间，毫秒--&gt;
+        &lt;property name=&quot;readTimeout&quot; value=&quot;5000&quot;/&gt;
+    &lt;/bean&gt;
+
+    &lt;bean id=&quot;restTemplate&quot; class=&quot;org.springframework.web.client.RestTemplate&quot;&gt;
+        &lt;constructor-arg ref=&quot;ky.clientHttpRequestFactory&quot;/&gt;
+        &lt;property name=&quot;errorHandler&quot;&gt;
+            &lt;bean class=&quot;org.springframework.web.client.DefaultResponseErrorHandler&quot;/&gt;
+        &lt;/property&gt;
+        &lt;property name=&quot;messageConverters&quot;&gt;
+            &lt;list&gt;
+                &lt;bean class=&quot;org.springframework.http.converter.FormHttpMessageConverter&quot;/&gt;
+                &lt;bean class=&quot;cn.com.autodx.common.jsonView.ViewAwareJsonMessageConverter&quot;/&gt;
+                &lt;bean class=&quot;org.springframework.http.converter.StringHttpMessageConverter&quot;&gt;
+                    &lt;property name=&quot;supportedMediaTypes&quot;&gt;
+                        &lt;list&gt;
+                            &lt;value&gt;text/html;charset=UTF-8&lt;/value&gt;
+                            &lt;value&gt;application/json&lt;/value&gt;
+                        &lt;/list&gt;
+                    &lt;/property&gt;
+                &lt;/bean&gt;
+            &lt;/list&gt;
+        &lt;/property&gt;
+    &lt;/bean&gt;</code></pre>
+
+<p>本次需求，并没有修改逻辑，为什么会出现这种情况呢？只是网络关系，还是跟代码有关呢。我有几个疑问：</p>
+
+<ol>
+	<li>什么情况下会产生Connection reset？</li>
+	<li>长连接中，向server发请求，是先发送数据的，如果连接断开，应该是写数据异常，为什么是读数据异常呢？请求是否发送成功？发送之前有校验连接是否可用吗？</li>
+	<li>http连接池defaultMaxPerRoute什么意思？每个并发都建立一个长连接吗？</li>
+	<li>Connection reset之后，如何重新建立连接，继而继续进行业务交互？</li>
+	<li>RestTemplate中配置了重试，为什么没有重新发起连接？</li>
+</ol>
+
+<p>我们便来解答上面的问题。</p>
+
+<h3>问题1，什么情况下会产生Connection reset？</h3>
+
+<p>网上搜一下，很多这样的打包附送的答案，如下：</p>
+
+<blockquote>
+<p>第1个异常是java.net.BindException:Address already in use: JVM_Bind。该异常发生在服务器端进行new ServerSocket(port)（port是一个0，65536的整型值）操作时。异常的原因是以为与port一样的一个端口已经被启动，并进行监听。此时用netstat &ndash;an命令，可以看到一个Listending状态的端口。只需要找一个没有被占用的端口就能解决这个问题。</p>
+</blockquote>
+
+<blockquote>
+<p>第2个异常是java.net.ConnectException: Connection refused: connect。该异常发生在客户端进行new Socket(ip, port)操作时，该异常发生的原因是或者具有ip地址的机器不能找到（也就是说从当前机器不存在到指定ip路由），或者是该ip存在，但找不到指定的端口进行监听。出现该问题，首先检查客户端的ip和port是否写错了，如果正确则从客户端ping一下服务器看是否能ping通，如果能ping通（服务服务器端把ping禁掉则需要另外的办法），则看在服务器端的监听指定端口的程序是否启动，这个肯定能解决这个问题。</p>
+</blockquote>
+
+<blockquote>
+<p>第3个异常是java.net.SocketException: Socket is closed，该异常在客户端和服务器均可能发生。异常的原因是己方主动关闭了连接后（调用了Socket的close方法）再对网络连接进行读写操作。</p>
+</blockquote>
+
+<blockquote>
+<p>第4个异常是java.net.SocketException: （Connection reset或者Connect reset by peer:Socket write error）。该异常在客户端和服务器端均有可能发生，引起该异常的原因有两个，第一个就是如果一端的Socket被关闭（或主动关闭或者因为异常退出而引起的关闭），另一端仍发送数据，发送的第一个数据包引发该异常(Connect reset by peer)。另一个是一端退出，但退出时并未关闭该连接，另一端如果在从连接中读数据则抛出该异常（Connection reset）。简单的说就是在连接断开后的读和写操作引起的。</p>
+</blockquote>
+
+<blockquote>
+<p>第5个异常是java.net.SocketException: Broken pipe。该异常在客户端和服务器均有可能发生。在第4个异常的第一种情况中（也就是抛出SocketExcepton:Connect reset by peer:Socket write error后），如果再继续写数据则抛出该异常。前两个异常的解决方法是首先确保程序退出前关闭所有的网络连接，其次是要检测对方的关闭连接操作，发现对方关闭连接后自己也要关闭该连接。</p>
+</blockquote>
+
+<p>这里我们关心的是第四个异常，即server已经关闭了连接，client仍然在从连接中读数据。</p>
+
+<h2>细节剖析</h2>
+
+<h4>正常流程（成功日志）剖析</h4>
+
+<p>接下来，先逐步debug，分析调用成功的日志。</p>
+
+<p>org.springframework.http.client.support.HttpAccessor.createRequest(URI url, HttpMethod method)</p>
+
+<pre>
+<code>(org.springframework.web.client.RestTemplate:?) - Created GET request for &quot;https://domainName/creative/getAuditInfo&quot;
+(org.springframework.web.client.RestTemplate:?) - Setting request Accept header to [application/json, application/*+json, text/html, application/json]
+(org.apache.http.client.protocol.RequestAddCookies:?) - CookieSpec selected: default
+(org.apache.http.client.protocol.RequestAuthCache:?) - Auth cache not set in the context</code></pre>
+
+<p>org.apache.http.impl.execchain.MainClientExec.execute</p>
+
+<h3>1. 获取ConnectionRequest connManager.requestConnection(route, userToken);</h3>
+
+<p>调用org.apache.http.impl.conn.PoolingHttpClientConnectionManager.requestConnection</p>
+
+<pre>
+<code>(org.apache.http.impl.conn.PoolingHttpClientConnectionManager:?) - Connection request: [route: {s}-&gt;https://domainName:443][total kept alive: 1; route allocated: 1 of 32; total allocated: 1 of 1000]</code></pre>
+
+<h3>2. 根据ConnectionRequest，获取HttpClientConnection</h3>
+
+<p>[调用 org.apache.http.impl.conn.PoolingHttpClientConnectionManager.leaseConnection]<br />
+获取连接后，校验连接不可用，则关闭连接connection。后面判断connection没有打开，就会重新建立连接</p>
+
+<pre>
+<code>(org.apache.http.wire:?) - http-outgoing-798 &lt;&lt; &quot;end of stream&quot; 
+ //isStale返回true     
+(org.apache.http.impl.conn.DefaultManagedHttpClientConnection:?) - http-outgoing-798: Close connection    
+(org.apache.http.impl.conn.PoolingHttpClientConnectionManager:?) - Connection leased: [id: 799][route: {s}-&gt;https://domainName:443][total kept alive: 0; route allocated: 1 of 32; total allocated: 1 of 1000]</code></pre>
+
+<h3>3. 如果managedConn没有打开, 则建立路由 establishRoute</h3>
+
+<pre>
+<code>(org.apache.http.impl.execchain.MainClientExec:?) - Opening connection {s}-&gt;https://domainName:443</code></pre>
+
+<p>1、调用 org.apache.http.impl.conn.PoolingHttpClientConnectionManager.connect<br />
+调用 org.apache.http.impl.conn.DefaultHttpClientConnectionOperator.connect 遍历地址集，新建socket，并与connection绑定，成功即返回。 以下是建立连接的过程</p>
+
+<pre>
+<code>(org.apache.http.impl.conn.DefaultHttpClientConnectionOperator:?) - Connecting to domainName/0.0.0.0:443</code></pre>
+
+<p>2、调用 sock = sf.connectSocket(connectTimeout, sock, host, remoteAddress, localAddress, context); //建立socket<br />
+conn.bind(sock); //绑定socket</p>
+
+<pre>
+<code>(org.apache.http.conn.ssl.SSLConnectionSocketFactory:?) - Connecting socket to domainName/0.0.0.0:443 with timeout 2000
+(org.apache.http.conn.ssl.SSLConnectionSocketFactory:?) - Enabled protocols: [TLSv1]
+(org.apache.http.conn.ssl.SSLConnectionSocketFactory:?) - Enabled cipher suites:[]  //session.getCipherSuite()</code></pre>
+
+<p>3、调用 org.apache.http.conn.ssl.SSLConnectionSocketFactory.connectSocket sslsock.startHandshake();</p>
+
+<pre>
+<code>(org.apache.http.conn.ssl.SSLConnectionSocketFactory:?) - Starting handshake</code></pre>
+
+<p>4、调用 org.apache.http.conn.ssl.SSLConnectionSocketFactory.connectSocket.verifyHostname(sslsock, host.getHostName()); session可用，打印信息</p>
+
+<pre>
+<code>(org.apache.http.conn.ssl.SSLConnectionSocketFactory:?) - Secure session established
+(org.apache.http.conn.ssl.SSLConnectionSocketFactory:?) -  negotiated protocol: TLSv1  
+(org.apache.http.conn.ssl.SSLConnectionSocketFactory:?) -  negotiated cipher suite: TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA
+(org.apache.http.conn.ssl.SSLConnectionSocketFactory:?) -  peer principal: CN=*.home.com.cn, OU=IT, O=&quot;Beijing Autohome Information Technology Co., Ltd.&quot;, L=Beijing, ST=Beijing, C=CN
+(org.apache.http.conn.ssl.SSLConnectionSocketFactory:?) -  issuer principal: CN=Symantec Class 3 Secure Server CA - G4, OU=Symantec Trust Network, O=Symantec Corporation, C=US</code>
+
+5、调用 org.apache.http.impl.conn.DefaultHttpClientConnectionOperator.connect</pre>
+
+<pre>
+<code>(org.apache.http.impl.conn.DefaultHttpClientConnectionOperator:?) - Connection established localhost:4357&lt;-&gt;0.0.0.0:443</code></pre>
+
+<ol>
+	<li>
+	<p>设置socket超时时间 managedConn.setSocketTimeout(timeout);</p>
+
+	<pre>
+<code>(org.apache.http.impl.conn.DefaultManagedHttpClientConnection:?) - http-outgoing-799: set socket timeout to 5000</code></pre>
+	</li>
+	<li>
+	<p>开始处理请求 根据request头部参数，作相应操作</p>
+
+	<pre>
+<code>(org.apache.http.impl.execchain.MainClientExec:?) - Executing request GET /creative/getAuditInfo HTTP/1.1
+(org.apache.http.impl.execchain.MainClientExec:?) - Target auth state: UNCHALLENGED
+(org.apache.http.impl.execchain.MainClientExec:?) - Proxy auth state: UNCHALLENGED</code></pre>
+	</li>
+	<li>
+	<p>处理请求 requestExecutor.execute(request, managedConn, context);<br />
+	调用：org.apache.http.protocol.HttpRequestExecutor.execute<br />
+	主要功能：</p>
+
+	<pre>
+<code>  HttpResponse response = doSendRequest(request, conn, context);
+  if (response == null) {
+  response = doReceiveResponse(request, conn, context);
+  }</code></pre>
+	</li>
+</ol>
+
+<h3>&nbsp;</h3>
+
+<h3>6、doSendRequest</h3>
+
+<p>1 发送请求头部</p>
+
+<p>调用org.apache.http.impl.DefaultBHttpClientConnection.sendRequestHeader （确保socket有效，然后向缓存写请求头部，写完后打印以下日志）</p>
+
+<pre>
+<code>(org.apache.http.headers:?) - http-outgoing-799 &gt;&gt; GET /creative/getAuditInfo HTTP/1.1
+(org.apache.http.headers:?) - http-outgoing-799 &gt;&gt; Accept: application/json, application/*+json, text/html, application/json
+(org.apache.http.headers:?) - http-outgoing-799 &gt;&gt; User-Agent: Mozilla/5.0 (Windows NT 6.1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/31.0.1650.16 Safari/537.36
+(org.apache.http.headers:?) - http-outgoing-799 &gt;&gt; Accept-Encoding: gzip,deflate
+(org.apache.http.headers:?) - http-outgoing-799 &gt;&gt; Accept-Language: zh-CN
+(org.apache.http.headers:?) - http-outgoing-799 &gt;&gt; Connection: keep-alive
+(org.apache.http.headers:?) - http-outgoing-799 &gt;&gt; Host: domainName</code></pre>
+
+<p>2 发送请求头部之后，如果请求带有entity，则继续发送entity，即conn.sendRequestEntity。这里对HTTP 1.0协议做了兼容判断</p>
+
+<p>3 通过connection将所有缓存数据发送到服务端,并记录日志如下： （headers和wire的日志稍有不同。）</p>
+
+<pre>
+<code>(org.apache.http.wire:?) - http-outgoing-799 &gt;&gt; &quot;GET /creative/getAuditInfo HTTP/1.1[\r][\n]&quot;
+(org.apache.http.wire:?) - http-outgoing-799 &gt;&gt; &quot;Accept: application/json, application/*+json, text/html, application/json[\r][\n]&quot;
+(org.apache.http.wire:?) - http-outgoing-799 &gt;&gt; &quot;User-Agent: Mozilla/5.0 (Windows NT 6.1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/31.0.1650.16 Safari/537.36[\r][\n]&quot;
+(org.apache.http.wire:?) - http-outgoing-799 &gt;&gt; &quot;Accept-Encoding: gzip,deflate[\r][\n]&quot;
+(org.apache.http.wire:?) - http-outgoing-799 &gt;&gt; &quot;Accept-Language: zh-CN[\r][\n]&quot;
+(org.apache.http.wire:?) - http-outgoing-799 &gt;&gt; &quot;Connection: keep-alive[\r][\n]&quot;
+(org.apache.http.wire:?) - http-outgoing-799 &gt;&gt; &quot;Host: domainName[\r][\n]&quot;
+(org.apache.http.wire:?) - http-outgoing-799 &gt;&gt; &quot;[\r][\n]&quot;</code></pre>
+
+<h3>7、&nbsp;doReceiveResponse 如果response为空，则接收服务端的响应</h3>
+
+<pre>
+<code> response = conn.receiveResponseHeader();
+ if (canResponseHaveBody(request, response)) {
+     conn.receiveResponseEntity(response);
+ }</code></pre>
+
+<h4>1 接收响应头 receiveResponseHeader</h4>
+
+<p>--- 读入数据，头部和数据体，第一次读取内容【这里数据包读了两次】 &lt;&lt; 表示接收数据，从输入流读入</p>
+
+<pre>
+<code>(org.apache.http.wire:?) - http-outgoing-799 &lt;&lt; &quot;HTTP/1.1 200 OK[\r][\n]&quot;
+(org.apache.http.wire:?) - http-outgoing-799 &lt;&lt; &quot;Server: 10.29[\r][\n]&quot;
+(org.apache.http.wire:?) - http-outgoing-799 &lt;&lt; &quot;Date: Wed, 22 Mar 2017 01:50:00 GMT[\r][\n]&quot;
+(org.apache.http.wire:?) - http-outgoing-799 &lt;&lt; &quot;Content-Type: application/json;charset=UTF-8[\r][\n]&quot;
+(org.apache.http.wire:?) - http-outgoing-799 &lt;&lt; &quot;Transfer-Encoding: chunked[\r][\n]&quot;
+(org.apache.http.wire:?) - http-outgoing-799 &lt;&lt; &quot;Connection: keep-alive[\r][\n]&quot;
+(org.apache.http.wire:?) - http-outgoing-799 &lt;&lt; &quot;Pragma: no-cache[\r][\n]&quot;
+(org.apache.http.wire:?) - http-outgoing-799 &lt;&lt; &quot;Cache-Control: no-cache, no-store, max-age=0[\r][\n]&quot;
+(org.apache.http.wire:?) - http-outgoing-799 &lt;&lt; &quot;Expires: Thu, 01 Jan 1970 00:00:00 GMT[\r][\n]&quot;
+(org.apache.http.wire:?) - http-outgoing-799 &lt;&lt; &quot;Content-Language: zh-CN[\r][\n]&quot;
+(org.apache.http.wire:?) - http-outgoing-799 &lt;&lt; &quot;[\r][\n]&quot;
+(org.apache.http.wire:?) - http-outgoing-799 &lt;&lt; &quot;6f7[\r][\n]&quot;
+(org.apache.http.wire:?) - http-outgoing-799 &lt;&lt; &quot;{&quot;data&quot;:{......... data1</code></pre>
+
+<p>--- 接收完之后，打印日志</p>
+
+<pre>
+<code>(org.apache.http.headers:?) - http-outgoing-799 &lt;&lt; HTTP/1.1 200 OK
+(org.apache.http.headers:?) - http-outgoing-799 &lt;&lt; Server: 10.29
+(org.apache.http.headers:?) - http-outgoing-799 &lt;&lt; Date: Wed, 22 Mar 2017 01:50:00 GMT
+(org.apache.http.headers:?) - http-outgoing-799 &lt;&lt; Content-Type: application/json;charset=UTF-8
+(org.apache.http.headers:?) - http-outgoing-799 &lt;&lt; Transfer-Encoding: chunked
+(org.apache.http.headers:?) - http-outgoing-799 &lt;&lt; Connection: keep-alive
+(org.apache.http.headers:?) - http-outgoing-799 &lt;&lt; Pragma: no-cache
+(org.apache.http.headers:?) - http-outgoing-799 &lt;&lt; Cache-Control: no-cache, no-store, max-age=0
+(org.apache.http.headers:?) - http-outgoing-799 &lt;&lt; Expires: Thu, 01 Jan 1970 00:00:00 GMT
+(org.apache.http.headers:?) - http-outgoing-799 &lt;&lt; Content-Language: zh-CN</code></pre>
+
+<h4>2 如果响应含有消息体，则接收消息体</h4>
+
+<ol>
+	<li>检查reuse策略和keepAlive策略，设置connection属性。 这里永久保留<br />
+	(org.apache.http.impl.execchain.MainClientExec:?) - Connection can be kept alive indefinitely</li>
+</ol>
+
+<h4>org.springframework.web.client.RestTemplate</h4>
+
+<ol>
+	<li>
+	<p>处理请求response = request.execute(); 日志如上<br />
+	2.如果响应没有出错，则打印以下日志</p>
+
+	<pre>
+<code>(org.springframework.web.client.RestTemplate:?) - GET request for &quot;https://domainName/creative/getAuditInfo?&quot; resulted in 200 (OK)</code></pre>
+	</li>
+	<li>
+	<p>读取扩展字段 extractData</p>
+	</li>
+</ol>
+
+<h4>3 使用HttpMessageConverter读取并解析数据、</h4>
+
+<p>1 调用org.springframework.http.converter.GenericHttpMessageConverter</p>
+
+<pre>
+<code>(org.springframework.web.client.RestTemplate:?) - Reading [java.lang.String] as &quot;application/json;charset=UTF-8&quot; using [cn.com.autodx.common.jsonView.ViewAwareJsonMessageConverter@56a00a64]</code></pre>
+
+<p>2 如果上一次的数据没有读全，这里会接着从输入流读取数据</p>
+
+<pre>
+<code>(org.apache.http.wire:?) - http-outgoing-799 &lt;&lt; &quot;......  data2&quot;
+(org.apache.http.wire:?) - http-outgoing-799 &lt;&lt; &quot;[\r][\n]&quot;
+(org.apache.http.wire:?) - http-outgoing-799 &lt;&lt; &quot;0[\r][\n]&quot;
+(org.apache.http.wire:?) - http-outgoing-799 &lt;&lt; &quot;[\r][\n]&quot;</code></pre>
+
+<p>3 数据读取完毕，就释放连接<br />
+调用org.apache.http.impl.conn.PoolingHttpClientConnectionManager.releaseConnection</p>
+
+<pre>
+<code>(org.apache.http.impl.conn.PoolingHttpClientConnectionManager:?) - Connection [id: 799][route: {s}-&gt;https://domainName:443] can be kept alive indefinitely
+(org.apache.http.impl.conn.PoolingHttpClientConnectionManager:?) - Connection released: [id: 799][route: {s}-&gt;https://domainName:443][total kept alive: 1; route allocated: 1 of 32; total allocated: 1 of 1000]</code></pre>
+
+<p>RestTemplate调用完毕</p>
+
+<pre>
+<code>(cn.com.autodx.creative.task.service.autohomeAdx.AutoHomeAdxServiceImpl:?) - getAuditResult .....</code></pre>
+
+<p>总结一下流程：</p>
+
+<ul>
+	<li>创建连接请求</li>
+	<li>根据连接请求的参数，从连接池中获取一个连接</li>
+	<li>如果连接没有打开，则创建一个底层的socket连接。</li>
+	<li>设置socket超时时间</li>
+	<li>发送请求头部（如果请求中带有entity，则发送）</li>
+	<li>接收响应（先接收头部，如果有主体，则接收）</li>
+	<li>读取扩展数据（使用HttpMessageConverter读取并解析数据，读取完成后，关闭输入流及释放连接池中的连接）</li>
+	<li>调用完毕，返回数据</li>
+</ul>
+
+<h2>本次异常日志剖析</h2>
+
+<p>接下来，查看失败日志：</p>
+
+<p>org.springframework.http.client.support.HttpAccessor.createRequest(URI url, HttpMethod method)</p>
+
+<pre>
+<code> (org.springframework.web.client.RestTemplate:?) - Created GET request for &quot;https://domain/creative/getAuditInfo&quot;
+ (org.springframework.web.client.RestTemplate:?) - Setting request Accept header to [application/json, application/*+json, text/html, application/json]
+ (org.apache.http.client.protocol.RequestAddCookies:?) - CookieSpec selected: default
+ (org.apache.http.client.protocol.RequestAuthCache:?) - Auth cache not set in the context</code></pre>
+
+<p>org.apache.http.impl.execchain.MainClientExec.execute</p>
+
+<ol>
+	<li>
+	<p>获取ConnectionRequest connManager.requestConnection(route, userToken);<br />
+	调用org.apache.http.impl.conn.PoolingHttpClientConnectionManager.requestConnection</p>
+
+	<pre>
+<code> (org.apache.http.impl.conn.PoolingHttpClientConnectionManager:?) - Connection request: [route: {s}-&gt;https://domain:443][total kept alive: 1; route allocated: 1 of 32; total allocated: 1 of 1000]</code></pre>
+	</li>
+</ol>
+
+<p>2.根据ConnectionRequest，获取HttpClientConnection<br />
+调用 org.apache.http.impl.conn.PoolingHttpClientConnectionManager.leaseConnection<br />
+其间获取entry时，校验connection().isStale()。</p>
+
+<pre>
+<code>    public boolean isStale() {
+        if (!isOpen()) {
+            return true;
+        }
+        try {
+            //如果测试结果返回-1说明不可用
+            final int bytesRead = fillInputBuffer(1);
+            return bytesRead &lt; 0;
+        } catch (final SocketTimeoutException ex) {
+            //注意这里SocketTimeoutException时，认为是可用的
+            return false;
+        } catch (final IOException ex) {
+            //有I/O异常，不可用
+            return true;
+        }
+    }</code></pre>
+
+<p>这里读超时，返回连接可用。于是后面，就没有关闭连接。也就没有重新建立新连接。具体参见<a href="http://www.cnblogs.com/shoren/p/httpclient-leaseConnection.html">这篇文章</a>。</p>
+
+<pre>
+<code> (org.apache.http.wire:?) - http-outgoing-766 &lt;&lt; &quot;[read] I/O error: Read timed out&quot;
+ (org.apache.http.impl.conn.PoolingHttpClientConnectionManager:?) - Connection leased: [id: 766][route: {s}-&gt;https://domain:443][total kept alive: 0; route allocated: 1 of 32; total allocated: 1 of 1000]</code></pre>
+
+<p>设置socket超时时间 managedConn.setSocketTimeout(timeout);</p>
+
+<pre>
+<code> (org.apache.http.impl.conn.DefaultManagedHttpClientConnection:?) - http-outgoing-766: set socket timeout to 5000</code></pre>
+
+<p>处理请求，并发送请求数据。处理过程同成功日志中的流程。</p>
+
+<pre>
+<code> (org.apache.http.impl.execchain.MainClientExec:?) - Executing request GET /creative/getAuditInfo HTTP/1.1
+ (org.apache.http.impl.execchain.MainClientExec:?) - Target auth state: UNCHALLENGED
+ (org.apache.http.impl.execchain.MainClientExec:?) - Proxy auth state: UNCHALLENGED
+ (org.apache.http.headers:?) - http-outgoing-766 &gt;&gt; GET /creative/getAuditInfo HTTP/1.1
+ (org.apache.http.headers:?) - http-outgoing-766 &gt;&gt; Accept: application/json, application/*+json, text/html, application/json
+ (org.apache.http.headers:?) - http-outgoing-766 &gt;&gt; User-Agent: Mozilla/5.0 (Windows NT 6.1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/31.0.1650.16 Safari/537.36
+ (org.apache.http.headers:?) - http-outgoing-766 &gt;&gt; Accept-Encoding: gzip,deflate
+ (org.apache.http.headers:?) - http-outgoing-766 &gt;&gt; Accept-Language: zh-CN
+ (org.apache.http.headers:?) - http-outgoing-766 &gt;&gt; Connection: keep-alive
+ (org.apache.http.headers:?) - http-outgoing-766 &gt;&gt; Host: domain
+ (org.apache.http.wire:?) - http-outgoing-766 &gt;&gt; &quot;GET /creative/getAuditInfo HTTP/1.1[\r][\n]&quot;
+ (org.apache.http.wire:?) - http-outgoing-766 &gt;&gt; &quot;Accept: application/json, application/*+json, text/html, application/json[\r][\n]&quot;
+ (org.apache.http.wire:?) - http-outgoing-766 &gt;&gt; &quot;User-Agent: Mozilla/5.0 (Windows NT 6.1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/31.0.1650.16 Safari/537.36[\r][\n]&quot;
+ (org.apache.http.wire:?) - http-outgoing-766 &gt;&gt; &quot;Accept-Encoding: gzip,deflate[\r][\n]&quot;
+ (org.apache.http.wire:?) - http-outgoing-766 &gt;&gt; &quot;Accept-Language: zh-CN[\r][\n]&quot;
+ (org.apache.http.wire:?) - http-outgoing-766 &gt;&gt; &quot;Connection: keep-alive[\r][\n]&quot;
+ (org.apache.http.wire:?) - http-outgoing-766 &gt;&gt; &quot;Host: domain[\r][\n]&quot;
+ (org.apache.http.wire:?) - http-outgoing-766 &gt;&gt; &quot;[\r][\n]&quot;</code></pre>
+
+<p>接收相应数据时，出现I/O异常，关闭连接，并向上抛出异常。</p>
+
+<pre>
+<code> (org.apache.http.wire:?) - http-outgoing-766 &lt;&lt; &quot;[read] I/O error: Connection reset&quot;
+ (org.apache.http.impl.conn.DefaultManagedHttpClientConnection:?) - http-outgoing-766: Close connection
+ (org.apache.http.impl.conn.DefaultManagedHttpClientConnection:?) - http-outgoing-766: Shutdown connection
+ (org.apache.http.impl.execchain.MainClientExec:?) - Connection discarded
+ (org.apache.http.impl.conn.PoolingHttpClientConnectionManager:?) - Connection released: [id: 766][route: {s}-&gt;https://domain:443][total kept alive: 0; route allocated: 0 of 32; total allocated: 0 of 1000]
+ (cn.com.autodx.creative.task.service.autohomeAdx.AutoHomeAdxServiceImpl:169) - getAuditResult exception, call adx api failed. msg:I/O error on GET request for &quot;https://domain/creative/getAuditInfo&quot;:Connection reset; nested exception is java.net.SocketException: Connection reset</code></pre>
+
+<p>对比失败与成功的日志，发现问题在于获取connection的时候，校验connection是否可用的操作上。此时服务器因为不可知的原因断开了连接（服务端不可以向客户端发数据），这里应该是没有按照正常流程进行四次挥手，所以客户端还保持着连接（可以向服务端发数据，但收不到数据）。测试连接时，客户端读超时（必然的），但此时认为连接可用，实际上不可用（不知道这里是不是认为给的1ms探测时间太短了，允许读超时？），然后就没有重新建立连接。将错误操作延迟到读取请求这一步。</p>
+
+<p>现在可以回答前面的问题</p>
+
+<ul>
+	<li>
+	<p>长连接中，向server发请求，是先发送数据的，如果连接断开，应该是写数据异常，为什么是读数据异常呢？请求是否发送成功？发送之前有校验连接是否可用吗？<br />
+	本次异常发生在发送完请求，读取response的时候，所以是read异常。既然服务端连接断掉，请求应该是没有发送成功。发送之前有检查连接是否可用，然而检查认为连接可用。</p>
+	</li>
+	<li>http连接池defaultMaxPerRoute什么意思？每个并发都建立一个长连接吗？<br />
+	为每一个路由建立一个连接池，连接数最大为defaultMaxPerRoute。每一个连接都是一个socket连接。如果配置为长连接，则是长连接。</li>
+	<li>Connection reset之后，如何重新建立连接，继而继续进行业务交互？<br />
+	上面的分析，connection reset之后，把有问题的连接关闭掉了，所以，后面不会再使用这个连接，只要重试，一般是可以成功的。</li>
+	<li>
+	<p>RestTemplate中配置了重试，为什么没有重新发起连接？<br />
+	在org.apache.http.impl.execchain.RetryExec的execute（调用MainClientExec的execute，但是被RestTemplate的doExecute调用）中，有如下重试处理：</p>
+	</li>
+</ul>
+
+<pre>
+<code>    public CloseableHttpResponse execute(final HttpRoute route,
+            final HttpRequestWrapper request, final HttpClientContext context,
+            final HttpExecutionAware execAware) throws IOException, HttpException {
+        ......
+
+        //不停重试，停下的判断在retryHandler.retryRequest
+        for (int execCount = 1;; execCount++) {
+            try {
+                //执行操作
+                return this.requestExecutor.execute(route, request, context, execAware);
+            } catch (final IOException ex) {
+                ......
+
+                //判断是否符合重试的条件   
+                if (retryHandler.retryRequest(ex, execCount, context)) {
+                    //重试的话就打印日志
+                    if (this.log.isInfoEnabled()) {
+                        this.log.info(&quot;I/O exception (&quot;+ ex.getClass().getName() +
+                                &quot;) caught when processing request to &quot;
+                                + route + &quot;: &quot; + ex.getMessage());
+                    }
+                    //是否可以重试
+                    if (!RequestEntityProxy.isRepeatable(request)) {
+                        this.log.debug(&quot;Cannot retry non-repeatable request&quot;);
+                        throw new NonRepeatableRequestException(&quot;Cannot retry request &quot; +
+                                &quot;with a non-repeatable request entity&quot;, ex);
+                    }
+                    request.setHeaders(origheaders);
+                } else {
+                    //不符合重试条件，就抛出异常
+                    if (ex instanceof NoHttpResponseException) {
+                        final NoHttpResponseException updatedex = new NoHttpResponseException(
+                                route.getTargetHost().toHostString() + &quot; failed to respond&quot;);
+                        updatedex.setStackTrace(ex.getStackTrace());
+                        throw updatedex;
+                    } else {
+                        throw ex;
+                    }
+                }
+            }
+        }
+    }</code></pre>
+
+<p>上一个版本中，没有connection reset的Error日志，这一个版本就有了。如果说新版本上线之后网络才有问题，可能性小。所以，以前和现在都会偶尔有网络问题产生。<br />
+如果之前版本有网络问题，为什么没有Error日志呢？是否有重试呢？是否通过重试补救了呢？<br />
+查看一下以前的info日志，发现的确有重试，也的确补救成功(没有类似的Connection reset报出)。</p>
+
+<pre>
+<code>//3.11
+(org.apache.http.impl.execchain.RetryExec:?) - I/O exception (java.net.SocketException) caught when processing request to {s}-&gt;https://domainName:443: Connection reset
+
+//3.12
+(org.apache.http.impl.execchain.RetryExec:?) - I/O exception (java.net.SocketException) caught when processing request to {s}-&gt;https://domainName:443: Connection reset</code></pre>
+
+<p>然后查看新版本上线之后的日志，没有发现重试日志，说明SocketException能被DefaultHttpRequestRetryHandler处理，而不能被CustomRequestRetryHandler处理。在对比两者的异常处理类型，发现DefaultHttpRequestRetryHandler处理的ConnectException extends SocketException，所以能处理。因为，我们只要在CustomRequestRetryHandler中，加入SocketException或者ConnectException，就可以通过重试解决网络问题。</p>
+
+<p>至此，我们搞清楚了这个Connection reset的问题，并且找到了解决方案，开心ing~~</p>
+
+<h2>补充与参考</h2>
+
+<p>几个重要的类说明：</p>
+
+<ul>
+	<li>MainClientExec<br />
+	执行流程核心类，execute方法。<a href="http://www.cnblogs.com/shoren/p/httpclient-MainClientExec.html">这里</a>有源码分析，还不错。</li>
+	<li>
+	<p>PoolingHttpClientConnectionManager<br />
+	用来管理connection，方法如：requestConnection（从连接池中lease一个连接，连接的状态可能是关闭的），connect（真正建立底层socket连接），releaseConnection（释放连接池中的连接）等。<a href="http://www.cnblogs.com/shoren/p/httpclient-leaseConnection.html">这里</a>有一篇分析。</p>
+	</li>
+	<li>
+	<p>如何检查httpConnection连接是否有效</p>
+
+	<h5>方法一，org.apache.http.HttpConnection的isStale()方法</h5>
+
+	<pre>
+<code>public boolean isStale() {
+    //没有打开，即socket为空，则不可用
+    if (!isOpen()) {
+        return true;
+    }
+    try {
+    //socket链路有了，测试链路是否可用
+    //这里的测试方法是查看很短的时间内（这里是1ms），是否可以从输入流中读到数据
+    //如果测试结果返回-1说明不可用
+        final int bytesRead = fillInputBuffer(1);
+        return bytesRead &lt; 0;
+    } catch (final SocketTimeoutException ex) {
+        //注意这里SocketTimeoutException时，认为是可用的
+        return false;
+    } catch (final IOException ex) {
+        //有I/O异常，不可用
+        return true;
+    }
+}</code></pre>
+
+	<h5>方法二、org.apache.http.HttpClientConnection的isResponseAvailable方法</h5>
+
+	<p>有几种实现方法，但大都被弃用。查看org.apache.http.impl.DefaultBHttpClientConnection的实现。</p>
+
+	<pre>
+<code>@Override
+public boolean isResponseAvailable(final int timeout) throws IOException {
+    ensureOpen();
+    try {
+        return awaitInput(timeout);
+    } catch (final SocketTimeoutException ex) {
+       //这里与isStale不同，SocketTimeoutException时认为不可用
+        return false;
+    }
+}
+
+protected boolean awaitInput(final int timeout) throws IOException {
+    if (this.inbuffer.hasBufferedData()) {
+        return true;
+    }
+    //BHttpConnectionBase 中的fillInputBuffer方法，与isStale的测试方法一致
+    fillInputBuffer(timeout);
+    return this.inbuffer.hasBufferedData();
+}</code></pre>
+	</li>
+</ul>
+
+<p>比较两种方法：isResponseAvailable暂时没有找到使用的地方；isStale在MainClientExec.execute中有直接使用。使用的话需要配置staleConnectionCheckEnabled，即每次请求都要去检测（最高耗时30ms）一次，看起来有一点悲观锁的意思，对性能影响比较大。所以4.4版本开始，默认值为false，且功能被标识为过时。这种方法不推荐。</p>
+
+<pre>
+<code>if (config.isStaleConnectionCheckEnabled()) {
+    // validate connection
+    if (managedConn.isOpen()) {
+        this.log.debug(&quot;Stale connection check&quot;);
+        if (managedConn.isStale()) {
+            this.log.debug(&quot;Stale connection detected&quot;);
+            managedConn.close();
+        }
+    }
+}</code></pre>
+
+<h5>方法三：官方推荐的org.apache.http.impl.conn.PoolingHttpClientConnectionManager#getValidateAfterInactivity()</h5>
+
+<p>对非活动的永久连接，每个validateAfterInactivity毫秒（默认2s）做一次链路检查，尽量确保在使用的时候是可用的。为什么说尽量呢？本文就是一个例子，2s检查没有问题，但在使用之前的2s内网络出了问题，这就没有办法了。</p>
+
+<p>validateAfterInactivity的使用，在org.apache.http.pool.AbstractConnPool中，getPoolEntryBlocking方法。</p>
+
+<pre>
+<code>if (entry.isExpired(System.currentTimeMillis())) {
+    entry.close();
+} else if (this.validateAfterInactivity &gt; 0) {
+    if (entry.getUpdated() + this.validateAfterInactivity &lt;= System.currentTimeMillis()) {
+        if (!validate(entry)) {
+            entry.close();
+        }
+    }
+}</code></pre>
+
+<p>详细解释在<a href="http://www.cnblogs.com/shoren/p/httpclient-leaseConnection.html">这里</a>。</p>
