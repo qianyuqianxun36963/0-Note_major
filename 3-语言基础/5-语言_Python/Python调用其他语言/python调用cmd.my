@@ -1,0 +1,42 @@
+<h1>python调用Shell脚本：os.system(cmd)或os.popen(cmd)的区别</h1>
+
+<p>&nbsp;两者的区别是：</p>
+
+<p>os.system(cmd)的返回值只会有0(成功),1,2</p>
+
+<p>os.popen(cmd)会吧执行的cmd的输出作为值返回。</p>
+
+<p>python调用Shell脚本，有两种方法：os.system(cmd)或os.popen(cmd),前者返回值是脚本的退出状态码，后者的返回值是脚本执行过程中的输出内容。实际使用时视需求情况而选择。</p>
+
+<p>现假定有一个shell脚本test.sh：</p>
+
+<p>#!/bin/bash</p>
+
+<p>1.&nbsp;echo &quot;hello world!&quot;</p>
+
+<p>2.&nbsp;exit 3</p>
+
+<p><strong>os.system(cmd):</strong></p>
+
+<p>该方法在调用完shell脚本后，返回一个16位的二进制数，低位为杀死所调用脚本的信号号码，高位为脚本的退出状态码，即脚本中&ldquo;exit 1&rdquo;的代码执行后，os.system函数返回值的高位数则是1，如果低位数是0的情况下，则函数的返回值是0&times;100,换算为10进制得到256。</p>
+
+<p>如果我们需要获得os.system的正确返回值，那使用位移运算可以还原返回值：</p>
+
+<p>1.&nbsp;&gt;&gt;&gt; &nbsp;n = os.system(test.sh)</p>
+
+<p>2.&nbsp;&gt;&gt;&gt; n &gt;&gt; 8</p>
+
+<p>3.&nbsp;&gt;&gt;&gt; 3</p>
+
+<p><strong>os.popen(cmd):</strong></p>
+
+<p>这种调用方式是通过管道的方式来实现，函数返回一个file-like的对象，里面的内容是脚本输出的内容（可简单理解为echo输出的内容）。使用os.popen调用test.sh的情况：<br />
+python调用Shell脚本，有两种方法：os.system(cmd)或os.popen(cmd),前者返回值是脚本的退出状态码，后者的返回值是脚本执行过程中的输出内容。实际使用时视需求情况而选择。</p>
+
+<p>明显地，像调用&rdquo;ls&rdquo;这样的shell命令，应该使用popen的方法来获得内容</p>
+
+<p>以前就疑惑popen和system有什么不同，今天实际的应用，才让我恍然大悟<br />
+os.popen（）可以实现一个&ldquo;管道&rdquo;，从这个命令获取的值可以继续被调用。而os.system不同，它只是调用，调用完后自身退出，可能返回个0吧<br />
+<br />
+比如，我想得到ntpd的进程id，就要这么做：<br />
+os.popen(&#39;ps -C ntpd | grep -v CMD |awk &#39;{ print $1 }&#39;).readlines()[0]</p>
