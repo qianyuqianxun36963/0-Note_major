@@ -30,32 +30,21 @@
 
 <pre>
 <code>class InternalHttpClient extends CloseableHttpClient {
-
-&nbsp; &nbsp; private final Log log = LogFactory.getLog(getClass());
-
+   &nbsp; private final Log log = LogFactory.getLog(getClass());
 &nbsp; &nbsp; private final ClientExecChain execChain;
-
 &nbsp; &nbsp; private final HttpClientConnectionManager connManager;
-
 &nbsp; &nbsp; private final HttpRoutePlanner routePlanner;
-
 &nbsp; &nbsp; private final Lookup&lt;CookieSpecProvider&gt; cookieSpecRegistry;
-
 &nbsp; &nbsp; private final Lookup&lt;AuthSchemeProvider&gt; authSchemeRegistry;
-
 &nbsp; &nbsp; private final CookieStore cookieStore;
-
 &nbsp; &nbsp; private final CredentialsProvider credentialsProvider;
-
 &nbsp; &nbsp; private final RequestConfig defaultConfig;
-
 &nbsp; &nbsp; private final List&lt;Closeable&gt; closeables;
-
 }</code></pre>
 
 <p>其中需要注意的有HttpCLientConnectionManager、HttpRoutePlanner和RequestConfig。</p>
 
-<h2>(1)HttpClientConnectionManager</h2>
+<h3>(1)HttpClientConnectionManager</h3>
 
 <p>HttpClientConnectionManager是一个HTTP连接管理器。它负责新HTTP连接的创建、管理连接的生命周期还有保证一个HTTP连接在某一时刻只被一个线程使用。在内部实现的时候，manager使用一个<strong>ManagedHttpClientConnection</strong>的实例来<strong>作为一个实际connection的代理，负责管理connection的状态以及执行实际的I/O操作。</strong>如果一个被监管的connection被释放或者被明确关闭，尽管此时manager仍持有该连接的代理，但是这个connection的状态不会被改变也不能再执行任何的I/O操作。</p>
 
@@ -81,11 +70,11 @@ poolingHttpClientConnectionManager.setDefaultMaxPerRoute(MAX_CONNECTION);
 CloseableHttpClient httpClient = HttpClientBuilder.create().setConnectionManager(poolingHttpClientConnectionManager).build();</code>
 </pre>
 
-<h2>(2)HttpRoutePlanner</h2>
+<h3>(2)HttpRoutePlanner</h3>
 
 <p>HttpClient不仅支持简单的直连、复杂的路由策略以及代理。HttpRoutePlanner是基于http上下文情况下，客户端到服务器的路由计算策略，一般没有代理的话，就不用设置这个东西。这里有一个很关键的概念&mdash;Route：在HttpClient中，一个Route指&nbsp;运行环境机器-&gt;目标机器host的一条线路，也就是如果目标url的host是同一个，那么它们的route也是一样的。</p>
 
-<h2>(3)RequestConfig</h2>
+<h3>(3)RequestConfig</h3>
 
 <p>RequestConfig是对request的一些配置。里面比较重要的有三个超时时间，默认的情况下这三个超时时间都为0（如果不设置request的Config，会在execute的过程中使用HttpClientParamConfig的getRequestConfig中用默认参数进行设置），这也就意味着无限等待，很容易导致所有的请求阻塞在这个地方无限期等待。这三个超时时间为：</p>
 
@@ -105,7 +94,7 @@ CloseableHttpClient httpClient = HttpClientBuilder.create().setConnectionManager
 
 <p><code>RequestConfig requestConfig = RequestConfig.custom().setConnectionRequestTimeout(CON_RST_TIME_OUT).setConnectTimeout(CON_TIME_OUT).setSocketTimeout(SOCKET_TIME_OUT).build(); CloseableHttpClient httpClient = HttpClientBuilder.create().setDefaultRequestConfig(requestConfig).build();</code></p>
 
-<h1>3、创建一个Request对象</h1>
+<h2>3、创建一个Request对象</h2>
 
 <p>HttpClient支持所有的HTTP1.1中的所有定义的请求类型：GET、HEAD、POST、PUT、DELETE、TRACE和OPTIONS。对使用的类为HttpGet、HttpHead、HttpPost、HttpPut、HttpDelete、HttpTrace和HttpOptions。Request的对象建立很简单，一般用目标url来构造就好了。下面是一个HttpPost的创建代码：</p>
 
@@ -119,29 +108,20 @@ CloseableHttpClient httpClient = HttpClientBuilder.create().setConnectionManager
 <p>staleConnectionCheckEnabled：这个配置默认为true，HttpClient的execute方法中有下面的代码，也就是说如果这个设置为true的话，是会自动关闭那些状态为stale的managed connection所管理的connection和socket（和remote ip）。（这里有个问题，在第7部分中再说）</p>
 
 <pre>
-<code>if (config.isStaleConnectionCheckEnabled()) {
-
+<code>           if (config.isStaleConnectionCheckEnabled()) {
 &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; // validate connection
-
 &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; if (managedConn.isOpen()) {
-
 &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; this.log.debug(&quot;Stale connection check&quot;);
-
 &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; if (managedConn.isStale()) {
-
 &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; this.log.debug(&quot;Stale connection detected&quot;);
-
 &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; managedConn.close();
-
 &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; }
-
 &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; }
-
 &nbsp; &nbsp; &nbsp; &nbsp; }
 </code>
 </pre>
 
-<h1>4、执行Request请求</h1>
+<h2>4、执行Request请求</h2>
 
 <p>执行Request请求就是调用HttpClient的execute方法。最简单的使用方法是调用execute(final HttpUriRequest request)。</p>
 
@@ -202,7 +182,7 @@ CloseableHttpClient httpClient = HttpClientBuilder.create().setConnectionManager
 
 <p>用http协议拦截器处理response的各个部分</p>
 
-<h1>5、处理response</h1>
+<h2>5、处理response</h2>
 
 <p>HttpReaponse是将服务端发回的Http响应解析后的对象。CloseableHttpClient的execute方法返回的response都是CloseableHttpResponse类型。可以getFirstHeader(String)、getLastHeader(String)、headerIterator（String）取得某个Header name对应的迭代器、getAllHeaders()、getEntity、getStatus等，一般这几个方法比较常用。</p>
 
@@ -232,19 +212,13 @@ CloseableHttpClient httpClient = HttpClientBuilder.create().setConnectionManager
 
 <p>如果希望重复读取entity中的内容，就需要把entity缓存下来。最简单的方式是用entity来new一个BufferedHttpEntity，这一操作会把内容拷贝到内存中，之后使用这个BufferedHttpEntity就可以了。</p>
 
-<p>&nbsp;</p>
-
-<h1>6、关闭HttpClient</h1>
-
-<p>&nbsp;</p>
+<h2>6、关闭HttpClient</h2>
 
 <p>调用httpClient.close()会先shut down connection manager，然后再释放该HttpClient所占用的所有资源，关闭所有在使用或者空闲的connection包括底层socket。由于这里把它所使用的connection manager关闭了，所以在下次还要进行http请求的时候，要重新new一个connection manager来build一个HttpClient（也就是在需要关闭和新建Client的情况下，connection manager不能是单例的）。</p>
 
-<p>&nbsp;</p>
+<h2>7、其他一些东西</h2>
 
-<h1>7、其他一些东西</h1>
-
-<h2>（1）关于keep-alive</h2>
+<h3>（1）关于keep-alive</h3>
 
 <p>在HttpClient.execute得到response之后的相关代码中，它会先取出response的keep-alive头来设置connection是否resuable以及存活的时间。如果服务器返回的响应中包含了Connection:Keep-Alive（默认有的），但没有包含Keep-Alive时长的头消息，HttpClient认为这个连接可以永远保持。</p>
 
@@ -252,43 +226,31 @@ CloseableHttpClient httpClient = HttpClientBuilder.create().setConnectionManager
 
 <p><code>ClosableHttpClient client = HttpClients.custom().setKeepAliveStrategy(xxx).build();</code></p>
 
-<h2>（2）连接池管理</h2>
+<h3>（2）连接池管理</h3>
 
 <p>前面也有说到关于从连接池中取可用连接的部分逻辑。完整的逻辑是：在每收到一个route请求后，连接池都会建立一个以这个route为key的子连接池，当有一个新的连接请求到来的时候，它会优先匹配已经存在的子连接池们，如果之前已经有过以这个route为key的子连接池，那么就会去试图取这个子连接池中状态为available的连接，如果此时有可用的连接，则将取得的available连接状态改为leased的，取连接成功。如果此时子连接池没有可用连接，那再看是否达到了所设置的最大连接数和每个route所允许的最大连接数的上限，如果还有余量则new一个新的连接，或者取得lastUsedConnection，关闭这个连接、把连接从原来所在的子连接池删除，再lease取连接成功。如果此时的情况不允许再new一个新的连接，就把这个请求连接的请求放入一个queue中排队等待，直到得到一个连接或者超时才会从queue中删去。</p>
 
 <p>一个连接被release之后，会从等待连接的queue中唤醒等待连接的服务进行处理。</p>
 
-<h2>（3）连接回收策略</h2>
+<h3>（3）连接回收策略</h3>
 
 <p>当连接被管理器收回后，这个连接仍然存活，但是却无法监控socket的状态，也无法对I/O事件做出反馈。如果连接被服务器端关闭了，客户端监测不到连接的状态变化（也就无法根据连接状态的变化，关闭本地的socket）。</p>
 
 <p>HttpClient为了缓解这一问题造成的影响，会在使用某个连接前，监测这个连接是否已经过时，如果服务器端关闭了连接，那么连接就会失效。前面提到的RequestConfig中的staleConnectionCheckEnabled就是用来控制是否进行上述操作，相关代码：</p>
 
 <pre>
-<code>if (config.isStaleConnectionCheckEnabled()) {
-
+<code>         if (config.isStaleConnectionCheckEnabled()) {
 &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; // validate connection
-
 &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; if (managedConn.isOpen()) {
-
 &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; this.log.debug(&quot;Stale connection check&quot;);
-
 &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; if (managedConn.isStale()) {
-
 &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; this.log.debug(&quot;Stale connection detected&quot;);
-
 &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; managedConn.close();
-
 &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; }
-
 &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; }
-
 &nbsp; &nbsp; &nbsp; &nbsp; }
-</code></pre>
-
-<p>&nbsp;</p>
-
-<p>&nbsp;</p>
+</code>
+</pre>
 
 <p>其中的managedConn.isStale()就是检查取出的连接是否失效，需要注意的是这种过时检查并不是100%有效，并且会给每个请求增加10到30毫秒额外开销。isStale()有一点比较奇怪的是，如果抛出SocketTimeoutException的时候会返回false，即意味着此managedConn并不是失效的（如果此managedConn是长连接的，那么没失效是可理解的，但为什么会抛SocketTimeoutException异常就不懂了）。而这里SocketTimeoutException的发生与我们前面设置的RequestConfig.sotimeout是没有关系的，它实现的机制是先设置1ms的超时时间，看在这1ms内是否能从inputBuffer里面读到数据，如果读到的数据长度为-1（即没有数据），说明此连接失效。但是很经常随机会发生SocketTimeoutException，这时会返回false，并且此时managedConn是open的状态，这样就会跳过后面的dns解析及socket重新建立和绑定的过程，直接再次重用之前的connection以及它绑定的socket。</p>
 
@@ -305,7 +267,7 @@ Http1.1默认进行的长连接并不适用于我们的应用场景，我们的h
 <br />
 在尝试了改系统的各种tcp配置参数还有其他的socket、系统配置无果后，最终找到的解决方式却异常简单。简单来说，其实我们的应用场景下需要的是短连接，这样只要在request中添加Connection:close的头部，就可以保证这个链接在这次请求完成之后就被关掉，只用一次。同时发现，如果头中既有Connection:Keep-Alive又有Connection:close的话，Connection:close并不会有更高的优先级，依旧会保持长连。</p>
 
-<h1>8、总结</h1>
+<h2>8、总结</h2>
 
 <p>使用HttpClient的时候特别需要注意的有下面几个地方：</p>
 
