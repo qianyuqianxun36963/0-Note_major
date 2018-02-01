@@ -1,6 +1,8 @@
-<h1>python调用Shell脚本：os.system(cmd)或os.popen(cmd)的区别</h1>
+<h1>python调用cmd脚本</h1>
 
-<p>&nbsp;两者的区别是：</p>
+<h2>python中os.system(cmd)或os.popen(cmd)的区别</h2>
+
+<h3>&nbsp;两者的区别是：</h3>
 
 <p>os.system(cmd)的返回值只会有0(成功),1,2</p>
 
@@ -16,7 +18,7 @@
 
 <p>2.&nbsp;exit 3</p>
 
-<p><strong>os.system(cmd):</strong></p>
+<h3><strong>os.system(cmd):</strong></h3>
 
 <p>该方法在调用完shell脚本后，返回一个16位的二进制数，低位为杀死所调用脚本的信号号码，高位为脚本的退出状态码，即脚本中&ldquo;exit 1&rdquo;的代码执行后，os.system函数返回值的高位数则是1，如果低位数是0的情况下，则函数的返回值是0&times;100,换算为10进制得到256。</p>
 
@@ -28,7 +30,7 @@
 
 <p>3.&nbsp;&gt;&gt;&gt; 3</p>
 
-<p><strong>os.popen(cmd):</strong></p>
+<h3><strong>os.popen(cmd):</strong></h3>
 
 <p>这种调用方式是通过管道的方式来实现，函数返回一个file-like的对象，里面的内容是脚本输出的内容（可简单理解为echo输出的内容）。使用os.popen调用test.sh的情况：<br />
 python调用Shell脚本，有两种方法：os.system(cmd)或os.popen(cmd),前者返回值是脚本的退出状态码，后者的返回值是脚本执行过程中的输出内容。实际使用时视需求情况而选择。</p>
@@ -40,3 +42,306 @@ os.popen（）可以实现一个&ldquo;管道&rdquo;，从这个命令获取的�
 <br />
 比如，我想得到ntpd的进程id，就要这么做：<br />
 os.popen(&#39;ps -C ntpd | grep -v CMD |awk &#39;{ print $1 }&#39;).readlines()[0]</p>
+
+<h2>python中os.system、os.popen、subprocess.popen的区别</h2>
+
+<p>最近项目中需要在python中执行shell脚本，以下解释使用os.system、&nbsp;<br />
+os.popen和subprocess.popen的区别：</p>
+
+<h3>1.os.system</h3>
+
+<p>该函数返回命令<strong>执行结果的返回值</strong>，system()函数在执行过程中进行了以下三步操作：&nbsp;<br />
+1.fork一个子进程；&nbsp;<br />
+2.在子进程中调用exec函数去执行命令；&nbsp;<br />
+3.在父进程中调用wait（阻塞）去等待子进程结束。&nbsp;<br />
+对于fork失败，system()函数返回-1。&nbsp;<br />
+<strong>由于使用该函数经常会莫名其妙地出现错误，但是直接执行命令并没有问题，所以一般建议不要使用。</strong></p>
+
+<h3>2.os.popen</h3>
+
+<p>popen() 创建一个管道，通过fork一个子进程,然后该子进程执行命令。返回值在标准IO流中，该管道用于父子进程间通信。父进程要么从管道读信息，要么向管道写信息，至于是读还是写取决于父进程调用popen时传递的参数（w或r）。通过popen函数读取命令执行过程中的输出示例如下：</p>
+
+<pre>
+<code>#!/usr/bin/python
+import os
+
+p=os.popen(&#39;ssh 10.3.16.121 ls&#39;)
+x=p.read()
+print x
+p.close()</code></pre>
+
+<h3>3.subprocess模块</h3>
+
+<h4><strong>1）概述</strong></h4>
+
+<pre>
+<code>  subprocess模块是在2.4版本中新增的，官方文档中描述为可以用来替换以下函数：
+
+    os.system、os.spawn、os.popen、popen2
+</code></pre>
+
+<h4><strong>2）参数</strong></h4>
+
+<p>官方对于subprocess模块的参数解释如下：</p>
+
+<blockquote>
+<p>args is required for all calls and should be a string, or a sequence of program arguments. Providing a sequence of arguments is generally preferred, as it allows the module to take care of any required escaping and quoting of arguments (e.g. to permit spaces in file names). If passing a single string, either shell must be True (see below) or else the string must simply name the program to be executed without specifying any arguments.</p>
+</blockquote>
+
+<p><img alt="这里写图片描述" src="http://img.blog.csdn.net/20171009103025746?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQvYmNmZHNhZ2JmY2lzYmc=/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70/gravity/SouthEast" title="" /></p>
+
+<p>参数既可以是string，也可以是list。&nbsp;<br />
+subprocess.Popen([&ldquo;cat&rdquo;,&rdquo;test.txt&rdquo;])&nbsp;<br />
+subprocess.Popen(&ldquo;cat test.txt&rdquo;, shell=True)&nbsp;<br />
+对于参数是字符串，需要指定shell=True</p>
+
+<h4><strong>3）使用示例</strong></h4>
+
+<ul>
+	<li><strong>其中subprocess.call用于代替os.system</strong>，示例：</li>
+</ul>
+
+<pre>
+<code>import subprocess
+returnCode = subprocess.call(&#39;adb devices&#39;)
+print returnCode</code></pre>
+
+<ul>
+	<li>
+	<p><strong>subprocess.check_output</strong></p>
+	</li>
+	<li>
+	<p><strong>subprocess.Popen的使用</strong></p>
+
+	<p>1.执行结果保存在文件</p>
+	</li>
+</ul>
+
+<pre>
+<code>cmd = &quot;adb shell ls /sdcard/ | findstr aa.png&quot;  
+fhandle = open(r&quot;e:\aa.txt&quot;, &quot;w&quot;)  
+pipe = subprocess.Popen(cmd, shell=True, stdout=fhandle).stdout  
+fhandle.close()  </code></pre>
+
+<p>&nbsp; &nbsp; &nbsp; &nbsp; 2.执行结果使用管道输出</p>
+
+<pre>
+<code>pipe=subprocess.Popen(cmd,shell=True,stdout=subprocess.PIPE).stdout  
+print pipe.read() </code></pre>
+
+<h3>4.commands.getstatusoutput()</h3>
+
+<p>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;使用commands.getstatusoutput() 方法就可以获得到返回值和输出：</p>
+
+<pre>
+<code>(status, output) = commands.getstatusoutput(&#39;sh hello.sh&#39;)
+print status, output</code></pre>
+
+<h2>python获取命令行输出结果</h2>
+
+<p>python获取命令行输出结果，并对结果进行过滤找到自己需要的！</p>
+
+<p>这里以获取本机MAC地址和IP地址为例！</p>
+
+<p>#&nbsp;coding:&nbsp;GB2312&nbsp;&nbsp;<br />
+import&nbsp;os,&nbsp;re&nbsp;&nbsp;<br />
+&nbsp;&nbsp;<br />
+#&nbsp;execute&nbsp;command,&nbsp;and&nbsp;return&nbsp;the&nbsp;output&nbsp;&nbsp;<br />
+def&nbsp;execCmd(cmd):&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;r&nbsp;=&nbsp;os.popen(cmd)&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;text&nbsp;=&nbsp;r.read()&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;r.close()&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;return&nbsp;text&nbsp;&nbsp;<br />
+&nbsp;&nbsp;<br />
+#&nbsp;write&nbsp;&quot;data&quot;&nbsp;to&nbsp;file-filename&nbsp;&nbsp;<br />
+def&nbsp;writeFile(filename,&nbsp;data):&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;f&nbsp;=&nbsp;open(filename,&nbsp;&quot;w&quot;)&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;f.write(data)&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;f.close()&nbsp;&nbsp;<br />
+&nbsp;&nbsp;<br />
+#&nbsp;获取计算机MAC地址和IP地址&nbsp;&nbsp;<br />
+if&nbsp;__name__&nbsp;==&nbsp;&#39;__main__&#39;:&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;cmd&nbsp;=&nbsp;&quot;ipconfig&nbsp;/all&quot;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;result&nbsp;=&nbsp;execCmd(cmd)&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;pat1&nbsp;=&nbsp;&quot;Physical&nbsp;Address[\.&nbsp;]+:&nbsp;([\w-]+)&quot;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;pat2&nbsp;=&nbsp;&quot;IP&nbsp;Address[\.&nbsp;]+:&nbsp;([\.\d]+)&quot;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;MAC&nbsp;=&nbsp;re.findall(pat1,&nbsp;result)[0]&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;#&nbsp;找到MAC&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;IP&nbsp;=&nbsp;re.findall(pat2,&nbsp;result)[0]&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;#&nbsp;找到IP&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;print(&quot;MAC=%s,&nbsp;IP=%s&quot;&nbsp;%(MAC,&nbsp;IP))&nbsp;&nbsp;</p>
+
+<p>运行结果：</p>
+
+<ol start="1">
+	<li>E:\Program\Python&gt;del.py&nbsp;&nbsp;</li>
+	<li>MAC=00-1B-77-CD-62-2B,&nbsp;IP=192.168.1.110&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>E:\Program\Python&gt;&nbsp;&nbsp;</li>
+</ol>
+
+<h1>使用Python实时获取cmd的输出</h1>
+
+<p><a href="https://www.cnblogs.com/podolski/p/5040107.html">原文地址</a></p>
+
+<p>最近发现一个问题，一个小伙儿写的console程序不够健壮，监听SOCKET的时候容易崩，造成程序的整体奔溃，无奈他没有找到问题的解决办法，一直解决不了，可是这又是一个监控程序，还是比较要紧的，又必须想办法解决。</p>
+
+<p>（这是要搞死我的节奏啊....）由于个人不太懂他用的语言，只能在程序外围想办法。</p>
+
+<h3>环境描述：</h3>
+
+<p>1. 目标程序执行时会监听8080端口，TCP，并在每一次client连接后通过console输出client的IP地址。</p>
+
+<p>2. 监听不是一次性完成的，而是一直监听，程序并不会退出</p>
+
+<p>3. 为了监控需要，最好能对连接的IP进行排序，整理。</p>
+
+<p>P.S. 系统基于windows平台。</p>
+
+<p>想起来做监控程序，简单点比较好，于是想到了Python。</p>
+
+<p>我的预想逻辑是这样的，通过python检测目标程序是否崩了，如果中标就启动目标程序，并进行监控，每输出一次，python进行一次数据运算整理，然后循环。</p>
+
+<h3>第一步，先搞定输出的捕获问题。</h3>
+
+<pre>
+# this method is used for monitoring
+
+import time
+import subprocess
+import locale
+import codecs
+
+mylist = []
+ps = subprocess.Popen(&#39;netstat -a&#39;, stdin=subprocess.PIPE, stdout=subprocess.PIPE, shell=True)
+while True:
+    data = ps.stdout.readline()
+    if data == b&#39;&#39;:
+        if ps.poll() is not None:
+            break
+    else:
+        mylist.append(data.decode(codecs.lookup(locale.getpreferredencoding()).name))
+        newlist = []
+        for i in mylist:
+            if i.find(&#39;192.168&#39;) &gt; 0:
+                newlist.append(i)
+        newlist.sort()
+        print(&#39;Sum of requests from LAN:&#39;, len(newlist))
+</pre>
+
+<p>我用netstat -a替代那个需要持续输出的程序，执行程序，发现程序和想象的不太一样，确实是实时获得数据了，但是感觉总是有点不太和谐，不管了，继续。</p>
+
+<h3>第二步，解决监控程序的问题</h3>
+
+<p>程序或者还是死的，有一点非常关键，就是监听端口，那只要检测一下端口就行了。三个办法：</p>
+
+<p>1. 找端口检测的API</p>
+
+<p>2. 连接一次目标端口，通了就是活的</p>
+
+<p>3. netstat</p>
+
+<p>第一种方法需要去找找有没有相关的API，第二种方法容易对目标程序的正常运行造成问题，第三种我想都没想就用了吧。这里需要用到cmd的重定向功能</p>
+
+<pre>
+# this method is used for monitoring
+
+import time
+import subprocess
+import locale
+import codecs
+
+
+def getstdout(p):
+    mylist = []
+    while True:
+        data = p.stdout.readline()
+        if data == b&#39;&#39;:
+            if p.poll() is not None:
+                break
+        else:
+            mylist.append(data.decode(codecs.lookup(locale.getpreferredencoding()).name))
+    return mylist
+
+while True:
+    ps = subprocess.Popen(&#39;netstat -an | findstr &quot;8080&quot;&#39;, stdin=subprocess.PIPE, stdout=subprocess.PIPE, shell=True)
+    resultlist = getstdout(ps)
+    if len(resultlist) &gt;= 1:
+        pass
+    else:
+        print(time.strftime(&quot;%Y-%m-%d %H:%M:%S&quot;))
+        subprocess.Popen(&#39;taskkill.exe /f /im node.exe&#39;, shell=False)
+　　　　 # 防止动作过快，把新建的程序整死了
+        time.sleep(3)
+        subprocess.Popen(&#39;start node D:\\app.js&#39;, shell=True)
+    time.sleep(10)
+</pre>
+
+<p>netstat -an获得当前的端口监听情况，&ldquo;|&rdquo;将netstat的输出重定向到findstr函数</p>
+
+<p>netstat -an | findstr &quot;8080&quot; 查找有8080端口的地址行，有就说明活着，否则就是挂了。</p>
+
+<h3>最后一步，整合</h3>
+
+<pre>
+# this method is used for monitoring
+
+import time
+import subprocess
+import locale
+import codecs
+
+
+def getstdout(p):
+    mylist = []
+    while True:
+        data = p.stdout.readline()
+        if data == b&#39;&#39;:
+            if p.poll() is not None:
+                break
+        else:
+            mylist.append(data.decode(codecs.lookup(locale.getpreferredencoding()).name))
+    return mylist
+
+while True:
+    ps = subprocess.Popen(&#39;netstat -an | findstr &quot;8080&quot;&#39;, stdin=subprocess.PIPE, stdout=subprocess.PIPE, shell=True)
+    resultlist = getstdout(ps)
+    if len(resultlist) &gt;= 1:
+        pass
+    else:
+        print(time.strftime(&quot;%Y-%m-%d %H:%M:%S&quot;))
+        subprocess.Popen(&#39;taskkill.exe /f /im node.exe&#39;, shell=False)
+        time.sleep(3)
+        pss = subprocess.Popen(&#39;start cmd.exe /k node app.js&#39;, stdin=subprocess.PIPE,
+                               stdout=subprocess.PIPE, shell=True)
+        alist = getstdout(pss)
+        newlist = []
+        for i in alist:
+            if i.find(&#39;192.168&#39;) &gt; 0:
+                newlist.append(i)
+        newlist.sort()
+        print(&#39;Sum of requests from LAN:&#39;, len(newlist))
+    time.sleep(10)
+</pre>
+
+<p>然后发现有问题，程序完全不会定时检测，只会卡在readline()上。</p>
+
+<p>各种找问题，发现那个process.stdout.readline()是个同步方法，没结果就不返回。有没有的能异步的方法？</p>
+
+<p>有人用fnctl，windows不支持，pass</p>
+
+<p>asyncio？看了半天没太明白...</p>
+
+<p>折腾了半天，最后关头我还是用c#解决这个问题了....</p>
+
+<p>参考代码见<a href="http://www.jiamaocode.com/Cts/1031.html" rel="nofollow" target="blank">http://www.jiamaocode.com/Cts/1031.html</a>，打不开的话http://www.cnblogs.com/sode/archive/2012/07/10/2583941.html有转载</p>
+
+<p>&nbsp;</p>
+
+<p>总算解决了这个问题，但是我心中还是不爽，思考了很久如何解决异步readline()的问题。忽然想起来多线程这个利器，干脆开一个线程，不返回就等着，不就问题解决了。</p>
+
+<h2>总结</h2>
+
+<p>有时候简单的解决方法也可以实现同样的功能，对比python的实现与C#的实现，C#更面向事件一点，python应该也有不错的解决方案，继续摸索...</p>
+
+<p>P.S. 注意cmd输出在UNICODE系统是b&#39;&#39;这种类型的字符串，转码对自己系统的默认编码不清楚的建议用codecs.lookup(locale.getpreferredencoding()).name，贸然用utf-8各种坑。</p>
+
+<p>&nbsp;</p>
