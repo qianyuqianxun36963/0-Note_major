@@ -1,0 +1,717 @@
+<h1>腾讯对象存储服务COS加密签名上传文件与下载文件的剖析</h1>
+
+<p><a href="http://blog.csdn.net/jspping/article/details/52538440">原文地址</a></p>
+
+<p><strong>在做一些用户需求的时候，公司往往需要工程师采集到更多有用的关于用户的个人信息，然后对用户群进行分析，今天我不是来分析这些的，今天我主要是说</strong></p>
+
+<p><strong>腾讯推出的款云产品，那就是对象存储服务COS，这个产品面向所有开发者，新用户都有免费享有10G的使用权，10G可能对于做方案的工程师来说可能是微不</strong></p>
+
+<p><strong>足道的，比如后视镜和车载方案，会常常需要用到视频的存储与云分享，当然这里不是只本地存储哦，我指的是用户在使用方案商的方案的时候，比如他开车</strong></p>
+
+<p><strong>的时候录了一段视频需要分享到某个域，共享给大家看，比如微信，这时候他肯定需要将这个视频存储在一个服务器上，这时候问题来了，如果你们公司够有</strong></p>
+
+<p><strong>钱够任性可以买更好的服务器和配置，那就不需要用到这个COS对象存储产品了，但是就app的和后台的性能来说，这个就很有必要了</strong></p>
+
+<p>&nbsp;</p>
+
+<p><strong>比如我目前就在写一个大型的app，初步用户数大概在50万以上，举个简单的小例子，加入今天有2000+个用户同时一起更换用户头像，那这时候对后台的来说</strong></p>
+
+<p><strong>就是影响效率的操作，当然牛逼的服务器配置我们就不再此对比了，那是超大公司的配置，但我们可以将这个样的负荷转移到别的地方，比如COS对象存储，</strong></p>
+
+<p><strong>我们客户端只需要将用户更换头像的图片地址放到后台上传就行了，跟服务器没有任何交互，一但COS存储完毕，我们会收到Response这时候如果是</strong></p>
+
+<p><strong>Success，那我们再向我们自己服务器的后台插入一个COS的头像地址，下次用户重新登录或者登录超时或更换IOS/Android登录，后台返回一个远程COS头</strong></p>
+
+<p><strong>像地址，我们客户端后台获取，轻松完美！当然还有一个小缺陷就是，如果用户是拍照获取头像的话，因为是超清晰的所以比较大，上传可能会异常的慢，而且设置头像的</strong></p>
+
+<p><strong>时候还可能</strong><strong>OOM，但这些都是小问题，因为</strong><strong>一个头像本来可见范围就那么一</strong><strong>点点，我们客户端是可以采取措施的，比如压缩可裁剪，像我就是写了一个裁剪依赖，对较大的</strong></p>
+
+<p><strong>超过1.5MB的头像首先进行压缩，确保它不会失真就得大于30%的压缩率，然后在裁剪，最后把所有用户头像均控制在1MB以内，轻松搞定！</strong></p>
+
+<p>&nbsp;</p>
+
+<p>下面开始分享COS的使用和加密签名算法</p>
+
+<p>&nbsp;</p>
+
+<p>COS免费10G地址：<a href="https://www.qcloud.com/product/cos.html" target="_blank">https://www.qcloud.com/product/cos.html</a></p>
+
+<p>&nbsp;</p>
+
+<p><strong>进入这个链接以后，点击立即使用，随后完成准备工作开始创建 bucket</strong></p>
+
+<p><strong><img alt="" src="http://img.blog.csdn.net/20160914155709007?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQv/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70/gravity/Center" /></strong></p>
+
+<p><strong>创建完毕之后，获取API的一些密钥，点击获取API密钥或密钥管理</strong></p>
+
+<p><strong>拿到这些必须的参数以后，就要开始编写校验签名加密程序了，用来访问COS</strong></p>
+
+<p><strong>Android SDK 地址：<a href="https://www.qcloud.com/doc/product/227/3391" target="_blank">https://www.qcloud.com/doc/product/227/3391</a></strong></p>
+
+<p><strong>SDK地址下载下来的Demo是可用的，但是对签名加密那一块压根就没提，甚是恶心，签名都是从自己后台的PHP接口生成返回到客户端的，而且腾讯官方也没有提供相应</strong></p>
+
+<p><strong>的demo，太不负责任了。。。</strong></p>
+
+<p><strong>于是我开始动手写算了，太坑爹了，加密签名需要用&nbsp;</strong></p>
+
+<p><strong>HMAC-SHA1 对拼接参数进行签名，然后签名串需要使用 Base64 编码</strong></p>
+
+<p><strong>官方给出的提示就如下，其他什么都没有了。。。</strong></p>
+
+<p>&nbsp;</p>
+
+<p>SignTmp = HMAC-SHA1(SecretKey, orignal)</p>
+
+<p>Sign = Base64(SignTmp.orignal)</p>
+
+<p>其中SecretKey为2.1节获取的项目Secret Key，orignal为2.2节中拼接好的签名串，首先对orignal使用HMAC-SHA1算法进行签名，然后将orignal附加到签名结果的末尾，再进行Base64编码，得到最终的sign。</p>
+
+<p>注：此处使用的是标准的Base64编码，不是urlsafe的Base64编码，请注意。</p>
+
+<p><strong>这里我还是做一下解释吧，要不然大家都看不懂，HMAC-SHA1函数需要两个参数，一个是SecretKey，这个在API密钥里面获得，另一个是original，这个是需要拼接所有</strong></p>
+
+<p><strong>需要用到的参数，比如：</strong></p>
+
+<p><strong>String Original = &quot;a=%s&amp;b=%s&amp;k=%s&amp;e=%s&amp;t=%s&amp;r=%s&amp;f=&quot;;</strong></p>
+
+<p><strong>a:&nbsp;Appid ，可在API密钥中获取</strong></p>
+
+<p><strong>b:&nbsp;空间名称bucket,比如笔者上图的 &quot;rmtonline&quot;</strong></p>
+
+<p><strong>k:&nbsp;Secret ID ,可在API密钥中获取</strong></p>
+
+<p><strong>e:&nbsp;签名的有效期，一个UNIX Epoch时间戳，即签名多久的使用期，最长3个月，从年精确到秒</strong></p>
+
+<p><strong>t: &nbsp;当前时间的UNIX Epoch时间戳，即签名开始生效的日期，也精确到秒，而且e&gt;t，因为到期日必须大于生效日期</strong></p>
+
+<p><strong>r:&nbsp;随机串，无符号10进制整数，用户需自行生成，最长10位</strong></p>
+
+<p><strong>f: 这个参数的值可以不填</strong></p>
+
+<p><strong>比如：a=200001&amp;b=newbucket&amp;k=AKIDUfLUEUigQiXqm7CVSspKJnuaiIKtxqAv&amp;e=1438669115&amp;t=1436077115&amp;r=11162&amp;f=</strong></p>
+
+<p><strong>下面开始进行编写签名和加密函数</strong></p>
+
+<p>&nbsp;</p>
+
+<p><strong>[java]</strong>&nbsp;<a href="http://blog.csdn.net/jspping/article/details/52538440#" onclick="dp.sh.Toolbar.Command('ViewSource',this);return false;" title="view plain">view plain</a>&nbsp;<a href="http://blog.csdn.net/jspping/article/details/52538440#" onclick="dp.sh.Toolbar.Command('CopyToClipboard',this);return false;" title="copy">copy</a></p>
+
+<p><embed allowscriptaccess="always" bgcolor="#ffffff" height="18" pluginspage="http://www.macromedia.com/go/getflashplayer" quality="best" src="http://static.blog.csdn.net/scripts/ZeroClipboard/ZeroClipboard.swf" type="application/x-shockwave-flash" width="18" wmode="transparent"></embed></p>
+
+<ol start="1">
+	<li>private&nbsp;static&nbsp;final&nbsp;String&nbsp;MAC_NAME&nbsp;=&nbsp;&quot;HmacSHA1&quot;;&nbsp;&nbsp;</li>
+	<li>private&nbsp;static&nbsp;final&nbsp;String&nbsp;ENCODING&nbsp;=&nbsp;&quot;UTF-8&quot;;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>/**&nbsp;</li>
+	<li>&nbsp;*&nbsp;&nbsp;</li>
+	<li>&nbsp;*&nbsp;@param&nbsp;SecretKey&nbsp;</li>
+	<li>&nbsp;*&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;密钥&nbsp;</li>
+	<li>&nbsp;*&nbsp;@param&nbsp;EncryptText&nbsp;</li>
+	<li>&nbsp;*&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;签名串&nbsp;</li>
+	<li>&nbsp;*&nbsp;@return&nbsp;</li>
+	<li>&nbsp;*&nbsp;@throws&nbsp;Exception&nbsp;</li>
+	<li>&nbsp;*/&nbsp;&nbsp;</li>
+	<li>public&nbsp;static&nbsp;byte[]&nbsp;HmacSHA1Encrypt(String&nbsp;SecretKey,&nbsp;String&nbsp;EncryptText)&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;throws&nbsp;Exception&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;byte[]&nbsp;data&nbsp;=&nbsp;SecretKey.getBytes(ENCODING);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;SecretKey&nbsp;secretKey&nbsp;=&nbsp;new&nbsp;SecretKeySpec(data,&nbsp;MAC_NAME);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;Mac&nbsp;mac&nbsp;=&nbsp;Mac.getInstance(MAC_NAME);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;mac.init(secretKey);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;byte[]&nbsp;text&nbsp;=&nbsp;EncryptText.getBytes(ENCODING);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;return&nbsp;mac.doFinal(text);&nbsp;&nbsp;</li>
+	<li>}&nbsp;&nbsp;</li>
+</ol>
+
+<p>该函数返回一个byte[]，SecretKey 为你的secretKey&nbsp;下面开始拼接original</p>
+
+<p>&nbsp;</p>
+
+<p>&nbsp;</p>
+
+<p><strong>[java]</strong>&nbsp;<a href="http://blog.csdn.net/jspping/article/details/52538440#" onclick="dp.sh.Toolbar.Command('ViewSource',this);return false;" title="view plain">view plain</a>&nbsp;<a href="http://blog.csdn.net/jspping/article/details/52538440#" onclick="dp.sh.Toolbar.Command('CopyToClipboard',this);return false;" title="copy">copy</a></p>
+
+<p><embed allowscriptaccess="always" bgcolor="#ffffff" height="18" pluginspage="http://www.macromedia.com/go/getflashplayer" quality="best" src="http://static.blog.csdn.net/scripts/ZeroClipboard/ZeroClipboard.swf" type="application/x-shockwave-flash" width="18" wmode="transparent"></embed></p>
+
+<ol start="1">
+	<li>public&nbsp;static&nbsp;String&nbsp;getSignOriginal()&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;return&nbsp;String.format(TencentUpload.Original,&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ParamPreference.TENCENT_COS_APPID,&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ParamPreference.TENCENT_COS_BUCKET,&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ParamPreference.TENCENT_COS_SECRET_ID,&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;String.valueOf(getFurureLinuxDate()),&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;String.valueOf(getLinuxDateSimple()),&nbsp;getRandomTenStr());&nbsp;&nbsp;</li>
+	<li>}&nbsp;&nbsp;</li>
+</ol>
+
+<p><br />
+<strong>TencentUpload.Original 为待通配字符串：String Original = &quot;a=%s&amp;b=%s&amp;k=%s&amp;e=%s&amp;t=%s&amp;r=%s&amp;f=&quot;</strong></p>
+
+<p>&nbsp;</p>
+
+<p><strong>ParamPreference.TENCENT_COS_APPID 为常量字符串，即你的appid</strong></p>
+
+<p><strong>ParamPreference.TENCENT_COS_BUCKET 为常量字符串，即你的bucket 名称</strong></p>
+
+<p><strong>ParamPreference.TENCENT_COS_SECRET_ID 为常量字符串，即你的&nbsp;secretID</strong></p>
+
+<p><strong>String.valueOf(getFurureLinuxDate()) 和&nbsp;String.valueOf(getLinuxDateSimple()) 为签名生效期和到期日的Linux时间戳</strong></p>
+
+<p><strong>getRandomTenStr() 为随即无符号的int 5-8 位 开头不为0 后面为0-9的转字符串拼接</strong></p>
+
+<p>&nbsp;</p>
+
+<p><strong>[java]</strong>&nbsp;<a href="http://blog.csdn.net/jspping/article/details/52538440#" onclick="dp.sh.Toolbar.Command('ViewSource',this);return false;" title="view plain">view plain</a>&nbsp;<a href="http://blog.csdn.net/jspping/article/details/52538440#" onclick="dp.sh.Toolbar.Command('CopyToClipboard',this);return false;" title="copy">copy</a></p>
+
+<p><embed allowscriptaccess="always" bgcolor="#ffffff" height="18" pluginspage="http://www.macromedia.com/go/getflashplayer" quality="best" src="http://static.blog.csdn.net/scripts/ZeroClipboard/ZeroClipboard.swf" type="application/x-shockwave-flash" width="18" wmode="transparent"></embed></p>
+
+<ol start="1">
+	<li>@SuppressLint(&quot;SimpleDateFormat&quot;)&nbsp;&nbsp;</li>
+	<li>public&nbsp;static&nbsp;long&nbsp;getFurureLinuxDate()&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;try&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;String&nbsp;futureTime&nbsp;=&nbsp;ParamPreference.TENCENT_COS_FUTURE_LINUXTIME;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Date&nbsp;date&nbsp;=&nbsp;new&nbsp;SimpleDateFormat(&quot;yyyy/MM/dd&nbsp;HH:mm:ss&quot;)&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;.parse(futureTime);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;long&nbsp;unixTimestamp&nbsp;=&nbsp;date.getTime()&nbsp;/&nbsp;1000L;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return&nbsp;unixTimestamp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;catch&nbsp;(Exception&nbsp;e)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;e.printStackTrace();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;return&nbsp;-1;&nbsp;&nbsp;</li>
+	<li>}&nbsp;&nbsp;</li>
+</ol>
+
+<p><br />
+&nbsp;</p>
+
+<p>&nbsp;</p>
+
+<p>&nbsp;</p>
+
+<p><strong>[java]</strong>&nbsp;<a href="http://blog.csdn.net/jspping/article/details/52538440#" onclick="dp.sh.Toolbar.Command('ViewSource',this);return false;" title="view plain">view plain</a>&nbsp;<a href="http://blog.csdn.net/jspping/article/details/52538440#" onclick="dp.sh.Toolbar.Command('CopyToClipboard',this);return false;" title="copy">copy</a></p>
+
+<p><embed allowscriptaccess="always" bgcolor="#ffffff" height="18" pluginspage="http://www.macromedia.com/go/getflashplayer" quality="best" src="http://static.blog.csdn.net/scripts/ZeroClipboard/ZeroClipboard.swf" type="application/x-shockwave-flash" width="18" wmode="transparent"></embed></p>
+
+<ol start="1">
+	<li>public&nbsp;static&nbsp;long&nbsp;getLinuxDateSimple()&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;try&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;long&nbsp;unixTimestamp&nbsp;=&nbsp;System.currentTimeMillis()&nbsp;/&nbsp;1000L;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return&nbsp;unixTimestamp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;catch&nbsp;(Exception&nbsp;e)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;e.printStackTrace();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;return&nbsp;-1;&nbsp;&nbsp;</li>
+	<li>}&nbsp;&nbsp;</li>
+</ol>
+
+<p><br />
+&nbsp;</p>
+
+<p><strong>[java]</strong>&nbsp;<a href="http://blog.csdn.net/jspping/article/details/52538440#" onclick="dp.sh.Toolbar.Command('ViewSource',this);return false;" title="view plain">view plain</a>&nbsp;<a href="http://blog.csdn.net/jspping/article/details/52538440#" onclick="dp.sh.Toolbar.Command('CopyToClipboard',this);return false;" title="copy">copy</a></p>
+
+<p><embed allowscriptaccess="always" bgcolor="#ffffff" height="18" pluginspage="http://www.macromedia.com/go/getflashplayer" quality="best" src="http://static.blog.csdn.net/scripts/ZeroClipboard/ZeroClipboard.swf" type="application/x-shockwave-flash" width="18" wmode="transparent"></embed></p>
+
+<ol start="1">
+	<li>private&nbsp;static&nbsp;String&nbsp;getRandomTenStr()&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;String&nbsp;randomstr&nbsp;=&nbsp;null;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;randomstr&nbsp;=&nbsp;String.valueOf(new&nbsp;Random().nextInt(8)&nbsp;+&nbsp;1);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;int&nbsp;random&nbsp;=&nbsp;new&nbsp;Random().nextInt(3)&nbsp;+&nbsp;5;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;for&nbsp;(int&nbsp;i&nbsp;=&nbsp;0;&nbsp;i&nbsp;&lt;&nbsp;random;&nbsp;i++)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;randomstr&nbsp;+=&nbsp;String.valueOf(new&nbsp;Random().nextInt(9));&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;return&nbsp;randomstr;&nbsp;&nbsp;</li>
+	<li>}&nbsp;&nbsp;</li>
+</ol>
+
+<p><br />
+<strong>随后需要将他们签名和加密，最后转成标准Base64编码格式，需要注意的是，获取 SIGN 需要将&nbsp;secretKey 和 original&nbsp;传入HmacSHA1Encrypt(String SecretKey, String EncryptText)函数，获取到签名的byte[]结果后，还需要在其后面</strong></p>
+
+<p>&nbsp;</p>
+
+<p>追加 original 最后再进行Base64编码转码得的 SIGN&nbsp;</p>
+
+<p><strong>编写代码如下：</strong></p>
+
+<p>&nbsp;</p>
+
+<p><strong>[java]</strong>&nbsp;<a href="http://blog.csdn.net/jspping/article/details/52538440#" onclick="dp.sh.Toolbar.Command('ViewSource',this);return false;" title="view plain">view plain</a>&nbsp;<a href="http://blog.csdn.net/jspping/article/details/52538440#" onclick="dp.sh.Toolbar.Command('CopyToClipboard',this);return false;" title="copy">copy</a></p>
+
+<p><embed allowscriptaccess="always" bgcolor="#ffffff" height="18" pluginspage="http://www.macromedia.com/go/getflashplayer" quality="best" src="http://static.blog.csdn.net/scripts/ZeroClipboard/ZeroClipboard.swf" type="application/x-shockwave-flash" width="18" wmode="transparent"></embed></p>
+
+<ol start="1">
+	<li>public&nbsp;String&nbsp;getTencentSign()&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;try&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;String&nbsp;Original&nbsp;=&nbsp;TencentUtils.getSignOriginal();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;byte[]&nbsp;HmacSHA1&nbsp;=&nbsp;TencentUtils.HmacSHA1Encrypt(&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ParamPreference.TENCENT_COS_SECRET_KEY,&nbsp;Original);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;byte[]&nbsp;all&nbsp;=&nbsp;new&nbsp;byte[HmacSHA1.length&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;+&nbsp;Original.getBytes(ENCODING).length];&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;System.arraycopy(HmacSHA1,&nbsp;0,&nbsp;all,&nbsp;0,&nbsp;HmacSHA1.length);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;System.arraycopy(Original.getBytes(ENCODING),&nbsp;0,&nbsp;all,&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;HmacSHA1.length,&nbsp;Original.getBytes(ENCODING).length);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if&nbsp;(DEBUG)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Log.v(TencentUpload.TAG,&nbsp;&quot;getTencentSign()&nbsp;Original:\n&quot;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;+&nbsp;Original);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;String&nbsp;SignData&nbsp;=&nbsp;Base64Util.encode(all);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if&nbsp;(DEBUG)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Log.v(TencentUpload.TAG,&nbsp;&quot;getTencentSign()&nbsp;SignData:\n&quot;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;+&nbsp;SignData);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return&nbsp;SignData;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;catch&nbsp;(Exception&nbsp;e)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;e.printStackTrace();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;return&nbsp;&quot;get&nbsp;sign&nbsp;failed&quot;;&nbsp;&nbsp;</li>
+	<li>}&nbsp;&nbsp;</li>
+</ol>
+
+<p><strong>ParamPreference.TENCENT_COS_SECRET_KEY 为常量字符串，即你的&nbsp;secretKey</strong></p>
+
+<p>&nbsp;</p>
+
+<p><strong>Base64Util:</strong></p>
+
+<p>&nbsp;</p>
+
+<p><strong>[java]</strong>&nbsp;<a href="http://blog.csdn.net/jspping/article/details/52538440#" onclick="dp.sh.Toolbar.Command('ViewSource',this);return false;" title="view plain">view plain</a>&nbsp;<a href="http://blog.csdn.net/jspping/article/details/52538440#" onclick="dp.sh.Toolbar.Command('CopyToClipboard',this);return false;" title="copy">copy</a></p>
+
+<p><embed allowscriptaccess="always" bgcolor="#ffffff" height="18" pluginspage="http://www.macromedia.com/go/getflashplayer" quality="best" src="http://static.blog.csdn.net/scripts/ZeroClipboard/ZeroClipboard.swf" type="application/x-shockwave-flash" width="18" wmode="transparent"></embed></p>
+
+<ol start="1">
+	<li>package&nbsp;com.rmt.online.tools;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>import&nbsp;java.io.ByteArrayOutputStream;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>public&nbsp;class&nbsp;Base64Util&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;private&nbsp;static&nbsp;final&nbsp;char[]&nbsp;base64EncodeChars&nbsp;=&nbsp;new&nbsp;char[]&nbsp;{&nbsp;&#39;A&#39;,&nbsp;&#39;B&#39;,&nbsp;&#39;C&#39;,&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;D&#39;,&nbsp;&#39;E&#39;,&nbsp;&#39;F&#39;,&nbsp;&#39;G&#39;,&nbsp;&#39;H&#39;,&nbsp;&#39;I&#39;,&nbsp;&#39;J&#39;,&nbsp;&#39;K&#39;,&nbsp;&#39;L&#39;,&nbsp;&#39;M&#39;,&nbsp;&#39;N&#39;,&nbsp;&#39;O&#39;,&nbsp;&#39;P&#39;,&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;Q&#39;,&nbsp;&#39;R&#39;,&nbsp;&#39;S&#39;,&nbsp;&#39;T&#39;,&nbsp;&#39;U&#39;,&nbsp;&#39;V&#39;,&nbsp;&#39;W&#39;,&nbsp;&#39;X&#39;,&nbsp;&#39;Y&#39;,&nbsp;&#39;Z&#39;,&nbsp;&#39;a&#39;,&nbsp;&#39;b&#39;,&nbsp;&#39;c&#39;,&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;d&#39;,&nbsp;&#39;e&#39;,&nbsp;&#39;f&#39;,&nbsp;&#39;g&#39;,&nbsp;&#39;h&#39;,&nbsp;&#39;i&#39;,&nbsp;&#39;j&#39;,&nbsp;&#39;k&#39;,&nbsp;&#39;l&#39;,&nbsp;&#39;m&#39;,&nbsp;&#39;n&#39;,&nbsp;&#39;o&#39;,&nbsp;&#39;p&#39;,&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;q&#39;,&nbsp;&#39;r&#39;,&nbsp;&#39;s&#39;,&nbsp;&#39;t&#39;,&nbsp;&#39;u&#39;,&nbsp;&#39;v&#39;,&nbsp;&#39;w&#39;,&nbsp;&#39;x&#39;,&nbsp;&#39;y&#39;,&nbsp;&#39;z&#39;,&nbsp;&#39;0&#39;,&nbsp;&#39;1&#39;,&nbsp;&#39;2&#39;,&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#39;3&#39;,&nbsp;&#39;4&#39;,&nbsp;&#39;5&#39;,&nbsp;&#39;6&#39;,&nbsp;&#39;7&#39;,&nbsp;&#39;8&#39;,&nbsp;&#39;9&#39;,&nbsp;&#39;+&#39;,&nbsp;&#39;/&#39;&nbsp;};&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;private&nbsp;static&nbsp;byte[]&nbsp;base64DecodeChars&nbsp;=&nbsp;new&nbsp;byte[]&nbsp;{&nbsp;-1,&nbsp;-1,&nbsp;-1,&nbsp;-1,&nbsp;-1,&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;-1,&nbsp;-1,&nbsp;-1,&nbsp;-1,&nbsp;-1,&nbsp;-1,&nbsp;-1,&nbsp;-1,&nbsp;-1,&nbsp;-1,&nbsp;-1,&nbsp;-1,&nbsp;-1,&nbsp;-1,&nbsp;-1,&nbsp;-1,&nbsp;-1,&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;-1,&nbsp;-1,&nbsp;-1,&nbsp;-1,&nbsp;-1,&nbsp;-1,&nbsp;-1,&nbsp;-1,&nbsp;-1,&nbsp;-1,&nbsp;-1,&nbsp;-1,&nbsp;-1,&nbsp;-1,&nbsp;-1,&nbsp;-1,&nbsp;-1,&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;-1,&nbsp;-1,&nbsp;-1,&nbsp;-1,&nbsp;62,&nbsp;-1,&nbsp;-1,&nbsp;-1,&nbsp;63,&nbsp;52,&nbsp;53,&nbsp;54,&nbsp;55,&nbsp;56,&nbsp;57,&nbsp;58,&nbsp;59,&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;60,&nbsp;61,&nbsp;-1,&nbsp;-1,&nbsp;-1,&nbsp;-1,&nbsp;-1,&nbsp;-1,&nbsp;-1,&nbsp;0,&nbsp;1,&nbsp;2,&nbsp;3,&nbsp;4,&nbsp;5,&nbsp;6,&nbsp;7,&nbsp;8,&nbsp;9,&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;10,&nbsp;11,&nbsp;12,&nbsp;13,&nbsp;14,&nbsp;15,&nbsp;16,&nbsp;17,&nbsp;18,&nbsp;19,&nbsp;20,&nbsp;21,&nbsp;22,&nbsp;23,&nbsp;24,&nbsp;25,&nbsp;-1,&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;-1,&nbsp;-1,&nbsp;-1,&nbsp;-1,&nbsp;-1,&nbsp;26,&nbsp;27,&nbsp;28,&nbsp;29,&nbsp;30,&nbsp;31,&nbsp;32,&nbsp;33,&nbsp;34,&nbsp;35,&nbsp;36,&nbsp;37,&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;38,&nbsp;39,&nbsp;40,&nbsp;41,&nbsp;42,&nbsp;43,&nbsp;44,&nbsp;45,&nbsp;46,&nbsp;47,&nbsp;48,&nbsp;49,&nbsp;50,&nbsp;51,&nbsp;-1,&nbsp;-1,&nbsp;-1,&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;-1,&nbsp;-1&nbsp;};&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;private&nbsp;Base64Util()&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;static&nbsp;String&nbsp;encode(byte[]&nbsp;data)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;StringBuffer&nbsp;sb&nbsp;=&nbsp;new&nbsp;StringBuffer();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;int&nbsp;len&nbsp;=&nbsp;data.length;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;int&nbsp;i&nbsp;=&nbsp;0;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;int&nbsp;b1,&nbsp;b2,&nbsp;b3;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;while&nbsp;(i&nbsp;&lt;&nbsp;len)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;b1&nbsp;=&nbsp;data[i++]&nbsp;&amp;&nbsp;0xff;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if&nbsp;(i&nbsp;==&nbsp;len)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;sb.append(base64EncodeChars[b1&nbsp;&gt;&gt;&gt;&nbsp;2]);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;sb.append(base64EncodeChars[(b1&nbsp;&amp;&nbsp;0x3)&nbsp;&lt;&lt;&nbsp;4]);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;sb.append(&quot;==&quot;);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;break;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;b2&nbsp;=&nbsp;data[i++]&nbsp;&amp;&nbsp;0xff;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if&nbsp;(i&nbsp;==&nbsp;len)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;sb.append(base64EncodeChars[b1&nbsp;&gt;&gt;&gt;&nbsp;2]);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;sb.append(base64EncodeChars[((b1&nbsp;&amp;&nbsp;0x03)&nbsp;&lt;&lt;&nbsp;4)&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;|&nbsp;((b2&nbsp;&amp;&nbsp;0xf0)&nbsp;&gt;&gt;&gt;&nbsp;4)]);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;sb.append(base64EncodeChars[(b2&nbsp;&amp;&nbsp;0x0f)&nbsp;&lt;&lt;&nbsp;2]);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;sb.append(&quot;=&quot;);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;break;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;b3&nbsp;=&nbsp;data[i++]&nbsp;&amp;&nbsp;0xff;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;sb.append(base64EncodeChars[b1&nbsp;&gt;&gt;&gt;&nbsp;2]);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;sb.append(base64EncodeChars[((b1&nbsp;&amp;&nbsp;0x03)&nbsp;&lt;&lt;&nbsp;4)&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;|&nbsp;((b2&nbsp;&amp;&nbsp;0xf0)&nbsp;&gt;&gt;&gt;&nbsp;4)]);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;sb.append(base64EncodeChars[((b2&nbsp;&amp;&nbsp;0x0f)&nbsp;&lt;&lt;&nbsp;2)&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;|&nbsp;((b3&nbsp;&amp;&nbsp;0xc0)&nbsp;&gt;&gt;&gt;&nbsp;6)]);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;sb.append(base64EncodeChars[b3&nbsp;&amp;&nbsp;0x3f]);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return&nbsp;sb.toString();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;static&nbsp;byte[]&nbsp;decode(String&nbsp;str)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;byte[]&nbsp;data&nbsp;=&nbsp;str.getBytes();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;int&nbsp;len&nbsp;=&nbsp;data.length;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ByteArrayOutputStream&nbsp;buf&nbsp;=&nbsp;new&nbsp;ByteArrayOutputStream(len);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;int&nbsp;i&nbsp;=&nbsp;0;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;int&nbsp;b1,&nbsp;b2,&nbsp;b3,&nbsp;b4;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;while&nbsp;(i&nbsp;&lt;&nbsp;len)&nbsp;{&nbsp;/*&nbsp;b1&nbsp;*/&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;do&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;b1&nbsp;=&nbsp;base64DecodeChars[data[i++]];&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;while&nbsp;(i&nbsp;&lt;&nbsp;len&nbsp;&amp;&amp;&nbsp;b1&nbsp;==&nbsp;-1);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if&nbsp;(b1&nbsp;==&nbsp;-1)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;break;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;/*&nbsp;b2&nbsp;*/&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;do&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;b2&nbsp;=&nbsp;base64DecodeChars[data[i++]];&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;while&nbsp;(i&nbsp;&lt;&nbsp;len&nbsp;&amp;&amp;&nbsp;b2&nbsp;==&nbsp;-1);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if&nbsp;(b2&nbsp;==&nbsp;-1)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;break;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;buf.write((int)&nbsp;((b1&nbsp;&lt;&lt;&nbsp;2)&nbsp;|&nbsp;((b2&nbsp;&amp;&nbsp;0x30)&nbsp;&gt;&gt;&gt;&nbsp;4)));&nbsp;/*&nbsp;b3&nbsp;*/&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;do&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;b3&nbsp;=&nbsp;data[i++];&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if&nbsp;(b3&nbsp;==&nbsp;61)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return&nbsp;buf.toByteArray();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;b3&nbsp;=&nbsp;base64DecodeChars[b3];&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;while&nbsp;(i&nbsp;&lt;&nbsp;len&nbsp;&amp;&amp;&nbsp;b3&nbsp;==&nbsp;-1);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if&nbsp;(b3&nbsp;==&nbsp;-1)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;break;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;buf.write((int)&nbsp;(((b2&nbsp;&amp;&nbsp;0x0f)&nbsp;&lt;&lt;&nbsp;4)&nbsp;|&nbsp;((b3&nbsp;&amp;&nbsp;0x3c)&nbsp;&gt;&gt;&gt;&nbsp;2)));&nbsp;/*&nbsp;b4&nbsp;*/&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;do&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;b4&nbsp;=&nbsp;data[i++];&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if&nbsp;(b4&nbsp;==&nbsp;61)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return&nbsp;buf.toByteArray();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;b4&nbsp;=&nbsp;base64DecodeChars[b4];&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;while&nbsp;(i&nbsp;&lt;&nbsp;len&nbsp;&amp;&amp;&nbsp;b4&nbsp;==&nbsp;-1);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if&nbsp;(b4&nbsp;==&nbsp;-1)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;break;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;buf.write((int)&nbsp;(((b3&nbsp;&amp;&nbsp;0x03)&nbsp;&lt;&lt;&nbsp;6)&nbsp;|&nbsp;b4));&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return&nbsp;buf.toByteArray();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;static&nbsp;void&nbsp;main(String[]&nbsp;args)&nbsp;throws&nbsp;Exception&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;System.out.println(encode(&quot;liao&quot;.getBytes()));&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;System.out.println(new&nbsp;String(decode(encode(&quot;1&quot;.getBytes()))));&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>}&nbsp;&nbsp;</li>
+</ol>
+
+<p><br />
+<strong>最后附上工具类代码：</strong></p>
+
+<p>&nbsp;</p>
+
+<p>&nbsp;</p>
+
+<p><strong>[java]</strong>&nbsp;<a href="http://blog.csdn.net/jspping/article/details/52538440#" onclick="dp.sh.Toolbar.Command('ViewSource',this);return false;" title="view plain">view plain</a>&nbsp;<a href="http://blog.csdn.net/jspping/article/details/52538440#" onclick="dp.sh.Toolbar.Command('CopyToClipboard',this);return false;" title="copy">copy</a></p>
+
+<p><embed allowscriptaccess="always" bgcolor="#ffffff" height="18" pluginspage="http://www.macromedia.com/go/getflashplayer" quality="best" src="http://static.blog.csdn.net/scripts/ZeroClipboard/ZeroClipboard.swf" type="application/x-shockwave-flash" width="18" wmode="transparent"></embed></p>
+
+<ol start="1">
+	<li>package&nbsp;com.rmt.online.tools;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>/**&nbsp;</li>
+	<li>&nbsp;*&nbsp;class:&nbsp;&nbsp;TencentUtils&nbsp;</li>
+	<li>&nbsp;*&nbsp;author:&nbsp;Engineer-Jsp&nbsp;</li>
+	<li>&nbsp;*&nbsp;use:&nbsp;&nbsp;&nbsp;&nbsp;Tencent&nbsp;cos&nbsp;cdn&nbsp;upload&nbsp;and&nbsp;download&nbsp;utils&nbsp;</li>
+	<li>&nbsp;*&nbsp;date:&nbsp;&nbsp;&nbsp;2016/09/14&nbsp;</li>
+	<li>&nbsp;*&nbsp;*/&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>import&nbsp;java.text.SimpleDateFormat;&nbsp;&nbsp;</li>
+	<li>import&nbsp;java.util.Date;&nbsp;&nbsp;</li>
+	<li>import&nbsp;java.util.Random;&nbsp;&nbsp;</li>
+	<li>import&nbsp;javax.crypto.Mac;&nbsp;&nbsp;</li>
+	<li>import&nbsp;javax.crypto.SecretKey;&nbsp;&nbsp;</li>
+	<li>import&nbsp;javax.crypto.spec.SecretKeySpec;&nbsp;&nbsp;</li>
+	<li>import&nbsp;android.annotation.SuppressLint;&nbsp;&nbsp;</li>
+	<li>import&nbsp;android.content.Context;&nbsp;&nbsp;</li>
+	<li>import&nbsp;android.graphics.Bitmap;&nbsp;&nbsp;</li>
+	<li>import&nbsp;android.graphics.BitmapFactory;&nbsp;&nbsp;</li>
+	<li>import&nbsp;android.util.Log;&nbsp;&nbsp;</li>
+	<li>import&nbsp;com.rmt.online.preference.ParamPreference;&nbsp;&nbsp;</li>
+	<li>import&nbsp;com.tencent.download.Downloader;&nbsp;&nbsp;</li>
+	<li>import&nbsp;com.tencent.download.core.DownloadResult;&nbsp;&nbsp;</li>
+	<li>import&nbsp;com.tencent.upload.UploadManager;&nbsp;&nbsp;</li>
+	<li>import&nbsp;com.tencent.upload.Const.FileType;&nbsp;&nbsp;</li>
+	<li>import&nbsp;com.tencent.upload.task.IUploadTaskListener;&nbsp;&nbsp;</li>
+	<li>import&nbsp;com.tencent.upload.task.ITask.TaskState;&nbsp;&nbsp;</li>
+	<li>import&nbsp;com.tencent.upload.task.data.FileInfo;&nbsp;&nbsp;</li>
+	<li>import&nbsp;com.tencent.upload.task.impl.FileUploadTask;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>public&nbsp;class&nbsp;TencentUtils&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;static&nbsp;boolean&nbsp;DEBUG&nbsp;=&nbsp;true;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;private&nbsp;static&nbsp;final&nbsp;String&nbsp;MAC_NAME&nbsp;=&nbsp;&quot;HmacSHA1&quot;;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;private&nbsp;static&nbsp;final&nbsp;String&nbsp;ENCODING&nbsp;=&nbsp;&quot;UTF-8&quot;;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;/**&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;*&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;*&nbsp;@param&nbsp;SecretKey&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;*&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;密钥&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;*&nbsp;@param&nbsp;EncryptText&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;*&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;签名串&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;*&nbsp;@return&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;*&nbsp;@throws&nbsp;Exception&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;*/&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;static&nbsp;byte[]&nbsp;HmacSHA1Encrypt(String&nbsp;SecretKey,&nbsp;String&nbsp;EncryptText)&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;throws&nbsp;Exception&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;byte[]&nbsp;data&nbsp;=&nbsp;SecretKey.getBytes(ENCODING);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;SecretKey&nbsp;secretKey&nbsp;=&nbsp;new&nbsp;SecretKeySpec(data,&nbsp;MAC_NAME);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Mac&nbsp;mac&nbsp;=&nbsp;Mac.getInstance(MAC_NAME);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;mac.init(secretKey);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;byte[]&nbsp;text&nbsp;=&nbsp;EncryptText.getBytes(ENCODING);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return&nbsp;mac.doFinal(text);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;static&nbsp;long&nbsp;getLinuxDateSimple()&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;try&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;long&nbsp;unixTimestamp&nbsp;=&nbsp;System.currentTimeMillis()&nbsp;/&nbsp;1000L;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return&nbsp;unixTimestamp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;catch&nbsp;(Exception&nbsp;e)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;e.printStackTrace();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return&nbsp;-1;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;@SuppressLint(&quot;SimpleDateFormat&quot;)&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;static&nbsp;long&nbsp;getFurureLinuxDate()&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;try&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;String&nbsp;futureTime&nbsp;=&nbsp;ParamPreference.TENCENT_COS_FUTURE_LINUXTIME;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Date&nbsp;date&nbsp;=&nbsp;new&nbsp;SimpleDateFormat(&quot;yyyy/MM/dd&nbsp;HH:mm:ss&quot;)&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;.parse(futureTime);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;long&nbsp;unixTimestamp&nbsp;=&nbsp;date.getTime()&nbsp;/&nbsp;1000L;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return&nbsp;unixTimestamp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;catch&nbsp;(Exception&nbsp;e)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;e.printStackTrace();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return&nbsp;-1;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;private&nbsp;static&nbsp;String&nbsp;getRandomTenStr()&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;String&nbsp;randomstr&nbsp;=&nbsp;null;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;randomstr&nbsp;=&nbsp;String.valueOf(new&nbsp;Random().nextInt(8)&nbsp;+&nbsp;1);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;int&nbsp;random&nbsp;=&nbsp;new&nbsp;Random().nextInt(3)&nbsp;+&nbsp;5;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;for&nbsp;(int&nbsp;i&nbsp;=&nbsp;0;&nbsp;i&nbsp;&lt;&nbsp;random;&nbsp;i++)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;randomstr&nbsp;+=&nbsp;String.valueOf(new&nbsp;Random().nextInt(9));&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return&nbsp;randomstr;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;static&nbsp;String&nbsp;getSignOriginal()&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return&nbsp;String.format(TencentUpload.Original,&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ParamPreference.TENCENT_COS_APPID,&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ParamPreference.TENCENT_COS_BUCKET,&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ParamPreference.TENCENT_COS_SECRET_ID,&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;String.valueOf(getFurureLinuxDate()),&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;String.valueOf(getLinuxDateSimple()),&nbsp;getRandomTenStr());&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;static&nbsp;class&nbsp;TencentUpload&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;static&nbsp;final&nbsp;String&nbsp;TAG&nbsp;=&nbsp;&quot;TencentUpload&quot;;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;private&nbsp;static&nbsp;UploadManager&nbsp;mFileUploadManager&nbsp;=&nbsp;null;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;private&nbsp;FileUploadTask&nbsp;fileUploadTask&nbsp;=&nbsp;null;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;static&nbsp;String&nbsp;Original&nbsp;=&nbsp;&quot;a=%s&amp;b=%s&amp;k=%s&amp;e=%s&amp;t=%s&amp;r=%s&amp;f=&quot;;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;private&nbsp;static&nbsp;TencentUpload&nbsp;mTencentUpload&nbsp;=&nbsp;null;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;private&nbsp;static&nbsp;Context&nbsp;mContext&nbsp;=&nbsp;null;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;static&nbsp;TencentUpload&nbsp;initTencentUpload(Context&nbsp;context)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;mContext&nbsp;=&nbsp;context;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if&nbsp;(mTencentUpload&nbsp;==&nbsp;null)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;mTencentUpload&nbsp;=&nbsp;new&nbsp;TencentUpload();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if&nbsp;(mFileUploadManager&nbsp;==&nbsp;null)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;mFileUploadManager&nbsp;=&nbsp;new&nbsp;UploadManager(context,&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ParamPreference.TENCENT_COS_APPID,&nbsp;FileType.File,&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ParamPreference.TENCENT_COS_PERSISTENCEID);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return&nbsp;mTencentUpload;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;void&nbsp;statrtUpLoad(String&nbsp;loacFilePath,&nbsp;String&nbsp;filename)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if&nbsp;(DEBUG)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Log.v(TAG,&nbsp;&quot;DEBUG:&quot;&nbsp;+&nbsp;&quot;\nbucket:&quot;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;+&nbsp;ParamPreference.TENCENT_COS_BUCKET&nbsp;+&nbsp;&quot;\nsrcFilePath:&quot;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;+&nbsp;loacFilePath&nbsp;+&nbsp;&quot;\ndestPath:&quot;&nbsp;+&nbsp;&quot;/&quot;&nbsp;+&nbsp;filename);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;fileUploadTask&nbsp;=&nbsp;new&nbsp;FileUploadTask(&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ParamPreference.TENCENT_COS_BUCKET,&nbsp;loacFilePath,&nbsp;&quot;/&quot;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;+&nbsp;filename,&nbsp;&quot;&quot;,&nbsp;false,&nbsp;new&nbsp;IUploadTaskListener()&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;@Override&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;void&nbsp;onUploadFailed(final&nbsp;int&nbsp;errorCode,&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;final&nbsp;String&nbsp;errorMsg)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Log.v(TAG,&nbsp;&quot;上传失败&nbsp;ret:&quot;&nbsp;+&nbsp;errorCode&nbsp;+&nbsp;&quot;&nbsp;msg:&quot;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;+&nbsp;errorMsg);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;@Override&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;void&nbsp;onUploadProgress(final&nbsp;long&nbsp;totalSize,&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;final&nbsp;long&nbsp;sendSize)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;long&nbsp;p&nbsp;=&nbsp;(long)&nbsp;((sendSize&nbsp;*&nbsp;100)&nbsp;/&nbsp;(totalSize&nbsp;*&nbsp;1.0f));&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Log.v(TAG,&nbsp;&quot;上传中:&nbsp;&quot;&nbsp;+&nbsp;p&nbsp;+&nbsp;&quot;%&quot;);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;@Override&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;void&nbsp;onUploadStateChange(TaskState&nbsp;arg0)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;@Override&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;void&nbsp;onUploadSucceed(final&nbsp;FileInfo&nbsp;result)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Log.v(TAG,&nbsp;&quot;上传成功，下载路径:&nbsp;&quot;&nbsp;+&nbsp;result.url);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if&nbsp;(DEBUG)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if&nbsp;(mContext&nbsp;==&nbsp;null)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;TencentDownload.initTencentDownload(mContext)&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;.startDownLoad(result.url);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;});&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;try&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;fileUploadTask.setAuth(getTencentSign());&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;mFileUploadManager.upload(fileUploadTask);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;catch&nbsp;(Exception&nbsp;e)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;e.printStackTrace();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;String&nbsp;getTencentSign()&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;try&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;String&nbsp;Original&nbsp;=&nbsp;TencentUtils.getSignOriginal();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;byte[]&nbsp;HmacSHA1&nbsp;=&nbsp;TencentUtils.HmacSHA1Encrypt(&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ParamPreference.TENCENT_COS_SECRET_KEY,&nbsp;Original);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;byte[]&nbsp;all&nbsp;=&nbsp;new&nbsp;byte[HmacSHA1.length&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;+&nbsp;Original.getBytes(ENCODING).length];&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;System.arraycopy(HmacSHA1,&nbsp;0,&nbsp;all,&nbsp;0,&nbsp;HmacSHA1.length);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;System.arraycopy(Original.getBytes(ENCODING),&nbsp;0,&nbsp;all,&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;HmacSHA1.length,&nbsp;Original.getBytes(ENCODING).length);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if&nbsp;(DEBUG)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Log.v(TencentUpload.TAG,&nbsp;&quot;getTencentSign()&nbsp;Original:\n&quot;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;+&nbsp;Original);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;String&nbsp;SignData&nbsp;=&nbsp;Base64Util.encode(all);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if&nbsp;(DEBUG)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Log.v(TencentUpload.TAG,&nbsp;&quot;getTencentSign()&nbsp;SignData:\n&quot;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;+&nbsp;SignData);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return&nbsp;SignData;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;catch&nbsp;(Exception&nbsp;e)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;e.printStackTrace();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return&nbsp;&quot;get&nbsp;sign&nbsp;failed&quot;;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;static&nbsp;class&nbsp;TencentDownload&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;private&nbsp;static&nbsp;final&nbsp;String&nbsp;TAG&nbsp;=&nbsp;&quot;TencentDownload&quot;;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;private&nbsp;static&nbsp;TencentDownload&nbsp;mTencentDownload&nbsp;=&nbsp;null;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;private&nbsp;static&nbsp;Downloader&nbsp;mDownloader&nbsp;=&nbsp;null;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;static&nbsp;TencentDownload&nbsp;initTencentDownload(Context&nbsp;context)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if&nbsp;(mTencentDownload&nbsp;==&nbsp;null)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;mTencentDownload&nbsp;=&nbsp;new&nbsp;TencentDownload();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if&nbsp;(mDownloader&nbsp;==&nbsp;null)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;mDownloader&nbsp;=&nbsp;new&nbsp;Downloader(context,&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ParamPreference.TENCENT_COS_APPID,&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ParamPreference.TENCENT_COS_PERSISTENCEID);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return&nbsp;mTencentDownload;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;void&nbsp;startDownLoad(String&nbsp;downloadUrl)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;mDownloader.download(downloadUrl,&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;new&nbsp;Downloader.DownloadListener()&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;@Override&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;void&nbsp;onDownloadSucceed(final&nbsp;String&nbsp;url,&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;final&nbsp;DownloadResult&nbsp;result)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;String&nbsp;file_path&nbsp;=&nbsp;result.getPath();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Bitmap&nbsp;bmp&nbsp;=&nbsp;decodeSampledBitmap(file_path,&nbsp;2);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Log.v(TAG,&nbsp;&quot;下载完成：&quot;&nbsp;+&nbsp;bmp.toString());&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;@Override&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;void&nbsp;onDownloadProgress(String&nbsp;url,&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;long&nbsp;totalSize,&nbsp;final&nbsp;float&nbsp;progress)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;long&nbsp;nProgress&nbsp;=&nbsp;(int)&nbsp;(progress&nbsp;*&nbsp;100);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Log.i(TAG,&nbsp;&quot;下载进度:&nbsp;&quot;&nbsp;+&nbsp;nProgress&nbsp;+&nbsp;&quot;%&quot;);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;@Override&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;void&nbsp;onDownloadFailed(String&nbsp;url,&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;DownloadResult&nbsp;result)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;@Override&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;void&nbsp;onDownloadCanceled(String&nbsp;url)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;});&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;static&nbsp;Bitmap&nbsp;decodeSampledBitmap(String&nbsp;path,&nbsp;int&nbsp;sample)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;final&nbsp;BitmapFactory.Options&nbsp;options&nbsp;=&nbsp;new&nbsp;BitmapFactory.Options();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;options.inJustDecodeBounds&nbsp;=&nbsp;true;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;options.inSampleSize&nbsp;=&nbsp;sample;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;options.inJustDecodeBounds&nbsp;=&nbsp;false;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return&nbsp;BitmapFactory.decodeFile(path,&nbsp;options);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>}&nbsp;&nbsp;</li>
+</ol>
+
+<p><br />
+<strong>工具类代码里面附带了上传文件和下载文件的函数，以及打印日志，日志调试开启，将 DEBUG 设为 true 即可，DEBUG 为 true 默认开启下载之前上</strong></p>
+
+<p>&nbsp;</p>
+
+<p><strong>传成功的哪一个文件，文件上传默认的是覆盖模式，即出现同名的文件执行覆盖操作</strong><br />
+&nbsp;</p>
+
+<p><strong>工具类函数解析：</strong></p>
+
+<p><strong>new FileUploadTask(ParamPreference.TENCENT_COS_BUCKET, loacFilePath, &quot;/&quot;+ filename, &quot;&quot;, false, new IUploadTaskListener()...);</strong></p>
+
+<p><strong>ParamPreference.TENCENT_COS_BUCKET 为你的 bucket 名称</strong></p>
+
+<p><strong>loacFilePath 为你的需要上传的文件的绝对路径</strong></p>
+
+<p><strong>&quot;/&quot;+ filename 为你需要上传文件的相对路径 如：/test.png</strong></p>
+
+<p><strong>第四个参数为空</strong></p>
+
+<p><strong>第五个为回调接口实例</strong></p>
+
+<p><strong>至此关于腾讯存储对象COS的使用和加密签名校验等就分享完毕了，谢谢大家的观看！</strong></p>
