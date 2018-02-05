@@ -1,0 +1,111 @@
+<h1>Zookeeper基础</h1>
+
+<p><a href="http://www.yiibai.com/zookeeper/zookeeper_fundamentals.html">原文地址</a></p>
+
+<p>在深入学习ZooKeeper工作之前，让我们一起来看看ZooKeeper 的一些基本概念。我们将在本章讨论下列主题 -</p>
+
+<h2>ZooKeeper的体系结构</h2>
+
+<p>看看下面的图。它描绘ZooKeeper 的&ldquo;客户端 - 服务器架构&rdquo;。</p>
+
+<p><img alt="Architecture of ZooKeeper" src="http://www.yiibai.com/uploads/tutorial/151119/0IIK2V-0.jpg" /></p>
+
+<p>ZooKeeper 架构的一部分组件如下表中所解释。</p>
+
+<table>
+	<tbody>
+		<tr>
+			<th>部分</th>
+			<th>描述</th>
+		</tr>
+		<tr>
+			<td>Client</td>
+			<td>
+			<p>客户端，在我们的分布式应用集群的一个节点，从服务器获取信息。对于一个特定的时间间隔，每个客户端将消息发送到服务器，以让服务器都知道客户机是活的。</p>
+
+			<p>同样，服务器会发送一个确认当客户端连接。如果没有从所连接的服务器的响应，客户端自动重定向消息到另一个服务器</p>
+			</td>
+		</tr>
+		<tr>
+			<td>Server</td>
+			<td>服务器，ZooKeeper集成的一个节点，提供所有的服务提供给客户。给出应答客户，告知该服务器还活着</td>
+		</tr>
+		<tr>
+			<td>合组</td>
+			<td>ZooKeeper 服务器组。节点所需要形成的合奏的最小数目为3</td>
+		</tr>
+		<tr>
+			<td>Leader</td>
+			<td>它执行自动恢复，如果任何连接的节点的故障的服务器节点。领导者服务启动</td>
+		</tr>
+		<tr>
+			<td>Follower</td>
+			<td>遵循领导指示服务器节点</td>
+		</tr>
+	</tbody>
+</table>
+
+<h2>分层命名空间</h2>
+
+<p>下图显示了用于内存中表示 ZooKeeper 文件系统的树形结构。 ZooKeeper节点被称为znode。每个znode由一个名称识别，并通过路径（/）序列隔开。</p>
+
+<ul>
+	<li>
+	<p>在图中，首先有一个根znode，它由&ldquo;/&rdquo;分隔。在根下，有两个逻辑命名空间 config 和 workers。</p>
+	</li>
+	<li>
+	<p>在config命名空间用于集中配置管理以及 workers 命名空间用于命名。</p>
+	</li>
+	<li>
+	<p>在 config 命名空间下，每个znode可以存储高达 1MB 的数据。这类似于UNIX文件系统，不同的是父 znode 也可以存储数据。这种结构的主要目的是存储同步数据以及描述znode的元数据。这种结构被称为 ZooKeeper数据模型。</p>
+	</li>
+</ul>
+
+<p><img alt="Hierarchical Namespace" src="http://www.yiibai.com/uploads/tutorial/151119/0IIIW6-1.jpg" /></p>
+
+<p>在 ZooKeeper 数据模型中每个 znode 维护一个 stat 结构。 一个统计（stat&nbsp;）只是提供了一个 znode 元数据。&nbsp;它由版本号，动作控制列表（ACL），时间戳和数据长度组成。</p>
+
+<ul>
+	<li>
+	<p><strong>版本号</strong>&nbsp;&minus; 每个znode都有一个版本号，这意味着每个相关的时间使用节点改变数据，其相应的版本号也将增加。使用版本号是重要的，在多个 zookeeper 的客户端正在努力通过相同znode执行操作。</p>
+	</li>
+	<li>
+	<p><strong>动作控制列表（ACL）</strong>&nbsp;&minus;ACL是基本的身份验证机制，用于访问znode。它管理所有的znode读写操作。</p>
+	</li>
+	<li>
+	<p><strong>时间戳&nbsp;</strong>&minus; 时间戳表示过去时间，从znode创建和修改起算。它通常以毫秒表示。ZooKeeper 确定每次从&ldquo;事务ID&rdquo;（zxid）更改znodes。Zxid是独特的，为每个事务处理维持时间，使您可以轻松地识别从一个请求到另一个请求经过的时间。</p>
+	</li>
+	<li>
+	<p><strong>数据长度</strong>&nbsp;&minus; 存储在 znode 数据的合计量是数据长度。可以存储的最大数据容量为1MB。</p>
+	</li>
+</ul>
+
+<h3>Znodes 类型</h3>
+
+<p>Znodes 被归类为持久性，顺序和短暂。</p>
+
+<ul>
+	<li>
+	<p><strong>持久性znode</strong>&nbsp;&minus; 持久性 znode 处于活动状态，即使客户端，它创造了特定的 znode。默认情况下，所有的 znodes 是持久的，除非另有说明。</p>
+	</li>
+	<li>
+	<p><strong>短暂znode</strong>&nbsp;&minus; 短暂znodes活跃，直到客户端还活着。当客户端被从 ZooKeeper 集合断开连接，然后znodes自动删除。由于这个原因，只有短暂znodes不允许再有一个子。如果短周期znode被删除，那么下一个合适的节点，将填补其位置。短暂znodes 发挥在领导选举中起重要作用。</p>
+	</li>
+	<li>
+	<p><strong>连续znode</strong><strong>&nbsp;</strong>&minus; 连续znodes可以是持久或短暂的。当一个新的znode作为连续znode创建的，则 ZooKeeper 通过将10位的序列号为原始名称设置znode的路径。例如，如果使用路径 /myapp 来创建一个znode作为连续znode，ZooKeeper将改变路径 /myapp0000000001并设置一个序列号为0000000002。如果两个连续znodes同时被创建，ZooKeeper从来不使用相同数量在每个znode上。连续znodes在锁定和同步中起到重要作用。</p>
+	</li>
+</ul>
+
+<h2>会话</h2>
+
+<p>会话对于 ZooKeeper 操作是非常重要的。请求在会话 FIFO 顺序执行。当一个客户端连接到服务器，会话将建立一个会话ID并分配给客户端。</p>
+
+<p>客户端在特定的时间间隔发送心跳来保持会话有效。如果 ZooKeeper 从客户端接收检测信号超过在服务的开始指定的期间（会话超时），它认为该客户死亡。</p>
+
+<p>会话超时通常以毫秒表示。当一个会话因任何原因而结束，该会话期间短暂创造了的&nbsp;znodes 会被删除。</p>
+
+<h2>监视</h2>
+
+<p>监视是一个简单的机制，在ZooKeeper集合通知下以获取客户有关的变化。 客户端可以设置监视，同时读取特定znode。监视发送通知给注册的客户机对任何znode（在其上的客户端寄存器）的变化。</p>
+
+<p>节点改变时znode或子znode变化相关联的数据也会被修改。监视只被触发一次。如果客户想要再次通知，则必须通过另一次读操作来完成。当一个连接会话已过期，客户端会从服务器断开，并在相关的监视也将被删除。</p>

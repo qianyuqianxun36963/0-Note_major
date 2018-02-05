@@ -1,0 +1,66 @@
+<p><a href="http://www.cnblogs.com/saiwa/articles/5253713.html" id="cb_post_title_url">原文地址</a></p>
+
+<p>本篇将介绍python中sys, getopt模块处理命令行参数</p>
+
+<p>如果想对python脚本传参数，python中对应的argc, argv(c语言的命令行参数)是什么呢？<br />
+需要模块：sys<br />
+参数个数：len(sys.argv)<br />
+<code>脚本名： &nbsp; &nbsp;sys.argv[0]<br />
+参数1： &nbsp; &nbsp;&nbsp;sys.argv[1]<br />
+参数2： &nbsp; &nbsp; sys.argv[2]</code><br />
+<br />
+test.py</p>
+
+<pre>
+import sys
+print &quot;脚本名：&quot;, sys.argv[0]
+for i in range(1, len(sys.argv)):
+    print &quot;参数&quot;, i, sys.argv[i]
+</pre>
+
+<p>&gt;&gt;&gt;python test.py hello world</p>
+
+<p>脚本名：test.py<br />
+参数 1 hello<br />
+参数 2 world</p>
+
+<p>python中使用命令行选项：<br />
+例如我们需要一个convert.py脚本。它的作用是处理一个文件,并将处理后的结果输出到另一个文件中。<br />
+要求该脚本满足以下条件：<br />
+1.通过-i -o选项来区别参数是输入文件还是输出文件.<br />
+&gt;&gt;&gt; python convert.py -i inputfile -o outputfile<br />
+2.当不知道convert.py需要哪些参数时，用-h打印出帮助信息<br />
+&gt;&gt;&gt; python convert.py -h</p>
+
+<p>getopt函数原形:<br />
+getopt.getopt(args, options[, long_options])</p>
+
+<p>convert.py</p>
+
+<pre>
+import sys, getopt
+
+opts, args = getopt.getopt(sys.argv[1:], &quot;hi:o:&quot;)
+input_file=&quot;&quot;
+output_file=&quot;&quot;
+for op, value in opts:
+    if op == &quot;-i&quot;:
+        input_file = value
+    elif op == &quot;-o&quot;:
+        output_file = value
+    elif op == &quot;-h&quot;:
+        usage()
+        sys.exit()
+</pre>
+
+<p><code>代码解释：<br />
+a)&nbsp;sys.argv[1:]为要处理的参数列表，sys.argv[0]为脚本名，所以用sys.argv[1:]过滤掉脚本名。<br />
+b)&nbsp;&quot;hi:o:&quot;: 当一个选项只是表示开关状态时，即后面不带附加参数时，在分析串中写入选项字符。当选项后面是带一个附加参数时，在分析串中写入选项字符同时后面加一个&quot;:&quot;号。所以&quot;hi:o:&quot;就表示&quot;h&quot;是一个开关选项；&quot;i:&quot;和&quot;o:&quot;则表示后面应该带一个参数。<br />
+c)&nbsp;调用getopt函数。函数返回两个列表：opts和args。opts为分析出的格式信息。args为不属于格式信息的剩余的命令行参数。opts是一个两元组的列表。每个元素为：(选项串,附加参数)。如果没有附加参数则为空串&#39;&#39;。</code></p>
+
+<p><code>getopt函数的第三个参数[, long_options]为可选的长选项参数，上面例子中的都为短选项(如-i -o)<br />
+长选项格式举例:<br />
+--version<br />
+--file=error.txt<br />
+让一个脚本同时支持短选项和长选项<br />
+getopt.getopt(sys.argv[1:], &quot;hi:o:&quot;, [&quot;version&quot;, &quot;file=&quot;])</code></p>
