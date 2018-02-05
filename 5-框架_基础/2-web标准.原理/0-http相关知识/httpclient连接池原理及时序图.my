@@ -1,0 +1,906 @@
+<div class="blog_title" style="-webkit-text-stroke-width:0px; margin-bottom:15px; text-align:left">
+<h1 style="margin-left:0px; margin-right:0px">原创]HttpClient连接池原理及一次连接时序图</h1>
+
+<h3 style="margin-left:0px; margin-right:0px"><span style="font-size:12px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><a href="http://ouqi.iteye.com/blog/1844284" style="color:#108ac6; text-decoration:underline">原文地址</a></span></span></h3>
+
+<h2 style="margin-left:0px; margin-right:0px"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:2em"><span style="font-family:&quot;Times New Roman&quot;"><span style="font-size:x-large">1.</span><span style="font-size:x-large">httpClient</span></span><span style="font-size:x-large"><span style="font-family:黑体">介绍</span></span></span></span></span></span></h2>
+</div>
+
+<div class="blog_content" id="blog_content" style="-webkit-text-stroke-width:0px; text-align:left">
+<div class="iteye-blog-content-contain">
+<p style="margin-left:0cm; margin-right:0cm"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:&quot;Times New Roman&quot;,serif">HttpClient</span><span style="font-family:宋体">是一个实现了</span><span style="font-family:&quot;Times New Roman&quot;,serif">http</span><span style="font-family:宋体">协议的开源</span><span style="font-family:&quot;Times New Roman&quot;,serif">Java</span><span style="font-family:宋体">客户端工具库，可以通过程序发送</span><span style="font-family:&quot;Times New Roman&quot;,serif">http</span><span style="font-family:宋体">请求。</span></span></span></span></p>
+
+<p style="margin-left:0cm; margin-right:0cm"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">&nbsp;</span></span></span><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:x-large"><span style="font-family:Arial">1.1.</span></span>&nbsp;&nbsp;<span style="font-size:x-large"><span style="font-family:Arial">HttpClient</span><span style="font-family:黑体">发送请求和接收响应</span></span></span></span></span></p>
+
+<h3 style="margin-left:0px; margin-right:0px"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-size:12px"><span style="font-size:12px"><span style="font-family:&quot;Times New Roman&quot;"><span style="font-size:medium">1.1.1.</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></span></span></span><strong><span style="font-size:medium"><span style="font-size:12px"><span style="font-family:宋体">代码示例</span></span></span></strong></span></span></span></h3>
+
+<p style="margin-left:0cm; margin-right:0cm"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:宋体">以</span><span style="font-family:&quot;Times New Roman&quot;">Get</span><span style="font-family:宋体">请求为例，以下代码获得</span><span style="font-family:&quot;Times New Roman&quot;">google</span><span style="font-family:宋体">主页内容并将返回结果打印出来。</span></span></span></span></p>
+
+<div style="padding:1pt 4pt">
+<p style="margin-left:0cm; margin-right:0cm"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:&quot;Times New Roman&quot;">public final static void main(String[] args) throws Exception {</span></span></span></span></p>
+
+<p style="margin-left:0cm; margin-right:0cm"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">&nbsp;</span></span></span><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="font-family:&quot;Times New Roman&quot;">HttpClient</span><span style="font-family:&quot;Times New Roman&quot;">&nbsp;httpclient = new DefaultHttpClient();</span></span></span></span></p>
+
+<p style="margin-left:0cm; margin-right:0cm"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:&quot;Times New Roman&quot;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;try {</span></span></span></span></p>
+
+<p style="margin-left:0cm; margin-right:0cm"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:&quot;Times New Roman&quot;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;HttpGet httpget = new HttpGet(&quot;http://www.google.com/&quot;);</span></span></span></span></p>
+
+<p style="margin-left:0cm; margin-right:0cm"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:&quot;Times New Roman&quot;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;System.out.println(&quot;executing request &quot; + httpget.getURI());</span></span></span></span></p>
+
+<p style="margin-left:0cm; margin-right:0cm"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:&quot;Times New Roman&quot;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//&nbsp;</span><span style="font-family:宋体">创建</span><span style="font-family:&quot;Times New Roman&quot;">response</span><span style="font-family:宋体">处理器</span></span></span></span></p>
+
+<p style="margin-left:0cm; margin-right:0cm"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:&quot;Times New Roman&quot;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ResponseHandler&lt;String&gt; responseHandler = new BasicResponseHandler();</span></span></span></span></p>
+
+<p style="margin-left:0cm; margin-right:0cm"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:&quot;Times New Roman&quot;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;String responseBody = httpclient.execute(httpget, responseHandler);</span></span></span></span></p>
+
+<p style="margin-left:0cm; margin-right:0cm"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:&quot;Times New Roman&quot;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;System.out.println(&quot;----------------------------------------&quot;);</span></span></span></span></p>
+
+<p style="margin-left:0cm; margin-right:0cm"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:&quot;Times New Roman&quot;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;System.out.println(responseBody);</span></span></span></span></p>
+
+<p style="margin-left:0cm; margin-right:0cm"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:&quot;Times New Roman&quot;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;System.out.println(&quot;----------------------------------------&quot;);</span></span></span></span></p>
+
+<p style="margin-left:0cm; margin-right:0cm"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:&quot;Times New Roman&quot;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;} finally {</span></span></span></span></p>
+
+<p style="margin-left:0cm; margin-right:0cm"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:&quot;Times New Roman&quot;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//HttpClient</span><span style="font-family:宋体">不再使用时，关闭连接管理器以保证所有资源的释放</span></span></span></span></p>
+
+<p style="margin-left:0cm; margin-right:0cm"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:&quot;Times New Roman&quot;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;httpclient.getConnectionManager().shutdown();</span></span></span></span></p>
+
+<p style="margin-left:0cm; margin-right:0cm"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:&quot;Times New Roman&quot;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}</span></span></span></span></p>
+
+<p style="margin-left:0cm; margin-right:0cm"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:&quot;Times New Roman&quot;">&nbsp;&nbsp;&nbsp;&nbsp;}</span></span></span></span></p>
+</div>
+
+<h3 style="margin-left:0px; margin-right:0px"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-size:12px"><span style="font-size:12px"><span style="font-family:&quot;Times New Roman&quot;"><strong><span style="font-size:medium">1.1.2.</span></strong>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></span></span></span><strong><span style="font-size:medium"><span style="font-size:12px"><span style="font-family:宋体">时序图</span></span></span></strong></span></span></span></h3>
+
+<p style="margin-left:21pt; margin-right:0cm"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:&quot;Times New Roman&quot;">httpClient</span><span style="font-family:宋体">执行一次请求，即运行一次</span><span style="font-family:&quot;Times New Roman&quot;">httpclient.execute()</span><span style="font-family:宋体">方法，时序图如下：</span></span></span></span></p>
+
+<p style="margin-left:21pt; margin-right:0cm"><br />
+<span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:宋体"><img alt="" class="magplus" src="http://dl.iteye.com/upload/attachment/0082/8390/6375a1ff-0882-3c76-8681-851956fcdebc.jpg" style="border:0px; cursor:url(&quot;/images/magplus.gif&quot;), pointer; height:517px; width:1200px" title="点击查看原始大小图片" /><br />
+&nbsp;</span></span></span></span></p>
+
+<p style="margin-left:21pt; margin-right:0cm"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">&nbsp;</span></span></span></p>
+
+<p style="margin-left:0cm; margin-right:0cm"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">&nbsp;</span></span></span></p>
+
+<h3 style="margin-left:0px; margin-right:0px"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-size:12px"><span style="font-size:12px"><span style="font-family:&quot;Times New Roman&quot;"><strong><span style="font-size:medium">1.1.3.</span></strong>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></span></span></span><strong><span style="font-size:medium"><span style="font-size:12px"><span style="font-family:宋体">时序图说明</span></span></span></strong></span></span></span></h3>
+
+<h4 style="margin-left:42.55pt; margin-right:0cm"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:medium"><span style="font-family:Arial">1.1.3.1.</span></span>&nbsp;&nbsp;&nbsp;<span style="font-size:medium"><span style="font-family:黑体">时序图编号说明</span></span></span></span></span></h4>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:Wingdings">&sup2;&nbsp;&nbsp;</span><span style="font-family:Calibri">1.1</span><span style="font-family:宋体">、</span><span style="font-family:Calibri">1.2</span><span style="font-family:宋体">、</span><span style="font-family:Calibri">1.3</span><span style="font-family:宋体">等均为操作</span><span style="font-family:Calibri">1</span><span style="font-family:宋体">的子操作，即：操作</span><span style="font-family:Calibri">1 execute()</span><span style="font-family:宋体">中又分别调用了操作</span><span style="font-family:Calibri">1.1 createClientConnectionManager()</span><span style="font-family:宋体">、操作</span><span style="font-family:Calibri">1.2 createClientRequestDirector()</span><span style="font-family:宋体">以及操作</span><span style="font-family:Calibri">1.3 requestDirector&nbsp;</span><span style="font-family:宋体">对象的</span><span style="font-family:Calibri">execute()</span><span style="font-family:宋体">方法等，以此类推。</span></span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:Wingdings">&sup2;&nbsp;&nbsp;</span><span style="font-family:宋体">按时间先后顺序分别编号为</span><span style="font-family:Calibri">1,2,3</span><span style="font-family:宋体">等，以此类推。</span></span></span></span></p>
+
+<h4 style="margin-left:42.55pt; margin-right:0cm"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:medium"><span style="font-family:Arial">1.1.3.2.</span></span>&nbsp;&nbsp;&nbsp;<span style="font-size:medium"><span style="font-family:黑体">主要类说明</span></span></span></span></span></h4>
+
+<p><br />
+<span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:medium"><span style="font-family:黑体"><img alt="" class="magplus" src="http://dl.iteye.com/upload/attachment/0082/8394/61e39e8d-8915-33cf-91d1-db0a8be7bc23.jpg" style="border:0px; cursor:url(&quot;/images/magplus.gif&quot;), pointer; height:534px; width:1200px" title="点击查看原始大小图片" /><br />
+&nbsp;</span></span></span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:Wingdings">&sup2;&nbsp;&nbsp;</span><span style="font-family:宋体">对于图中各对象，</span><span style="font-family:Calibri">httpClient jar</span><span style="font-family:宋体">包中均提供对应的接口及相应的实现类。</span></span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:Wingdings">&sup2;&nbsp;&nbsp;</span><span style="font-family:宋体">图中直接与服务器进行</span><span style="font-family:Calibri">socket</span><span style="font-family:宋体">通信的是最右端接口</span><span style="font-family:Calibri">OperatedClientConnection</span><span style="font-family:宋体">某一实现类的对象，图中从右到左进行了层层的封装，最终开发人员直接使用的是接口</span><span style="font-family:Calibri">HttpClient</span><span style="font-family:宋体">某一实现类的对象进行请求的发送和响应的接收（如</span><span style="font-family:Calibri">2.1.1</span><span style="font-family:宋体">代码示例）。</span></span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:Wingdings">&sup2;&nbsp;&nbsp;</span><span style="font-family:宋体">时序图中各对象所在类关系如下图类图所示（仅列出图中所出现的各个类及方法，参数多的方法省略部分参数，其他类属性和操作请参照源码）：</span></span></span></span></p>
+
+<p style="margin-left:21pt; margin-right:0cm"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">&nbsp;</span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><strong><span style="font-family:Arial">1.1.3.2.1.</span></strong>&nbsp;&nbsp;<strong><span style="font-family:黑体">接口</span><span style="font-family:Arial">OperatedClientConnection</span></strong></span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:Wingdings">&sup2;&nbsp;&nbsp;</span><span style="font-family:宋体">该接口对应一个</span><span style="font-family:Calibri">http</span><span style="font-family:宋体">连接，与服务器端建立</span><span style="font-family:Calibri">socket</span><span style="font-family:宋体">连接进行通信。</span></span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><strong><span style="font-family:Arial">1.1.3.2.2.</span></strong>&nbsp;&nbsp;<strong><span style="font-family:黑体">接口</span><span style="font-family:Arial">ManagedClientConnection</span></strong></span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:Wingdings">&sup2;&nbsp;&nbsp;</span><span style="font-family:宋体">该接口对一个</span><span style="font-family:Calibri">http</span><span style="font-family:宋体">连接</span><span style="font-family:Calibri">OperatedClientConnection</span><span style="font-family:宋体">进行封装，</span><span style="font-family:Calibri">ManagedClientConnection</span><span style="font-family:宋体">维持一个</span><span style="font-family:Calibri">PoolEntry&lt;HttpRoute, OperatedClientConnection&gt;</span><span style="font-family:宋体">路由和连接的对应。提供方法获得对应连接管理器，对</span><span style="font-family:Calibri">http</span><span style="font-family:宋体">连接的各类方法，如建立连接，获得相应，关闭连接等进行封装。</span></span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><strong><span style="font-family:Arial">1.1.3.2.3.</span></strong>&nbsp;&nbsp;<strong><span style="font-family:黑体">接口</span><span style="font-family:Arial">RequestDirector</span></strong></span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:Wingdings">&sup2;&nbsp;&nbsp;</span><span style="font-family:Calibri">RequestDirector</span><span style="font-family:宋体">为消息的发送执行者，该接口负责消息路由的选择和可能的重定向，消息的鉴权，连接的分配回收（调用</span><span style="font-family:Calibri">ClientConnectionManager</span><span style="font-family:宋体">相关方法），建立，关闭等并控制连接的保持。</span></span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:Wingdings">&sup2;&nbsp;&nbsp;</span><span style="font-family:宋体">连接是否保持以及保持时间默认原则如下：</span></span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:Wingdings">n&nbsp;&nbsp;</span><strong><span style="font-family:宋体">连接是否保持</span></strong><span style="font-family:宋体">：客户端如果希望保持长连接，应该在发起请求时告诉服务器希望服务器保持长连接（</span><span style="font-family:Calibri">http 1.0</span><span style="font-family:宋体">设置</span><span style="font-family:Calibri">connection</span><span style="font-family:宋体">字段为</span><span style="font-family:Calibri">keep-alive</span><span style="font-family:宋体">，</span><span style="font-family:Calibri">http 1.1</span><span style="font-family:宋体">字段默认保持）。根据服务器的响应来确定是否保持长连接，判断原则如下：</span></span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:Wingdings">u&nbsp;&nbsp;</span><span style="font-family:宋体">检查返回</span><span style="font-family:Calibri">response</span><span style="font-family:宋体">报文头的</span><span style="font-family:Calibri">Transfer-Encoding</span><span style="font-family:宋体">字段，若该字段值存在且不为</span><span style="font-family:Calibri">chunked</span><span style="font-family:宋体">，则连接不保持，直接关闭。其他情况进入下一步。</span></span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:Wingdings">u&nbsp;&nbsp;</span><span style="font-family:宋体">检查返回的</span><span style="font-family:Calibri">response</span><span style="font-family:宋体">报文头的</span><span style="font-family:Calibri">Content-Length</span><span style="font-family:宋体">字段，若该字段值为空或者格式不正确（多个长度，值不是整数），则连接不保持，直接关闭。其他情况进入下一步</span></span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:Wingdings">u&nbsp;&nbsp;</span><span style="font-family:宋体">检查返回的</span><span style="font-family:Calibri">response</span><span style="font-family:宋体">报文头的</span><span style="font-family:Calibri">connection</span><span style="font-family:宋体">字段（若该字段不存在，则为</span><span style="font-family:Calibri">Proxy-Connection</span><span style="font-family:宋体">字段）值</span></span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:Wingdings">l&nbsp;&nbsp;</span><span style="font-family:宋体">如果这俩字段都不存在，则</span><span style="font-family:Calibri">http 1.1</span><span style="font-family:宋体">版本默认为保持，将连接标记为保持，</span><span style="font-family:Calibri">&nbsp;1.0</span><span style="font-family:宋体">版本默认为连接不保持，直接关闭。</span></span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:Wingdings">l&nbsp;&nbsp;</span><span style="font-family:宋体">如果字段存在，若字段值为</span><span style="font-family:Calibri">close&nbsp;</span><span style="font-family:宋体">则连接不保持，直接关闭；若字段值为</span><span style="font-family:Calibri">keep-alive</span><span style="font-family:宋体">则连接标记为保持。</span></span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:Wingdings">n&nbsp;&nbsp;</span><strong><span style="font-family:宋体">连接保持时间</span></strong><span style="font-family:宋体">：连接交换至连接管理时，若连接标记为保持，则将由连接管理器保持一段时间；若连接没有标记为保持，则直接从连接池中删除并关闭</span><span style="font-family:Calibri">entry</span><span style="font-family:宋体">。连接保持时，保持时间规则如下：</span></span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:Wingdings">u&nbsp;&nbsp;</span><span style="font-family:宋体">保持时间计时开始时间为连接交换至连接池的时间。</span></span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:Wingdings">u&nbsp;&nbsp;</span><span style="font-family:宋体">保持时长计算规则为：获取</span><span style="font-family:Calibri">keep-alive</span><span style="font-family:宋体">字段中</span><span style="font-family:Calibri">timeout</span><span style="font-family:宋体">属性的值，</span></span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:Wingdings">l&nbsp;&nbsp;</span><span style="font-family:宋体">若该字段存在，则保持时间为</span><span style="font-family:Calibri">&nbsp;timeout</span><span style="font-family:宋体">属性值</span><span style="font-family:Calibri">*1000</span><span style="font-family:宋体">，单位毫秒。</span></span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:Wingdings">l&nbsp;&nbsp;</span><span style="font-family:宋体">若该字段不存在，则连接保持时间设置为</span><span style="font-family:Calibri">-1</span><span style="font-family:宋体">，表示为无穷。</span></span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:Wingdings">n&nbsp;&nbsp;</span><span style="font-family:宋体">响应头日志示例：</span></span></span></span></p>
+
+<div style="padding:1pt 4pt">
+<p style="margin-left:0cm; margin-right:0cm"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:&quot;Times New Roman&quot;">17:59:42.051 [main] DEBUG org.apache.http.headers - &lt;&lt;&nbsp;Keep-Alive: timeout=5, max=100</span></span></span></span></p>
+
+<p style="margin-left:0cm; margin-right:0cm"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:&quot;Times New Roman&quot;">17:59:42.051 [main] DEBUG org.apache.http.headers - &lt;&lt;&nbsp;Connection: Keep-Alive</span></span></span></span></p>
+
+<p style="margin-left:0cm; margin-right:0cm"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:&quot;Times New Roman&quot;">17:59:42.051 [main] DEBUG org.apache.http.headers - &lt;&lt; Content-Type: text/html; charset=utf-8</span></span></span></span></p>
+
+<p style="margin-left:0cm; margin-right:0cm"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:&quot;Times New Roman&quot;">17:59:42.062 [main] DEBUG c.ebupt.omp.sop.srmms.SopHttpClient - Connection can be kept alive for&nbsp;5000 MILLISECONDS</span></span></span></span></p>
+</div>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:Wingdings">n&nbsp;&nbsp;</span><span style="font-family:宋体">若需要修改连接的保持及重用默认原则，则需编写子类继承自</span><span style="font-family:Calibri">AbstractHttpClient</span><span style="font-family:宋体">，分别覆盖其</span><span style="font-family:Calibri">&nbsp;&nbsp;&nbsp;createConnectionReuseStrategy()&nbsp;</span><span style="font-family:宋体">和</span><span style="font-family:Calibri">createConnectionKeepAliveStrategy()&nbsp;</span><span style="font-family:宋体">方法。</span></span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><strong><span style="font-family:Arial">1.1.3.2.4.</span></strong>&nbsp;&nbsp;<strong><span style="font-family:黑体">接口</span><span style="font-family:Arial">ClientConnectionManager</span></strong></span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:Wingdings">&sup2;&nbsp;&nbsp;</span><span style="font-family:Calibri">ClientConnectionManager</span><span style="font-family:宋体">为连接池管理器，是线程安全的。</span><span style="font-family:Calibri">Jar</span><span style="font-family:宋体">包中提供的具体实现类有</span><span style="font-family:Calibri">BasicClientConnectionManager</span><span style="font-family:宋体">和</span><span style="font-family:Calibri">PoolingClientConnectionManager</span><span style="font-family:宋体">。其中</span><span style="font-family:Calibri">BasicClientConnectionManager</span><span style="font-family:宋体">只管理一个连接。</span><span style="font-family:Calibri">PoolingClientConnectionManager</span><span style="font-family:宋体">管理连接池。</span></span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">&nbsp;</span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:Wingdings">&sup2;&nbsp;&nbsp;</span><span style="font-family:宋体">若有特殊需要，开发人员可自行编写连接管理器实现该接口。</span></span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:Wingdings">&sup2;&nbsp;&nbsp;</span><span style="font-family:宋体">连接管理器自动管理连接的分配以及回收工作，并支持连接保持以及重用。连接保持以及重用由</span><span style="font-family:Calibri">RequestDirector</span><span style="font-family:宋体">进行控制。</span></span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><strong><span style="font-family:Arial">1.1.3.2.5.</span></strong>&nbsp;&nbsp;<strong><span style="font-family:黑体">接口</span><span style="font-family:Arial">HttpClient</span></strong></span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:Wingdings">&sup2;&nbsp;&nbsp;</span><span style="font-family:宋体">接口</span><span style="font-family:Calibri">HttpClient</span><span style="font-family:宋体">为开发人员直接使用的发送请求和接收响应的接口，是线程安全的。</span><span style="font-family:Calibri">jar</span><span style="font-family:宋体">包中提供的实现类有：</span><span style="font-family:Calibri">AbstractHttpClient, DefaultHttpClient, AutoRetryHttpClient, ContentEncodingHttpClient, DecompressingHttpClient, SystemDefaultHttpClient</span><span style="font-family:宋体">。其中其他所有类都继承自抽象类</span><span style="font-family:Calibri">AbStractHttpClient</span><span style="font-family:宋体">，该类使用了门面模式，对</span><span style="font-family:Calibri">http</span><span style="font-family:宋体">协议的处理进行了默认的封装</span><span style="font-family:Calibri">,</span><span style="font-family:宋体">包括默认连接管理器，默认消息头，默认消息发送等，开发人员可以覆盖其中的方法更改其默认设置。</span></span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:Wingdings">&sup2;&nbsp;&nbsp;</span><span style="font-family:Calibri">AbstractHttpClient</span><span style="font-family:宋体">默认设置连接管理器为</span><span style="font-family:Calibri">BasicClientConnectionManager</span><span style="font-family:宋体">。若要修改连接管理器，则应该采用以下方式之一：</span></span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:Wingdings">n&nbsp;&nbsp;</span><span style="font-family:宋体">初始化时，传入连接池，例如：</span></span></span></span></p>
+
+<div style="padding:1pt 4pt">
+<p style="margin-left:0cm; margin-right:0cm"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:&quot;Times New Roman&quot;">ClientConnectionManager connManager&nbsp;&nbsp;= new PoolingClientConnectionManager();</span></span></span></span></p>
+
+<p style="margin-left:0cm; margin-right:0cm"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:&quot;Times New Roman&quot;">HttpClient httpclient = new DefaultHttpClient(connManager);</span></span></span></span></p>
+</div>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:Wingdings">n&nbsp;&nbsp;</span><span style="font-family:宋体">编写</span><span style="font-family:Calibri">httpClient</span><span style="font-family:宋体">接口的实现类，继承自</span><span style="font-family:Calibri">AbstractHttpClient</span><span style="font-family:宋体">并覆盖其</span><span style="font-family:Calibri">createClientConnectionManager()</span><span style="font-family:宋体">方法，在方法中创建自己的连接管理器。</span></span></span></span></p>
+
+<h4 style="margin-left:42.55pt; margin-right:0cm"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:medium">1.1.3.3.</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="font-size:medium"><span style="font-family:黑体">方法说明</span></span></span></span></span></h4>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:Wingdings">&sup2;&nbsp;&nbsp;</span><span style="font-family:Calibri">createClientConnectionManager()</span><span style="font-family:宋体">，创建连接池，该方法为</span><span style="font-family:Calibri">protected</span><span style="font-family:宋体">。子类可覆盖修改默认连接池。</span></span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:Wingdings">&sup2;&nbsp;&nbsp;</span><span style="font-family:Calibri">createClientRequestDirector()</span><span style="font-family:宋体">，创建请求执行者，该方法为</span><span style="font-family:&quot;Times New Roman&quot;,serif">protected</span><span style="font-family:宋体">。子类可覆盖但一般不需要。</span></span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:Wingdings">&sup2;&nbsp;&nbsp;</span><span style="font-family:Calibri">httpClient</span><span style="font-family:宋体">中调用</span><span style="font-family:Calibri">1.2</span><span style="font-family:宋体">方法所创建的请求执行者</span><span style="font-family:Calibri">requestDirector</span><span style="font-family:宋体">的</span><span style="font-family:Calibri">execute()</span><span style="font-family:宋体">方法。该方法中依次调用如下方法：</span></span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:Wingdings">n&nbsp;&nbsp;</span><span style="font-family:Calibri">1.3.1</span><span style="font-family:宋体">调用连接管理器的</span><span style="font-family:Calibri">requestConnection(route, userToken)</span><span style="font-family:宋体">方法，该方法调用连接池</span><span style="font-family:Calibri">httpConnPool</span><span style="font-family:宋体">的</span><span style="font-family:Calibri">lease</span><span style="font-family:宋体">方法，创建一个</span><span style="font-family:Calibri">Future&lt;HttpPoolEntry&gt;</span><span style="font-family:宋体">。</span><span style="font-family:Calibri">Futrue</span><span style="font-family:宋体">用法参见</span><span style="font-family:Calibri">Java</span><span style="font-family:宋体">标准</span><span style="font-family:Calibri">API</span><span style="font-family:宋体">。返回</span><span style="font-family:Calibri">clientConnectionRequest</span><span style="font-family:宋体">。</span></span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:Wingdings">n&nbsp;&nbsp;</span><span style="font-family:Calibri">1.3.2.</span><span style="font-family:宋体">调用</span><span style="font-family:Calibri">clientConnectionRequest</span><span style="font-family:宋体">的</span><span style="font-family:Calibri">getConnection(timeout, TimeUnit.MILLISECONDS)</span><span style="font-family:宋体">方法，该方法负责将连接池中可用连接分配给当前请求，具体如下：</span></span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:Wingdings">u&nbsp;&nbsp;</span><span style="font-family:宋体">创建</span><span style="font-family:Calibri">clientConnectionOperator</span><span style="font-family:宋体">。</span></span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:Wingdings">u&nbsp;&nbsp;</span><span style="font-family:宋体">执行</span><span style="font-family:Calibri">1.3.1</span><span style="font-family:宋体">中创建的</span><span style="font-family:Calibri">Future</span><span style="font-family:宋体">的任务，该任务获得当前可用的</span><span style="font-family:Calibri">poolEntry&lt;router</span><span style="font-family:宋体">，</span><span style="font-family:Calibri">OperatedClientConnection&gt;</span><span style="font-family:宋体">并封装成</span><span style="font-family:Calibri">managedClientConnectionImpl</span><span style="font-family:宋体">返回。</span></span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:Wingdings">n&nbsp;&nbsp;</span><span style="font-family:Calibri">1.3.3.&nbsp;</span><span style="font-family:宋体">调用</span><span style="font-family:Calibri">&nbsp;tryConnect(roureq, context)</span><span style="font-family:宋体">方法，该方法最终调用</span><span style="font-family:Calibri">OperatedClientConnection</span><span style="font-family:宋体">的</span><span style="font-family:Calibri">openning</span><span style="font-family:宋体">方法，与服务器建立</span><span style="font-family:Calibri">socket</span><span style="font-family:宋体">连接。</span></span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:Wingdings">n&nbsp;&nbsp;</span><span style="font-family:Calibri">1.3.4.&nbsp;</span><span style="font-family:宋体">调用</span><span style="font-family:Calibri">&nbsp;tryExecute(roureq, context)</span><span style="font-family:宋体">方法，该方法最终调用</span><span style="font-family:Calibri">OperatedClientConnection</span><span style="font-family:宋体">的</span><span style="font-family:Calibri">receiveResponseHeader</span><span style="font-family:宋体">（）和</span><span style="font-family:Calibri">receiveResponseEntity</span><span style="font-family:宋体">（）获得服务器响应。</span></span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:Wingdings">n&nbsp;&nbsp;</span><span style="font-family:Calibri">1.3.5&nbsp;</span><span style="font-family:宋体">判断连接是否保持用来重用，若保持，则设置保持时间，并将连接标记为可重用不保持则调用</span><span style="font-family:Calibri">managedClientConnectionImpl</span><span style="font-family:宋体">的</span><span style="font-family:Calibri">close</span><span style="font-family:宋体">方法关闭连接，该方法最终调用</span><span style="font-family:Calibri">OperatedClientConnection</span><span style="font-family:宋体">的</span><span style="font-family:Calibri">close()</span><span style="font-family:宋体">方法关闭连接。</span></span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:Wingdings">&sup2;&nbsp;&nbsp;</span><span style="font-family:宋体">最终</span><span style="font-family:Calibri">respose</span><span style="font-family:宋体">返回至</span><span style="font-family:Calibri">httpClient</span><span style="font-family:宋体">。</span></span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:Wingdings">&sup2;&nbsp;&nbsp;</span><span style="font-family:宋体">发送请求的线程需处理当前连接，若已被标记为重用，则交还至连接池管理器；否则，关闭当前连接。（使用响应处理器</span><span style="font-family:Calibri">ResponseHanler</span><span style="font-family:宋体">）。本次请求结束。</span></span></span></span></p>
+
+<h2 style="margin-left:1cm; margin-right:0cm"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:x-large"><span style="font-family:Arial">1.2.</span></span>&nbsp;&nbsp;<span style="font-size:x-large"><span style="font-family:Arial">httpClient</span><span style="font-family:黑体">连接池</span></span></span></span></span></h2>
+
+<p style="margin-left:21pt; margin-right:0cm"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:宋体">若连接管理器配置为</span><span style="font-family:&quot;Times New Roman&quot;">PoolingClientConnectionManager</span><span style="font-family:宋体">，则</span><span style="font-family:&quot;Times New Roman&quot;">httpClient</span><span style="font-family:宋体">将使用连接池来管理连接的分配，回收等操作。</span></span></span></span></p>
+
+<h3 style="margin-left:35.45pt; margin-right:0cm"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-size:12px"><span style="font-size:12px"><span style="font-family:&quot;Times New Roman&quot;"><strong><span style="font-size:medium">1.2.1.</span></strong>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></span></span></span><strong><span style="font-size:medium"><span style="font-size:12px"><span style="font-family:宋体">连接池结构</span></span></span></strong></span></span></span></h3>
+
+<p style="margin-left:21pt; margin-right:0cm"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:宋体">连接池结构图如下，其中：</span></span></span></span></p>
+
+<p style="margin-left:21pt; margin-right:0cm"><br />
+<span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:宋体"><img alt="" class="magplus" src="http://dl.iteye.com/upload/attachment/0082/8396/fce18507-967f-3a29-bee8-6f3717d34737.png" style="border:0px; cursor:url(&quot;/images/magplus.gif&quot;), pointer; height:484px; width:700px" title="点击查看原始大小图片" /><br />
+&nbsp;</span></span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:Wingdings">l&nbsp;&nbsp;</span><span style="font-family:Calibri">PoolEntry&lt;HttpRoute, OperatedClientConnection&gt;</span><span style="font-family:宋体">为路由和连接的对应。</span></span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:Wingdings">l&nbsp;&nbsp;</span><span style="font-family:Calibri">routeToPool</span><span style="font-family:宋体">可以多个（图中仅示例两个）；图中各队列大小动态变化，并不相等；</span></span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:Wingdings">l&nbsp;&nbsp;</span><span style="font-family:Calibri">maxTotal</span><span style="font-family:宋体">限制的是外层</span><span style="font-family:Calibri">httpConnPool</span><span style="font-family:宋体">中</span><span style="font-family:Calibri">leased</span><span style="font-family:宋体">集合和</span><span style="font-family:Calibri">available</span><span style="font-family:宋体">队列的总和的大小，</span><span style="font-family:Calibri">leased</span><span style="font-family:宋体">和</span><span style="font-family:Calibri">available</span><span style="font-family:宋体">的大小没有单独限制；</span></span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:Wingdings">l&nbsp;&nbsp;</span><span style="font-family:宋体">同理：</span><span style="font-family:Calibri">maxPerRoute</span><span style="font-family:宋体">限制的是</span><span style="font-family:Calibri">routeToPool</span><span style="font-family:宋体">中</span><span style="font-family:Calibri">leased</span><span style="font-family:宋体">集合和</span><span style="font-family:Calibri">available</span><span style="font-family:宋体">队列的总和的大小；</span></span></span></span></p>
+
+<p style="margin-left:21pt; margin-right:0cm"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">&nbsp;</span></span></span></p>
+
+<h3 style="margin-left:35.45pt; margin-right:0cm"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-size:12px"><span style="font-size:12px"><span style="font-family:&quot;Times New Roman&quot;"><strong><span style="font-size:medium">1.2.2.</span></strong>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></span></span></span><strong><span style="font-size:medium"><span style="font-size:12px"><span style="font-family:宋体">连接池工作原理</span></span></span></strong></span></span></span></h3>
+
+<h4 style="margin-left:42.55pt; margin-right:0cm"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:medium"><span style="font-family:Arial">1.2.2.1.</span></span>&nbsp;&nbsp;&nbsp;<span style="font-size:medium"><span style="font-family:黑体">分配连接</span></span></span></span></span></h4>
+
+<p style="margin-left:0cm; margin-right:0cm"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:宋体">分配连接给当前请求包括两部分：</span><span style="font-family:&quot;Times New Roman&quot;">1.&nbsp;</span><span style="font-family:宋体">从连接池获取可用连接</span><span style="font-family:&quot;Times New Roman&quot;">PoolEntry</span><span style="font-family:宋体">；</span><span style="font-family:&quot;Times New Roman&quot;">2.</span><span style="font-family:宋体">将连接与当前请求绑定。其中第一部分从连接池获取可用连接的过程为：</span></span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:Calibri">1.</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="font-family:宋体">获取</span><span style="font-family:Calibri">route</span><span style="font-family:宋体">对应连接池</span><span style="font-family:Calibri">routeToPool</span><span style="font-family:宋体">中可用的连接，有则返回该连接。若没有则转入下一步。</span></span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:Calibri">2.</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="font-family:宋体">若</span><span style="font-family:Calibri">routeToPool</span><span style="font-family:宋体">和外层</span><span style="font-family:Calibri">HttpConnPool</span><span style="font-family:宋体">连接池均还有可用的空间，则新建连接，并将该连接作为可用连接返回；否则进行下一步</span></span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:Calibri">3.</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="font-family:宋体">将当前请求放入</span><span style="font-family:Calibri">pending</span><span style="font-family:宋体">队列，等待执行。</span></span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:Calibri">4.</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="font-family:宋体">上述过程中包含各个队列和集合的删除，添加等操作以及各种判断条件，具体流程如下：</span></span></span></span></p>
+
+<p><br />
+<span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:宋体"><img alt="" src="http://dl.iteye.com/upload/attachment/0082/8398/a6501b65-74af-3814-b191-4c06edba42ff.jpg" style="border:0px" /><br />
+&nbsp;</span></span></span></span></p>
+
+<p style="margin-left:0cm; margin-right:0cm"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">&nbsp;</span></span></span></p>
+
+<h4 style="margin-left:42.55pt; margin-right:0cm"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:medium"><span style="font-family:Arial">1.2.2.2.</span></span>&nbsp;&nbsp;&nbsp;<span style="font-size:medium"><span style="font-family:黑体">回收连接</span></span></span></span></span></h4>
+
+<p style="margin-left:0cm; margin-right:0cm"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:宋体">连接用完之后连接池需要进行回收，具体流程如下：</span></span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:Calibri">1.</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="font-family:宋体">若当前连接标记为重用，则将该连接从</span><span style="font-family:Calibri">routeToPool</span><span style="font-family:宋体">中的</span><span style="font-family:Calibri">leased</span><span style="font-family:宋体">集合删除，并添加至</span><span style="font-family:Calibri">available</span><span style="font-family:宋体">队列，同样的将该请求从外层</span><span style="font-family:Calibri">httpConnPool</span><span style="font-family:宋体">的</span><span style="font-family:Calibri">leased</span><span style="font-family:宋体">集合删除，并添加至其</span><span style="font-family:Calibri">available</span><span style="font-family:宋体">队列。同时唤醒该</span><span style="font-family:Calibri">routeToPool</span><span style="font-family:宋体">的</span><span style="font-family:Calibri">pending</span><span style="font-family:宋体">队列的第一个</span><span style="font-family:Calibri">PoolEntryFuture</span><span style="font-family:宋体">。将其从</span><span style="font-family:Calibri">pending</span><span style="font-family:宋体">队列删除，并将其从外层</span><span style="font-family:Calibri">httpConnPool</span><span style="font-family:宋体">的</span><span style="font-family:Calibri">pending</span><span style="font-family:宋体">队列中删除。</span></span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:Calibri">2.</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="font-family:宋体">若连接没有标记为重用，则分别从</span><span style="font-family:Calibri">routeToPool</span><span style="font-family:宋体">和外层</span><span style="font-family:Calibri">httpConnPool</span><span style="font-family:宋体">中删除该连接，并关闭该连接。</span></span></span></span></p>
+
+<h4 style="margin-left:42.55pt; margin-right:0cm"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:medium"><span style="font-family:Arial">1.2.2.3.</span></span>&nbsp;&nbsp;&nbsp;<span style="font-size:medium"><span style="font-family:黑体">过期和空闲连接的关闭</span></span></span></span></span></h4>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:Wingdings">&sup2;&nbsp;&nbsp;</span><span style="font-family:宋体">连接如果标记为保持时，将由连接管理器保持一段时间，此时连接可能出现的情况是：</span></span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:Wingdings">n&nbsp;&nbsp;</span><span style="font-family:宋体">连接处于空闲状态，时间已超过连接保持时间</span></span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:Wingdings">n&nbsp;&nbsp;</span><span style="font-family:宋体">连接处于空闲状态，时间没有超过连接保持时间</span></span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:Wingdings">n&nbsp;&nbsp;</span><span style="font-family:宋体">以上两种情况中，随时都会出现连接的服务端已关闭的情况，而此时连接的客户端并没有阻塞着去接受服务端的数据，所以客户端不知道连接已关闭，无法关闭自身的</span><span style="font-family:Calibri">socket</span><span style="font-family:宋体">。</span></span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:Wingdings">&sup2;&nbsp;&nbsp;</span><span style="font-family:宋体">连接池提供的方法：</span></span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:Wingdings">n&nbsp;&nbsp;</span><span style="font-family:宋体">首先连接池在每个请求获取连接时，都会在</span><span style="font-family:Calibri">RouteToPool</span><span style="font-family:宋体">的</span><span style="font-family:Calibri">available</span><span style="font-family:宋体">队列获取</span><span style="font-family:Calibri">Entry</span><span style="font-family:宋体">并检测此时</span><span style="font-family:Calibri">Entry</span><span style="font-family:宋体">是否已关闭或者已过期，若是则关闭并移除该</span><span style="font-family:Calibri">Entry</span><span style="font-family:宋体">。</span></span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:Wingdings">n&nbsp;&nbsp;</span><span style="font-family:Calibri">closeExpiredConnections()</span><span style="font-family:宋体">该方法关闭超过连接保持时间的空闲连接。</span></span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:Wingdings">n&nbsp;&nbsp;</span><span style="font-family:Calibri">closeIdleConnections(timeout,tunit)</span><span style="font-family:宋体">该方法关闭空闲时间超过</span><span style="font-family:Calibri">timeout</span><span style="font-family:宋体">的连接，空闲时间从交还给连接管理器时开始，不管是否已过期超过空闲时间则关闭。所以</span><span style="font-family:Calibri">Idle</span><span style="font-family:宋体">时间应该设置的尽量长一点。</span></span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:Wingdings">n&nbsp;&nbsp;</span><span style="font-family:宋体">以上两个方法连接关闭的过程均是：</span></span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:Wingdings">u&nbsp;&nbsp;</span><span style="font-family:宋体">关闭</span><span style="font-family:Calibri">entry;</span></span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:Wingdings">u&nbsp;&nbsp;</span><span style="font-family:Calibri">RouteToPool</span><span style="font-family:宋体">中删除当前</span><span style="font-family:Calibri">entry</span><span style="font-family:宋体">。先删</span><span style="font-family:Calibri">available</span><span style="font-family:宋体">队列中的，如果没有，再删除</span><span style="font-family:Calibri">leased</span><span style="font-family:宋体">集合中的。</span></span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:Wingdings">u&nbsp;&nbsp;</span><span style="font-family:Calibri">httpConnPool</span><span style="font-family:宋体">中删除当前</span><span style="font-family:Calibri">entry</span><span style="font-family:宋体">。删除过程同</span><span style="font-family:Calibri">RouteToPool</span></span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:Wingdings">u&nbsp;&nbsp;</span><span style="font-family:宋体">唤醒阻塞在</span><span style="font-family:Calibri">RouteToPool</span><span style="font-family:宋体">中的第一个</span><span style="font-family:Calibri">future</span><span style="font-family:宋体">。</span></span></span></span></p>
+
+<h2 style="margin-left:1cm; margin-right:0cm"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:x-large"><span style="font-family:Arial">1.3.</span></span>&nbsp;&nbsp;<span style="font-size:x-large"><span style="font-family:黑体">相关原理说明</span></span></span></span></span></h2>
+
+<h3 style="margin-left:35.45pt; margin-right:0cm"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-family:&quot;Times New Roman&quot;"><span style="font-size:12px"><span style="font-size:12px"><span style="font-size:medium">1.3.1.</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></span><span style="font-size:12px"><strong><span style="font-size:medium">Tcp</span></strong></span></span></span><strong><span style="font-size:medium"><span style="font-size:12px"><span style="font-family:宋体">连接的关闭</span></span></span></strong></span></span></span></h3>
+
+<p style="margin-left:0cm; margin-right:0cm"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:&quot;Times New Roman&quot;">Http</span><span style="font-family:宋体">连接实际上在传输层建立的是</span><span style="font-family:&quot;Times New Roman&quot;">tcp</span><span style="font-family:宋体">连接，最终利用的是</span><span style="font-family:&quot;Times New Roman&quot;">socket</span><span style="font-family:宋体">进行通信。</span><span style="font-family:&quot;Times New Roman&quot;">http</span><span style="font-family:宋体">连接的保持和关闭实际上都和</span><span style="font-family:&quot;Times New Roman&quot;">TCP</span><span style="font-family:宋体">连接的关闭有关。</span><span style="font-family:&quot;Times New Roman&quot;">TCP</span><span style="font-family:宋体">关闭过程如下图：</span></span></span></span></p>
+
+<p style="margin-left:0cm; margin-right:0cm"><br />
+<span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:宋体"><img alt="" src="http://dl.iteye.com/upload/attachment/0082/8404/0017459e-0628-3a6c-bfdd-bde4eb5bf85f.png" style="border:0px" /><br />
+&nbsp;</span></span></span></span></p>
+
+<p style="margin-left:0cm; margin-right:0cm"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">&nbsp;</span></span></span></p>
+
+<p style="margin-left:0cm; margin-right:0cm"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:宋体">说明：</span></span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:Wingdings">&sup2;&nbsp;&nbsp;</span><span style="font-family:Calibri">TCP</span><span style="font-family:宋体">连接程序中使用</span><span style="font-family:Calibri">socket</span><span style="font-family:宋体">编程进行实现。一条</span><span style="font-family:Calibri">TCP</span><span style="font-family:宋体">是一条抽象的连接通道，由通信双方的</span><span style="font-family:Calibri">IP+</span><span style="font-family:宋体">端口号唯一确定，两端分别通过</span><span style="font-family:Calibri">socket</span><span style="font-family:宋体">实例进行操作，一个</span><span style="font-family:Calibri">socket</span><span style="font-family:宋体">实例包括一个输入通道和输出通道，一端的输出通道为另一端的输入通道。</span></span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:Wingdings">&sup2;&nbsp;&nbsp;</span><span style="font-family:Calibri">Tcp</span><span style="font-family:宋体">连接的关闭是连接的两端分别都需要进行关闭（调用</span><span style="font-family:Calibri">close(socket)</span><span style="font-family:宋体">，该函数执行发送</span><span style="font-family:Calibri">FIN</span><span style="font-family:宋体">，等待</span><span style="font-family:Calibri">ACK</span><span style="font-family:宋体">等图示操作）。实际上没有客户端和服务端的区别，只有主动关闭和被动关闭的区别。对于上层的其</span><span style="font-family:Calibri">http</span><span style="font-family:宋体">连接，实际上也就是</span><span style="font-family:Calibri">http</span><span style="font-family:宋体">服务端主动关闭或者</span><span style="font-family:Calibri">http</span><span style="font-family:宋体">客户端主动关闭，而不管谁主动，最终服务端和客户端都需要调用</span><span style="font-family:Calibri">close(socket)</span><span style="font-family:宋体">关闭连接。</span></span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:Wingdings">&sup2;&nbsp;&nbsp;</span><span style="font-family:宋体">主动关闭的一端</span><span style="font-family:Calibri">A</span><span style="font-family:宋体">调用了</span><span style="font-family:Calibri">close</span><span style="font-family:宋体">函数之后，若另一端</span><span style="font-family:Calibri">B</span><span style="font-family:宋体">并没有阻塞着等待着数据，就无法检测到连接的</span><span style="font-family:Calibri">A</span><span style="font-family:宋体">端已关闭，就没法关闭自身的</span><span style="font-family:Calibri">socket</span><span style="font-family:宋体">，造成资源的浪费。</span><span style="font-family:Calibri">http</span><span style="font-family:宋体">连接都是一次请求和响应，之后便交回给连接管理池，因此在</span><span style="font-family:Calibri">http</span><span style="font-family:宋体">连接池中应当能够移除已过期或者空闲太久的连接，因为他们可能已经被服务器端关闭或者客户端短期内不再使用。</span></span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:Wingdings">&sup2;&nbsp;&nbsp;</span><span style="font-family:Calibri">TIME_WAIT</span><span style="font-family:宋体">状态：</span></span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:Wingdings">n&nbsp;&nbsp;</span><span style="font-family:宋体">可靠地实现</span><span style="font-family:Calibri">TCP</span><span style="font-family:宋体">全双工连接的终止</span></span></span></span></p>
+
+<p style="margin-left:0cm; margin-right:0cm"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">&nbsp;&nbsp;&nbsp;&nbsp;<span style="font-family:宋体">在进行关闭连接四路握手协议时，最后的</span>ACK<span style="font-family:宋体">是由主动关闭端发出的，如果这个最终的</span>ACK<span style="font-family:宋体">丢失，被动关闭端将重发最终的</span>FIN<span style="font-family:宋体">，因此主动关闭端必须维护状态信息允许它重发最终的</span>ACK<span style="font-family:宋体">。如果不维持这个状态信息，那么主动关闭端将发送</span>RST<span style="font-family:宋体">分节（复位），被动关闭端将此分节解释成一个错误（在</span>java<span style="font-family:宋体">中会抛出</span>connection reset<span style="font-family:宋体">的</span>SocketException)<span style="font-family:宋体">。因而，要实现</span>TCP<span style="font-family:宋体">全双工连接的正常终止，主动关闭的客户端必须维持状态信息进入</span>TIME_WAIT<span style="font-family:宋体">状态。</span></span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:Wingdings">n&nbsp;&nbsp;</span><span style="font-family:宋体">允许老的重复分节在网络中消逝</span>&nbsp;</span></span></span></p>
+
+<p style="margin-left:0cm; margin-right:0cm"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">TCP<span style="font-family:宋体">分节可能由于路由器异常而&ldquo;迷途&rdquo;，在迷途期间，</span>TCP<span style="font-family:宋体">发送端可能因确认超时而重发这个分节，迷途的分节在路由器修复后也会被送到最终目的地，这个</span><span style="font-family:宋体">原来的迷途分节就称为</span>lost duplicate<span style="font-family:宋体">。在关闭一个</span>TCP<span style="font-family:宋体">连接后，马上又重新建立起一个相同的</span>IP<span style="font-family:宋体">地址和端口之间的</span>TCP<span style="font-family:宋体">连接，后一个连接被称为前一个连接的化身</span><span style="font-family:宋体">（</span>incarnation)<span style="font-family:宋体">，那么有可能出现这种情况，前一个连接的迷途重复分组在前一个连接终止后出现，从而被误解成从属于新的化身。为了避免这个情况，</span>TCP<span style="font-family:宋体">不允许处于</span>TIME_WAIT<span style="font-family:宋体">状态的连接启动一个新的化身，因为</span>TIME_WAIT<span style="font-family:宋体">状态持续</span>2MSL<span style="font-family:宋体">，就可以保证当成功建立一个</span>TCP<span style="font-family:宋体">连接的时候，来自连接先前化身的重复分组已经在网络中消逝。</span></span></span></span></p>
+
+<p style="margin-left:0cm; margin-right:0cm">&nbsp;</p>
+
+<p><strong>2.5、过期和空闲连接清理</strong></p>
+
+<p><strong>在连接池保持连接的这段时间，可能出现两种导致连接过期或失效的情况：</strong></p>
+
+<p>1、连接保持时间到期</p>
+
+<p>每个连接对象PoolEntry都有expiry到期时间，在创建和释放归还连接是都会为expiry到期时间赋值，在连接池保持连接的这段时间，连接已经到了过期时间（注意，这个过期时间是为了管理连接所设定的，并不是指的TCP连接真的不能使用了）。</p>
+
+<p>对于这种情况，在每次从连接池获取连接时，都会从routeToPool的available队列获取Entry并检测此时Entry是否已关闭或者已过期，若是则关闭并分别从routeToPool、httpConnPool的available队列移除该Entry，之后再次尝试获取连接。代码如下</p>
+
+<pre>
+/**AbstractConnPool#getPoolEntryBlocking()*/
+for (;;) {
+	//从availabe链表头迭代查找符合state的entry
+    entry = pool.getFree(state);
+    //找不到entry，跳出
+    if (entry == null) {
+        break;
+    }
+    //如果entry已关闭或已过期，关闭entry，并从routeToPool、httpConnPool的available队列移除
+    if (entry.isClosed() || entry.isExpired(System.currentTimeMillis())) {
+        entry.close();
+        this.available.remove(entry);
+        pool.free(entry, false);
+    } 
+    else {  //找到可用连接
+        break;
+    }
+}</pre>
+
+<p>2、底层连接已被关闭</p>
+
+<p>在连接池保持连接的时候，可能会出现连接已经被服务端关闭的情况，而此时连接的客户端并没有阻塞着去接收服务端的数据，所以客户端不知道连接已关闭，无法关闭自身的socket。</p>
+
+<p>对于这种情况，在从连接池获取可用连接时无法知晓，在获取到可用连接后，如果连接是打开的，会有判断连接是否陈旧的逻辑，如下</p>
+
+<pre>
+/**MainClientExec#execute()*/
+if (config.isStaleConnectionCheckEnabled()) {
+    // validate connection
+    if (managedConn.isOpen()) {
+        this.log.debug(&quot;Stale connection check&quot;);
+        if (managedConn.isStale()) {
+            this.log.debug(&quot;Stale connection detected&quot;);
+            managedConn.close();
+        }
+    }
+}</pre>
+
+<p>isOpen()会通过连接的状态判断连接是否是open状态；</p>
+
+<p>isStale()会通过socket输入流尝试读取数据，在读取前暂时将soTimeout设置为1ms，如果读取到的字节数小于0，即已经读到了输入流的末尾，或者发生了IOException，可能连接已经关闭，那么isStale()返回true，需要关闭连接；如果读到的字节数大于0，或者发生了SocketTimeoutException，可能是读超时，isStale()返回false，连接还可用。</p>
+
+<pre>
+/**BHttpConnectionBase#isStale()*/
+public boolean isStale() {
+    if (!isOpen()) {
+        return true;
+    }
+    try {
+        final int bytesRead = fillInputBuffer(1);
+        return bytesRead &lt; 0;
+    } catch (final SocketTimeoutException ex) {
+        return false;
+    } catch (final IOException ex) {
+        return true;
+    }
+}</pre>
+
+<p>如果在整个判断过程中发现连接是陈旧的，就会关闭连接，那么这个从连接池获取的连接就是不可用的，后面的代码逻辑里会重建当前PoolEntry的socket连接，继续后续请求逻辑。</p>
+
+<p><strong>后台监控线程检查连接</strong></p>
+
+<p>上述过程是在从连接池获取连接后，检查连接是否可用，如不可用需重新建立socket连接，建立连接的过程是比较耗时的，可能导致性能问题，也失去了连接池的意义，针对这种情况，HttpClient采取一个策略，通过一个后台的监控线程定时的去检查连接池中连接是否还&ldquo;新鲜&rdquo;，如果过期了，或者空闲了一定时间则就将其从连接池里删除掉。</p>
+
+<p>ClientConnectionManager提供了 closeExpiredConnections()和closeIdleConnections()两个方法，关闭过期或空闲了一段时间的连接，并从连接池删除。</p>
+
+<p>closeExpiredConnections()<br />
+该方法关闭超过连接保持时间的连接，并从池中移除。</p>
+
+<p>closeIdleConnections(timeout,tunit)</p>
+
+<p>该方法关闭空闲时间超过timeout的连接，空闲时间从交还给连接池时开始，不管是否已过期，超过空闲时间则关闭。</p>
+
+<p>下面是httpClient官方给出的清理过期、空闲连接的例子</p>
+
+<pre>
+public static class IdleConnectionMonitorThread extends Thread {
+    
+    private final ClientConnectionManager connMgr;
+    private volatile boolean shutdown;
+    
+    public IdleConnectionMonitorThread(ClientConnectionManager connMgr) {
+        super();
+        this.connMgr = connMgr;
+    }
+
+    @Override
+    public void run() {
+        try {
+            while (!shutdown) {
+                synchronized (this) {
+                    wait(5000);
+                    // Close expired connections
+                    connMgr.closeExpiredConnections();
+                    // Optionally, close connections
+                    // that have been idle longer than 30 sec
+                    connMgr.closeIdleConnections(30, TimeUnit.SECONDS);
+                }
+            }
+        } catch (InterruptedException ex) {
+            // terminate
+        }
+    }
+    
+    public void shutdown() {
+        shutdown = true;
+        synchronized (this) {
+            notifyAll();
+        }
+    }
+}</pre>
+
+<p>&nbsp;</p>
+
+<p style="margin-left:0cm; margin-right:0cm"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:2em"><span style="font-family:&quot;Times New Roman&quot;"><span style="font-size:x-large">2.httpClient</span></span><span style="font-size:x-large"><span style="font-family:黑体">最佳实践</span></span></span></span></span></span></p>
+
+<h3 style="margin-left:1cm; margin-right:0cm"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:x-large"><span style="font-family:Arial">2.1.</span></span>&nbsp;&nbsp;<span style="font-size:x-large"><span style="font-family:黑体">总原则</span></span></span></span></span></h3>
+
+<p style="margin-left:0cm; margin-right:0cm"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-size:12px"><span style="font-size:12px"><span style="font-family:&quot;Times New Roman&quot;"><span style="font-size:medium">2.1.1.</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></span></span></span><strong><span style="font-size:medium"><span style="font-size:12px"><span style="font-family:宋体">版本</span></span></span></strong></span></span></span></p>
+
+<p style="margin-left:0cm; margin-right:0cm"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:宋体">原</span><span style="font-family:&quot;Times New Roman&quot;">Commons HttpClient</span><span style="font-family:宋体">：</span><span style="font-family:&quot;Times New Roman&quot;">3.x</span><span style="font-family:宋体">不再升级维护，使用</span>Apache HttpComponents<span style="font-family:宋体">的</span>HttpClient<span style="font-family:宋体">代替。</span>Pom<span style="font-family:宋体">文件修改如下：</span></span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:Calibri">1.</span>&nbsp;&nbsp;<span style="font-family:宋体">原</span><span style="font-family:Calibri">maven</span><span style="font-family:宋体">依赖：</span></span></span></span></p>
+
+<div style="padding:1pt 4pt">
+<p style="margin-left:0cm; margin-right:0cm"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:&quot;Times New Roman&quot;">&lt;dependency&gt;</span></span></span></span></p>
+
+<p style="margin-left:0cm; margin-right:0cm"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:&quot;Times New Roman&quot;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;groupId&gt;commons-httpclient&lt;/groupId&gt;</span></span></span></span></p>
+
+<p style="margin-left:0cm; margin-right:0cm"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:&quot;Times New Roman&quot;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;artifactId&gt;commons-httpclient&lt;/artifactId&gt;</span></span></span></span></p>
+
+<p style="margin-left:0cm; margin-right:0cm"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:&quot;Times New Roman&quot;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;version&gt;3.1&lt;/version&gt;</span></span></span></span></p>
+
+<p style="margin-left:0cm; margin-right:0cm"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:&quot;Times New Roman&quot;">&lt;/dependency&gt;</span></span></span></span></p>
+</div>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:Calibri">2.</span>&nbsp;&nbsp;<span style="font-family:宋体">替换为：</span></span></span></span></p>
+
+<div style="padding:1pt 4pt">
+<p style="margin-left:0cm; margin-right:0cm"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">&lt;<span style="font-family:&quot;Times New Roman&quot;">dependency&gt;</span></span></span></span></p>
+
+<p style="margin-left:0cm; margin-right:0cm"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:&quot;Times New Roman&quot;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;groupId&gt;org.apache.httpcomponents&lt;/groupId&gt;</span></span></span></span></p>
+
+<p style="margin-left:0cm; margin-right:0cm"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:&quot;Times New Roman&quot;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;artifactId&gt;httpclient&lt;/artifactId&gt;</span></span></span></span></p>
+
+<p style="margin-left:0cm; margin-right:0cm"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:&quot;Times New Roman&quot;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;version&gt;4.2.1&lt;/version&gt;</span></span></span></span></p>
+
+<p style="margin-left:0cm; margin-right:0cm"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:&quot;Times New Roman&quot;">&lt;/dependency&gt;</span></span></span></span></p>
+
+<p style="margin-left:0cm; margin-right:0cm"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-size:12px"><span style="font-size:12px"><span style="font-family:&quot;Times New Roman&quot;"><strong><span style="font-size:medium">2.1.2.</span></strong>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></span></span></span><strong><span style="font-size:medium"><span style="font-size:12px"><span style="font-family:宋体">使用</span></span><span style="font-size:12px"><span style="font-size:12px"><span style="font-family:&quot;Times New Roman&quot;">http</span></span></span><span style="font-size:12px"><span style="font-family:宋体">连接池管理器</span></span></span></strong></span></span></span></p>
+</div>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:Wingdings">&sup2;&nbsp;&nbsp;</span><span style="font-family:宋体">编写类继承自</span><span style="font-family:Calibri">DefaultHttpClient</span><span style="font-family:Calibri">(</span><span style="font-family:宋体">以下假设为</span><span style="font-family:Calibri">SopHttpClient</span><span style="font-family:Calibri">)</span><span style="font-family:宋体">，覆盖其</span><span style="font-family:Calibri">createClientConnectionManager()</span><span style="font-family:宋体">方法，方法中创建连接池管理器。</span></span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:Wingdings">&sup2;&nbsp;&nbsp;</span><span style="font-family:宋体">开启一个线程（假设为</span><span style="font-family:Calibri">IdleConnectionMonitorThread</span><span style="font-family:宋体">）用来清除连接池中空闲和过期的连接。</span></span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-size:12px"><span style="font-size:12px"><span style="font-family:&quot;Times New Roman&quot;"><strong><span style="font-size:medium">2.1.3.</span></strong>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></span></span></span><strong><span style="font-size:medium"><span style="font-size:12px"><span style="font-family:宋体">保持</span></span><span style="font-size:12px"><span style="font-size:12px"><span style="font-family:&quot;Times New Roman&quot;">HttpClient</span></span></span><span style="font-size:12px"><span style="font-family:宋体">单例</span></span></span></strong></span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:Calibri">Spring</span><span style="font-family:宋体">配置中使用默认</span><span style="font-family:Calibri">scope</span><span style="font-family:宋体">，即单例模式，其他类使用时由</span><span style="font-family:Calibri">Spring</span><span style="font-family:宋体">配置进行依赖注入，不要使用</span><span style="font-family:Calibri">new</span><span style="font-family:宋体">方法。</span><span style="font-family:Calibri">SopHttpClient</span><span style="font-family:宋体">应该提供方法</span><span style="font-family:Calibri">destroy()</span><span style="font-family:宋体">并配置在</span><span style="font-family:Calibri">Spring</span><span style="font-family:宋体">销毁该</span><span style="font-family:Calibri">bean</span><span style="font-family:宋体">前调用，</span><span style="font-family:Calibri">destory()</span><span style="font-family:宋体">方法中关闭对应连接池管理器和监控线程</span><span style="font-family:Calibri">IdleConnectionMonitorThread</span><span style="font-family:宋体">。</span></span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-size:12px"><span style="font-size:12px"><span style="font-family:&quot;Times New Roman&quot;"><strong><span style="font-size:medium">2.1.4.</span></strong>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></span></span></span><strong><span style="font-size:medium"><span style="font-size:12px"><span style="font-family:宋体">异常处理机制（请求和响应）：</span></span></span></strong></span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:宋体">编写类实现接口</span><span style="font-family:Calibri">HttpRequestRetryHandler</span><span style="font-family:宋体">（可参照默认实现</span><span style="font-family:Calibri">DefaultHttpRequestRetryHandler</span><span style="font-family:宋体">），并覆盖</span><span style="font-family:Calibri">AbstractHttpClient</span><span style="font-family:宋体">中的</span><span style="font-family:Calibri">createHttpRequestRetryHandler()</span><span style="font-family:宋体">方法创建新的重试处理机制。</span></span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-size:12px"><span style="font-size:12px"><span style="font-family:&quot;Times New Roman&quot;"><strong><span style="font-size:medium">2.1.5.</span></strong>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></span></span></span><strong><span style="font-size:medium"><span style="font-size:12px"><span style="font-family:宋体">参数可配置</span></span></span></strong></span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:宋体">各参数（连接池默认</span><span style="font-family:Calibri">ip</span><span style="font-family:宋体">、端口和大小等，超时时间等）尽量都集中在</span><span style="font-family:Calibri">SopHttpClient</span><span style="font-family:宋体">类中，设置为由</span><span style="font-family:Calibri">Spring</span><span style="font-family:宋体">进行统一配置，且提供接口在程序中修改。</span></span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-size:12px"><span style="font-size:12px"><span style="font-family:&quot;Times New Roman&quot;"><strong><span style="font-size:medium">2.1.6.</span></strong>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></span></span></span><strong><span style="font-size:medium"><span style="font-size:12px"><span style="font-family:宋体">保证连接交回至连接池管理器</span></span></span></strong></span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:medium"><span style="font-family:Arial">2.1.6.1.</span></span>&nbsp;&nbsp;&nbsp;<span style="font-size:medium"><span style="font-family:黑体">方式</span></span></span></span></span></p>
+
+<div style="padding:1pt 4pt">
+<p style="margin-left:0cm; margin-right:0cm"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:&quot;Times New Roman&quot;">HttpResponse response = httpclient.execute(httpMethod);</span></span></span></span></p>
+
+<p style="margin-left:0cm; margin-right:0cm"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:&quot;Times New Roman&quot;">HttpEntity entity = response.getEntity();</span></span></span></span></p>
+</div>
+
+<p style="margin-left:21pt; margin-right:0cm"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:宋体">这两段代码返回的</span><span style="font-family:Calibri">entity</span><span style="font-family:宋体">是</span><span style="font-family:Calibri">HttpEntity</span><span style="font-family:宋体">的实现类</span><span style="font-family:Calibri">BasicManagedEntity</span><span style="font-family:宋体">。此时与本次请求关联的连接尚未归还至连接管理器。需要调用以下两条语句：</span></span></span></span></p>
+
+<div style="padding:1pt 4pt">
+<p style="margin-left:0cm; margin-right:0cm"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:&quot;Times New Roman&quot;">InputStream instream = entity.getContent();//</span><span style="font-family:宋体">获得响应具体内容</span></span></span></span></p>
+
+<p style="margin-left:0cm; margin-right:0cm"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:&quot;Times New Roman&quot;">//</span><span style="font-family:宋体">处理响应：代码省略</span></span></span></span></p>
+
+<p style="margin-left:0cm; margin-right:0cm"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:&quot;Times New Roman&quot;">instream.close();//</span><span style="font-family:宋体">关闭输入流</span><span style="font-family:宋体">同时会将连接交回至连接处理器</span></span></span></span></p>
+</div>
+
+<h4 style="margin-left:42.55pt; margin-right:0cm"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:medium"><span style="font-family:Arial">2.1.6.2.</span></span>&nbsp;&nbsp;&nbsp;<span style="font-size:medium"><span style="font-family:黑体">使用默认的响应处理器</span><span style="font-family:Arial">BasicResponseHandler</span></span></span></span></span></h4>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:Wingdings">&sup2;&nbsp;&nbsp;</span><span style="font-family:Calibri">httpClient Jar</span><span style="font-family:宋体">包中提供</span><span style="font-family:Calibri">BasicResponseHandler</span><span style="font-family:宋体">。<strong>如果返回的类型能确定需要解码为</strong></span><strong><span style="font-family:Calibri">String</span></strong><strong><span style="font-family:宋体">类型的话，推荐使用该响应处理器。</span></strong></span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:Wingdings">&sup2;&nbsp;&nbsp;</span><span style="font-family:宋体">该处理器解码</span><span style="font-family:Calibri">http</span><span style="font-family:宋体">连接响应字节流为</span><span style="font-family:Calibri">String</span><span style="font-family:宋体">类型，对返回码</span><span style="font-family:Calibri">&gt;=300</span><span style="font-family:宋体">的响应进行了异常封装，并能够保证连接交还给连接池管理器。</span></span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:Wingdings">&sup2;&nbsp;&nbsp;</span><span style="font-family:宋体">该处理器将字节解码为字符的过程依次如下：</span></span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:Calibri">1.</span>&nbsp;&nbsp;<span style="font-family:宋体">如果响应</span><span style="font-family:Calibri">http</span><span style="font-family:宋体">报文</span><span style="font-family:Calibri">Head</span><span style="font-family:宋体">部分由指定的</span><span style="font-family:Calibri">charset</span><span style="font-family:宋体">，则使用该</span><span style="font-family:Calibri">charset</span><span style="font-family:宋体">进行解码，否则进行下一步。例如使用</span><span style="font-family:Calibri">UTF-8</span><span style="font-family:宋体">解码以下响应：</span></span></span></span></p>
+
+<div style="margin-left:21pt; margin-right:0cm; padding:1pt 4pt">
+<p style="margin-left:0cm; margin-right:0cm"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:Calibri">17:59:42.051 [main] DEBUG org.apache.http.headers - &lt;&lt; Content-Type: text/html; charset=utf-8</span></span></span></span></p>
+</div>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:Calibri">2.</span>&nbsp;<span style="font-family:宋体">如果响应报文未执行</span><span style="font-family:Calibri">charset</span><span style="font-family:宋体">，则使用传入</span><span style="font-family:Calibri">EntityUntils.toString()</span><span style="font-family:宋体">时指定的</span><span style="font-family:Calibri">charset</span><span style="font-family:宋体">进行解码。否则进行下一步</span></span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:Calibri">3.</span>&nbsp;<span style="font-family:宋体">使用</span><span style="font-family:Calibri">ISO-8859-1</span><span style="font-family:宋体">进行解码。</span></span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:medium"><span style="font-family:Arial">2.1.6.3.</span></span>&nbsp;&nbsp;&nbsp;<span style="font-size:medium"><span style="font-family:Arial">BasicManagedEntity</span><span style="font-family:黑体">关闭连接池管理器原理</span></span></span></span></span></p>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:Calibri">1.</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="font-family:Calibri">BasicManagedEntity</span><span style="font-family:宋体">实现了三个接口</span><span style="font-family:Calibri">:HttpEntity</span><span style="font-family:宋体">，</span><span style="font-family:Calibri">ConnectionReleaseTrigger, EofSensorWatcher</span><span style="font-family:宋体">。</span></span></span></span></p>
+
+<p style="margin-left:21pt; margin-right:0cm"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:宋体">调用</span><span style="font-family:Calibri">BasicManagedEntity</span><span style="font-family:宋体">的</span><span style="font-family:Calibri">getContent</span><span style="font-family:宋体">方法时，实际上初始化了</span><span style="font-family:&quot;Times New Roman&quot;,serif">EofSensorInputStream</span><span style="font-family:宋体">的实例，并将</span><span style="font-family:Calibri">BasicManagedEntity</span><span style="font-family:宋体">当前对象自身作为</span><span style="font-family:&quot;Times New Roman&quot;,serif">EofSensorWatcher</span><span style="font-family:宋体">传入。</span></span></span></span></p>
+
+<div style="padding:1pt 4pt">
+<p style="margin-left:0cm; margin-right:0cm"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:&quot;Times New Roman&quot;">//BasicManagedEntity</span><span style="font-family:宋体">类的继承体系，</span><span style="font-family:&quot;Times New Roman&quot;">HttpEntityWrapper</span><span style="font-family:宋体">实现了接口</span><span style="font-family:&quot;Times New Roman&quot;">HttpEntity</span></span></span></span></p>
+
+<p style="margin-left:0cm; margin-right:0cm"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:&quot;Times New Roman&quot;">public class BasicManagedEntity extends&nbsp;HttpEntityWrapper</span></span></span></span></p>
+
+<p style="margin-left:0cm; margin-right:0cm"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:&quot;Times New Roman&quot;">implements ConnectionReleaseTrigger,&nbsp;EofSensorWatcher</span></span></span></span></p>
+
+<p style="margin-left:0cm; margin-right:0cm"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">&nbsp;</span></span></span></p>
+
+<p style="margin-left:0cm; margin-right:0cm"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:&quot;Times New Roman&quot;">// BasicManagedEntity</span><span style="font-family:宋体">的</span><span style="font-family:&quot;Times New Roman&quot;">getContent</span><span style="font-family:宋体">方法</span><span style="font-family:宋体">：</span></span></span></span></p>
+
+<p style="margin-left:0cm; margin-right:0cm"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:&quot;Times New Roman&quot;">@Override</span></span></span></span></p>
+
+<p style="margin-left:0cm; margin-right:0cm"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:&quot;Times New Roman&quot;">&nbsp;&nbsp;&nbsp;&nbsp;public InputStream getContent() throws IOException {</span></span></span></span></p>
+
+<p style="margin-left:0cm; margin-right:0cm"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:&quot;Times New Roman&quot;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return new EofSensorInputStream(wrappedEntity.getContent(), this);</span></span></span></span></p>
+
+<p style="margin-left:0cm; margin-right:0cm"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:&quot;Times New Roman&quot;">}</span></span></span></span></p>
+
+<p style="margin-left:0cm; margin-right:0cm"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:&quot;Times New Roman&quot;">// EofSensorInputStream</span><span style="font-family:宋体">构造函数声明</span></span></span></span></p>
+
+<p style="margin-left:0cm; margin-right:0cm"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:&quot;Times New Roman&quot;">public EofSensorInputStream(final InputStream in,</span><span style="font-family:&quot;Times New Roman&quot;">final&nbsp;EofSensorWatcher watcher);</span></span></span></span></p>
+</div>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:Calibri">2.</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="font-family:宋体">调用</span><span style="font-family:&quot;Times New Roman&quot;,serif">EofSensorInputStream</span><span style="font-family:宋体">的</span><span style="font-family:&quot;Times New Roman&quot;,serif">close</span><span style="font-family:宋体">方法，该方法调用自身的</span><span style="font-family:&quot;Times New Roman&quot;,serif">checkClose()</span><span style="font-family:宋体">方法，</span><span style="font-family:&quot;Times New Roman&quot;,serif">checkClose()</span><span style="font-family:宋体">方法中调入了传入的</span><span style="font-family:&quot;Times New Roman&quot;,serif">EofSensorWatcher watcher</span><span style="font-family:宋体">的</span><span style="font-family:&quot;Times New Roman&quot;,serif">streamClosed()</span><span style="font-family:宋体">方法并关闭输入流，由于上一步骤中实际传入的</span><span style="font-family:&quot;Times New Roman&quot;,serif">watcher</span><span style="font-family:宋体">是</span><span style="font-family:Calibri">BasicManagedEntity</span><span style="font-family:宋体">的实例，因此实际上调用的是</span><span style="font-family:Calibri">BasicManagedEntity</span><span style="font-family:宋体">的</span><span style="font-family:Calibri">streamClose()</span><span style="font-family:宋体">方法</span><span style="font-family:宋体">。</span></span></span></span></p>
+
+<div style="padding:1pt 4pt">
+<p style="margin-left:0cm; margin-right:0cm"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:&quot;Times New Roman&quot;">//close</span><span style="font-family:宋体">方法</span></span></span></span></p>
+
+<p style="margin-left:0cm; margin-right:0cm"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:11pt"><span style="font-family:&quot;Courier New&quot;">@</span></span><span style="font-family:&quot;Times New Roman&quot;">Override</span></span></span></span></p>
+
+<p style="margin-left:0cm; margin-right:0cm"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:&quot;Times New Roman&quot;">&nbsp;&nbsp;&nbsp;&nbsp;public void close() throws IOException {</span></span></span></span></p>
+
+<p style="margin-left:0cm; margin-right:0cm"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:&quot;Times New Roman&quot;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// tolerate multiple calls to close()</span></span></span></span></p>
+
+<p style="margin-left:0cm; margin-right:0cm"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:&quot;Times New Roman&quot;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;selfClosed = true;</span></span></span></span></p>
+
+<p style="margin-left:0cm; margin-right:0cm"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:&quot;Times New Roman&quot;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;checkClose();</span></span></span></span></p>
+
+<p style="margin-left:0cm; margin-right:0cm"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:&quot;Times New Roman&quot;">}</span></span></span></span></p>
+
+<p style="margin-left:0cm; margin-right:0cm"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">&nbsp;</span></span></span></p>
+
+<p style="margin-left:0cm; margin-right:0cm"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:&quot;Times New Roman&quot;">//checkClose</span><span style="font-family:宋体">方法</span></span></span></span></p>
+
+<p style="margin-left:0cm; margin-right:0cm"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:&quot;Times New Roman&quot;">protected void checkClose() throws IOException {</span></span></span></span></p>
+
+<p style="margin-left:0cm; margin-right:0cm"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">&nbsp;</span></span></span></p>
+
+<p style="margin-left:0cm; margin-right:0cm"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:&quot;Times New Roman&quot;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if (wrappedStream != null) {</span></span></span></span></p>
+
+<p style="margin-left:0cm; margin-right:0cm"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:&quot;Times New Roman&quot;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;try {</span></span></span></span></p>
+
+<p style="margin-left:0cm; margin-right:0cm"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:&quot;Times New Roman&quot;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;boolean scws = true; // should close wrapped stream?</span></span></span></span></p>
+
+<p style="margin-left:0cm; margin-right:0cm"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:&quot;Times New Roman&quot;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if (eofWatcher != null)</span></span></span></span></p>
+
+<p style="margin-left:0cm; margin-right:0cm"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:&quot;Times New Roman&quot;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;scws =&nbsp;eofWatcher.streamClosed(wrappedStream);</span></span></span></span></p>
+
+<p style="margin-left:0cm; margin-right:0cm"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:&quot;Times New Roman&quot;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if (scws)</span></span></span></span></p>
+
+<p style="margin-left:0cm; margin-right:0cm"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:&quot;Times New Roman&quot;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;wrappedStream.close();</span></span></span></span></p>
+
+<p style="margin-left:0cm; margin-right:0cm"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:&quot;Times New Roman&quot;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;} finally {</span></span></span></span></p>
+
+<p style="margin-left:0cm; margin-right:0cm"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:&quot;Times New Roman&quot;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;wrappedStream = null;</span></span></span></span></p>
+
+<p style="margin-left:0cm; margin-right:0cm"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:&quot;Times New Roman&quot;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}</span></span></span></span></p>
+
+<p style="margin-left:0cm; margin-right:0cm"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:&quot;Times New Roman&quot;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}</span></span></span></span></p>
+
+<p style="margin-left:0cm; margin-right:0cm"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:11pt"><span style="font-family:&quot;Courier New&quot;">&nbsp;&nbsp;&nbsp;&nbsp;}</span></span></span></span></span></p>
+</div>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:Calibri">3.</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="font-family:Calibri">BasicManagedEntity</span><span style="font-family:宋体">的</span><span style="font-family:Calibri">streamClose()</span><span style="font-family:宋体">方法中将连接交回至连接池管理器。</span></span></span></span></p>
+
+<div style="padding:1pt 4pt">
+<p style="margin-left:0cm; margin-right:0cm"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:&quot;Times New Roman&quot;">public boolean streamClosed(InputStream wrapped) throws IOException {</span></span></span></span></p>
+
+<p style="margin-left:0cm; margin-right:0cm"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:&quot;Times New Roman&quot;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;try {</span></span></span></span></p>
+
+<p style="margin-left:0cm; margin-right:0cm"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:&quot;Times New Roman&quot;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if (attemptReuse &amp;&amp; (managedConn != null)) {</span></span></span></span></p>
+
+<p style="margin-left:0cm; margin-right:0cm"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:&quot;Times New Roman&quot;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;boolean valid = managedConn.isOpen();</span></span></span></span></p>
+
+<p style="margin-left:0cm; margin-right:0cm"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:&quot;Times New Roman&quot;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// this assumes that closing the stream will</span></span></span></span></p>
+
+<p style="margin-left:0cm; margin-right:0cm"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:&quot;Times New Roman&quot;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// consume the remainder of the response body:</span></span></span></span></p>
+
+<p style="margin-left:0cm; margin-right:0cm"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:&quot;Times New Roman&quot;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;try {</span></span></span></span></p>
+
+<p style="margin-left:0cm; margin-right:0cm"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:&quot;Times New Roman&quot;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;wrapped.close();</span></span></span></span></p>
+
+<p style="margin-left:0cm; margin-right:0cm"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:&quot;Times New Roman&quot;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;managedConn.markReusable();</span></span></span></span></p>
+
+<p style="margin-left:0cm; margin-right:0cm"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:&quot;Times New Roman&quot;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;} catch (SocketException ex) {</span></span></span></span></p>
+
+<p style="margin-left:0cm; margin-right:0cm"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:&quot;Times New Roman&quot;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if (valid) {</span></span></span></span></p>
+
+<p style="margin-left:0cm; margin-right:0cm"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:&quot;Times New Roman&quot;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;throw ex;</span></span></span></span></p>
+
+<p style="margin-left:0cm; margin-right:0cm"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:&quot;Times New Roman&quot;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}</span></span></span></span></p>
+
+<p style="margin-left:0cm; margin-right:0cm"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:&quot;Times New Roman&quot;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}</span></span></span></span></p>
+
+<p style="margin-left:0cm; margin-right:0cm"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:&quot;Times New Roman&quot;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}</span></span></span></span></p>
+
+<p style="margin-left:0cm; margin-right:0cm"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:&quot;Times New Roman&quot;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;} finally {</span></span></span></span></p>
+
+<p style="margin-left:0cm; margin-right:0cm"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:&quot;Times New Roman&quot;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;releaseManagedConnection();</span></span></span></span></p>
+
+<p style="margin-left:0cm; margin-right:0cm"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:&quot;Times New Roman&quot;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}</span></span></span></span></p>
+
+<p style="margin-left:0cm; margin-right:0cm"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:&quot;Times New Roman&quot;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return false;</span></span></span></span></p>
+
+<p style="margin-left:0cm; margin-right:0cm"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-family:&quot;Times New Roman&quot;">}</span></span></span></span></p>
+</div>
+
+<h3 style="margin-left:35.45pt; margin-right:0cm"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:12px"><span style="font-size:12px"><span style="font-size:12px"><span style="font-family:&quot;Times New Roman&quot;"><strong><span style="font-size:medium">2.1.7.</span></strong>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></span></span></span><strong><span style="font-size:medium"><span style="font-size:12px"><span style="font-family:宋体">其他</span></span></span></strong></span></span></span></h3>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:10.5pt"><span style="font-family:&quot;Times New Roman&quot;,serif">httpClient&nbsp;</span></span><span style="font-size:10.5pt"><span style="font-family:宋体">提供了非常灵活的架构，同时提供了很多接口，需要修改时，找到对应接口和默认实现类，参照默认实现类进行修改即可（或继承默认实现类，覆盖其对应方法）。通常需要更改的类有</span></span><span style="font-size:10.5pt"><span style="font-family:&quot;Times New Roman&quot;,serif">AbstractHttpClient</span></span><span style="font-size:10.5pt"><span style="font-family:宋体">和各种</span></span><span style="font-size:10.5pt"><span style="font-family:&quot;Times New Roman&quot;,serif">handler</span></span><span style="font-size:10.5pt"><span style="font-family:宋体">以及</span></span><span style="font-size:10.5pt"><span style="font-family:&quot;Times New Roman&quot;,serif">Strategy</span></span></span></span></span></p>
+
+<p>&nbsp;</p>
+
+<p>&nbsp;</p>
+
+<h2>如何设置合理的参数</h2>
+
+<p>关于设置合理的参数，这个说起来真的不是一个简单的话题，需要考虑的方面也听到，是需要一定经验的，这里先简单的说一下自己的理解，欢迎各位批评指教。</p>
+
+<p>这里主要涉及两部分参数：连接数相关参数、超时时间相关参数</p>
+
+<p><strong>1、连接数相关参数</strong></p>
+
+<p>根据&ldquo;利尔特法则&rdquo;可以得到简单的公式：</p>
+
+<p><img alt="bb1dddfc6ee63" src="http://images2015.cnblogs.com/blog/677054/201701/677054-20170125150656816-173079484.png" style="height:30px; width:240px" title="bb1dddfc6ee63" /></p>
+
+<p>简单地说，利特尔法则解释了这三种变量的关系：L&mdash;系统里的请求数量、&lambda;&mdash;请求到达的速率、W&mdash;每个请求的处理时间。例如，如果每秒10个请求到达，处理一个请求需要1秒，那么系统在每个时刻都有10个请求在处理。如果处理每个请求的时间翻倍，那么系统每时刻需要处理的请求数也翻倍为20，因此需要20个线程。连接池的大小可以参考 L。</p>
+
+<p>qps指标可以作为&ldquo;&lambda;&mdash;请求到达的速率&rdquo;，由于httpClient是作为http客户端，故需要通过一些监控手段得到服务端集群访问量较高时的qps，如客户端集群为4台，服务端集群为2台，监控到每台服务端机器的qps为100，如果每个请求处理时间为1秒，那么2台服务端每个时刻总共有 100 * 2 * 1s = 200 个请求访问，平均到4台客户端机器，每台要负责50，即每台客户端的连接池大小可以设置为50。</p>
+
+<p>当然实际的情况是更复杂的，上面的请求平均处理时间1秒只是一种业务的，实际情况的业务情况更多，评估请求平均处理时间更复杂。所以在设置连接数后，最好通过比较充分性能测试验证是否可以满足要求。</p>
+
+<p>还有一些Linux系统级的配置需要考虑，如单个进程能够打开的最大文件描述符数量open files默认为1024，每个与服务端建立的连接都需要占用一个文件描述符，如果open files值太小会影响建立连接。</p>
+
+<p>还要注意，连接数主要包含maxTotal-连接总数、maxPerRoute-路由最大连接数，尤其是maxPerRoute默认值为2，很小，设置不好的话即使maxTotal再大也无法充分利用连接池。</p>
+
+<p><strong>2、超时时间相关参数</strong></p>
+
+<p>connectTimeout&nbsp; --&nbsp; 连接超时时间</p>
+
+<p>根据网络情况，内网、外网等，可设置连接超时时间为2秒，具体根据业务调整</p>
+
+<p>socketTimeout&nbsp; --&nbsp; 读超时时间（等待数据超时时间）</p>
+
+<p>需要根据具体请求的业务而定，如请求的API接口从接到请求到返回数据的平均处理时间为1秒，那么读超时时间可以设置为2秒，考虑并发量较大的情况，也可以通过性能测试得到一个相对靠谱的值。</p>
+
+<p>socketTimeout有默认值，也可以针对每个请求单独设置。</p>
+
+<p>connectionRequestTimeout&nbsp; --&nbsp; 从池中获取连接超时时间</p>
+
+<p>建议设置500ms即可，不要设置太大，这样可以使连接池连接不够时不用等待太久去获取连接，不要让大量请求堆积在获取连接处，尽快抛出异常，发现问题。</p>
+
+<h2><strong>instream.close()、response.close()、httpclient.close()的区别</strong></h2>
+
+<pre>
+/**
+ * This example demonstrates the recommended way of using API to make sure
+ * the underlying connection gets released back to the connection manager.
+ */
+public class ClientConnectionRelease {
+
+    public final static void main(String[] args) throws Exception {
+        CloseableHttpClient httpclient = HttpClients.createDefault();
+        try {
+            HttpGet httpget = new HttpGet(&quot;http://localhost/&quot;);
+
+            System.out.println(&quot;Executing request &quot; + httpget.getRequestLine());
+            CloseableHttpResponse response = httpclient.execute(httpget);
+            try {
+                System.out.println(&quot;----------------------------------------&quot;);
+                System.out.println(response.getStatusLine());
+
+                // Get hold of the response entity
+                HttpEntity entity = response.getEntity();
+
+                // If the response does not enclose an entity, there is no need
+                // to bother about connection release
+                if (entity != null) {
+                    InputStream instream = entity.getContent();
+                    try {
+                        instream.read();
+                        // do something useful with the response
+                    } catch (IOException ex) {
+                        // In case of an IOException the connection will be released
+                        // back to the connection manager automatically
+                        throw ex;
+                    } finally {
+                        // Closing the input stream will trigger connection release
+                        instream.close();
+                    }
+                }
+            } finally {
+                response.close();
+            }
+        } finally {
+            httpclient.close();
+        }
+    }
+}</pre>
+
+<p>在HttpClient Manual connection release的例子中可以看到，从内层依次调用的是instream.close()、response.close()、httpClient.close()，那么它们有什么区别呢？</p>
+
+<p>&nbsp;</p>
+
+<p><strong>instream.close()</strong></p>
+
+<p>在主动操作输入流，或者调用EntityUtils.toString(httpResponse.getEntity())时会调用instream.read()、instream.close()等方法。instream的实现类为org.apache.http.conn.EofSensorInputStream。</p>
+
+<p>在每次通过instream.read()读取数据流后，都会判断流是否读取结束</p>
+
+<pre>
+@Override
+public int read(final byte[] b, final int off, final int len) throws IOException {
+    int l = -1;
+    if (isReadAllowed()) {
+        try {
+            l = wrappedStream.read(b,  off,  len);
+            checkEOF(l);
+        } catch (final IOException ex) {
+            checkAbort();
+            throw ex;
+        }
+    }
+    return l;
+}</pre>
+
+<p>在EofSensorInputStream#checkEOF()方法中如果eof=-1，流已经读完，如果连接可重用，就会尝试释放连接，否则关闭连接。</p>
+
+<pre>
+protected void checkEOF(final int eof) throws IOException {
+    if ((wrappedStream != null) &amp;&amp; (eof &lt; 0)) {
+        try {
+            boolean scws = true; // should close wrapped stream?
+            if (eofWatcher != null) {
+                scws = eofWatcher.eofDetected(wrappedStream);
+            }
+            if (scws) {
+                wrappedStream.close();
+            }
+        } finally {
+            wrappedStream = null;
+        }
+    }
+}</pre>
+
+<p>ResponseEntityWrapper#eofDetected</p>
+
+<pre>
+public boolean eofDetected(final InputStream wrapped) throws IOException {
+    try {
+        // there may be some cleanup required, such as
+        // reading trailers after the response body:
+        wrapped.close();
+        releaseConnection(); //释放连接 或 关闭连接
+    } finally {
+        cleanup();
+    }
+    return false;
+}</pre>
+
+<p>ConnectionHolder#releaseConnection</p>
+
+<pre>
+public void releaseConnection() {
+    synchronized (this.managedConn) {
+    	//如果连接已经释放，直接返回
+        if (this.released) {
+            return;
+        }
+        
+        this.released = true;
+        //连接可重用，释放回连接池
+        if (this.reusable) {
+            this.manager.releaseConnection(this.managedConn,
+                    this.state, this.validDuration, this.tunit);
+        } 
+        //不可重用，关闭连接
+        else {
+            try {
+                this.managedConn.close();
+                log.debug(&quot;Connection discarded&quot;);
+            } catch (final IOException ex) {
+                if (this.log.isDebugEnabled()) {
+                    this.log.debug(ex.getMessage(), ex);
+                }
+            } finally {
+                this.manager.releaseConnection(
+                        this.managedConn, null, 0, TimeUnit.MILLISECONDS);
+            }
+        }
+    }
+}</pre>
+
+<p>&nbsp;</p>
+
+<p>如果没有instream.read()读取数据，在instream.close()时会调用EofSensorInputStream#checkClose()，也会有类似上面的逻辑。</p>
+
+<p>所以就如官方例子注释的一样，在正常操作输入流后，会释放连接。</p>
+
+<p>&nbsp;</p>
+
+<p><strong>response.close()</strong></p>
+
+<p>最终是调用ConnectionHolder#abortConnection()</p>
+
+<pre>
+public void abortConnection() {
+    synchronized (this.managedConn) {
+    	//如果连接已经释放，直接返回
+        if (this.released) {
+            return;
+        }
+        this.released = true;
+        try {
+        	//关闭连接
+            this.managedConn.shutdown();
+            log.debug(&quot;Connection discarded&quot;);
+        } catch (final IOException ex) {
+            if (this.log.isDebugEnabled()) {
+                this.log.debug(ex.getMessage(), ex);
+            }
+        } finally {
+            this.manager.releaseConnection(
+                    this.managedConn, null, 0, TimeUnit.MILLISECONDS);
+        }
+    }
+}</pre>
+
+<p>所以，如果在调用response.close()之前，没有读取过输入流，也没有关闭输入流，那么连接没有被释放，released=false，就会关闭连接。</p>
+
+<p>&nbsp;</p>
+
+<p><strong>httpClient.close()</strong></p>
+
+<p>最终调用的是InternalHttpClient#close()，会关闭整个连接管理器，并关闭连接池中所有连接。</p>
+
+<pre>
+public void close() {
+    this.connManager.shutdown();
+    if (this.closeables != null) {
+        for (final Closeable closeable: this.closeables) {
+            try {
+                closeable.close();
+            } catch (final IOException ex) {
+                this.log.error(ex.getMessage(), ex);
+            }
+        }
+    }
+}</pre>
+
+<p>&nbsp;</p>
+
+<p><strong>总结：</strong></p>
+
+<p>1、使用连接池时，要正确释放连接需要通过读取输入流 或者 instream.close()方式；</p>
+
+<p>2、如果已经释放连接，response.close()直接返回，否则会关闭连接；</p>
+
+<p>3、httpClient.close()会关闭连接管理器，并关闭其中所有连接，谨慎使用。</p>
+
+<p>&nbsp;</p>
+
+<p><strong>参考资料：</strong></p>
+
+<p>httpClient 4.3.x configuration 官方样例</p>
+
+<p>使用httpclient必须知道的参数设置及代码写法、存在的风险</p>
+
+<p>HttpClient连接池的连接保持、超时和失效机制</p>
+
+<p>HttpClient连接池原理及一次连接时序图</p>
+</div>
+</div>

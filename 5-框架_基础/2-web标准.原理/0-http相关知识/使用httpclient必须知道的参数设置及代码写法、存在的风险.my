@@ -1,0 +1,380 @@
+<div class="blog_title" style="-webkit-text-stroke-width:0px; margin-bottom:15px; text-align:left">
+<h1 style="margin-left:0px; margin-right:0px">使用httpclient必须知道的参数设置及代码写法、存在的风险</h1>
+
+<h3 style="margin-left:0px; margin-right:0px"><span style="font-size:12px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><a href="http://jinnianshilongnian.iteye.com/blog/2089792" style="color:#108ac6; text-decoration:underline">原文地址</a></span></span></h3>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><strong>结论：</strong></span></span></span></p>
+</div>
+
+<div class="blog_content" id="blog_content" style="-webkit-text-stroke-width:0px; text-align:left">
+<div class="iteye-blog-content-contain">
+<div><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">如果使用httpclient 3.1并发量比较大的项目，最好升级到httpclient4.2.3上，保证并发量大时能抗住。httpclient 4.3.3，目前还有一些bug；还是用4.2.x稳定版本吧。</span></span></span></div>
+
+<div><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><strong>&nbsp;</strong></span></span></span></div>
+
+<div><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><strong>以库存项目为例：</strong></span></span></span></div>
+
+<div>
+<p style="margin-left:0cm; margin-right:0cm"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><span style="font-size:10pt"><span style="font-family:宋体">httpclient一天并发量在</span></span><span style="font-size:10pt"><span style="font-family:&quot;Segoe UI&quot;,sans-serif">1500w</span></span><span style="font-size:10pt"><span style="font-family:宋体">左右，峰值一秒</span></span><span style="font-size:10pt"><span style="font-family:&quot;Segoe UI&quot;,sans-serif">7</span></span><span style="font-size:10pt"><span style="font-family:宋体">万。</span></span></span></span></span></p>
+
+<p style="margin-left:0cm; margin-right:0cm"><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">在之前使用过程中，一直存在大量的</span></span></span></p>
+</div>
+
+<p><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">&nbsp;</span></span></span><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><em>org.apache.http.conn.ConnectionPoolTimeoutException</em>:&nbsp;<em>Timeout</em>&nbsp;<em>waiting</em>&nbsp;<em>for</em>&nbsp;<em>connection</em>&nbsp;<em>from</em>&nbsp;<em>pool</em><br />
+<em>at</em><em><em>org</em>.<em>apache</em>.<em>http</em>.<em>impl</em>.<em>conn</em>.<em>PoolingClientConnectionManager</em>.<em>leaseConnection</em></em>(<em><em>PoolingClientConnectionManager</em>.<em>java</em></em>:<em>232</em>)<br />
+<em>at</em><em><em>org</em>.<em>apache</em>.<em>http</em>.<em>impl</em>.<em>conn</em>.<em>PoolingClientConnectionManager</em></em>$<em><em>1</em>.<em>getConnection</em></em>(<em><em>PoolingClientConnectionManager</em>.<em>java</em></em>:<em>199</em>)<br />
+<em>at</em>&nbsp;<em><em>org</em>.<em>apache</em>.<em>http</em>.<em>impl</em>.<em>client</em>.<em>DefaultRequestDirector</em>.<em>execute</em></em>(<em><em>DefaultRequestDirector</em>.<em>java</em></em>:<em>456</em>)</span></span></span></p>
+
+<div>
+<div><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">另外通过jstack查看线程，会发现：</span></span></span></div>
+
+<div><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">&quot;pool-21-thread-3&quot; prio=10 tid=0x00007f6b7c002800 nid=0x40ff waiting on condition [0x00007f6b37020000]<br />
+java.lang.Thread.State: TIMED_WAITING (parking)<br />
+at sun.misc.Unsafe.park(Native Method)<br />
+- parking to wait for &lt;0x00000000f97918b8&gt; (a java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject)<br />
+at java.util.concurrent.locks.LockSupport.parkUntil(LockSupport.java:239)<br />
+at java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject.awaitUntil(AbstractQueuedSynchronizer.java:2072)<br />
+at org.apache.http.pool.PoolEntryFuture.await(PoolEntryFuture.java:129)<br />
+at org.apache.http.pool.AbstractConnPool.getPoolEntryBlocking(AbstractConnPool.java:281)<br />
+at org.apache.http.pool.AbstractConnPool.access$000(AbstractConnPool.java:62)<br />
+at org.apache.http.pool.AbstractConnPool$2.getPoolEntry(AbstractConnPool.java:176)<br />
+at org.apache.http.pool.AbstractConnPool$2.getPoolEntry(AbstractConnPool.java:172)<br />
+at org.apache.http.pool.PoolEntryFuture.get(PoolEntryFuture.java:100)<br />
+at org.apache.http.impl.conn.PoolingClientConnectionManager.leaseConnection(PoolingClientConnectionManager.java:212)</span></span></span></div>
+
+<div><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">&nbsp;</span></span></span><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">&nbsp;</span></span></span></div>
+
+<div><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><strong>问题：</strong></span></span></span></div>
+
+<div><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">因为使用了连接池，但连接不够用，造成大量的等待；而且这种等待都有滚雪球的效应（和交易组最近使用的apache common dbcp存在的风险是类似的）。</span></span></span></div>
+
+<div><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">&nbsp;</span></span></span><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">&nbsp;</span></span></span></div>
+
+<div><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><strong>解决方案</strong></span></span></span></div>
+
+<div><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">最终我们定了一些合理的参数值，目前来看还没有遇到问题。</span></span></span></div>
+
+<div><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">&nbsp;</span></span></span><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">&nbsp;</span></span></span></div>
+
+<div><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><strong>思考</strong></span></span></span></div>
+
+<div><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">其实出问题的原因是我们对一些参数不了解，随意设置其值，不出现问题则好，出现问题很难排查到原因，因此我把使用httpclient必须设置的参数及代码写法及排查方法总结一下，供参考。</span></span></span></div>
+
+<div><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">&nbsp;</span></span></span></div>
+
+<div><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><strong>参数设置</strong></span></span></span></div>
+
+<div><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">1、httpclient 4.2.3</span></span></span></div>
+
+<div>
+<div><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">HttpParams params = new BasicHttpParams();</span></span></span></div>
+
+<div><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">//设置连接超时时间</span></span></span></div>
+
+<div><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">Integer CONNECTION_TIMEOUT = 2 * 1000;&nbsp;//设置请求超时2秒钟 根据业务调整</span></span></span></div>
+
+<div><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">Integer SO_TIMEOUT = 2 * 1000;&nbsp;//设置等待数据超时时间2秒钟 根据业务调整</span></span></span></div>
+
+<div><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">//定义了当从ClientConnectionManager中检索ManagedClientConnection实例时使用的毫秒级的超时时间</span></span></span></div>
+
+<div><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">//这个参数期望得到一个java.lang.Long类型的值。如果这个参数没有被设置，默认等于CONNECTION_TIMEOUT，因此一定要设置</span></span></span></div>
+
+<div><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">Long CONN_MANAGER_TIMEOUT = 500L;&nbsp;//该值就是连接不够用的时候等待超时时间，一定要设置，而且不能太大 ()</span></span></span></div>
+
+<div><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">&nbsp;</span></span></span></div>
+
+<div><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">params.setIntParameter(CoreConnectionPNames.CONNECTION_TIMEOUT, CONNECTION_TIMEOUT);</span></span></span></div>
+
+<div><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">params.setIntParameter(CoreConnectionPNames.SO_TIMEOUT, SO_TIMEOUT);</span></span></span></div>
+
+<div><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">params.setLongParameter(ClientPNames.CONN_MANAGER_TIMEOUT, CONN_MANAGER_TIMEOUT);</span></span></span></div>
+
+<div><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">//在提交请求之前 测试连接是否可用</span></span></span>
+
+<div><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">params.setBooleanParameter(CoreConnectionPNames.STALE_CONNECTION_CHECK, true);</span></span></span></div>
+
+<div><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">&nbsp;</span></span></span></div>
+</div>
+
+<div><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">PoolingClientConnectionManager conMgr = new PoolingClientConnectionManager();</span></span></span></div>
+
+<div><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">conMgr.setMaxTotal(200);&nbsp;//设置整个连接池最大连接数 根据自己的场景决定</span></span></span></div>
+
+<div><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">//是路由的默认最大连接（该值默认为2），限制数量实际使用DefaultMaxPerRoute并非MaxTotal。</span></span></span></div>
+
+<div><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">//设置过小无法支持大并发(ConnectionPoolTimeoutException: Timeout waiting for connection from pool)，路由是对maxTotal的细分。</span></span></span></div>
+
+<div><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">conMgr.setDefaultMaxPerRoute(conMgr.getMaxTotal());//（目前只有一个路由，因此让他等于最大值）</span></span></span></div>
+
+<div><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">&nbsp;</span></span></span></div>
+
+<div><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">//另外设置http client的重试次数，默认是3次；当前是禁用掉（如果项目量不到，这个默认即可）</span></span></span></div>
+
+<div><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">httpClient.setHttpRequestRetryHandler(new DefaultHttpRequestRetryHandler(0, false));</span></span></span></div>
+
+<div><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">此处解释下MaxtTotal和DefaultMaxPerRoute的区别：</span></span></span></div>
+
+<div><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">1、MaxtTotal是整个池子的大小；</span></span></span></div>
+
+<div><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">2、DefaultMaxPerRoute是根据连接到的主机对MaxTotal的一个细分；比如：</span></span></span></div>
+
+<div><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">MaxtTotal=400 DefaultMaxPerRoute=200</span></span></span></div>
+
+<div><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">而我只连接到http://sishuok.com时，到这个主机的并发最多只有200；而不是400；</span></span></span></div>
+
+<div><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">而我连接到http://sishuok.com 和 http://qq.com时，到每个主机的并发最多只有200；即加起来是400（但不能超过400）；所以起作用的设置是DefaultMaxPerRoute。</span></span></span></div>
+</div>
+
+<div><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">&nbsp;</span></span></span></div>
+
+<div><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">&nbsp;</span></span></span><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">2、httpclient 3.1</span></span></span></div>
+
+<div>
+<div><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">HttpConnectionManagerParams params = new HttpConnectionManagerParams();</span></span></span></div>
+
+<div><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">params.setConnectionTimeout(2000);</span></span></span></div>
+
+<div><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">params.setSoTimeout(2000);</span></span></span></div>
+
+<div><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">// 最大连接数</span></span></span></div>
+
+<div><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">params.setMaxTotalConnections(500);</span></span></span></div>
+
+<div><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">params.setDefaultMaxConnectionsPerHost(500);</span></span></span></div>
+
+<div><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">params.setStaleCheckingEnabled(true);</span></span></span></div>
+
+<div><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">connectionManager.setParams(params);</span></span></span></div>
+
+<div><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">&nbsp;</span></span></span></div>
+
+<div><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">HttpClientParams httpClientParams = new HttpClientParams();</span></span></span></div>
+
+<div><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">// 设置httpClient的连接超时，对连接管理器设置的连接超时是无用的</span></span></span></div>
+
+<div><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">httpClientParams.setConnectionManagerTimeout(5000); //等价于4.2.3中的CONN_MANAGER_TIMEOUT</span></span></span></div>
+
+<div><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">httpClient = new HttpClient(connectionManager);</span></span></span></div>
+
+<div><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">httpClient.setParams(httpClientParams);</span></span></span></div>
+
+<div><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">&nbsp;</span></span></span></div>
+
+<div><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">//另外设置http client的重试次数，默认是3次；当前是禁用掉（如果项目量不到，这个默认即可）</span></span></span></div>
+
+<div>
+<div><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">httpClientParams.setParameter(HttpMethodParams.RETRY_HANDLER, new DefaultHttpMethodRetryHandler(0, false));</span></span></span></div>
+
+<div><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">&nbsp;</span></span></span></div>
+</div>
+</div>
+
+<div><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">参数类似 就不多解释了；</span></span></span></div>
+
+<div><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">&nbsp;</span></span></span></div>
+
+<div><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><strong>代码写法</strong></span></span></span></div>
+
+<div><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">1、httpclient 4.2.3</span></span></span></div>
+
+<div>
+<div><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">HttpResponse response = null;</span></span></span></div>
+
+<div><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">HttpEntity entity = null;</span></span></span></div>
+
+<div><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">try {</span></span></span></div>
+
+<div><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">&nbsp; HttpGet get = new HttpGet();</span></span></span></div>
+
+<div><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">&nbsp; String url = &quot;http://hc.apache.org/&quot;;</span></span></span></div>
+
+<div><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">&nbsp; get.setURI(new URI(url));</span></span></span></div>
+
+<div><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">&nbsp; response = getHttpClient().execute(get);</span></span></span></div>
+
+<div><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">/ &nbsp;/处理响应</span></span></span></div>
+
+<div><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">} catch (Exception e) {</span></span></span></div>
+
+<div><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">&nbsp; //处理异常</span></span></span></div>
+
+<div><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">} finally {</span></span></span></div>
+
+<div><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">&nbsp; if(response != null) {&nbsp;</span></span></span></div>
+
+<div><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">&nbsp; &nbsp; EntityUtils.consume(response.getEntity()); //会自动释放连接</span></span></span></div>
+
+<div><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">&nbsp; }</span></span></span></div>
+
+<div><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">&nbsp; //如下方法也是可以的，但是存在一些风险；不要用</span></span></span>
+
+<div><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">&nbsp; //InputStream is = response.getEntity().getContent();</span></span></span></div>
+
+<div><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">&nbsp; //is.close();</span></span></span></div>
+</div>
+
+<div><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">}</span></span></span></div>
+</div>
+
+<div><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">&nbsp;</span></span></span></div>
+
+<div><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">2、httpclient 3.1</span></span></span></div>
+
+<div><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">PostMethod postMethod = new PostMethod(yxUrl);</span></span></span></div>
+
+<div><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">try {&nbsp;</span></span></span></div>
+
+<div><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">&nbsp; httpClient.executeMethod(postMethod);</span></span></span></div>
+
+<div><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">} catch (Exception e) {</span></span></span></div>
+
+<div><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">&nbsp; //处理异常</span></span></span></div>
+
+<div><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">} finally {</span></span></span></div>
+
+<div><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">&nbsp; if(postMethod != null) { //不要忘记释放，尽量通过该方法实现，</span></span></span></div>
+
+<div><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">&nbsp; &nbsp; postMethod.releaseConnection();</span></span></span></div>
+
+<div><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">&nbsp; &nbsp; //存在风险，不要用</span></span></span></div>
+
+<div>
+<div><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">&nbsp; &nbsp; //postMethod.setParameter(&quot;Connection&quot;, &quot;close&quot;);</span></span></span></div>
+
+<div><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">&nbsp; &nbsp; //InputStream is = postMethod.getResponseBodyAsStream();</span></span></span></div>
+
+<div><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">&nbsp; &nbsp; //is.clsoe();也会关闭并释放连接的</span></span></span></div>
+</div>
+
+<div><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">&nbsp; }</span></span></span></div>
+
+<div><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">}</span></span></span></div>
+
+<div><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">&nbsp;</span></span></span></div>
+
+<div><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><strong>存在的风险</strong></span></span></span></div>
+
+<div><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">1、httpclient 4.2.3 在释放连接时</span></span></span></div>
+
+<div>
+<div><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">if (managedConn.isOpen() &amp;&amp; !managedConn.isMarkedReusable()) { //如果连接打开的且不可重用（not keepalive） close socket</span></span></span></div>
+
+<div><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">&nbsp; try {</span></span></span></div>
+
+<div><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">&nbsp; &nbsp; managedConn.shutdown();</span></span></span></div>
+
+<div><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">&nbsp; } catch (IOException iox) {</span></span></span></div>
+
+<div><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">&nbsp; &nbsp; if (this.log.isDebugEnabled()) {</span></span></span></div>
+
+<div><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">&nbsp; &nbsp; &nbsp; this.log.debug(&quot;I/O exception shutting down released connection&quot;, iox);</span></span></span></div>
+
+<div><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">&nbsp; &nbsp; }</span></span></span></div>
+
+<div><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">&nbsp; }</span></span></span></div>
+
+<div><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">}</span></span></span></div>
+
+<div><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">// Only reusable connections can be kept alive</span></span></span></div>
+
+<div><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">if (managedConn.isMarkedReusable()) {</span></span></span></div>
+
+<div><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">&nbsp; entry.updateExpiry(keepalive, tunit != null ? tunit : TimeUnit.MILLISECONDS);</span></span></span></div>
+
+<div><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">&nbsp; if (this.log.isDebugEnabled()) {</span></span></span></div>
+
+<div><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">&nbsp; &nbsp; String s;</span></span></span></div>
+
+<div><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">&nbsp; &nbsp; if (keepalive &gt; 0) {</span></span></span></div>
+
+<div><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">&nbsp; &nbsp; &nbsp; s = &quot;for &quot; + keepalive + &quot; &quot; + tunit;</span></span></span></div>
+
+<div><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">&nbsp; &nbsp; } else {&nbsp;</span></span></span></div>
+
+<div><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">&nbsp; &nbsp; &nbsp; s = &quot;indefinitely&quot;;</span></span></span></div>
+
+<div><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">&nbsp; &nbsp; }</span></span></span></div>
+
+<div><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">&nbsp; &nbsp; this.log.debug(&quot;Connection &quot; + format(entry) + &quot; can be kept alive &quot; + s);</span></span></span></div>
+
+<div><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">&nbsp; }</span></span></span></div>
+
+<div><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">}</span></span></span></div>
+</div>
+
+<div><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">无风险</span></span></span></div>
+
+<div><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">&nbsp;</span></span></span></div>
+
+<div><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">2、httpclient 3.1</span></span></span></div>
+
+<div><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">1、如果走http1.1协议：如果proxy-connection/connection请求头设置为close；那么会关闭socket； 或者这两个头不等于close 也会自动关；</span></span></span></div>
+
+<div><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">2、如果是keep-alive ，不会关闭；</span></span></span></div>
+
+<div>
+<div><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">3、如果协议小于等于http1.0协议没有问题；调用releaseConnection时会close socket；</span></span></span></div>
+
+<div><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">4、其他情况不会close；</span></span></span></div>
+
+<div><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">&nbsp;</span></span></span></div>
+
+<div><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">也就是说如果走http1.1且没有设置相关参数；那么socket其实是没有关闭的；可能造成很多TIME_WAIT；因此如果是走短连接建议设置postMethod.setParameter(&quot;Connection&quot;, &quot;close&quot;)。</span></span></span></div>
+</div>
+
+<div><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">&nbsp;</span></span></span></div>
+
+<div><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px"><strong>其他注意事项：</strong></span></span></span></div>
+
+<div>
+<div><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">1、使用keep-alive一定要设置Content-Length头（否则也不是长连接）。</span></span></span></div>
+
+<div><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">&nbsp;</span></span></span></div>
+
+<div>
+<div><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">2、在使用httpclient3.1时（4.2.3没问题）；尽量不要调用 byte[] getResponseBody() ：因为如果Content-Length没设置或者传输的数据大于1M，会有大量如下日志</span></span></span></div>
+</div>
+
+<div>
+<div><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">LOG.warn(&quot;Going to buffer response body of large or unknown size. &quot;</span></span></span></div>
+
+<div><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">+&quot;Using getResponseBodyAsStream instead is recommended.&quot;);</span></span></span></div>
+
+<div><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">&nbsp;</span></span></span></div>
+
+<div>
+<div><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">如果大于1M可以设置该参数；但是-1的话就没办法了，就不要调用 byte[] getResponseBody()</span></span></span></div>
+
+<div><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">httpClientParams.setLongParameter(HttpMethodParams.BUFFER_WARN_TRIGGER_LIMIT, 2L * 1024 * 1024);</span></span></span></div>
+</div>
+</div>
+
+<div><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">&nbsp;</span></span></span><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">3、锁</span></span></span></div>
+
+<div><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">httpclient 3.1 使用synchronized+wait+notifyAll，存在两个问题，量大synchronized慢和notifyAll可能造成线程饥饿；httpclient 4.2.3 使用 ReentrantLock（默认非公平） + Condition（每个线程一个）。</span></span></span></div>
+
+<div><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">&nbsp;</span></span></span></div>
+
+<div><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">这里有个测试：<a href="http://java.dzone.com/articles/synchronized-vs-lock" style="color:#108ac6; text-decoration:underline">http://java.dzone.com/articles/synchronized-vs-lock</a>&nbsp;，在我本机（jdk1.6.0_43 ）测试结果明细锁的优势比较大</span></span></span></div>
+
+<div><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">1x synchronized {} with 32 threads took 2.621 seconds</span></span></span></div>
+
+<div>
+<div><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">1x Lock.lock()/unlock() with 32 threads took 1.951 seconds</span></span></span></div>
+
+<div><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">1x AtomicInteger with 32 threads took 4.113 seconds</span></span></span></div>
+
+<div><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">1x synchronized {} with 64 threads took&nbsp;2.621&nbsp;seconds</span></span></span></div>
+
+<div><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">1x Lock.lock()/unlock() with 64 threads took&nbsp;1.983&nbsp;seconds</span></span></span></div>
+
+<div><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">&nbsp;</span></span></span></div>
+<span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">这也是为什么在库存项目中使用httpclient 3.1 依然有大量的wait，而httpclient4.2.3 一个没有的问题所在。</span></span></span></div>
+</div>
+
+<div><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">&nbsp;</span></span></span></div>
+
+<div><span style="font-size:14px"><span style="font-family:Helvetica,Tahoma,Arial,sans-serif"><span style="font-size:14px">如有问题，请赐教。</span></span></span></div>
+</div>
+</div>
+</div>
