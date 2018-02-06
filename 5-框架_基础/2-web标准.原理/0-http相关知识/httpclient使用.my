@@ -1,0 +1,1045 @@
+<h1>HttpClient详细解释</h1>
+
+<p>Http协议的重要性相信不用我多说了，HttpClient相比传统JDK自带的URLConnection，增加了易用性和灵活性（具体区别，日后我们再讨论），它不仅是客户端发送Http请求变得容易，而且也方便了开发人员测试接口（基于Http协议的），即提高了开发的效率，也方便提高代码的健壮性。因此熟练掌握HttpClient是很重要的必修内容，掌握HttpClient后，相信对于Http协议的了解会更加深入。</p>
+
+<p>org.apache.commons.httpclient.HttpClient与org.apache.http.client.HttpClient的区别</p>
+
+<p>[java]&nbsp;view plain&nbsp;copy</p>
+
+<p>Commons的HttpClient项目现在是生命的尽头，不再被开发,&nbsp;&nbsp;<br />
+已被Apache&nbsp;HttpComponents项目HttpClient和的HttpCore&nbsp;&nbsp;<br />
+模组取代，提供更好的性能和更大的灵活性。&nbsp;&nbsp;</p>
+
+<h2><br />
+一、简介</h2>
+
+<p>HttpClient是Apache Jakarta Common下的子项目，用来提供高效的、最新的、功能丰富的支持HTTP协议的客户端编程工具包，并且它支持HTTP协议最新的版本和建议。HttpClient已经应用在很多的项目中，比如Apache Jakarta上很著名的另外两个开源项目Cactus和HTMLUnit都使用了HttpClient。</p>
+
+<p>下载地址:&nbsp;http://hc.apache.org/downloads.cgi</p>
+
+<h2>二、特性</h2>
+
+<p>1. 基于标准、纯净的java语言。实现了Http1.0和Http1.1</p>
+
+<p>2. 以可扩展的面向对象的结构实现了Http全部的方法（GET, POST, PUT, DELETE, HEAD, OPTIONS, and TRACE）。</p>
+
+<p>3. 支持HTTPS协议。</p>
+
+<p>4. 通过Http代理建立透明的连接。</p>
+
+<p>5. 利用CONNECT方法通过Http代理建立隧道的https连接。</p>
+
+<p>6. Basic, Digest, NTLMv1, NTLMv2, NTLM2 Session, SNPNEGO/Kerberos认证方案。</p>
+
+<p>7. 插件式的自定义认证方案。</p>
+
+<p>8. 便携可靠的套接字工厂使它更容易的使用第三方解决方案。</p>
+
+<p>9. 连接管理器支持多线程应用。支持设置最大连接数，同时支持设置每个主机的最大连接数，发现并关闭过期的连接。</p>
+
+<p>10. 自动处理Set-Cookie中的Cookie。</p>
+
+<p>11. 插件式的自定义Cookie策略。</p>
+
+<p>12. Request的输出流可以避免流中内容直接缓冲到socket服务器。</p>
+
+<p>13. Response的输入流可以有效的从socket服务器直接读取相应内容。</p>
+
+<p>14. 在http1.0和http1.1中利用KeepAlive保持持久连接。</p>
+
+<p>15. 直接获取服务器发送的response code和 headers。</p>
+
+<p>16. 设置连接超时的能力。</p>
+
+<p>17. 实验性的支持http1.1 response caching。</p>
+
+<p>18. 源代码基于Apache License 可免费获取。</p>
+
+<h2>三、使用方法</h2>
+
+<p>使用HttpClient发送请求、接收响应很简单，一般需要如下几步即可。</p>
+
+<p>1.&nbsp;创建HttpClient对象。</p>
+
+<p>2.&nbsp;创建请求方法的实例，并指定请求URL。如果需要发送GET请求，创建HttpGet对象；如果需要发送POST请求，创建HttpPost对象。</p>
+
+<p>3.&nbsp;如果需要发送请求参数，可调用HttpGet、HttpPost共同的setParams(HetpParams params)方法来添加请求参数；对于HttpPost对象而言，也可调用setEntity(HttpEntity entity)方法来设置请求参数。</p>
+
+<p>4.&nbsp;调用HttpClient对象的execute(HttpUriRequest request)发送请求，该方法返回一个HttpResponse。</p>
+
+<p>5.&nbsp;调用HttpResponse的getAllHeaders()、getHeaders(String name)等方法可获取服务器的响应头；调用HttpResponse的getEntity()方法可获取HttpEntity对象，该对象包装了服务器的响应内容。程序可通过该对象获取服务器的响应内容。</p>
+
+<p>6.&nbsp;释放连接。无论执行方法是否成功，都必须释放连接</p>
+
+<p>相关jar包</p>
+
+<p>[java]&nbsp;view plain&nbsp;copy</p>
+
+<p>commons-cli-1.2.jar&nbsp;&nbsp;<br />
+commons-codec-1.9.jar&nbsp;&nbsp;<br />
+commons-logging-1.2.jar&nbsp;&nbsp;<br />
+fluent-hc-4.5.1.jar&nbsp;&nbsp;<br />
+httpclient-4.5.1.jar&nbsp;&nbsp;<br />
+httpclient-cache-4.5.1.jar&nbsp;&nbsp;<br />
+httpclient-win-4.5.1.jar&nbsp;&nbsp;<br />
+httpcore-4.4.3.jar&nbsp;&nbsp;<br />
+httpcore-ab-4.4.3.jar&nbsp;&nbsp;<br />
+httpcore-nio-4.4.3.jar&nbsp;&nbsp;<br />
+httpmime-4.5.1.jar&nbsp;&nbsp;<br />
+jna-4.1.0.jar&nbsp;&nbsp;<br />
+jna-platform-4.1.0.jar&nbsp;&nbsp;</p>
+
+<p><br />
+最简单post请求, 源自&nbsp;http://my.oschina.net/xinxingegeya/blog/282683</p>
+
+<p>package&nbsp;a;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;<br />
+import&nbsp;java.io.FileInputStream;&nbsp;&nbsp;<br />
+import&nbsp;java.io.IOException;&nbsp;&nbsp;<br />
+import&nbsp;java.util.ArrayList;&nbsp;&nbsp;<br />
+import&nbsp;java.util.List;&nbsp;&nbsp;<br />
+import&nbsp;java.util.Properties;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;<br />
+import&nbsp;org.apache.http.HttpEntity;&nbsp;&nbsp;<br />
+import&nbsp;org.apache.http.HttpResponse;&nbsp;&nbsp;<br />
+import&nbsp;org.apache.http.NameValuePair;&nbsp;&nbsp;<br />
+import&nbsp;org.apache.http.client.HttpClient;&nbsp;&nbsp;<br />
+import&nbsp;org.apache.http.client.config.RequestConfig;&nbsp;&nbsp;<br />
+import&nbsp;org.apache.http.client.entity.UrlEncodedFormEntity;&nbsp;&nbsp;<br />
+import&nbsp;org.apache.http.client.methods.HttpPost;&nbsp;&nbsp;<br />
+import&nbsp;org.apache.http.impl.client.DefaultHttpClient;&nbsp;&nbsp;<br />
+import&nbsp;org.apache.http.message.BasicNameValuePair;&nbsp;&nbsp;<br />
+import&nbsp;org.apache.http.util.EntityUtils;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;<br />
+public&nbsp;class&nbsp;First&nbsp;{&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;static&nbsp;void&nbsp;main(String[]&nbsp;args)&nbsp;throws&nbsp;Exception{&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;List&lt;NameValuePair&gt;&nbsp;formparams&nbsp;=&nbsp;new&nbsp;ArrayList&lt;NameValuePair&gt;();&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;formparams.add(new&nbsp;BasicNameValuePair(&quot;account&quot;,&nbsp;&quot;&quot;));&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;formparams.add(new&nbsp;BasicNameValuePair(&quot;password&quot;,&nbsp;&quot;&quot;));&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;HttpEntity&nbsp;reqEntity&nbsp;=&nbsp;new&nbsp;UrlEncodedFormEntity(formparams,&nbsp;&quot;utf-8&quot;);&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;RequestConfig&nbsp;requestConfig&nbsp;=&nbsp;RequestConfig.custom()&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;.setConnectTimeout(5000)//一、连接超时：connectionTimeout--&gt;指的是连接一个url的连接等待时间&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;.setSocketTimeout(5000)//&nbsp;二、读取数据超时：SocketTimeout--&gt;指的是连接上一个url，获取response的返回等待时间&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;.setConnectionRequestTimeout(5000)&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;.build();&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;HttpClient&nbsp;client&nbsp;=&nbsp;new&nbsp;DefaultHttpClient();&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;HttpPost&nbsp;post&nbsp;=&nbsp;new&nbsp;HttpPost(&quot;http://cnivi.com.cn/login&quot;);&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;post.setEntity(reqEntity);&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;post.setConfig(requestConfig);&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;HttpResponse&nbsp;response&nbsp;=&nbsp;client.execute(post);&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if&nbsp;(response.getStatusLine().getStatusCode()&nbsp;==&nbsp;200)&nbsp;{&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;HttpEntity&nbsp;resEntity&nbsp;=&nbsp;response.getEntity();&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;String&nbsp;message&nbsp;=&nbsp;EntityUtils.toString(resEntity,&nbsp;&quot;utf-8&quot;);&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;System.out.println(message);&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;else&nbsp;{&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;System.out.println(&quot;请求失败&quot;);&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;<br />
+}&nbsp;&nbsp;</p>
+
+<h2>四、实例</h2>
+
+<h3>主文件</h3>
+
+<p>package&nbsp;com.test;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<br />
+import&nbsp;java.io.File;&nbsp;&nbsp;<br />
+import&nbsp;java.io.FileInputStream;&nbsp;&nbsp;<br />
+import&nbsp;java.io.IOException;&nbsp;&nbsp;<br />
+import&nbsp;java.io.UnsupportedEncodingException;&nbsp;&nbsp;<br />
+import&nbsp;java.security.KeyManagementException;&nbsp;&nbsp;<br />
+import&nbsp;java.security.KeyStore;&nbsp;&nbsp;<br />
+import&nbsp;java.security.KeyStoreException;&nbsp;&nbsp;<br />
+import&nbsp;java.security.NoSuchAlgorithmException;&nbsp;&nbsp;<br />
+import&nbsp;java.security.cert.CertificateException;&nbsp;&nbsp;<br />
+import&nbsp;java.util.ArrayList;&nbsp;&nbsp;<br />
+import&nbsp;java.util.List;&nbsp;&nbsp;<br />
+import&nbsp;javax.net.ssl.SSLContext;&nbsp;&nbsp;<br />
+import&nbsp;org.apache.http.HttpEntity;&nbsp;&nbsp;<br />
+import&nbsp;org.apache.http.NameValuePair;&nbsp;&nbsp;<br />
+import&nbsp;org.apache.http.ParseException;&nbsp;&nbsp;<br />
+import&nbsp;org.apache.http.client.ClientProtocolException;&nbsp;&nbsp;<br />
+import&nbsp;org.apache.http.client.entity.UrlEncodedFormEntity;&nbsp;&nbsp;<br />
+import&nbsp;org.apache.http.client.methods.CloseableHttpResponse;&nbsp;&nbsp;<br />
+import&nbsp;org.apache.http.client.methods.HttpGet;&nbsp;&nbsp;<br />
+import&nbsp;org.apache.http.client.methods.HttpPost;&nbsp;&nbsp;<br />
+import&nbsp;org.apache.http.conn.ssl.SSLConnectionSocketFactory;&nbsp;&nbsp;<br />
+import&nbsp;org.apache.http.conn.ssl.SSLContexts;&nbsp;&nbsp;<br />
+import&nbsp;org.apache.http.conn.ssl.TrustSelfSignedStrategy;&nbsp;&nbsp;<br />
+import&nbsp;org.apache.http.entity.ContentType;&nbsp;&nbsp;<br />
+import&nbsp;org.apache.http.entity.mime.MultipartEntityBuilder;&nbsp;&nbsp;<br />
+import&nbsp;org.apache.http.entity.mime.content.FileBody;&nbsp;&nbsp;<br />
+import&nbsp;org.apache.http.entity.mime.content.StringBody;&nbsp;&nbsp;<br />
+import&nbsp;org.apache.http.impl.client.CloseableHttpClient;&nbsp;&nbsp;<br />
+import&nbsp;org.apache.http.impl.client.HttpClients;&nbsp;&nbsp;<br />
+import&nbsp;org.apache.http.message.BasicNameValuePair;&nbsp;&nbsp;<br />
+import&nbsp;org.apache.http.util.EntityUtils;&nbsp;&nbsp;<br />
+import&nbsp;org.apache.http.client.config.RequestConfig;&nbsp;&nbsp;<br />
+import&nbsp;org.junit.Test;&nbsp;&nbsp;<br />
+public&nbsp;class&nbsp;HttpClientTest&nbsp;{&nbsp;&nbsp;<br />
+　　//方法见下........&nbsp;&nbsp;<br />
+}&nbsp;&nbsp;</p>
+
+<h3><br />
+HttpClientUtils工具类</h3>
+
+<p>package&nbsp;com.bobo.code.web.controller.technology.httpcomponents;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;<br />
+import&nbsp;org.apache.http.HttpEntity;&nbsp;&nbsp;<br />
+import&nbsp;org.apache.http.HttpHost;&nbsp;&nbsp;<br />
+import&nbsp;org.apache.http.HttpResponse;&nbsp;&nbsp;<br />
+import&nbsp;org.apache.http.NameValuePair;&nbsp;&nbsp;<br />
+import&nbsp;org.apache.http.client.HttpClient;&nbsp;&nbsp;<br />
+import&nbsp;org.apache.http.client.config.RequestConfig;&nbsp;&nbsp;<br />
+import&nbsp;org.apache.http.client.methods.HttpUriRequest;&nbsp;&nbsp;<br />
+import&nbsp;org.apache.http.client.methods.RequestBuilder;&nbsp;&nbsp;<br />
+import&nbsp;org.apache.http.conn.routing.HttpRoute;&nbsp;&nbsp;<br />
+import&nbsp;org.apache.http.impl.client.CloseableHttpClient;&nbsp;&nbsp;<br />
+import&nbsp;org.apache.http.impl.client.HttpClientBuilder;&nbsp;&nbsp;<br />
+import&nbsp;org.apache.http.impl.client.HttpClients;&nbsp;&nbsp;<br />
+import&nbsp;org.apache.http.impl.conn.PoolingHttpClientConnectionManager;&nbsp;&nbsp;<br />
+import&nbsp;org.apache.http.message.BasicNameValuePair;&nbsp;&nbsp;<br />
+import&nbsp;org.apache.http.util.EntityUtils;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;<br />
+import&nbsp;java.io.IOException;&nbsp;&nbsp;<br />
+import&nbsp;java.util.*;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;<br />
+public&nbsp;class&nbsp;HttpClientUtils&nbsp;{&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;private&nbsp;static&nbsp;PoolingHttpClientConnectionManager&nbsp;connectionManager&nbsp;=&nbsp;null;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;private&nbsp;static&nbsp;HttpClientBuilder&nbsp;httpBuilder&nbsp;=&nbsp;null;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;private&nbsp;static&nbsp;RequestConfig&nbsp;requestConfig&nbsp;=&nbsp;null;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;private&nbsp;static&nbsp;int&nbsp;MAXCONNECTION&nbsp;=&nbsp;10;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;private&nbsp;static&nbsp;int&nbsp;DEFAULTMAXCONNECTION&nbsp;=&nbsp;5;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;private&nbsp;static&nbsp;String&nbsp;IP&nbsp;=&nbsp;&quot;cnivi.com.cn&quot;;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;private&nbsp;static&nbsp;int&nbsp;PORT&nbsp;=&nbsp;80;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;static&nbsp;{&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//设置http的状态参数&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;requestConfig&nbsp;=&nbsp;RequestConfig.custom()&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;.setSocketTimeout(5000)&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;.setConnectTimeout(5000)&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;.setConnectionRequestTimeout(5000)&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;.build();&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;HttpHost&nbsp;target&nbsp;=&nbsp;new&nbsp;HttpHost(IP,&nbsp;PORT);&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;connectionManager&nbsp;=&nbsp;new&nbsp;PoolingHttpClientConnectionManager();&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;connectionManager.setMaxTotal(MAXCONNECTION);//客户端总并行链接最大数&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;connectionManager.setDefaultMaxPerRoute(DEFAULTMAXCONNECTION);//每个主机的最大并行链接数&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;connectionManager.setMaxPerRoute(new&nbsp;HttpRoute(target),&nbsp;20);&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;httpBuilder&nbsp;=&nbsp;HttpClients.custom();&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;httpBuilder.setConnectionManager(connectionManager);&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;static&nbsp;CloseableHttpClient&nbsp;getConnection()&nbsp;{&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;CloseableHttpClient&nbsp;httpClient&nbsp;=&nbsp;httpBuilder.build();&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return&nbsp;httpClient;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;static&nbsp;HttpUriRequest&nbsp;getRequestMethod(Map&lt;String,&nbsp;String&gt;&nbsp;map,&nbsp;String&nbsp;url,&nbsp;String&nbsp;method)&nbsp;{&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;List&lt;NameValuePair&gt;&nbsp;params&nbsp;=&nbsp;new&nbsp;ArrayList&lt;NameValuePair&gt;();&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Set&lt;Map.Entry&lt;String,&nbsp;String&gt;&gt;&nbsp;entrySet&nbsp;=&nbsp;map.entrySet();&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;for&nbsp;(Map.Entry&lt;String,&nbsp;String&gt;&nbsp;e&nbsp;:&nbsp;entrySet)&nbsp;{&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;String&nbsp;name&nbsp;=&nbsp;e.getKey();&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;String&nbsp;value&nbsp;=&nbsp;e.getValue();&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;NameValuePair&nbsp;pair&nbsp;=&nbsp;new&nbsp;BasicNameValuePair(name,&nbsp;value);&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;params.add(pair);&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;HttpUriRequest&nbsp;reqMethod&nbsp;=&nbsp;null;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if&nbsp;(&quot;post&quot;.equals(method))&nbsp;{&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;reqMethod&nbsp;=&nbsp;RequestBuilder.post().setUri(url)&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;.addParameters(params.toArray(new&nbsp;BasicNameValuePair[params.size()]))&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;.setConfig(requestConfig).build();&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;else&nbsp;if&nbsp;(&quot;get&quot;.equals(method))&nbsp;{&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;reqMethod&nbsp;=&nbsp;RequestBuilder.get().setUri(url)&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;.addParameters(params.toArray(new&nbsp;BasicNameValuePair[params.size()]))&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;.setConfig(requestConfig).build();&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return&nbsp;reqMethod;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;static&nbsp;void&nbsp;main(String&nbsp;args[])&nbsp;throws&nbsp;IOException&nbsp;{&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Map&lt;String,&nbsp;String&gt;&nbsp;map&nbsp;=&nbsp;new&nbsp;HashMap&lt;String,&nbsp;String&gt;();&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;map.put(&quot;account&quot;,&nbsp;&quot;&quot;);&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;map.put(&quot;password&quot;,&nbsp;&quot;&quot;);&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;HttpClient&nbsp;client&nbsp;=&nbsp;getConnection();&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;HttpUriRequest&nbsp;post&nbsp;=&nbsp;getRequestMethod(map,&nbsp;&quot;http://cnivi.com.cn/login&quot;,&nbsp;&quot;post&quot;);&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;HttpResponse&nbsp;response&nbsp;=&nbsp;client.execute(post);&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if&nbsp;(response.getStatusLine().getStatusCode()&nbsp;==&nbsp;200)&nbsp;{&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;HttpEntity&nbsp;entity&nbsp;=&nbsp;response.getEntity();&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;String&nbsp;message&nbsp;=&nbsp;EntityUtils.toString(entity,&nbsp;&quot;utf-8&quot;);&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;System.out.println(message);&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;else&nbsp;{&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;System.out.println(&quot;请求失败&quot;);&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;<br />
+}&nbsp;&nbsp;</p>
+
+<h3><br />
+get方式</h3>
+
+<p>/**&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;*&nbsp;发送&nbsp;get请求&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;*/&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;void&nbsp;get()&nbsp;{&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;CloseableHttpClient&nbsp;httpclient&nbsp;=&nbsp;HttpClients.createDefault();&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;try&nbsp;{&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//&nbsp;创建httpget.&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;HttpGet&nbsp;httpget&nbsp;=&nbsp;new&nbsp;HttpGet(&quot;http://www.baidu.com/&quot;);&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;System.out.println(&quot;executing&nbsp;request&nbsp;&quot;&nbsp;+&nbsp;httpget.getURI());&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//&nbsp;执行get请求.&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;CloseableHttpResponse&nbsp;response&nbsp;=&nbsp;httpclient.execute(httpget);&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;try&nbsp;{&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//&nbsp;获取响应实体&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;HttpEntity&nbsp;entity&nbsp;=&nbsp;response.getEntity();&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;System.out.println(&quot;--------------------------------------&quot;);&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//&nbsp;打印响应状态&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;System.out.println(response.getStatusLine());&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if&nbsp;(entity&nbsp;!=&nbsp;null)&nbsp;{&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//&nbsp;打印响应内容长度&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;System.out.println(&quot;Response&nbsp;content&nbsp;length:&nbsp;&quot;&nbsp;+&nbsp;entity.getContentLength());&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//&nbsp;打印响应内容&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;System.out.println(&quot;Response&nbsp;content:&nbsp;&quot;&nbsp;+&nbsp;EntityUtils.toString(entity));&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;System.out.println(&quot;------------------------------------&quot;);&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;finally&nbsp;{&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;response.close();&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;catch&nbsp;(ClientProtocolException&nbsp;e)&nbsp;{&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;e.printStackTrace();&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;catch&nbsp;(ParseException&nbsp;e)&nbsp;{&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;e.printStackTrace();&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;catch&nbsp;(IOException&nbsp;e)&nbsp;{&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;e.printStackTrace();&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;finally&nbsp;{&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//&nbsp;关闭连接,释放资源&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;try&nbsp;{&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;httpclient.close();&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;catch&nbsp;(IOException&nbsp;e)&nbsp;{&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;e.printStackTrace();&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;&nbsp;</p>
+
+<h3><br />
+post方式</h3>
+
+<p>/**&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;*&nbsp;发送&nbsp;post请求访问本地应用并根据传递参数不同返回不同结果&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;*/&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;void&nbsp;post()&nbsp;{&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//&nbsp;创建默认的httpClient实例.&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;CloseableHttpClient&nbsp;httpclient&nbsp;=&nbsp;HttpClients.createDefault();&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//&nbsp;创建httppost&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;HttpPost&nbsp;httppost&nbsp;=&nbsp;new&nbsp;HttpPost(&quot;http://localhost:8080/myDemo/Ajax/serivceJ.action&quot;);&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//&nbsp;创建参数队列&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;List&lt;NameValuePair&gt;&nbsp;formparams&nbsp;=&nbsp;new&nbsp;ArrayList&lt;NameValuePair&gt;();&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;formparams.add(new&nbsp;BasicNameValuePair(&quot;type&quot;,&nbsp;&quot;house&quot;));&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;UrlEncodedFormEntity&nbsp;uefEntity;&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;try&nbsp;{&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;uefEntity&nbsp;=&nbsp;new&nbsp;UrlEncodedFormEntity(formparams,&nbsp;&quot;UTF-8&quot;);&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;httppost.setEntity(uefEntity);&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;System.out.println(&quot;executing&nbsp;request&nbsp;&quot;&nbsp;+&nbsp;httppost.getURI());&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;CloseableHttpResponse&nbsp;response&nbsp;=&nbsp;httpclient.execute(httppost);&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;try&nbsp;{&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;HttpEntity&nbsp;entity&nbsp;=&nbsp;response.getEntity();&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if&nbsp;(entity&nbsp;!=&nbsp;null)&nbsp;{&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;System.out.println(&quot;--------------------------------------&quot;);&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;System.out.println(&quot;Response&nbsp;content:&nbsp;&quot;&nbsp;+&nbsp;EntityUtils.toString(entity,&nbsp;&quot;UTF-8&quot;));&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;System.out.println(&quot;--------------------------------------&quot;);&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;finally&nbsp;{&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;response.close();&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;catch&nbsp;(ClientProtocolException&nbsp;e)&nbsp;{&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;e.printStackTrace();&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;catch&nbsp;(UnsupportedEncodingException&nbsp;e1)&nbsp;{&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;e1.printStackTrace();&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;catch&nbsp;(IOException&nbsp;e)&nbsp;{&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;e.printStackTrace();&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;finally&nbsp;{&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//&nbsp;关闭连接,释放资源&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;try&nbsp;{&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;httpclient.close();&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;catch&nbsp;(IOException&nbsp;e)&nbsp;{&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;e.printStackTrace();&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;&nbsp;</p>
+
+<h3><br />
+post方式乱码补充　</h3>
+
+<p>如果有乱码,可以偿试使用&nbsp;StringEntity 来替换HttpEntity:</p>
+
+<p>StringEntity&nbsp;content&nbsp;=new&nbsp;StringEntity(soapRequestData.toString(),&nbsp;Charset.forName(&quot;UTF-8&quot;));//&nbsp;第二个参数，设置后才会对，内容进行编码&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;content.setContentType(&quot;application/soap+xml;&nbsp;charset=UTF-8&quot;);&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;content.setContentEncoding(&quot;UTF-8&quot;);&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;httppost.setEntity(content);&nbsp;&nbsp;</p>
+
+<p>具体SOAP协议代码如下:</p>
+
+<p>package&nbsp;com.isoftstone.core.service.impl;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;<br />
+import&nbsp;java.io.BufferedReader;&nbsp;&nbsp;<br />
+import&nbsp;java.io.File;&nbsp;&nbsp;<br />
+import&nbsp;java.io.FileInputStream;&nbsp;&nbsp;<br />
+import&nbsp;java.io.FileReader;&nbsp;&nbsp;<br />
+import&nbsp;java.io.IOException;&nbsp;&nbsp;<br />
+import&nbsp;java.io.InputStreamReader;&nbsp;&nbsp;<br />
+import&nbsp;java.nio.charset.Charset;&nbsp;&nbsp;<br />
+import&nbsp;java.util.Scanner;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;<br />
+import&nbsp;org.apache.http.HttpEntity;&nbsp;&nbsp;<br />
+import&nbsp;org.apache.http.HttpResponse;&nbsp;&nbsp;<br />
+import&nbsp;org.apache.http.client.ClientProtocolException;&nbsp;&nbsp;<br />
+import&nbsp;org.apache.http.client.HttpClient;&nbsp;&nbsp;<br />
+import&nbsp;org.apache.http.client.entity.EntityBuilder;&nbsp;&nbsp;<br />
+import&nbsp;org.apache.http.client.methods.HttpPost;&nbsp;&nbsp;<br />
+import&nbsp;org.apache.http.entity.ContentType;&nbsp;&nbsp;<br />
+import&nbsp;org.apache.http.entity.StringEntity;&nbsp;&nbsp;<br />
+import&nbsp;org.apache.http.impl.client.HttpClients;&nbsp;&nbsp;<br />
+import&nbsp;org.apache.http.util.EntityUtils;&nbsp;&nbsp;<br />
+import&nbsp;org.apache.log4j.Logger;&nbsp;&nbsp;<br />
+import&nbsp;org.jdom.Document;&nbsp;&nbsp;<br />
+import&nbsp;org.jdom.Element;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;<br />
+import&nbsp;com.isoftstone.core.common.constant.RequestConstants;&nbsp;&nbsp;<br />
+import&nbsp;com.isoftstone.core.common.tools.XmlTool;&nbsp;&nbsp;<br />
+import&nbsp;com.isoftstone.core.service.intf.ServiceOfStringPara;&nbsp;&nbsp;<br />
+/**&nbsp;<br />
+&nbsp;*&nbsp;德勤定价系统,由核心主动调用&nbsp;<br />
+&nbsp;*&nbsp;@author&nbsp;King&nbsp;<br />
+&nbsp;*&nbsp;<br />
+&nbsp;*/&nbsp;&nbsp;<br />
+public&nbsp;class&nbsp;DeloittePricingSingleCarImpl&nbsp;implements&nbsp;ServiceOfStringPara&nbsp;{&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;private&nbsp;&nbsp;String&nbsp;serviceUrl&nbsp;=&nbsp;&quot;http://10.30.0.35:7001/ZSInsUW/Auto/PricingService&quot;;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;private&nbsp;static&nbsp;Logger&nbsp;log&nbsp;=&nbsp;Logger.getLogger(DeloittePricingSingleCarImpl.class.getName());&nbsp;&nbsp;<br />
+&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;String&nbsp;invoke(String&nbsp;sRequest)&nbsp;{&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;StringBuffer&nbsp;soapRequestData&nbsp;=&nbsp;new&nbsp;StringBuffer();&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;soapRequestData.append(&quot;&lt;soapenv:Envelope&quot;);&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;soapRequestData.append(&quot;&nbsp;&nbsp;xmlns:soapenv=\&quot;http://schemas.xmlsoap.org/soap/envelope/\&quot;&nbsp;&quot;);&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;soapRequestData.append(&quot;&nbsp;&nbsp;xmlns:prov=\&quot;http://provider.webservice.zsins.dtt.com/\&quot;&gt;&quot;);&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;soapRequestData.append(&quot;&nbsp;&lt;soapenv:Header/&gt;&nbsp;&quot;);&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;soapRequestData.append(&quot;&lt;soapenv:Body&gt;&quot;);&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;soapRequestData.append(&quot;&lt;prov:executePrvPricing&gt;&quot;);&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;soapRequestData.append(&quot;&lt;arg0&gt;&quot;);&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;soapRequestData.append(&quot;&lt;![CDATA[&quot;&nbsp;+&nbsp;sRequest&nbsp;+&nbsp;&quot;]]&gt;&quot;);&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;soapRequestData.append(&quot;&lt;/arg0&gt;&quot;);&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;soapRequestData.append(&quot;&lt;/prov:executePrvPricing&gt;&quot;);&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;soapRequestData.append(&quot;&nbsp;&lt;/soapenv:Body&gt;&quot;);&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;soapRequestData.append(&quot;&lt;/soapenv:Envelope&gt;&quot;);&nbsp;&nbsp;<br />
+&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;HttpClient&nbsp;httpclient&nbsp;=&nbsp;HttpClients.createDefault();&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;HttpPost&nbsp;httppost&nbsp;=&nbsp;new&nbsp;HttpPost(serviceUrl);&nbsp;&nbsp;<br />
+&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;StringEntity&nbsp;content&nbsp;=new&nbsp;StringEntity(soapRequestData.toString(),&nbsp;Charset.forName(&quot;UTF-8&quot;));//&nbsp;第二个参数，设置后才会对，内容进行编码&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;content.setContentType(&quot;application/soap+xml;&nbsp;charset=UTF-8&quot;);&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;content.setContentEncoding(&quot;UTF-8&quot;);&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;httppost.setEntity(content);&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//用下面的服务器端以UTF-8接收到的报文会乱码,原因未知&nbsp;&nbsp;<br />
+//&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;HttpEntity&nbsp;reqEntity&nbsp;=&nbsp;EntityBuilder.create().setContentType(&nbsp;&nbsp;<br />
+//&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ContentType.TEXT_PLAIN)&nbsp;//&nbsp;.TEXT_PLAIN&nbsp;&nbsp;<br />
+//&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;.setText(soapRequestData.toString()).build();&nbsp;&nbsp;<br />
+//&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;httppost.setEntity(reqEntity);&nbsp;&nbsp;<br />
+//&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;httppost.addHeader(&quot;Content-Type&quot;,&nbsp;&nbsp;<br />
+//&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&quot;application/soap+xml;&nbsp;charset=utf-8&quot;);&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;HttpResponse&nbsp;response&nbsp;=&nbsp;null;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Document&nbsp;doc&nbsp;=&nbsp;null;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;String&nbsp;returnXml&nbsp;=&nbsp;null;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;String&nbsp;sentity&nbsp;=&nbsp;null;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;try&nbsp;{&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;response&nbsp;=&nbsp;httpclient.execute(httppost);&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;HttpEntity&nbsp;resEntity&nbsp;=&nbsp;response.getEntity();&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if&nbsp;(resEntity&nbsp;!=&nbsp;null)&nbsp;{&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;sentity&nbsp;=&nbsp;EntityUtils.toString(resEntity,&nbsp;&quot;UTF-8&quot;);&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;doc&nbsp;=&nbsp;XmlTool.getDocument(sentity,&nbsp;RequestConstants.ENCODE);&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;System.out.println(doc.toString());&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Element&nbsp;eRoot&nbsp;=&nbsp;doc.getRootElement();&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Element&nbsp;body&nbsp;=&nbsp;eRoot.getChild(&quot;Body&quot;,&nbsp;eRoot.getNamespace());&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Element&nbsp;resp&nbsp;=&nbsp;(Element)&nbsp;body.getChildren().get(0);&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Element&nbsp;returnele&nbsp;=&nbsp;resp.getChild(&quot;return&quot;);&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;returnXml&nbsp;=&nbsp;returnele.getText().toString();&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;catch&nbsp;(ClientProtocolException&nbsp;e)&nbsp;{&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;e.printStackTrace();&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;catch&nbsp;(IOException&nbsp;e)&nbsp;{&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;e.printStackTrace();&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;catch&nbsp;(Exception&nbsp;e)&nbsp;{&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;e.printStackTrace();&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;finally&nbsp;{&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;log.info(&quot;发送给德勤定价系统的请求报文：\n&quot;&nbsp;+&nbsp;soapRequestData.toString());&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;log.info(&quot;德勤定价系统返回的响应报文：\n&quot;&nbsp;+&nbsp;sentity);&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;log.info(&quot;返回给核心的的报文:\n&quot;&nbsp;+&nbsp;returnXml);&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return&nbsp;returnXml;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;String&nbsp;getServiceUrl()&nbsp;{&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return&nbsp;serviceUrl;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;<br />
+&nbsp;&nbsp;<br />
+&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;void&nbsp;setServiceUrl(String&nbsp;serviceUrl)&nbsp;{&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;this.serviceUrl&nbsp;=&nbsp;serviceUrl;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;<br />
+&nbsp;&nbsp;<br />
+&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;static&nbsp;void&nbsp;main(String[]&nbsp;args)&nbsp;throws&nbsp;Exception{&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;File&nbsp;file&nbsp;=&nbsp;new&nbsp;File(&quot;D:/浙商项目资料/z浙江资料/t唐建华/德勤定价调试报文.txt&quot;);&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;System.out.println(file.exists());&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;String&nbsp;temp2&nbsp;=&nbsp;null;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;StringBuilder&nbsp;sb2&nbsp;=&nbsp;new&nbsp;StringBuilder();&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;InputStreamReader&nbsp;isr&nbsp;=&nbsp;new&nbsp;InputStreamReader(new&nbsp;FileInputStream(file),&quot;GBK&quot;);&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;BufferedReader&nbsp;br&nbsp;=&nbsp;new&nbsp;BufferedReader(isr);&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;temp2&nbsp;=&nbsp;br.readLine();&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;while(&nbsp;temp2&nbsp;!=&nbsp;null&nbsp;){&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;sb2.append(temp2);&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;temp2&nbsp;=&nbsp;br.readLine();&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;String&nbsp;sss&nbsp;=&nbsp;sb2.toString();&nbsp;&nbsp;<br />
+//&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;System.out.println(sss.toString());&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;new&nbsp;DeloittePricingSingleCarImpl().invoke(sss);&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;<br />
+}&nbsp;&nbsp;</p>
+
+<h3><br />
+post提交表单</h3>
+
+<p>/**&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;*&nbsp;post方式提交表单（模拟用户登录请求）&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;*/&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;void&nbsp;postForm()&nbsp;{&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//&nbsp;创建默认的httpClient实例.&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;CloseableHttpClient&nbsp;httpclient&nbsp;=&nbsp;HttpClients.createDefault();&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//&nbsp;创建httppost&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;HttpPost&nbsp;httppost&nbsp;=&nbsp;new&nbsp;HttpPost(&quot;http://localhost:8080/myDemo/Ajax/serivceJ.action&quot;);&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//&nbsp;创建参数队列&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;List&lt;NameValuePair&gt;&nbsp;formparams&nbsp;=&nbsp;new&nbsp;ArrayList&lt;NameValuePair&gt;();&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;formparams.add(new&nbsp;BasicNameValuePair(&quot;username&quot;,&nbsp;&quot;admin&quot;));&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;formparams.add(new&nbsp;BasicNameValuePair(&quot;password&quot;,&nbsp;&quot;123456&quot;));&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;UrlEncodedFormEntity&nbsp;uefEntity;&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;try&nbsp;{&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;uefEntity&nbsp;=&nbsp;new&nbsp;UrlEncodedFormEntity(formparams,&nbsp;&quot;UTF-8&quot;);&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;httppost.setEntity(uefEntity);&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;System.out.println(&quot;executing&nbsp;request&nbsp;&quot;&nbsp;+&nbsp;httppost.getURI());&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;CloseableHttpResponse&nbsp;response&nbsp;=&nbsp;httpclient.execute(httppost);&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;try&nbsp;{&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;HttpEntity&nbsp;entity&nbsp;=&nbsp;response.getEntity();&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if&nbsp;(entity&nbsp;!=&nbsp;null)&nbsp;{&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;System.out.println(&quot;--------------------------------------&quot;);&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;System.out.println(&quot;Response&nbsp;content:&nbsp;&quot;&nbsp;+&nbsp;EntityUtils.toString(entity,&nbsp;&quot;UTF-8&quot;));&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;System.out.println(&quot;--------------------------------------&quot;);&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;finally&nbsp;{&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;response.close();&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;catch&nbsp;(ClientProtocolException&nbsp;e)&nbsp;{&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;e.printStackTrace();&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;catch&nbsp;(UnsupportedEncodingException&nbsp;e1)&nbsp;{&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;e1.printStackTrace();&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;catch&nbsp;(IOException&nbsp;e)&nbsp;{&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;e.printStackTrace();&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;finally&nbsp;{&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//&nbsp;关闭连接,释放资源&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;try&nbsp;{&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;httpclient.close();&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;catch&nbsp;(IOException&nbsp;e)&nbsp;{&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;e.printStackTrace();&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;&nbsp;</p>
+
+<h3><br />
+文件上传</h3>
+
+<p>/**&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;*&nbsp;上传文件&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;*/&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;void&nbsp;upload()&nbsp;{&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;CloseableHttpClient&nbsp;httpclient&nbsp;=&nbsp;HttpClients.createDefault();&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;try&nbsp;{&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;HttpPost&nbsp;httppost&nbsp;=&nbsp;new&nbsp;HttpPost(&quot;http://localhost:8080/myDemo/Ajax/serivceFile.action&quot;);&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;FileBody&nbsp;bin&nbsp;=&nbsp;new&nbsp;FileBody(new&nbsp;File(&quot;F:\\image\\sendpix0.jpg&quot;));&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;StringBody&nbsp;comment&nbsp;=&nbsp;new&nbsp;StringBody(&quot;A&nbsp;binary&nbsp;file&nbsp;of&nbsp;some&nbsp;kind&quot;,&nbsp;ContentType.TEXT_PLAIN);&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;HttpEntity&nbsp;reqEntity&nbsp;=&nbsp;MultipartEntityBuilder.create().addPart(&quot;bin&quot;,&nbsp;bin).addPart(&quot;comment&quot;,&nbsp;comment).build();&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;httppost.setEntity(reqEntity);&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;System.out.println(&quot;executing&nbsp;request&nbsp;&quot;&nbsp;+&nbsp;httppost.getRequestLine());&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;CloseableHttpResponse&nbsp;response&nbsp;=&nbsp;httpclient.execute(httppost);&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;try&nbsp;{&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;System.out.println(&quot;----------------------------------------&quot;);&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;System.out.println(response.getStatusLine());&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;HttpEntity&nbsp;resEntity&nbsp;=&nbsp;response.getEntity();&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if&nbsp;(resEntity&nbsp;!=&nbsp;null)&nbsp;{&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;System.out.println(&quot;Response&nbsp;content&nbsp;length:&nbsp;&quot;&nbsp;+&nbsp;resEntity.getContentLength());&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;EntityUtils.consume(resEntity);&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;finally&nbsp;{&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;response.close();&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;catch&nbsp;(ClientProtocolException&nbsp;e)&nbsp;{&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;e.printStackTrace();&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;catch&nbsp;(IOException&nbsp;e)&nbsp;{&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;e.printStackTrace();&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;finally&nbsp;{&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;try&nbsp;{&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;httpclient.close();&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;catch&nbsp;(IOException&nbsp;e)&nbsp;{&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;e.printStackTrace();&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;&nbsp;</p>
+
+<h3>ssl连接</h3>
+
+<p>/**&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;*&nbsp;HttpClient连接SSL&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;*/&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;void&nbsp;ssl()&nbsp;{&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;CloseableHttpClient&nbsp;httpclient&nbsp;=&nbsp;null;&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;try&nbsp;{&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;KeyStore&nbsp;trustStore&nbsp;=&nbsp;KeyStore.getInstance(KeyStore.getDefaultType());&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;FileInputStream&nbsp;instream&nbsp;=&nbsp;new&nbsp;FileInputStream(new&nbsp;File(&quot;d:\\tomcat.keystore&quot;));&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;try&nbsp;{&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//&nbsp;加载keyStore&nbsp;d:\\tomcat.keystore&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;trustStore.load(instream,&nbsp;&quot;123456&quot;.toCharArray());&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;catch&nbsp;(CertificateException&nbsp;e)&nbsp;{&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;e.printStackTrace();&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;finally&nbsp;{&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;try&nbsp;{&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;instream.close();&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;catch&nbsp;(Exception&nbsp;ignore)&nbsp;{&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//&nbsp;相信自己的CA和所有自签名的证书&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;SSLContext&nbsp;sslcontext&nbsp;=&nbsp;SSLContexts.custom().loadTrustMaterial(trustStore,&nbsp;new&nbsp;TrustSelfSignedStrategy()).build();&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//&nbsp;只允许使用TLSv1协议&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;SSLConnectionSocketFactory&nbsp;sslsf&nbsp;=&nbsp;new&nbsp;SSLConnectionSocketFactory(sslcontext,&nbsp;new&nbsp;String[]&nbsp;{&nbsp;&quot;TLSv1&quot;&nbsp;},&nbsp;null,&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;SSLConnectionSocketFactory.BROWSER_COMPATIBLE_HOSTNAME_VERIFIER);&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;httpclient&nbsp;=&nbsp;HttpClients.custom().setSSLSocketFactory(sslsf).build();&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//&nbsp;创建http请求(get方式)&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;HttpGet&nbsp;httpget&nbsp;=&nbsp;new&nbsp;HttpGet(&quot;https://localhost:8443/myDemo/Ajax/serivceJ.action&quot;);&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;System.out.println(&quot;executing&nbsp;request&quot;&nbsp;+&nbsp;httpget.getRequestLine());&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;CloseableHttpResponse&nbsp;response&nbsp;=&nbsp;httpclient.execute(httpget);&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;try&nbsp;{&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;HttpEntity&nbsp;entity&nbsp;=&nbsp;response.getEntity();&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;System.out.println(&quot;----------------------------------------&quot;);&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;System.out.println(response.getStatusLine());&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if&nbsp;(entity&nbsp;!=&nbsp;null)&nbsp;{&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;System.out.println(&quot;Response&nbsp;content&nbsp;length:&nbsp;&quot;&nbsp;+&nbsp;entity.getContentLength());&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;System.out.println(EntityUtils.toString(entity));&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;EntityUtils.consume(entity);&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;finally&nbsp;{&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;response.close();&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;catch&nbsp;(ParseException&nbsp;e)&nbsp;{&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;e.printStackTrace();&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;catch&nbsp;(IOException&nbsp;e)&nbsp;{&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;e.printStackTrace();&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;catch&nbsp;(KeyManagementException&nbsp;e)&nbsp;{&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;e.printStackTrace();&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;catch&nbsp;(NoSuchAlgorithmException&nbsp;e)&nbsp;{&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;e.printStackTrace();&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;catch&nbsp;(KeyStoreException&nbsp;e)&nbsp;{&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;e.printStackTrace();&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;finally&nbsp;{&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if&nbsp;(httpclient&nbsp;!=&nbsp;null)&nbsp;{&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;try&nbsp;{&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;httpclient.close();&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;catch&nbsp;(IOException&nbsp;e)&nbsp;{&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;e.printStackTrace();&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;&nbsp;</p>
+
+<h2><br />
+关于RequestConfig的配置:&nbsp;&nbsp;</h2>
+
+<p>源自: &nbsp;</p>
+
+<p>http://segmentfault.com/a/1190000000587944</p>
+
+<p>http://blog.csdn.net/walkerjong/article/details/51710945</p>
+
+<p>public&nbsp;void&nbsp;requestConfig(){&nbsp;&nbsp;<br />
+//&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;新建一个RequestConfig：&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;RequestConfig&nbsp;defaultRequestConfig&nbsp;=&nbsp;RequestConfig.custom()&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//一、连接目标服务器超时时间：ConnectionTimeout--&gt;指的是连接一个url的连接等待时间&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;.setConnectTimeout(5000)&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//二、读取目标服务器数据超时时间：SocketTimeout--&gt;指的是连接上一个url，获取response的返回等待时间&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;.setSocketTimeout(5000)&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//三、从连接池获取连接的超时时间:ConnectionRequestTimeout&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;.setConnectionRequestTimeout(5000)&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;.build();&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<br />
+//&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;这个超时可以设置为客户端级别,作为所有请求的默认值：&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;CloseableHttpClient&nbsp;httpclient&nbsp;=&nbsp;HttpClients.custom()&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;.setDefaultRequestConfig(defaultRequestConfig)&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;.build();&nbsp;&nbsp;<br />
+//&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;httpclient.execute(httppost);的时候可以让httppost直接享受到httpclient中的默认配置.&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<br />
+//&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Request不会继承客户端级别的请求配置，所以在自定义Request的时候，需要将客户端的默认配置拷贝过去：&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;HttpGet&nbsp;httpget&nbsp;=&nbsp;new&nbsp;HttpGet(&quot;http://www.apache.org/&quot;);&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;RequestConfig&nbsp;requestConfig&nbsp;=&nbsp;RequestConfig.copy(defaultRequestConfig)&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;.setProxy(new&nbsp;HttpHost(&quot;myotherproxy&quot;,&nbsp;8080))&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;.build();&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;httpget.setConfig(requestConfig);&nbsp;&nbsp;<br />
+//&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;httpget可以单独地使用新copy的requestConfig请求配置,不会对别的request请求产生影响&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</p>
+
+<h3>httpGet或httpPost 的abort()和releaseConnection()差异</h3>
+
+<p>//httpPost.abort();//中断请求,接下来可以开始另一段请求,所以个人理应,用这个应该可以在session中虚拟登录&nbsp;&nbsp;<br />
+&nbsp;//httpPost.releaseConnection();//释放请求.如果释放了相当于要清空session&nbsp;&nbsp;</p>
+
+<p>根所以上差异,可知模拟登录可以如下: &nbsp;源自&nbsp;http://bbs.csdn.net/topics/390195343</p>
+
+<p>[java]&nbsp;view plain&nbsp;copy</p>
+
+<p>package&nbsp;com.bms.core;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<br />
+import&nbsp;java.io.IOException;&nbsp;&nbsp;<br />
+import&nbsp;java.util.ArrayList;&nbsp;&nbsp;<br />
+import&nbsp;java.util.List;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<br />
+import&nbsp;org.apache.http.Consts;&nbsp;&nbsp;<br />
+import&nbsp;org.apache.http.HttpEntity;&nbsp;&nbsp;<br />
+import&nbsp;org.apache.http.HttpResponse;&nbsp;&nbsp;<br />
+import&nbsp;org.apache.http.NameValuePair;&nbsp;&nbsp;<br />
+import&nbsp;org.apache.http.client.ClientProtocolException;&nbsp;&nbsp;<br />
+import&nbsp;org.apache.http.client.entity.UrlEncodedFormEntity;&nbsp;&nbsp;<br />
+import&nbsp;org.apache.http.client.methods.HttpGet;&nbsp;&nbsp;<br />
+import&nbsp;org.apache.http.client.methods.HttpPost;&nbsp;&nbsp;<br />
+import&nbsp;org.apache.http.impl.client.DefaultHttpClient;&nbsp;&nbsp;<br />
+import&nbsp;org.apache.http.message.BasicNameValuePair;&nbsp;&nbsp;<br />
+import&nbsp;org.apache.http.util.EntityUtils;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<br />
+import&nbsp;com.bms.util.CommonUtil;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<br />
+public&nbsp;class&nbsp;Test2&nbsp;{&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;/**&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;*&nbsp;@param&nbsp;args&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;*&nbsp;@throws&nbsp;IOException&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;*&nbsp;@throws&nbsp;ClientProtocolException&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;*/&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;static&nbsp;void&nbsp;main(String[]&nbsp;args)&nbsp;throws&nbsp;ClientProtocolException,&nbsp;IOException&nbsp;{&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;DefaultHttpClient&nbsp;httpclient&nbsp;=&nbsp;new&nbsp;DefaultHttpClient();&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;HttpGet&nbsp;httpGet&nbsp;=&nbsp;new&nbsp;HttpGet(&quot;http://www.baidu.com&quot;);&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;String&nbsp;body&nbsp;=&nbsp;&quot;&quot;;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;HttpResponse&nbsp;response;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;HttpEntity&nbsp;entity;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;response&nbsp;=&nbsp;httpclient.execute(httpGet);&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;entity&nbsp;=&nbsp;response.getEntity();&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;body&nbsp;=&nbsp;EntityUtils.toString(entity);//这个就是页面源码了&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;httpGet.abort();//中断请求,接下来可以开始另一段请求&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;System.out.println(body);&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//httpGet.releaseConnection();//释放请求.如果释放了相当于要清空session&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//以下是post方法&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;HttpPost&nbsp;httpPost&nbsp;=&nbsp;new&nbsp;HttpPost(&quot;http://www.baidu.com&quot;);//一定要改成可以提交的地址,这里用百度代替&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;List&nbsp;&lt;NameValuePair&gt;&nbsp;nvps&nbsp;=&nbsp;new&nbsp;ArrayList&nbsp;&lt;NameValuePair&gt;();&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;nvps.add(new&nbsp;BasicNameValuePair(&quot;name&quot;,&nbsp;&quot;1&quot;));//名值对&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;nvps.add(new&nbsp;BasicNameValuePair(&quot;account&quot;,&nbsp;&quot;xxxx&quot;));&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;httpPost.setEntity(new&nbsp;UrlEncodedFormEntity(nvps,&nbsp;Consts.UTF_8));&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;response&nbsp;=&nbsp;httpclient.execute(httpPost);&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;entity&nbsp;=&nbsp;response.getEntity();&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;body&nbsp;=&nbsp;EntityUtils.toString(entity);&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;System.out.println(&quot;Login&nbsp;form&nbsp;get:&nbsp;&quot;&nbsp;+&nbsp;response.getStatusLine());//这个可以打印状态&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;httpPost.abort();&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;System.out.println(body);&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;httpPost.releaseConnection();&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<br />
+}&nbsp;&nbsp;</p>
+
+<p>源自 &nbsp;http://blog.csdn.net/wangpeng047/article/details/19624529#reply</p>
+
+<p>其它相关资料:&nbsp;非CloseableHttpClient &nbsp;HTTPClient模块的HttpGet和HttpPost</p>
+
+<h2>HttpClient 4.3教程</h2>
+
+<p>我的源码</p>
+
+<p>httpclient异常情况分析</p>
+
+<p>我项目中用到的HttpClientUtil (2016/12/17)</p>
+
+<p>[java]&nbsp;view plain&nbsp;copy</p>
+
+<p>package&nbsp;com.isoftstone.pcis.isc.util;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;<br />
+import&nbsp;java.io.IOException;&nbsp;&nbsp;<br />
+import&nbsp;java.io.InterruptedIOException;&nbsp;&nbsp;<br />
+import&nbsp;java.net.UnknownHostException;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;<br />
+import&nbsp;javax.net.ssl.SSLException;&nbsp;&nbsp;<br />
+import&nbsp;javax.net.ssl.SSLHandshakeException;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;<br />
+import&nbsp;org.apache.http.HttpEntityEnclosingRequest;&nbsp;&nbsp;<br />
+import&nbsp;org.apache.http.HttpRequest;&nbsp;&nbsp;<br />
+import&nbsp;org.apache.http.NoHttpResponseException;&nbsp;&nbsp;<br />
+import&nbsp;org.apache.http.client.HttpRequestRetryHandler;&nbsp;&nbsp;<br />
+import&nbsp;org.apache.http.client.protocol.HttpClientContext;&nbsp;&nbsp;<br />
+import&nbsp;org.apache.http.config.Registry;&nbsp;&nbsp;<br />
+import&nbsp;org.apache.http.config.RegistryBuilder;&nbsp;&nbsp;<br />
+import&nbsp;org.apache.http.conn.ConnectTimeoutException;&nbsp;&nbsp;<br />
+import&nbsp;org.apache.http.conn.socket.ConnectionSocketFactory;&nbsp;&nbsp;<br />
+import&nbsp;org.apache.http.conn.socket.LayeredConnectionSocketFactory;&nbsp;&nbsp;<br />
+import&nbsp;org.apache.http.conn.socket.PlainConnectionSocketFactory;&nbsp;&nbsp;<br />
+import&nbsp;org.apache.http.conn.ssl.SSLConnectionSocketFactory;&nbsp;&nbsp;<br />
+import&nbsp;org.apache.http.impl.client.CloseableHttpClient;&nbsp;&nbsp;<br />
+import&nbsp;org.apache.http.impl.client.HttpClients;&nbsp;&nbsp;<br />
+import&nbsp;org.apache.http.impl.conn.PoolingHttpClientConnectionManager;&nbsp;&nbsp;<br />
+import&nbsp;org.apache.http.protocol.HttpContext;&nbsp;&nbsp;<br />
+import&nbsp;com.isoftstone.pcis.isc.util.ProperUtil;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;<br />
+public&nbsp;class&nbsp;HttpClientUtil&nbsp;{&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;private&nbsp;static&nbsp;CloseableHttpClient&nbsp;httpclient&nbsp;=&nbsp;null;&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;static&nbsp;final&nbsp;int&nbsp;maxTotal=Integer.valueOf(ProperUtil.get(&quot;maxTotal&quot;)).intValue();//总最大连接数&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;static&nbsp;final&nbsp;int&nbsp;defaultMaxPerRoute=Integer.valueOf(ProperUtil.get(&quot;corePoolSize&quot;)).intValue();//每条线路最大连接数&nbsp;=&nbsp;本系统核心线程数&nbsp;,&nbsp;这样永远不会超过最大连接&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;static&nbsp;CloseableHttpClient&nbsp;getHttpClient()&nbsp;{&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if&nbsp;(null&nbsp;==&nbsp;httpclient)&nbsp;{&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;synchronized&nbsp;(HttpClientUtil.class)&nbsp;{&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if&nbsp;(null&nbsp;==&nbsp;httpclient)&nbsp;{&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;httpclient&nbsp;=&nbsp;getNewHttpClient();&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return&nbsp;httpclient;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;private&nbsp;static&nbsp;CloseableHttpClient&nbsp;getNewHttpClient()&nbsp;{&nbsp;&nbsp;<br />
+&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//&nbsp;设置连接池&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ConnectionSocketFactory&nbsp;plainsf&nbsp;=&nbsp;PlainConnectionSocketFactory.getSocketFactory();&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;LayeredConnectionSocketFactory&nbsp;sslsf&nbsp;=&nbsp;SSLConnectionSocketFactory.getSocketFactory();&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Registry&lt;ConnectionSocketFactory&gt;&nbsp;registry&nbsp;=&nbsp;RegistryBuilder.&lt;ConnectionSocketFactory&gt;&nbsp;create().register(&quot;http&quot;,&nbsp;plainsf).register(&quot;https&quot;,&nbsp;sslsf).build();&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;PoolingHttpClientConnectionManager&nbsp;cm&nbsp;=&nbsp;new&nbsp;PoolingHttpClientConnectionManager(registry);&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//&nbsp;配置最大连接数&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;cm.setMaxTotal(maxTotal);&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//&nbsp;配置每条线路的最大连接数&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;cm.setDefaultMaxPerRoute(defaultMaxPerRoute);&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//&nbsp;请求重试处理&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;HttpRequestRetryHandler&nbsp;httpRequestRetryHandler&nbsp;=&nbsp;new&nbsp;HttpRequestRetryHandler()&nbsp;{&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;@Override&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;boolean&nbsp;retryRequest(IOException&nbsp;exception,&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;int&nbsp;executionCount,&nbsp;HttpContext&nbsp;context)&nbsp;{&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if&nbsp;(executionCount&nbsp;&gt;=&nbsp;2)&nbsp;{//&nbsp;如果已经重试了2次，就放弃&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return&nbsp;false;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if&nbsp;(exception&nbsp;instanceof&nbsp;NoHttpResponseException)&nbsp;{//&nbsp;如果服务器丢掉了连接，那么就重试&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return&nbsp;true;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if&nbsp;(exception&nbsp;instanceof&nbsp;SSLHandshakeException)&nbsp;{//&nbsp;不要重试SSL握手异常&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return&nbsp;false;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if&nbsp;(exception&nbsp;instanceof&nbsp;InterruptedIOException)&nbsp;{//&nbsp;超时&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return&nbsp;false;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if&nbsp;(exception&nbsp;instanceof&nbsp;UnknownHostException)&nbsp;{//&nbsp;目标服务器不可达&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return&nbsp;false;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if&nbsp;(exception&nbsp;instanceof&nbsp;ConnectTimeoutException)&nbsp;{//&nbsp;连接被拒绝&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return&nbsp;false;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if&nbsp;(exception&nbsp;instanceof&nbsp;SSLException)&nbsp;{//&nbsp;SSL握手异常&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return&nbsp;false;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;<br />
+&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;HttpClientContext&nbsp;clientContext&nbsp;=&nbsp;HttpClientContext.adapt(context);&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;HttpRequest&nbsp;request&nbsp;=&nbsp;clientContext.getRequest();&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if&nbsp;(!(request&nbsp;instanceof&nbsp;HttpEntityEnclosingRequest))&nbsp;{&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return&nbsp;true;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return&nbsp;false;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;<br />
+&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;};&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;CloseableHttpClient&nbsp;newHttpclient=null;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;newHttpclient&nbsp;=&nbsp;HttpClients.custom()&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;.setConnectionManager(cm)&nbsp;&nbsp;<br />
+//&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;.setDefaultRequestConfig(requestConfig)&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;.setRetryHandler(httpRequestRetryHandler)&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;.build();&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return&nbsp;newHttpclient;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;<br />
+}&nbsp;&nbsp;</p>
+
+<h2><br />
+我自己整理的HttpClientTool (2017/06/01)</h2>
+
+<p>package&nbsp;com.isoftstone.core.util;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;<br />
+import&nbsp;java.io.IOException;&nbsp;&nbsp;<br />
+import&nbsp;java.io.InterruptedIOException;&nbsp;&nbsp;<br />
+import&nbsp;java.net.UnknownHostException;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;<br />
+import&nbsp;javax.net.ssl.SSLException;&nbsp;&nbsp;<br />
+import&nbsp;javax.net.ssl.SSLHandshakeException;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;<br />
+import&nbsp;org.apache.http.HttpEntityEnclosingRequest;&nbsp;&nbsp;<br />
+import&nbsp;org.apache.http.HttpHost;&nbsp;&nbsp;<br />
+import&nbsp;org.apache.http.HttpRequest;&nbsp;&nbsp;<br />
+import&nbsp;org.apache.http.NoHttpResponseException;&nbsp;&nbsp;<br />
+import&nbsp;org.apache.http.client.HttpRequestRetryHandler;&nbsp;&nbsp;<br />
+import&nbsp;org.apache.http.client.config.RequestConfig;&nbsp;&nbsp;<br />
+import&nbsp;org.apache.http.client.protocol.HttpClientContext;&nbsp;&nbsp;<br />
+import&nbsp;org.apache.http.config.Registry;&nbsp;&nbsp;<br />
+import&nbsp;org.apache.http.config.RegistryBuilder;&nbsp;&nbsp;<br />
+import&nbsp;org.apache.http.conn.ConnectTimeoutException;&nbsp;&nbsp;<br />
+import&nbsp;org.apache.http.conn.routing.HttpRoute;&nbsp;&nbsp;<br />
+import&nbsp;org.apache.http.conn.socket.ConnectionSocketFactory;&nbsp;&nbsp;<br />
+import&nbsp;org.apache.http.conn.socket.LayeredConnectionSocketFactory;&nbsp;&nbsp;<br />
+import&nbsp;org.apache.http.conn.socket.PlainConnectionSocketFactory;&nbsp;&nbsp;<br />
+import&nbsp;org.apache.http.conn.ssl.SSLConnectionSocketFactory;&nbsp;&nbsp;<br />
+import&nbsp;org.apache.http.impl.client.CloseableHttpClient;&nbsp;&nbsp;<br />
+import&nbsp;org.apache.http.impl.client.HttpClients;&nbsp;&nbsp;<br />
+import&nbsp;org.apache.http.impl.conn.PoolingHttpClientConnectionManager;&nbsp;&nbsp;<br />
+import&nbsp;org.apache.http.protocol.HttpContext;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;<br />
+/**&nbsp;<br />
+&nbsp;*&nbsp;org.apache.http.impl.client.CloseableHttpClient链接池生成工具&nbsp;<br />
+&nbsp;*&nbsp;@reference&nbsp;http://www.cnblogs.com/whatlonelytear/articles/4835538.html&nbsp;<br />
+&nbsp;*&nbsp;@author&nbsp;King&nbsp;<br />
+&nbsp;*&nbsp;@date&nbsp;20170601&nbsp;<br />
+&nbsp;*/&nbsp;&nbsp;<br />
+public&nbsp;class&nbsp;HttpClientTool&nbsp;{&nbsp;&nbsp;<br />
+&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;//&nbsp;org.apache.http.impl.client.CloseableHttpClient&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;private&nbsp;static&nbsp;CloseableHttpClient&nbsp;httpclient&nbsp;=&nbsp;null;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;//&nbsp;这里就直接默认固定了,因为以下三个参数在新建的method中仍然可以重新配置并被覆盖.&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;static&nbsp;final&nbsp;int&nbsp;connectionRequestTimeout&nbsp;=&nbsp;5000;//&nbsp;ms毫秒,从池中获取链接超时时间&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;static&nbsp;final&nbsp;int&nbsp;connectTimeout&nbsp;=&nbsp;5000;//&nbsp;ms毫秒,建立链接超时时间&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;static&nbsp;final&nbsp;int&nbsp;socketTimeout&nbsp;=&nbsp;30000;//&nbsp;ms毫秒,读取超时时间&nbsp;&nbsp;<br />
+&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;//&nbsp;总配置,主要涉及是以下两个参数,如果要作调整没有用到properties会比较后麻烦,但鉴于一经粘贴,随处可用的特点,就不再做依赖性配置化处理了.&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;//&nbsp;而且这个参数同一家公司基本不会变动.&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;static&nbsp;final&nbsp;int&nbsp;maxTotal&nbsp;=&nbsp;500;//&nbsp;最大总并发,很重要的参数&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;static&nbsp;final&nbsp;int&nbsp;maxPerRoute&nbsp;=&nbsp;100;//&nbsp;每路并发,很重要的参数&nbsp;&nbsp;<br />
+&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;//&nbsp;正常情况这里应该配成MAP或LIST&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;//&nbsp;细化配置参数,用来对每路参数做精细化处理,可以管控各ip的流量,比如默认配置请求baidu:80端口最大100个并发链接,&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;static&nbsp;final&nbsp;String&nbsp;detailHostName&nbsp;=&nbsp;&quot;http://www.baidu.com&quot;;//&nbsp;每个细化配置之ip(不重要,在特殊场景很有用)&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;static&nbsp;final&nbsp;int&nbsp;detailPort&nbsp;=&nbsp;80;//&nbsp;每个细化配置之port(不重要,在特殊场景很有用)&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;static&nbsp;final&nbsp;int&nbsp;detailMaxPerRoute&nbsp;=&nbsp;100;//&nbsp;每个细化配置之最大并发数(不重要,在特殊场景很有用)&nbsp;&nbsp;<br />
+&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;static&nbsp;CloseableHttpClient&nbsp;getHttpClient()&nbsp;{&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if&nbsp;(null&nbsp;==&nbsp;httpclient)&nbsp;{&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;synchronized&nbsp;(HttpClientTool.class)&nbsp;{&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if&nbsp;(null&nbsp;==&nbsp;httpclient)&nbsp;{&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;httpclient&nbsp;=&nbsp;init();&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return&nbsp;httpclient;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;<br />
+&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;/**&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;*&nbsp;链接池初始化&nbsp;这里最重要的一点理解就是.&nbsp;让CloseableHttpClient&nbsp;一直活在池的世界里,&nbsp;但是HttpPost却一直用完就消掉.&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;*&nbsp;这样可以让链接一直保持着.&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;*&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;*&nbsp;@return&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;*/&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;private&nbsp;static&nbsp;CloseableHttpClient&nbsp;init()&nbsp;{&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;CloseableHttpClient&nbsp;newHttpclient&nbsp;=&nbsp;null;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//&nbsp;设置连接池&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ConnectionSocketFactory&nbsp;plainsf&nbsp;=&nbsp;PlainConnectionSocketFactory.getSocketFactory();&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;LayeredConnectionSocketFactory&nbsp;sslsf&nbsp;=&nbsp;SSLConnectionSocketFactory.getSocketFactory();&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Registry&lt;ConnectionSocketFactory&gt;&nbsp;registry&nbsp;=&nbsp;RegistryBuilder.&lt;ConnectionSocketFactory&gt;&nbsp;create().register(&quot;http&quot;,&nbsp;plainsf).register(&quot;https&quot;,&nbsp;sslsf).build();&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;PoolingHttpClientConnectionManager&nbsp;cm&nbsp;=&nbsp;new&nbsp;PoolingHttpClientConnectionManager(registry);&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//&nbsp;将最大连接数增加&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;cm.setMaxTotal(maxTotal);&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//&nbsp;将每个路由基础的连接增加&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;cm.setDefaultMaxPerRoute(maxPerRoute);&nbsp;&nbsp;<br />
+&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//&nbsp;细化配置开始,其实这里用Map或List的for循环来配置每个链接,在特殊场景很有用.&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//&nbsp;将每个路由基础的连接做特殊化配置,一般用不着&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;HttpHost&nbsp;httpHost&nbsp;=&nbsp;new&nbsp;HttpHost(detailHostName,&nbsp;detailPort);&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//&nbsp;将目标主机的最大连接数增加&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;cm.setMaxPerRoute(new&nbsp;HttpRoute(httpHost),&nbsp;detailMaxPerRoute);&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//&nbsp;cm.setMaxPerRoute(new&nbsp;HttpRoute(httpHost2),&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//&nbsp;detailMaxPerRoute2);//可以有细化配置2&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//&nbsp;cm.setMaxPerRoute(new&nbsp;HttpRoute(httpHost3),&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//&nbsp;detailMaxPerRoute3);//可以有细化配置3&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//&nbsp;细化配置结束&nbsp;&nbsp;<br />
+&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//&nbsp;请求重试处理&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;HttpRequestRetryHandler&nbsp;httpRequestRetryHandler&nbsp;=&nbsp;new&nbsp;HttpRequestRetryHandler()&nbsp;{&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;@Override&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;boolean&nbsp;retryRequest(IOException&nbsp;exception,&nbsp;int&nbsp;executionCount,&nbsp;HttpContext&nbsp;context)&nbsp;{&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if&nbsp;(executionCount&nbsp;&gt;=&nbsp;2)&nbsp;{//&nbsp;如果已经重试了2次，就放弃&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return&nbsp;false;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if&nbsp;(exception&nbsp;instanceof&nbsp;NoHttpResponseException)&nbsp;{//&nbsp;如果服务器丢掉了连接，那么就重试&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return&nbsp;true;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if&nbsp;(exception&nbsp;instanceof&nbsp;SSLHandshakeException)&nbsp;{//&nbsp;不要重试SSL握手异常&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return&nbsp;false;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if&nbsp;(exception&nbsp;instanceof&nbsp;InterruptedIOException)&nbsp;{//&nbsp;超时&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return&nbsp;false;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if&nbsp;(exception&nbsp;instanceof&nbsp;UnknownHostException)&nbsp;{//&nbsp;目标服务器不可达&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return&nbsp;false;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if&nbsp;(exception&nbsp;instanceof&nbsp;ConnectTimeoutException)&nbsp;{//&nbsp;连接被拒绝&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return&nbsp;false;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if&nbsp;(exception&nbsp;instanceof&nbsp;SSLException)&nbsp;{//&nbsp;SSL握手异常&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return&nbsp;false;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;<br />
+&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;HttpClientContext&nbsp;clientContext&nbsp;=&nbsp;HttpClientContext.adapt(context);&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;HttpRequest&nbsp;request&nbsp;=&nbsp;clientContext.getRequest();&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//&nbsp;如果请求是幂等的，就再次尝试&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if&nbsp;(!(request&nbsp;instanceof&nbsp;HttpEntityEnclosingRequest))&nbsp;{&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return&nbsp;true;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return&nbsp;false;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;};&nbsp;&nbsp;<br />
+&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//&nbsp;配置请求的超时设置&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;RequestConfig&nbsp;requestConfig&nbsp;=&nbsp;RequestConfig.custom().setConnectionRequestTimeout(connectionRequestTimeout).setConnectTimeout(connectTimeout).setSocketTimeout(socketTimeout).build();&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;newHttpclient&nbsp;=&nbsp;HttpClients.custom().setConnectionManager(cm).setDefaultRequestConfig(requestConfig).setRetryHandler(httpRequestRetryHandler).build();&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return&nbsp;newHttpclient;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;<br />
+}&nbsp;</p>
