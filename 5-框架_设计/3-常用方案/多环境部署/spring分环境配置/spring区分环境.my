@@ -1,0 +1,293 @@
+<h1>Spring 区分环境</h1>
+
+<p>&ndash; Start&nbsp;<br />
+我们开发软件时，通常有三个环境，开发环境(dev)，测试环境(test)和生产环境(prod)，不同的环境连接不同的数据库，我们该怎么配置呢？&nbsp;<br />
+首先我们可以定义三个 properties 文件，将不同环境的数据库的配置在里面。&nbsp;<br />
+system.dev.properties&nbsp;<br />
+system.test.properties&nbsp;<br />
+system.prod.properties</p>
+
+<pre>
+<code>jdbc.driverClassName=org.hsqldb.jdbcDriver
+jdbc.url=jdbc:hsqldb:hsql://dev:9002
+jdbc.username=sa
+jdbc.password=root
+</code></pre>
+
+<pre>
+<code>jdbc.driverClassName=org.hsqldb.jdbcDriver
+jdbc.url=jdbc:hsqldb:hsql://test:9002
+jdbc.username=sa
+jdbc.password=root
+</code></pre>
+
+<pre>
+<code>jdbc.driverClassName=org.hsqldb.jdbcDriver
+jdbc.url=jdbc:hsqldb:hsql://production:9002
+jdbc.username=sa
+jdbc.password=root
+</code></pre>
+
+<p>然后我们可以在 Spring XML 配置文件中配置注册我们的 properties，然后通过${xx} 方式引用属性。</p>
+
+<pre>
+<code>&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot;?&gt;
+&lt;beans xmlns=&quot;http://www.springframework.org/schema/beans&quot;
+    xmlns:xsi=&quot;http://www.w3.org/2001/XMLSchema-instance&quot;
+    xmlns:context=&quot;http://www.springframework.org/schema/context&quot;
+    xsi:schemaLocation=&quot;http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd
+        http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context-4.3.xsd&quot;&gt;
+
+    &lt;!-- 
+        注册 properties 文件，需要引入 context 命名空间
+    --&gt;
+    &lt;context:property-placeholder location=&quot;classpath:shangbo/spring/example43/system.${env}.properties&quot;/&gt;
+
+    &lt;!-- 
+        也可以使用如下的方式注册 properties 文件
+
+        &lt;bean class=&quot;org.springframework.beans.factory.config.PropertyPlaceholderConfigurer&quot;&gt;
+            &lt;property name=&quot;locations&quot; value=&quot;classpath:shangbo/spring/example43/system.${env}.properties&quot;/&gt;
+        &lt;/bean&gt;
+     --&gt;
+
+    &lt;!-- 
+        使用 ${} 引用 properties 文件中值
+     --&gt;
+    &lt;bean id=&quot;dataSource&quot; destroy-method=&quot;close&quot; class=&quot;org.apache.commons.dbcp.BasicDataSource&quot;&gt;
+        &lt;property name=&quot;driverClassName&quot; value=&quot;${jdbc.driverClassName}&quot;/&gt;
+        &lt;property name=&quot;url&quot; value=&quot;${jdbc.url}&quot;/&gt;
+        &lt;property name=&quot;username&quot; value=&quot;${jdbc.username}&quot;/&gt;
+        &lt;property name=&quot;password&quot; value=&quot;${jdbc.password}&quot;/&gt;
+    &lt;/bean&gt;
+
+
+&lt;/beans&gt;</code></pre>
+
+<pre>
+<code>package shangbo.spring.example43;
+
+import org.apache.commons.dbcp.BasicDataSource;
+import org.springframework.context.ApplicationContext;
+import org.springframework.context.support.ClassPathXmlApplicationContext;
+
+public class App 
+{
+    public static void main( String[] args )
+    {
+        // 设置环境变量，通常在 shell 启动脚本中设置
+        System.setProperty(&quot;env&quot;, &quot;dev&quot;);
+
+        // 实例化 Spring IoC 容器
+        ApplicationContext context = new ClassPathXmlApplicationContext(&quot;shangbo/spring/example43/example.xml&quot;);
+
+        // 从容器中获得对象
+        BasicDataSource dataSource = context.getBean(BasicDataSource.class);
+
+        // 使用对象
+        System.out.println(dataSource.getUrl());
+    }
+}
+</code></pre>
+
+<p>我们也可以使用 Java 配置。</p>
+
+<pre>
+<code>package shangbo.spring.example44;
+
+import org.apache.commons.dbcp.BasicDataSource;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.PropertySource;
+
+@Configuration
+@PropertySource(&quot;classpath:shangbo/spring/example44/system.${env}.properties&quot;)
+public class AppConfig {
+
+    @Bean(destroyMethod = &quot;close&quot;)
+    public BasicDataSource dataSource(
+            @Value(&quot;${jdbc.driverClassName}&quot;) String driverClassName,
+            @Value(&quot;${jdbc.url}&quot;) String url,
+            @Value(&quot;${jdbc.username}&quot;) String username,
+            @Value(&quot;${jdbc.password}&quot;) String password) {
+        BasicDataSource dataSource = new BasicDataSource();
+        dataSource.setDriverClassName(driverClassName);
+        dataSource.setUrl(url);
+        dataSource.setUsername(username);
+        dataSource.setPassword(password);
+
+        return dataSource;
+    }
+
+}
+</code></pre>
+
+<pre>
+<code>package shangbo.spring.example44;
+
+import org.apache.commons.dbcp.BasicDataSource;
+import org.springframework.context.ApplicationContext;
+import org.springframework.context.annotation.AnnotationConfigApplicationContext;
+
+public class App 
+{
+    public static void main( String[] args )
+    {
+        // 设置环境变量，通常在 shell 启动脚本中设置
+        System.setProperty(&quot;env&quot;, &quot;test&quot;);
+
+        // 实例化 Spring IoC 容器
+        ApplicationContext context = new AnnotationConfigApplicationContext(AppConfig.class);
+
+        // 从容器中获得对象
+        BasicDataSource dataSource = context.getBean(BasicDataSource.class);
+
+        // 使用对象
+        System.out.println(dataSource.getUrl());
+    }
+}
+</code></pre>
+
+<p>&nbsp;</p>
+
+<p>在一个复杂的系统中，有时候一个对象在不同的环境中初始化的方式不一样，你可能会问为什么不弄成一样的呢，有时候事情并不是我们能决定的，但生活还的继续，怎么办？Spring 有办法，下面是一个简单的例子。&nbsp;<br />
+首先定义一个特殊的类，假设这个类在不同的环境中定义的方式不一样。</p>
+
+<pre>
+<code>package shangbo.spring.example45;
+
+public class SpecialClass {
+    private String env;
+
+    public String getEnv() {
+        return env;
+    }
+
+    public void setEnv(String env) {
+        this.env = env;
+    }
+
+}
+</code></pre>
+
+<pre>
+<code>&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot;?&gt;
+&lt;beans xmlns=&quot;http://www.springframework.org/schema/beans&quot;
+    xmlns:xsi=&quot;http://www.w3.org/2001/XMLSchema-instance&quot;
+    xsi:schemaLocation=&quot;http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd&quot;&gt;
+
+    &lt;!-- 
+        使用 profile
+     --&gt;
+    &lt;beans profile=&quot;dev&quot;&gt;
+        &lt;bean id=&quot;specialBean&quot; class=&quot;shangbo.spring.example45.SpecialClass&quot;&gt;
+            &lt;property name=&quot;env&quot; value = &quot;dev&quot;/&gt;
+        &lt;/bean&gt;
+    &lt;/beans&gt;
+
+    &lt;beans profile=&quot;uat&quot;&gt;
+        &lt;bean id=&quot;specialBean&quot; class=&quot;shangbo.spring.example45.SpecialClass&quot;&gt;
+            &lt;property name=&quot;env&quot; value = &quot;uat&quot;/&gt;
+        &lt;/bean&gt;
+    &lt;/beans&gt;
+
+    &lt;beans profile=&quot;prod&quot;&gt;
+        &lt;bean id=&quot;specialBean&quot; class=&quot;shangbo.spring.example45.SpecialClass&quot;&gt;
+            &lt;property name=&quot;env&quot; value = &quot;prod&quot;/&gt;
+        &lt;/bean&gt;
+    &lt;/beans&gt;
+
+&lt;/beans&gt;
+</code></pre>
+
+<pre>
+<code>package shangbo.spring.example45;
+
+import org.springframework.context.ApplicationContext;
+import org.springframework.context.support.ClassPathXmlApplicationContext;
+
+public class App 
+{
+    public static void main( String[] args )
+    {
+        // 设置环境变量，通常在 shell 启动脚本中设置
+        System.setProperty(&quot;spring.profiles.active&quot;, &quot;dev&quot;);
+
+        // 实例化 Spring IoC 容器
+        ApplicationContext context = new ClassPathXmlApplicationContext(&quot;shangbo/spring/example45/example.xml&quot;);
+
+        // 从容器中获得对象
+        SpecialClass specialBean = context.getBean(SpecialClass.class);
+
+        // 使用对象
+        System.out.println(specialBean.getEnv());
+    }
+}
+</code></pre>
+
+<p>我们也可以使用 Java 配置。</p>
+
+<pre>
+<code>package shangbo.spring.example46;
+
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Profile;
+
+@Configuration
+public class AppConfig {
+
+    @Bean
+    @Profile(&quot;dev&quot;)
+    public SpecialClass specialBean1() {
+        SpecialClass s = new SpecialClass();
+        s.setEnv(&quot;dev&quot;);
+
+        return s;
+    }
+
+    @Bean
+    @Profile(&quot;uat&quot;)
+    public SpecialClass specialBean2() {
+        SpecialClass s = new SpecialClass();
+        s.setEnv(&quot;uat&quot;);
+
+        return s;
+    }
+
+    @Bean
+    @Profile(&quot;prod&quot;)
+    public SpecialClass specialBean3() {
+        SpecialClass s = new SpecialClass();
+        s.setEnv(&quot;prod&quot;);
+
+        return s;
+    }
+
+}
+</code></pre>
+
+<pre>
+<code>package shangbo.spring.example46;
+
+import org.springframework.context.ApplicationContext;
+import org.springframework.context.annotation.AnnotationConfigApplicationContext;
+
+public class App 
+{
+    public static void main( String[] args )
+    {
+        // 设置环境变量，通常在 shell 启动脚本中设置
+        System.setProperty(&quot;spring.profiles.active&quot;, &quot;uat&quot;);
+
+        // 实例化 Spring IoC 容器
+        ApplicationContext context = new AnnotationConfigApplicationContext(AppConfig.class);
+
+        // 从容器中获得对象
+        SpecialClass specialBean = context.getBean(SpecialClass.class);
+
+        // 使用对象
+        System.out.println(specialBean.getEnv());
+    }
+}</code></pre>
