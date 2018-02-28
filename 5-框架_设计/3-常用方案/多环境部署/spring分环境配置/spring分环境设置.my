@@ -25,15 +25,18 @@
    &lt;!-- 测试环境，具体加载bean或者properties文件 --&gt;
  &lt;/beans&gt;   </code></pre>
 
-<h3>激活profile</h3>
+<h3>激活 profile</h3>
 
-<p>在J2EE项目中，一般通过web.xml配置。</p>
+<p>&emsp;&emsp;spring 为我们提供了大量的激活 profile 的方法，可以通过代码来激活，也可以通过系统环境变量、JVM参数、servlet上下文参数来定义 spring.profiles.active 参数激活 profile，这里我们通过定义 JVM 参数实现。</p>
 
-<pre>
-<code>&lt;context-param&gt;
-   &lt;param-name&gt;spring.profiles.default&lt;/param-name&gt;
-   &lt;param-value&gt;development&lt;/param-value&gt;
-&lt;/context-param&gt;</code></pre>
+<h3>1、web.xml方式：</h3>
+
+<p>在J2EE项目中，一般通过web.xml配置，这里指定的是默认profile。</p>
+
+<p><code>&lt;init-param&gt;<br />
+&lt;param-name&gt;spring.profiles.active&lt;/param-name&gt;<br />
+&lt;param-value&gt;production&lt;/param-value&gt;<br />
+&lt;/init-param&gt;</code></p>
 
 <p>或者</p>
 
@@ -43,18 +46,20 @@
    &lt;param-value&gt;test&lt;/param-value&gt;
 &lt;/context-param&gt;</code></pre>
 
-<p>两个方式都可以，一般推荐第一种。主要原因在于：方便扩展，没有指定具体profile，可通过其他方式覆盖；一般情况下开发环境是使用最多的情况。</p>
+<p>两个方式都可以，一般推荐第一种。主要原因在于：方便扩展，没有指定具体profile，可通过其他方式覆盖；一般情况下开发环境是使用最多的情况。<code> </code></p>
 
-<h3>测试环境激活profile</h3>
+<h3>2、测试环境激活profile</h3>
 
 <p>Spring-test 中提供了一个__ActiveProfiles__的注解，可以标注当前测试用例使用的具体profile</p>
+
+<p>标注方式（junit单元测试非常实用）</p>
 
 <pre>
 <code>@ActiveProfiles(&quot;test&quot;)
 public abstract class SpringTransactionalTestCase {
 }</code></pre>
 
-<h3>使用java运行参数指定profiles</h3>
+<h3>3、使用java运行参数指定profiles</h3>
 
 <p>java运行时可以指定jvm内存参数，这个大家都知道。形式类似下面这样去指定java虚拟机启动的内存设置。</p>
 
@@ -66,13 +71,59 @@ public abstract class SpringTransactionalTestCase {
 <pre>
 <code>root      2284     1  0 3月16 ?       00:01:54 /opt/jdk/bin/java -Djava.util.logging.config.file=/opt/apache-tomcat-8.0.32/conf/logging.properties -Djava.util.logging.manager=org.apache.juli.ClassLoaderLogManager -server -Xms1024m -Xmx1024m -XX:PermSize=512m -XX:MaxPermSize=512m -Djava.endorsed.dirs=/opt/apache-tomcat-8.0.32/endorsed -classpath /opt/apache-tomcat-8.0.32/bin/bootstrap.jar:/opt/apache-tomcat-8.0.32/bin/tomcat-juli.jar -Dcatalina.base=/opt/apache-tomcat-8.0.32 -Dcatalina.home=/opt/apache-tomcat-8.0.32 -Djava.io.tmpdir=/opt/apache-tomcat-8.0.32/temp org.apache.catalina.startup.Bootstrap start</code></pre>
 
-<p>回到正题，那这样，是不是也可以通过这种形式，来指定profile的呢？答案是肯定的。<br />
-修改tomcat启动脚本，直接修改JAVA_OPTS:</p>
+<p>回到正题，那这样，是不是也可以通过这种形式，来指定profile的呢？答案是肯定的。</p>
+
+<h4>方法一：使用tomcat启动参数指定profiles</h4>
+
+<p>修改tomcat启动脚本，直接修改JAVA_OPTS:</p>
+
+<h5><strong>linux下</strong></h5>
+
+<p>修改tomcat/bin/catalina.sh 设置JAVA_OPTS：</p>
+
+<p><code>JAVA_OPTS=&quot;-Dspring.profiles.active=production&quot;</code></p>
 
 <pre>
-<code>JAVA_OPTS=&quot; -Xms1024m -Xmx1024m  -XX:PermSize=512m -XX:MaxPermSize=512m -Dspring.profiles.active=test&quot;</code></pre>
+<code>JAVA_OPTS=&quot; -Xms1024m -Xmx1024m  -XX:PermSize=512m -XX:MaxPermSize=512m -Dspring.profiles.active=production&quot;</code>
+</pre>
 
-<p>启动tomcat，发现整个系统启动时，使用profile=test的bean被激活了，证明配置生效。</p>
+<p><span style="font-family:monospace">在tomcat的catalina.sh 或 catalina.bat中，会看到下面的写法，这里是指 JAVA_OPTS 后来的设置，是在原有基础上追加。</span></p>
+
+<p>JAVA_OPTS=&quot;<strong>$JAVA_OPTS</strong> -Dorg.apache.catalina.security.SecurityListener.UMASK=`umask`&quot;</p>
+
+<h5><strong>查看是否成功：</strong></h5>
+
+<p>启动tomcat，发现整个系统启动时，使用profile=<code>production</code>的bean被激活了，证明配置生效。</p>
+
+<p>或者，使用ps -ef| grep tomcat 命令，查看启动参数，可以看到profile=<code>production 表示成功。</code></p>
+
+<h5><strong><code>windows下</code></strong></h5>
+
+<p>tomcat 中 catalina.bat（.sh中不用&ldquo;set&rdquo;） 添加JAVA_OPS。通过设置active选择不同配置文件</p>
+
+<pre>
+<code>set JAVA_OPTS=&quot;-Dspring.profiles.active=test&quot;</code></pre>
+
+<p>&nbsp;</p>
+
+<h4>方法二：使用myeclipse配置java运行参数</h4>
+
+<p>方式1、eclipse 中启动tomcat 项目右键 run as &ndash;&gt; run configuration&ndash;&gt;Arguments&ndash;&gt; VM arguments中添加。local配置文件不必上传git追踪管理</p>
+
+<pre>
+<code>-Dspring.profiles.active=&quot;local&quot;</code></pre>
+
+<p>方式2、window -&gt; preferences -&gt; myeclipse -&gt; servers -&gt; Tomcat -&gt; Tomcat7.x(根据你自己的选) -&gt; JDK&nbsp;</p>
+
+<p>然后在Optional Java VM arguments: 下面的输入框中加入：&quot;-Dspring.profiles.active=production&quot; 其中&nbsp;production 是代码中设置的。</p>
+
+<p><img alt="" src="https://notebook-1255399141.cos.ap-shanghai.myqcloud.com/专业笔记图/5-框架_设计/3-常用方案/多环境部署/spring 多环境部署/spring指定多环境.png" style="height:615px; width:600px" /></p>
+
+<h3>4、ENV方式：</h3>
+
+<pre>
+<code>ConfigurableEnvironment.setActiveProfiles(&quot;test&quot;)</code>
+</pre>
 
 <h2>总结</h2>
 
