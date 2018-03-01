@@ -1,0 +1,229 @@
+<h1><a href="http://www.cnblogs.com/ccfdod/p/6436353.html" id="cb_post_title_url">shiro学习笔记-Subject#login(token)实现过程</a></h1>
+
+<p>本博文所有的代码均为shiro官网（http://shiro.apache.org/）中shiro 1.3.2版本中的源码。</p>
+
+<p>追踪Subject的login(AuthenticationToken&nbsp;token)方法，其调用的为DelegatingSubject类的login方法，DelegatingSubject实现了Subject接口，DelegatingSubject#login如下：</p>
+
+<p>&nbsp;</p>
+
+<pre>
+ 1 public void login(AuthenticationToken token) throws AuthenticationException {
+ 2     clearRunAsIdentitiesInternal();
+ 3     Subject subject = securityManager.login(this, token);
+ 4 
+ 5     PrincipalCollection principals;
+ 6 
+ 7     String host = null;
+ 8 
+ 9     if (subject instanceof DelegatingSubject) {
+10         DelegatingSubject delegating = (DelegatingSubject) subject;
+11         //we have to do this in case there are assumed identities - we don&#39;t want to lose the &#39;real&#39; principals:
+12         principals = delegating.principals;
+13         host = delegating.host;
+14     } else {
+15         principals = subject.getPrincipals();
+16     }
+17 
+18     if (principals == null || principals.isEmpty()) {
+19         String msg = &quot;Principals returned from securityManager.login( token ) returned a null or &quot; +
+20                 &quot;empty value.  This value must be non null and populated with one or more elements.&quot;;
+21         throw new IllegalStateException(msg);
+22     }
+23     this.principals = principals;
+24     this.authenticated = true;
+25     if (token instanceof HostAuthenticationToken) {
+26         host = ((HostAuthenticationToken) token).getHost();
+27     }
+28     if (host != null) {
+29         this.host = host;
+30     }
+31     Session session = subject.getSession(false);
+32     if (session != null) {
+33         this.session = decorate(session);
+34     } else {
+35         this.session = null;
+36     }
+37 }</pre>
+
+<p>&nbsp;</p>
+
+<p>在上面代码的第三行：Subject subject = securityManager.login(this, token); 注意到其调用了SecurityManager的login方法，SecurityManager为接口，实际上调用的其实现类DefaultSecurityManager的login方法，方法如下：</p>
+
+<p>&nbsp;</p>
+
+<pre>
+ 1 public Subject login(Subject subject, AuthenticationToken token) throws AuthenticationException {
+ 2     AuthenticationInfo info;
+ 3     try {
+ 4         info = authenticate(token);
+ 5     } catch (AuthenticationException ae) {
+ 6         try {
+ 7             onFailedLogin(token, ae, subject);
+ 8         } catch (Exception e) {
+ 9             if (log.isInfoEnabled()) {
+10                 log.info(&quot;onFailedLogin method threw an &quot; +
+11                         &quot;exception.  Logging and propagating original AuthenticationException.&quot;, e);
+12             }
+13         }
+14         throw ae; //propagate
+15     }
+16 
+17     Subject loggedIn = createSubject(token, info, subject);
+18 
+19     onSuccessfulLogin(token, info, loggedIn);
+20 
+21     return loggedIn;
+22 }</pre>
+
+<p>&nbsp;</p>
+
+<p>在上面代码第四行：info = authenticate(token); 继续跟踪，发现authenticate(AuthenticationToken token);方法为DefaultSecurityManager的父类AuthenticatingSecurityManager的方法，AuthenticatingSecurityManager#authenticate方法如下：</p>
+
+<pre>
+1 public AuthenticationInfo authenticate(AuthenticationToken token) throws AuthenticationException {
+2     return this.authenticator.authenticate(token);
+3 }</pre>
+
+<p>authenticator为Authenticator接口，继续跟踪，AbstractAuthenticator抽象类实现了Authenticator接口，接下来继续查看AbstractAuthenticator#authenticate(token);方法：</p>
+
+<p>&nbsp;</p>
+
+<pre>
+ 1 public final AuthenticationInfo authenticate(AuthenticationToken token) throws AuthenticationException {
+ 2 
+ 3     if (token == null) {
+ 4         throw new IllegalArgumentException(&quot;Method argument (authentication token) cannot be null.&quot;);
+ 5     }
+ 6 
+ 7     log.trace(&quot;Authentication attempt received for token [{}]&quot;, token);
+ 8 
+ 9     AuthenticationInfo info;
+10     try {
+11         info = doAuthenticate(token);
+12         if (info == null) {
+13             String msg = &quot;No account information found for authentication token [&quot; + token + &quot;] by this &quot; +
+14                     &quot;Authenticator instance.  Please check that it is configured correctly.&quot;;
+15             throw new AuthenticationException(msg);
+16         }
+17     } catch (Throwable t) {
+18         AuthenticationException ae = null;
+19         if (t instanceof AuthenticationException) {
+20             ae = (AuthenticationException) t;
+21         }
+22         if (ae == null) {
+23             //Exception thrown was not an expected AuthenticationException.  Therefore it is probably a little more
+24             //severe or unexpected.  So, wrap in an AuthenticationException, log to warn, and propagate:
+25             String msg = &quot;Authentication failed for token submission [&quot; + token + &quot;].  Possible unexpected &quot; +
+26                     &quot;error? (Typical or expected login exceptions should extend from AuthenticationException).&quot;;
+27             ae = new AuthenticationException(msg, t);
+28             if (log.isWarnEnabled())
+29                 log.warn(msg, t);
+30         }
+31         try {
+32             notifyFailure(token, ae);
+33         } catch (Throwable t2) {
+34             if (log.isWarnEnabled()) {
+35                 String msg = &quot;Unable to send notification for failed authentication attempt - listener error?.  &quot; +
+36                         &quot;Please check your AuthenticationListener implementation(s).  Logging sending exception &quot; +
+37                         &quot;and propagating original AuthenticationException instead...&quot;;
+38                 log.warn(msg, t2);
+39             }
+40         }
+41         throw ae;
+42     }
+43 
+44     log.debug(&quot;Authentication successful for token [{}].  Returned account [{}]&quot;, token, info);
+45 
+46     notifySuccess(token, info);
+47 
+48     return info;
+49 }</pre>
+
+<p>&nbsp;</p>
+
+<p>上面代码第11行：info = doAuthenticate(token); 这个方法为ModularRealmAuthticator类中的方法，因为ModularRealmAuthticator继承了AbstractAuthenticator抽象类。另外，要注意第12行-第16行，如果info==null，就会抛出异常。ModularRealmAuthticator的doAuthenticate(token);方法如下：</p>
+
+<p>&nbsp;</p>
+
+<pre>
+1 protected AuthenticationInfo doAuthenticate(AuthenticationToken authenticationToken) throws AuthenticationException {
+2     assertRealmsConfigured();
+3     Collection&lt;Realm&gt; realms = getRealms();
+4     if (realms.size() == 1) {
+5         return doSingleRealmAuthentication(realms.iterator().next(), authenticationToken);
+6     } else {
+7         return doMultiRealmAuthentication(realms, authenticationToken);
+8     }
+9 }</pre>
+
+<p>&nbsp;</p>
+
+<p>这里，我们关注上面第五行代码：doSingleRealmAuthentication(realms.iterator().next(), authenticationToken); else语句中的doMultiRealmAuthentication(realms, authenticationToken);类似。跟踪到doSingleRealmAuthentication方法如下：</p>
+
+<p>&nbsp;</p>
+
+<pre>
+ 1 protected AuthenticationInfo doSingleRealmAuthentication(Realm realm, AuthenticationToken token) {
+ 2     if (!realm.supports(token)) {
+ 3         String msg = &quot;Realm [&quot; + realm + &quot;] does not support authentication token [&quot; +
+ 4                 token + &quot;].  Please ensure that the appropriate Realm implementation is &quot; +
+ 5                 &quot;configured correctly or that the realm accepts AuthenticationTokens of this type.&quot;;
+ 6         throw new UnsupportedTokenException(msg);
+ 7     }
+ 8     AuthenticationInfo info = realm.getAuthenticationInfo(token);
+ 9     if (info == null) {
+10         String msg = &quot;Realm [&quot; + realm + &quot;] was unable to find account data for the &quot; +
+11                 &quot;submitted AuthenticationToken [&quot; + token + &quot;].&quot;;
+12         throw new UnknownAccountException(msg);
+13     }
+14     return info;
+15 }</pre>
+
+<p>这里的第三行&nbsp;<strong>getCachedAuthenticationInfo 回去配置了的缓存里面根据token找认证信息。</strong></p>
+
+<p>上面代码第八行：AuthenticationInfo info = realm.getAuthenticationInfo(token); realm为Realm接口，实际上调用的是其实现类AuthenticatingRealm中的getAuthenticationInfo方法，方法如下：</p>
+
+<p>&nbsp;</p>
+
+<pre>
+ 1 public final AuthenticationInfo getAuthenticationInfo(AuthenticationToken token) throws AuthenticationException {
+ 2 
+ 3     <strong>AuthenticationInfo info = getCachedAuthenticationInfo(token);</strong>
+ 4     if (info == null) {
+ 5         //otherwise not cached, perform the lookup:
+ 6         <strong>info = doGetAuthenticationInfo(token);</strong>
+ 7         log.debug(&quot;Looked up AuthenticationInfo [{}] from doGetAuthenticationInfo&quot;, info);
+ 8         if (token != null &amp;&amp; info != null) {
+ 9             cacheAuthenticationInfoIfPossible(token, info);
+10         }
+11     } else {
+12         log.debug(&quot;Using cached authentication info [{}] to perform credentials matching.&quot;, info);
+13     }
+14 
+15     if (info != null) {
+16         assertCredentialsMatch(token, info);
+17     } else {
+18         log.debug(&quot;No AuthenticationInfo found for submitted AuthenticationToken [{}].  Returning null.&quot;, token);
+19     }
+20     return info;
+21 }</pre>
+
+<p>&nbsp;</p>
+
+<p>上面代码第三行：AuthenticationInfo info = getCachedAuthenticationInfo(token);从缓存中获取认证信息，如果未获取到，则调用第六行的doGetAuthenticationInfo(token); 方法获取认证信息。继续跟踪，发现有几个类实现了该方法，如下图所示：</p>
+
+<p><img alt="" src="https://images2015.cnblogs.com/blog/858881/201702/858881-20170224002932585-1681618511.png" /></p>
+
+<p>最后，附上SecurityManager和Realm等的类关系图：</p>
+
+<p><strong>Realm：</strong></p>
+
+<p><img alt="" src="https://images2015.cnblogs.com/blog/858881/201702/858881-20170224003332913-1503597714.png" /></p>
+
+<p><strong>SecurityManager:</strong></p>
+
+<p><strong><img alt="" src="https://images2015.cnblogs.com/blog/858881/201702/858881-20170224003818913-2097309391.png" /></strong></p>
+
+<p><strong>Authenticator:</strong></p>
+
+<p><img alt="" src="https://images2015.cnblogs.com/blog/858881/201702/858881-20170224004333273-789142180.png" /></p>
