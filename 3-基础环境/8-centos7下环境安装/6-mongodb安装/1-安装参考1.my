@@ -1,0 +1,157 @@
+<h1>mongoDB在centos7上的安装</h1>
+
+<h2>1，下载安装包</h2>
+
+<p>下载mongoDB的安装文件</p>
+
+<p>地址：https://www.mongodb.org/downloads#production&nbsp;</p>
+
+<p>选择Linux 64-bit legacy 版本,下载到目标服务器上。</p>
+
+<p>解压文件</p>
+
+<p>tar -zxvf mongodb-linux-x86_64-3.0.2.tgz</p>
+
+<p>进入解压后的目录，把bin文件夹内的文件都置为可执行权限</p>
+
+<p>chmod -R 755 bin</p>
+
+<h2>2，创建数据文件路径</h2>
+
+<p>这里，我希望把数据文件和日志文件都放在data目录下，在任意位置创建data目录</p>
+
+<p>mkdir data</p>
+
+<p>进入data，创建数据文件目录</p>
+
+<p>mkdir db</p>
+
+<p>给data目录赋可写权限</p>
+
+<p>我这里粗暴一些，直接777了</p>
+
+<p>chmod -R 777 data</p>
+
+<h2>3，编写配置文件</h2>
+
+<p>为了便于我们启动mongoDB，先编写一个配置文件</p>
+
+<p>我这里把配置文件直接放入了bin目录下</p>
+
+<ol start="1">
+	<li>vi&nbsp;mongodb.conf&nbsp;&nbsp;</li>
+</ol>
+
+<p>内容如下：</p>
+
+<ol start="1">
+	<li>port=27017&nbsp;&nbsp;</li>
+	<li>dbpath=/usr/appdata/mongodb/data/db&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>logappend=true&nbsp;&nbsp;</li>
+	<li>fork=true&nbsp;&nbsp;</li>
+	<li>logpath=/usr/appdata/mongodb/data/logs/mongodb.log</li>
+</ol>
+
+<p>注意，开启守护进程模式 fork 的时候，一定要设置log日志；</p>
+
+<p>设置log日志要注意，<strong>logpath的路径一定要是文件路径</strong>，而不是文件夹路径。<br />
+&nbsp;</p>
+
+<h2>4，测试启动</h2>
+
+<p>进入bin目录，输入命令</p>
+
+<ol start="1">
+	<li>./mongod&nbsp;-f&nbsp;./mongodb.conf&nbsp;&nbsp;</li>
+</ol>
+
+<p>这时候会显示数据库启动成功</p>
+
+<p>在服务器本地测试一下，使用命令</p>
+
+<ol start="1">
+	<li>./mongo&nbsp;127.0.0.1&nbsp;&nbsp;</li>
+	<li>MongoDB&nbsp;shell&nbsp;version:&nbsp;2.6.4&nbsp;&nbsp;</li>
+	<li>connecting&nbsp;to:&nbsp;127.0.0.1/test&nbsp;&nbsp;</li>
+</ol>
+
+<p>这标识数据库启动成功</p>
+
+<p>在局域网内的其它机器使用工具连接测试一下。</p>
+
+<p>有的小伙伴可能会发现无法连接，通常这都是防火墙的端口没有打开造成的</p>
+
+<p>使用命令打开端口</p>
+
+<ol start="1">
+	<li>开启端口&nbsp;&nbsp;</li>
+	<li>firewall-cmd&nbsp;--zone=public&nbsp;--add-port=27017/tcp&nbsp;--permanent&nbsp;&nbsp;</li>
+	<li>查看端口&nbsp;&nbsp;</li>
+	<li>firewall-cmd&nbsp;--permanent&nbsp;--query-port=27017/tcp&nbsp;&nbsp;&nbsp;</li>
+	<li>重启防火墙&nbsp;&nbsp;</li>
+	<li>firewall-cmd&nbsp;--reload&nbsp;&nbsp;</li>
+</ol>
+
+<p>注意事项：</p>
+
+<p>a，要加上 &nbsp;--permanent 才能保证重启后也能打开</p>
+
+<p>b，这里最好重启一下防火墙，有时候开启端口并不能立即生效，什么原因我也不清楚</p>
+
+<p>&nbsp;</p>
+
+<p>好了，现在局域网内其它机器也可以连接到数据库了。<br />
+&nbsp;</p>
+
+<h2>5，注册到系统开机启动</h2>
+
+<p>centos 7的开机启动跟之前版本的centos有很大不同。现在用 systemctl命令代替了之前的chkconfig 和 service 命令</p>
+
+<p>注册到开机启动的方法如下：</p>
+
+<p>在系统服务目录下新建mongodb的启动服务，并给与754的权限</p>
+
+<ol start="1">
+	<li>cd&nbsp;/lib/systemd/system&nbsp;&nbsp;</li>
+	<li>vi&nbsp;mongodb.service&nbsp;&nbsp;</li>
+</ol>
+
+<ol start="1">
+	<li>chmod&nbsp;754&nbsp;mongodb.service&nbsp;&nbsp;</li>
+</ol>
+
+<p>内容如下</p>
+
+<ol start="1">
+	<li>[Unit]&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>Description=mongodb&nbsp;&nbsp;</li>
+	<li>After=network.target&nbsp;remote-fs.target&nbsp;nss-lookup.target&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>[Service]&nbsp;&nbsp;</li>
+	<li>Type=forking&nbsp;&nbsp;</li>
+	<li>ExecStart=/usr/appdata/mongodb/bin/mongod&nbsp;-f&nbsp;/usr/appdata/mongodb/bin/mongodb.conf&nbsp;&nbsp;</li>
+	<li>ExecReload=/bin/kill&nbsp;-s&nbsp;HUP&nbsp;$MAINPID&nbsp;&nbsp;</li>
+	<li>ExecStop=/usr/appdata/mongodb/bin/mongod&nbsp;--shutdown&nbsp;-f&nbsp;/usr/appdata/mongodb/bin/mongodb.conf&nbsp;&nbsp;</li>
+	<li>PrivateTmp=true&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>[Install]&nbsp;&nbsp;</li>
+	<li>WantedBy=multi-user.target&nbsp;&nbsp;</li>
+</ol>
+
+<p><br />
+路径必须要写绝对路径</p>
+
+<ol start="1">
+	<li>启动&nbsp;&nbsp;</li>
+	<li>systemctl&nbsp;start&nbsp;mongodb.service&nbsp;&nbsp;</li>
+	<li>关闭&nbsp;&nbsp;</li>
+	<li>systemctl&nbsp;stop&nbsp;mongodb.service&nbsp;&nbsp;</li>
+	<li>注册到开机启动&nbsp;&nbsp;</li>
+	<li>systemctl&nbsp;enable&nbsp;mongodb.service&nbsp;&nbsp;</li>
+</ol>
+
+<h2>6，重启机器验证</h2>
+
+<p>reboot&nbsp;</p>
