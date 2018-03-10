@@ -1,0 +1,41 @@
+<h1>CASFilter参数和传递登录用户名</h1>
+
+<h2>CASFilter 必需的参数：</h2>
+
+<p>edu.yale.its.tp.cas.client.filter.loginUrl&nbsp; 指定 CAS 提供登录页面的 URL&nbsp;&nbsp;<br />
+edu.yale.its.tp.cas.client.filter.validateUrl&nbsp; 指定 CAS 提供 service ticket 或 proxy ticket 验证服务的 URL&nbsp;&nbsp;<br />
+edu.yale.its.tp.cas.client.filter.serverName&nbsp; 指定客户端的域名和端口，是指客户端应用所在机器而不是 CAS Server 所在机器，该参数或 serviceUrl 至少有一个必须指定&nbsp;&nbsp;<br />
+edu.yale.its.tp.cas.client.filter.serviceUrl&nbsp; 该参数指定过后将覆盖 serverName 参数，成为登录成功过后重定向的目的地址&nbsp;</p>
+
+<h2>CASFilter 可选参数：</h2>
+
+<p>edu.yale.its.tp.cas.client.filter.proxyCallbackUrl&nbsp; 用于当前应用需要作为其他服务的代理(proxy)时获取 Proxy Granting Ticket 的地址&nbsp;&nbsp;<br />
+edu.yale.its.tp.cas.client.filter.authorizedProxy&nbsp; 用于允许当前应用从代理处获取 proxy tickets，该参数接受以空格分隔开的多个 proxy URLs，但实际使用只需要一个成功即可。当指定该参数过后，需要修改 validateUrl 到 proxyValidate，而不再是 serviceValidate&nbsp;&nbsp;<br />
+edu.yale.its.tp.cas.client.filter.renew&nbsp; 如果指定为 true，那么受保护的资源每次被访问时均要求用户重新进行验证，而不管之前是否已经通过&nbsp;&nbsp;<br />
+edu.yale.its.tp.cas.client.filter.wrapRequest&nbsp; 如果指定为 true，那么 CASFilter 将重新包装 HttpRequest,并且使 getRemoteUser() 方法返回当前登录用户的用户名&nbsp;&nbsp;<br />
+edu.yale.its.tp.cas.client.filter.gateway&nbsp; 指定 gateway 属性&nbsp;</p>
+
+<h2>传递登录用户名</h2>
+
+<p>CAS 在登录成功过后，会给浏览器回传 Cookie，设置新的到的 Service Ticket。但客户端应用拥有各自的 Session，我们要怎么在各个应用中获取当前登录用户的用户名呢？CAS Client 的 Filter 已经做好了处理，在登录成功后，就可以直接从 Session 的属性中获取<br />
+以下两者都可以</p>
+
+<ol>
+	<li>session.getAttribute(CASFilter.CAS_FILTER_USER);</li>
+	<li>session.getAttribute(&quot;edu.yale.its.tp.cas.client.filter.user&quot;);</li>
+</ol>
+
+<p>通过 JSTL 获取登录用户名</p>
+
+<ol>
+	<li>&lt;c:out&nbsp;value=&quot;${sessionScope[CAS:&#39;edu.yale.its.tp.cas.client.filter.user&#39;]}&quot;/&gt;</li>
+</ol>
+
+<p>另外，CAS 提供了一个 CASFilterRequestWrapper 类，该类继承自HttpServletRequestWrapper，主要是重写了 getRemoteUser() 方法，只要在前面配置 CASFilter 的时候为其设置&ldquo; edu.yale.its.tp.cas.client.filter.wrapRequest &rdquo;参数为 true，就可以通过 getRemoteUser（） 方法来获取登录用户名：</p>
+
+<p>通过 CASFilterRequestWrapper 获取登录用户名</p>
+
+<ol>
+	<li>CASFilterRequestWrapper&nbsp;&nbsp;reqWrapper=new&nbsp;CASFilterRequestWrapper(request);</li>
+	<li>out.println(&quot;The&nbsp;logon&nbsp;user:&quot;&nbsp;+&nbsp;reqWrapper.getRemoteUser());</li>
+</ol>

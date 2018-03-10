@@ -1,0 +1,106 @@
+<h1><a href="http://blog.csdn.net/m15712884682/article/details/54234119">CentOS7安装mongodb</a></h1>
+
+<p>1、下载&nbsp;<br />
+wget&nbsp;<a href="https://fastdl.mongodb.org/linux/mongodb-linux-x86_64-rhel70-3.2.8.tgz" target="_blank">https://fastdl.mongodb.org/linux/mongodb-linux-x86_64-rhel70-3.2.8.tgz</a></p>
+
+<p>2、解压&nbsp;<br />
+tar zxvf mongodb-linux-x86_64-rhel70-3.2.8.tgz&nbsp;<br />
+mv mongodb-linux-x86_64-rhel70-3.2.8 /usr/local/&nbsp;<br />
+mv mongodb-linux-x86_64-rhel70-3.2.8 mongodb&nbsp;<br />
+cd mongodb/</p>
+
+<p>mkdir db&nbsp;<br />
+mkdir logs&nbsp;<br />
+cd bin/&nbsp;<br />
+3、编辑配置文件：&nbsp;<br />
+vim mongodb.conf&nbsp;<br />
+输入以下内容：&nbsp;<br />
+dbpath=/usr/local/mongodb/db&nbsp;<br />
+logpath=/usr/local/mongodb/logs/mongodb.log&nbsp;<br />
+bind_ip=0.0.0.0&nbsp;<br />
+port=27017&nbsp;<br />
+fork=true&nbsp;<br />
+nohttpinterface=true</p>
+
+<p>4、创建新的账号：&nbsp;<br />
+groupadd mongodb&nbsp;<br />
+useradd mongodb -g mongodb&nbsp;<br />
+cd ../../&nbsp;<br />
+chown -R mongodb:mongodb mongodb</p>
+
+<p>5、启动：&nbsp;<br />
+/usr/local/mongodb/bin/mongod -f /usr/local/mongodb/bin/mongodb.conf</p>
+
+<p>6、设置开机自动启动mongodb&nbsp;<br />
+vi /etc/rc.d/rc.local&nbsp;<br />
+/usr/local/mongodb/bin/mongod &ndash;config /usr/local/mongodb/bin/mongodb.conf</p>
+
+<p>进入mongodb的shell模式：&nbsp;<br />
+/usr/local/mongodb/bin/mongo&nbsp;<br />
+查看数据库列表：&nbsp;<br />
+show dbs&nbsp;<br />
+查看当前db版本：&nbsp;<br />
+db.version();</p>
+
+<p>7、增加管理员权限：</p>
+
+<p>userAdminAnyDatabase 这个角色拥有分配角色和用户的权限，但没有查写的缺陷&nbsp;<br />
+root 这是超级管理员&nbsp;<br />
+readWrite 有读写权限&nbsp;<br />
+read 有读权限</p>
+
+<p>进入shell模式：&nbsp;<br />
+/usr/local/mongodb/bin/mongo</p>
+
+<p>use admin //切换到admin数据库</p>
+
+<p>db.createUser(&nbsp;<br />
+{&nbsp;<br />
+user: &ldquo;root&rdquo;,&nbsp;<br />
+pwd: &ldquo;testMongoDB2016&rdquo;,&nbsp;<br />
+roles:[{role:&rdquo;root&rdquo;, db:&rdquo;admin&rdquo;}]&nbsp;<br />
+}&nbsp;<br />
+);</p>
+
+<p>db.createUser(&nbsp;<br />
+{&nbsp;<br />
+user: &ldquo;mongoRoot&rdquo;,&nbsp;<br />
+pwd: &ldquo;testMongoDB2016&rdquo;,&nbsp;<br />
+roles:[{role:&rdquo;userAdminAnyDatabase&rdquo;, db:&rdquo;admin&rdquo;}]&nbsp;<br />
+}&nbsp;<br />
+);&nbsp;<br />
+验证一下，在哪里注册用户的要去哪个db里认证：&nbsp;<br />
+db.auth(&ldquo;mongoRoot&rdquo;, &ldquo;testMongoDB2016&rdquo;)&nbsp;<br />
+此后可以用这个mongoRoot账号去创建某一数据库管理账号：&nbsp;<br />
+db.createUser({user:&rdquo;hhq163&rdquo;,pwd:&rdquo;test123456&rdquo;,roles:[{&ldquo;role&rdquo;:&rdquo;readWrite&rdquo;,&rdquo;db&rdquo;:&rdquo;admin&rdquo;}]})</p>
+
+<p>但发现此时增加的账号不能在客户端登录，原因是mongodb版本错了：&nbsp;<br />
+先退出 mongod 服务</p>
+
+<p>use admin&nbsp;<br />
+db.auth(&ldquo;root&rdquo;, &ldquo;testMongoDB2016&rdquo;)&nbsp;<br />
+db.shutdownServer()&nbsp;<br />
+再在无认证情况下打开 mongod&nbsp;<br />
+use admin&nbsp;<br />
+db.dropUser(&ldquo;hhq163&rdquo;)&nbsp;<br />
+db.system.version.update({ &ldquo;_id&rdquo;:&rdquo;authSchema&rdquo;},{$set:{&ldquo;currentVersion&rdquo;:3}})&nbsp;<br />
+db.createUser({user:&rdquo;hhq163&rdquo;,pwd:&rdquo;test123456&rdquo;,roles:[{&ldquo;role&rdquo;:&rdquo;readWrite&rdquo;,&rdquo;db&rdquo;:&rdquo;admin&rdquo;}]})&nbsp;<br />
+再以认证的形式启动mongodb</p>
+
+<p>如果需要创建某一个新DB的账号：&nbsp;<br />
+需要在shell下执行：&nbsp;<br />
+use TestDB&nbsp;<br />
+db.createUser({user:&rdquo;hhq163&rdquo;,pwd:&rdquo;test123456&rdquo;,roles:[{&ldquo;role&rdquo;:&rdquo;readWrite&rdquo;,&rdquo;db&rdquo;:&rdquo;TestDB&rdquo;}]})</p>
+
+<p>vim /usr/local/mongodb/bin/mongodb.conf&nbsp;<br />
+在文件末尾增加以下这一行：&nbsp;<br />
+auth=true</p>
+
+<p>8、关闭数据库服务器：&nbsp;<br />
+use admin&nbsp;<br />
+db.shutdownServer()</p>
+
+<p>如果开户安全认证，则要先认证：&nbsp;<br />
+use admin&nbsp;<br />
+db.auth(&ldquo;root&rdquo;, &ldquo;testMongoDB2016&rdquo;)&nbsp;<br />
+db.shutdownServer()</p>
