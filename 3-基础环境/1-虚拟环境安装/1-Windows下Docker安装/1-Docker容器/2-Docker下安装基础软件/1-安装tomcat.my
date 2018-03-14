@@ -1,0 +1,183 @@
+<h1>Docker 安装 Tomcat</h1>
+
+<h2>方法一、通过 Dockerfile构建</h2>
+
+<p>创建Dockerfile</p>
+
+<p>首先，创建目录tomcat,用于存放后面的相关东西。</p>
+
+<pre>
+runoob@runoob:~$ mkdir -p ~/tomcat/webapps ~/tomcat/logs ~/tomcat/conf</pre>
+
+<p>webapps目录将映射为tomcat容器配置的应用程序目录</p>
+
+<p>logs目录将映射为tomcat容器的日志目录</p>
+
+<p>conf目录里的配置文件将映射为tomcat容器的配置文件</p>
+
+<p>进入创建的tomcat目录，创建Dockerfile</p>
+
+<pre>
+FROM java:8-jre
+
+ENV CATALINA_HOME /usr/local/tomcat
+ENV PATH $CATALINA_HOME/bin:$PATH
+RUN mkdir -p &quot;$CATALINA_HOME&quot;
+WORKDIR $CATALINA_HOME
+
+# runtime dependencies for Tomcat Native Libraries
+# Tomcat Native 1.2+ requires a newer version of OpenSSL than debian:jessie has available (1.0.2g+)
+# see http://tomcat.10.x6.nabble.com/VOTE-Release-Apache-Tomcat-8-0-32-tp5046007p5046024.html (and following discussion)
+ENV OPENSSL_VERSION 1.0.2h-1
+RUN { \
+                echo &#39;deb http://httpredir.debian.org/debian unstable main&#39;; \
+        } &gt; /etc/apt/sources.list.d/unstable.list \
+        &amp;&amp; { \
+# add a negative &quot;Pin-Priority&quot; so that we never ever get packages from unstable unless we explicitly request them
+                echo &#39;Package: *&#39;; \
+                echo &#39;Pin: release a=unstable&#39;; \
+                echo &#39;Pin-Priority: -10&#39;; \
+                echo; \
+# except OpenSSL, which is the reason we&#39;re here
+                echo &#39;Package: openssl libssl*&#39;; \
+                echo &quot;Pin: version $OPENSSL_VERSION&quot;; \
+                echo &#39;Pin-Priority: 990&#39;; \
+        } &gt; /etc/apt/preferences.d/unstable-openssl
+RUN apt-get update &amp;&amp; apt-get install -y --no-install-recommends \
+                libapr1 \
+                openssl=&quot;$OPENSSL_VERSION&quot; \
+        &amp;&amp; rm -rf /var/lib/apt/lists/*
+
+# see https://www.apache.org/dist/tomcat/tomcat-8/KEYS
+RUN set -ex \
+        &amp;&amp; for key in \
+                05AB33110949707C93A279E3D3EFE6B686867BA6 \
+                07E48665A34DCAFAE522E5E6266191C37C037D42 \
+                47309207D818FFD8DCD3F83F1931D684307A10A5 \
+                541FBE7D8F78B25E055DDEE13C370389288584E7 \
+                61B832AC2F1C5A90F0F9B00A1C506407564C17A3 \
+                79F7026C690BAA50B92CD8B66A3AD3F4F22C4FED \
+                9BA44C2621385CB966EBA586F72C284D731FABEE \
+                A27677289986DB50844682F8ACB77FC2E86E29AC \
+                A9C5DF4D22E99998D9875A5110C01C5A2F6059E7 \
+                DCFD35E0BF8CA7344752DE8B6FB21E8933C60243 \
+                F3A04C595DB5B6A5F1ECA43E3B7BBB100D811BBE \
+                F7DA48BB64BCB84ECBA7EE6935CD23C10D498E23 \
+        ; do \
+                gpg --keyserver ha.pool.sks-keyservers.net --recv-keys &quot;$key&quot;; \
+        done
+
+ENV TOMCAT_MAJOR 8
+ENV TOMCAT_VERSION 8.0.35
+ENV TOMCAT_TGZ_URL https://www.apache.org/dist/tomcat/tomcat-$TOMCAT_MAJOR/v$TOMCAT_VERSION/bin/apache-tomcat-$TOMCAT_VERSION.tar.gz
+
+RUN set -x \
+        \
+        &amp;&amp; curl -fSL &quot;$TOMCAT_TGZ_URL&quot; -o tomcat.tar.gz \
+        &amp;&amp; curl -fSL &quot;$TOMCAT_TGZ_URL.asc&quot; -o tomcat.tar.gz.asc \
+        &amp;&amp; gpg --batch --verify tomcat.tar.gz.asc tomcat.tar.gz \
+        &amp;&amp; tar -xvf tomcat.tar.gz --strip-components=1 \
+        &amp;&amp; rm bin/*.bat \
+        &amp;&amp; rm tomcat.tar.gz* \
+        \
+        &amp;&amp; nativeBuildDir=&quot;$(mktemp -d)&quot; \
+        &amp;&amp; tar -xvf bin/tomcat-native.tar.gz -C &quot;$nativeBuildDir&quot; --strip-components=1 \
+        &amp;&amp; nativeBuildDeps=&quot; \
+                gcc \
+                libapr1-dev \
+                libssl-dev \
+                make \
+                openjdk-${JAVA_VERSION%%[-~bu]*}-jdk=$JAVA_DEBIAN_VERSION \
+        &quot; \
+        &amp;&amp; apt-get update &amp;&amp; apt-get install -y --no-install-recommends $nativeBuildDeps &amp;&amp; rm -rf /var/lib/apt/lists/* \
+        &amp;&amp; ( \
+                export CATALINA_HOME=&quot;$PWD&quot; \
+                &amp;&amp; cd &quot;$nativeBuildDir/native&quot; \
+                &amp;&amp; ./configure \
+                        --libdir=/usr/lib/jni \
+                        --prefix=&quot;$CATALINA_HOME&quot; \
+                        --with-apr=/usr/bin/apr-1-config \
+                        --with-java-home=&quot;$(docker-java-home)&quot; \
+                        --with-ssl=yes \
+                &amp;&amp; make -j$(nproc) \
+                &amp;&amp; make install \
+        ) \
+        &amp;&amp; apt-get purge -y --auto-remove $nativeBuildDeps \
+        &amp;&amp; rm -rf &quot;$nativeBuildDir&quot; \
+        &amp;&amp; rm bin/tomcat-native.tar.gz
+
+# verify Tomcat Native is working properly
+RUN set -e \
+        &amp;&amp; nativeLines=&quot;$(catalina.sh configtest 2&gt;&amp;1)&quot; \
+        &amp;&amp; nativeLines=&quot;$(echo &quot;$nativeLines&quot; | grep &#39;Apache Tomcat Native&#39;)&quot; \
+        &amp;&amp; nativeLines=&quot;$(echo &quot;$nativeLines&quot; | sort -u)&quot; \
+        &amp;&amp; if ! echo &quot;$nativeLines&quot; | grep &#39;INFO: Loaded APR based Apache Tomcat Native library&#39; &gt;&amp;2; then \
+                echo &gt;&amp;2 &quot;$nativeLines&quot;; \
+                exit 1; \
+        fi
+
+EXPOSE 8080
+CMD [&quot;catalina.sh&quot;, &quot;run&quot;]</pre>
+
+<p>通过Dockerfile创建一个镜像，替换成你自己的名字</p>
+
+<pre>
+runoob@runoob:~/tomcat$ docker build -t tomcat .</pre>
+
+<p>创建完成后，我们可以在本地的镜像列表里查找到刚刚创建的镜像</p>
+
+<pre>
+runoob@runoob:~/tomcat$ docker images|grep tomcat
+tomcat              latest              70f819d3d2d9        7 days ago          335.8 MB</pre>
+
+<h2>方法二、docker pull tomcat</h2>
+
+<p>查找Docker Hub上的tomcat镜像</p>
+
+<pre>
+runoob@runoob:~/tomcat$ docker search tomcat
+NAME                       DESCRIPTION                                     STARS     OFFICIAL   AUTOMATED
+tomcat                     Apache Tomcat is an open source implementa...   744       [OK]       
+dordoka/tomcat             Ubuntu 14.04, Oracle JDK 8 and Tomcat 8 ba...   19                   [OK]
+consol/tomcat-7.0          Tomcat 7.0.57, 8080, &quot;admin/admin&quot;              16                   [OK]
+consol/tomcat-8.0          Tomcat 8.0.15, 8080, &quot;admin/admin&quot;              14                   [OK]
+cloudesire/tomcat          Tomcat server, 6/7/8                            8                    [OK]
+davidcaste/alpine-tomcat   Apache Tomcat 7/8 using Oracle Java 7/8 wi...   6                    [OK]
+andreptb/tomcat            Debian Jessie based image with Apache Tomc...   4                    [OK]
+kieker/tomcat                                                              2                    [OK]
+fbrx/tomcat                Minimal Tomcat image based on Alpine Linux      2                    [OK]
+jtech/tomcat               Latest Tomcat production distribution on l...   1                    [OK]</pre>
+
+<p>这里我们拉取官方的镜像</p>
+
+<pre>
+runoob@runoob:~/tomcat$ docker pull tomcat</pre>
+
+<p>等待下载完成后，我们就可以在本地镜像列表里查到REPOSITORY为tomcat的镜像。</p>
+
+<hr />
+<h2>使用tomcat镜像</h2>
+
+<h3>运行容器</h3>
+
+<pre>
+runoob@runoob:~/tomcat$ docker run --name tomcat -p 8080:8080 -v $PWD/test:/usr/local/tomcat/webapps/test -d tomcat  
+acb33fcb4beb8d7f1ebace6f50f5fc204b1dbe9d524881267aa715c61cf75320
+runoob@runoob:~/tomcat$</pre>
+
+<p>命令说明：</p>
+
+<p><strong>-p 8080:8080：</strong>将容器的8080端口映射到主机的8080端口</p>
+
+<p><strong>-v $PWD/test:/usr/local/tomcat/webapps/test：</strong>将主机中当前目录下的test挂载到容器的/test</p>
+
+<p>查看容器启动情况</p>
+
+<pre>
+runoob@runoob:~/tomcat$ docker ps 
+CONTAINER ID    IMAGE     COMMAND               ... PORTS                    NAMES
+acb33fcb4beb    tomcat    &quot;catalina.sh run&quot;     ... 0.0.0.0:8080-&gt;8080/tcp   tomcat</pre>
+
+<p>通过浏览器访问</p>
+
+<p><img src="http://www.runoob.com/wp-content/uploads/2016/06/tomcat01.png" /></p>
