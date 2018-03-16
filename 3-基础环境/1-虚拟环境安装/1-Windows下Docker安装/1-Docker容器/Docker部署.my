@@ -1,0 +1,343 @@
+<h1>运维人员的解放----Docker快速部署 推荐</h1>
+
+<p><a href="javascript:;">原创</a><a href="http://blog.51cto.com/yangrong">杨云1028</a><a href="javascript:;">2014-09-11 20:09:40</a><a href="http://blog.51cto.com/yangrong/1551327#comment">评论(9)</a><a href="javascript:;">15956人阅读</a></p>
+
+<p>Docker是一个用了一种新颖方式实现的超轻量虚拟机，在实现的原理和应用上还是和VM有巨大差别，专业的叫法是应用容器（Application Container）。（我个人还是喜欢称虚拟机）</p>
+
+<p>Docker应用容器相对于&nbsp;VM&nbsp;有以下几个优点：</p>
+
+<p>启动速度快，容器通常在一秒内可以启动，而&nbsp;VM&nbsp;通常要更久</p>
+
+<p>资源利用率高，一台普通PC&nbsp;可以跑上千个容器，你跑上千个&nbsp;VM&nbsp;试试</p>
+
+<p>性能开销小，&nbsp;VM&nbsp;通常需要额外的&nbsp;CPU&nbsp;和内存来完成&nbsp;OS&nbsp;的功能，这一部分占据了额外的资源</p>
+
+<p>因为VM&nbsp;的&nbsp;Hypervisor&nbsp;需要实现对硬件的虚拟化，并且还要搭载自己的操作系统，自然在启动速度和资源利用率以及性能上有比较大的开销。</p>
+
+<p>个人体会较深的两处优点：</p>
+
+<p>1、&nbsp;&nbsp;快速部署，传统的部署模式是：安装(包管理工具或者源码包编译)-&gt;配置-&gt;运行；Docker的部署模式是：复制-&gt;运行。</p>
+
+<p>2、&nbsp;&nbsp;可以保证线上与测试环境一致，计划以后上线就直接复制测试使用的docker容器）</p>
+
+<p>什么是docker?</p>
+
+<p><a href="http://oilbeater.com/docker/2014/06/29/what-is-docker.html" target="_blank">http://oilbeater.com/docker/2014/06/29/what-is-docker.html</a></p>
+
+<p>为什么你应该关注docker?</p>
+
+<p><a href="http://oilbeater.com/docker/2014/06/13/why-you-should-care-about-docker.html" target="_blank">http://oilbeater.com/docker/2014/06/13/why-you-should-care-about-docker.html</a></p>
+
+<h2>1、docker安装</h2>
+
+<p><strong>debian7</strong><strong>安装docker</strong></p>
+
+<p>参考地址：<a href="http://www.webmaster.me/server/installing-docker-on-debian-wheezy-in-60-seconds.html" target="_blank">http://www.webmaster.me/server/installing-docker-on-debian-wheezy-in-60-seconds.html</a></p>
+
+<p>echo deb http://get.docker.io/ubuntu docker main | sudo tee/etc/apt/sources.list.d/docker.list</p>
+
+<p>sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 36A1D7869245C8950F966E92D8576A8BA88D21E9</p>
+
+<p>sudo apt-get update</p>
+
+<p>sudo apt-get install -y lxc-docker</p>
+
+<p>#四行命令，Docker就安装好了。下面创建一个ubuntu虚拟系统：</p>
+
+<p>docker pull ubuntu&nbsp;&nbsp;&nbsp; #此处是从官网拉取名为ubuntu的image，也可手动在https://index.docker.io上搜索想要的镜像。</p>
+
+<p>docker run -i -t ubuntu /bin/bash&nbsp;&nbsp; #创建一个容器，-t是临时终端。</p>
+
+<p><strong>ubuntu12.04</strong><strong>、windows</strong><strong>、macOS</strong><strong>安装docke</strong>r</p>
+
+<p>参考docker中文文档<a href="http://www.widuu.com/docker/" target="_blank">http://www.widuu.com/docker/</a></p>
+
+<p>&nbsp;</p>
+
+<h2>2、docker使用过程实践</h2>
+
+<p><strong>2.1&nbsp;</strong><strong>在测试机启动容器，安装ssh</strong></p>
+
+<p>docker run -i -t ubuntu /bin/bash&nbsp;&nbsp; #此方式运行的容器，退出后容器就会关闭。</p>
+
+<p>apt-get install openssh-server&nbsp;&nbsp; #安装ssh</p>
+
+<p>#需要修改/etc/sshd/sshd_config文件中内容</p>
+
+<p>PermitRootLogin yes</p>
+
+<p>UsePAM no</p>
+
+<p><strong>2.2&nbsp;&nbsp;&nbsp;</strong><strong>启动ssh</strong><strong>，容器以后台方式运行</strong></p>
+
+<p>docker run -d -p 50001:22 &lt;镜像id&gt; /usr/sbin/sshd-D</p>
+
+<p>#容器id可通过&nbsp;docker ps -a查看，最上面的为最新的。</p>
+
+<p><strong>2.3&nbsp;</strong><strong>通过ssh</strong><strong>连接到容器安装软件</strong></p>
+
+<p>ssh&nbsp;<a href="mailto:root@127.0.0.1">root@127.0.0.1</a>-p 50001</p>
+
+<p>#连上后想装什么就装什么，可使用exit退出容器，但后台还会运行。</p>
+
+<p><strong>2.4&nbsp;</strong><strong>服务安装完成后，停止容器。</strong></p>
+
+<p>docker stop &nbsp;&lt;容器id&gt;&nbsp;&nbsp;&nbsp;&nbsp; #停止运行的容器</p>
+
+<p><strong>2.5&nbsp;</strong><strong>把容器提交生成最新的镜像</strong></p>
+
+<p>docker commit &lt;容器id&gt;&nbsp; debian02&nbsp;#把这个容器提交生成新的debian02镜像(该镜像是原始镜像与容器的整合)</p>
+
+<p><strong>2.6&nbsp;</strong><strong>打包镜像</strong></p>
+
+<p>docker save debian02 &gt;/root/debian02.tar&nbsp;&nbsp; #debian02镜像打包</p>
+
+<p><strong>2.7&nbsp;</strong><strong>在另外的机器上导入镜像</strong></p>
+
+<p>docker load &lt; debian02.tar&nbsp;&nbsp; #导入镜像</p>
+
+<p>docker images&nbsp;&nbsp; #查看存在的镜像</p>
+
+<p><strong>2.8&nbsp;</strong><strong>启动容器</strong></p>
+
+<p>docker run -h=&quot;redis-test&quot;&nbsp; --name redis-test -d -p 51000:22 -p51001:3306 -p 51003:6379 -p 51004:6381&nbsp;-p 51005:80 -p 51006:8000 -p 51007:8888&nbsp;&nbsp;debian02 /etc/rc.local</p>
+
+<p>#此处是我测试机器启动命令，指定主机名与端口映射。</p>
+
+<p>#启动后，后面又装了程序，开机自启动命令可放在/etc/rc.local文件中。</p>
+
+<p>docker容器迁移简单方便，可以任意的拷贝部署，以后再也不怕新部署环境了，一堆依赖装的想死有木有。</p>
+
+<h2>3、关于docker容器的端口映射</h2>
+
+<p>由于docker容器的IP地址每次启动都会变，所以不适用于手动添加端口映射(难道每次重启都来查看容器的IP么？)，所以需要每次启动容器时由docker程序自动添加NAT规则，前期尽可能的把需要映射的端口在创建容器时配置好，如下：</p>
+
+<p>docker run -h=&quot;activemq&quot;&nbsp; --name activemq -d -p 51000:22 -p 51001:3306-p 51003:6379 -p 51004:6381&nbsp; -p 51005:80-p 51006:8000 -p 51007:8888&nbsp;&nbsp; debian/base/etc/rc.local</p>
+
+<p>#此处我把mysql,redis,nginx,ssh都进行了映射。</p>
+
+<p>后续对于docker容器的管理，记住容器的名称，如上述名称是activemq，则使用docker stop,start来控制容器进程。</p>
+
+<p>docker&nbsp;stop&nbsp; activemq</p>
+
+<p>docker &nbsp;start &nbsp;activemq</p>
+
+<p>当然，也可以不让docker每次启动容器修改容器的IP地址，参考如下：</p>
+
+<p>docker网络配置：<a href="http://www.open-open.com/lib/view/open1404896485747.html" target="_blank">http://www.open-open.com/lib/view/open1404896485747.html</a></p>
+
+<h2>4、关于docker容器的多程序开机自动运行</h2>
+
+<p>&nbsp;&nbsp; docker容器每次启动时，开机自启动的命令都要在启动容器前指定。如&nbsp;docker run -I -t debian /bin/bash命令，只会运行/bin/bash程序，其它的程序都不会运行，对于要跑多个程序的容器特别纠结。</p>
+
+<p><strong>多程序开机自动运行方法</strong>：</p>
+
+<p>可把前面所说的启动命令换成dockerrun -I -t debian /etc/rc.local，在容器中把所有需要开机自的启动命令放在/etc/rc.local中，就可以达到多程序开机自启动了。</p>
+
+<p>后台运行则是：docker run -d -p 50001:22 debian /etc/rc.local。注意：run命令是创建一个新的容器，如果要启动一个曾经运行过的容器，则用命令docker ps -a中找对应的容器ID，然后使用docker start &lt;容器ID&gt;即可。</p>
+
+<h2>5、关于docker容器和镜像的关系</h2>
+
+<p>无论容器里做什么操作，写文件，删文件。该容器的基本镜像都不会有任何改变。</p>
+
+<p>这是因为Docker从父镜像建立增量镜像，只存储每个容器的更改。因此，如果你有一个300MB的父镜像，如果你在容器中安装了50MB的额外应用或服务，你的容器只有50MB，父镜像还是300MB。</p>
+
+<p>但是可以使用Dockfile或commit命令来，把增量镜像和父镜像一起生成一个新的镜像。</p>
+
+<p>commit使用：</p>
+
+<p>&nbsp;&nbsp;&nbsp;docker commit&nbsp; &lt;容器id&gt;&nbsp; &lt;新镜像名称&gt;</p>
+
+<p>Dockfile使用：</p>
+
+<p>root@yangrong:/data# cat Dockerfile</p>
+
+<p>FROMubuntu/testa&nbsp;&nbsp;&nbsp; #这是基础镜像</p>
+
+<p>CMD[&quot;/root/start.sh&quot;]&nbsp;&nbsp; #这是启动命令</p>
+
+<p>root@yangrong:/data# docker build -t &lt;新镜像名&gt; ./</p>
+
+<p>关于Dockfile更多参数参考地址：</p>
+
+<p><a href="http://www.tuicool.com/articles/FRvAbe" target="_blank">http://www.tuicool.com/articles/FRvAbe</a></p>
+
+<p><a href="http://www.colorscode.net/2014/01/04/howto-build-image-with-automatic-startup-ssh-service-from-dockerfile/" target="_blank">http://www.colorscode.net/2014/01/04/howto-build-image-with-automatic-startup-ssh-service-from-dockerfile/</a></p>
+
+<h2>6、docker参数详解</h2>
+
+<p>docker</p>
+
+<p>useage of docker</p>
+
+<p>&nbsp;&nbsp;&nbsp; -D&nbsp;&nbsp;&nbsp;默认false&nbsp;允许调试模式(debugmode)</p>
+
+<p>&nbsp;&nbsp;&nbsp; -H&nbsp;&nbsp;&nbsp;默认是unix:///var/run/docker.sock tcp://[host[:port]]来绑定&nbsp;或者unix://[/path/to/socket]来使用(二进制文件的时候)，当主机ip host=[0.0.0.0],(端口)port=[4243]&nbsp;或者&nbsp;path=[/var/run/docker.sock]是缺省值，做为默认值来使用</p>
+
+<p>&nbsp;&nbsp;&nbsp; -api-enable-cors&nbsp;默认flase&nbsp;允许CORS header远程api</p>
+
+<p>&nbsp;&nbsp;&nbsp; -b&nbsp;&nbsp;&nbsp;默认是空，附加在已存在的网桥上，如果是用&#39;none&#39;参数，就禁用了容器的网络</p>
+
+<p>&nbsp;&nbsp;&nbsp; -bip&nbsp;默认是空，使用提供的CIDR（ClasslessInter-Domain Routing-无类型域间选路）标记地址动态创建网桥(dcoker0),和-b参数冲突</p>
+
+<p>&nbsp;&nbsp;&nbsp; -d&nbsp;&nbsp;&nbsp;默认false&nbsp;允许进程模式(daemonmode)</p>
+
+<p>&nbsp;&nbsp;&nbsp; -dns&nbsp;默认是空，使docker使用指定的DNS服务器</p>
+
+<p>&nbsp;&nbsp;&nbsp; -g&nbsp;&nbsp;&nbsp;默认是&quot;/var/lib/docker&quot;:作为docker使用的根路径</p>
+
+<p>&nbsp;&nbsp;&nbsp; -icc&nbsp;默认true，允许inter-container来通信</p>
+
+<p>&nbsp;&nbsp;&nbsp; -ip&nbsp;&nbsp;默认&quot;0.0.0.0&quot;：绑定容器端口的默认Ip地址</p>
+
+<p>&nbsp;&nbsp;&nbsp; -iptables&nbsp;默认true&nbsp;禁用docker添加iptables规则</p>
+
+<p>&nbsp;&nbsp;&nbsp; -mtu&nbsp;默认1500 :&nbsp;设置容器网络传输的最大单元(mtu)</p>
+
+<p>&nbsp;&nbsp;&nbsp; -p&nbsp;&nbsp;&nbsp;默认是/var/run/docker.pid进程pid使用的文件路径</p>
+
+<p>&nbsp;&nbsp;&nbsp; -r&nbsp;&nbsp;&nbsp;默认是true&nbsp;重启之前运行的容器</p>
+
+<p>&nbsp;&nbsp;&nbsp; -s&nbsp;&nbsp;&nbsp;默认是空&nbsp;，这个是docker运行是使用一个指定的存储驱动器</p>
+
+<p>&nbsp;&nbsp;&nbsp; -v&nbsp;&nbsp;&nbsp;默认false&nbsp;打印版本信息和退出</p>
+
+<h2>7、docker run命令详解</h2>
+
+<p>Usage: docker run [OPTIONS] IMAGE[:TAG] [COMMAND] [ARG...]</p>
+
+<p>Run a command in a new container</p>
+
+<p>&nbsp;&nbsp;&nbsp;&nbsp;-a=map[]:&nbsp;附加标准输入、输出或者错误输出</p>
+
+<p>&nbsp;&nbsp; &nbsp;-c=0:&nbsp;共享CPU格式（相对重要）</p>
+
+<p>&nbsp;&nbsp; &nbsp;-cidfile=&quot;&quot;:&nbsp;将容器的ID标识写入文件</p>
+
+<p>&nbsp;&nbsp; &nbsp;-d=false:&nbsp;分离模式，在后台运行容器，并且打印出容器ID</p>
+
+<p>&nbsp;&nbsp; &nbsp;-e=[]:设置环境变量</p>
+
+<p>&nbsp;&nbsp; &nbsp;-h=&quot;&quot;:&nbsp;容器的主机名称</p>
+
+<p>&nbsp;&nbsp; &nbsp;-i=false:&nbsp;保持输入流开放即使没有附加输入流</p>
+
+<p>&nbsp;&nbsp; &nbsp;-privileged=false:&nbsp;给容器扩展的权限</p>
+
+<p>&nbsp;&nbsp; &nbsp;-m=&quot;&quot;:&nbsp;内存限制&nbsp;(格式:&lt;number&gt;&lt;optional unit&gt;, unit单位&nbsp;= b, k, m or g)</p>
+
+<p>&nbsp; &nbsp;&nbsp;-n=true:&nbsp;允许镜像使用网络</p>
+
+<p>&nbsp; &nbsp;&nbsp;-p=[]:&nbsp;匹配镜像内的网络端口号</p>
+
+<p>&nbsp; &nbsp;&nbsp;-rm=false:当容器退出时自动删除容器&nbsp;(不能跟&nbsp;-d一起使用)</p>
+
+<p>&nbsp; &nbsp;&nbsp;-t=false:&nbsp;分配一个伪造的终端输入</p>
+
+<p>&nbsp; &nbsp;&nbsp;-u=&quot;&quot;:&nbsp;用户名或者ID</p>
+
+<p>&nbsp; &nbsp;&nbsp;-dns=[]:&nbsp;自定义容器的DNS服务器</p>
+
+<p>&nbsp; &nbsp;&nbsp;-v=[]:&nbsp;创建一个挂载绑定：[host-dir]:[container-dir]:[rw|ro].如果容器目录丢失，docker会创建一个新的卷</p>
+
+<p>&nbsp; &nbsp;&nbsp;-volumes-from=&quot;&quot;:&nbsp;挂载容器所有的卷</p>
+
+<p>&nbsp; &nbsp;&nbsp;-entrypoint=&quot;&quot;:&nbsp;覆盖镜像设置默认的入口点</p>
+
+<p>&nbsp; &nbsp;&nbsp;-w=&quot;&quot;:&nbsp;工作目录内的容器</p>
+
+<p>&nbsp; &nbsp;&nbsp;-lxc-conf=[]:&nbsp;添加自定义-lxc-conf=&quot;lxc.cgroup.cpuset.cpus = 0,1&quot;</p>
+
+<p>&nbsp; &nbsp;&nbsp;-sig-proxy=true:&nbsp;代理接收所有进程信号(even in non-tty mode)</p>
+
+<p>&nbsp; &nbsp;&nbsp;-expose=[]:&nbsp;让你主机没有开放的端口</p>
+
+<p>&nbsp; &nbsp;&nbsp;-link=&quot;&quot;:&nbsp;连接到另一个容器(name:alias)</p>
+
+<p>&nbsp; &nbsp;&nbsp;-name=&quot;&quot;:&nbsp;分配容器的名称，如果没有指定就会随机生成一个</p>
+
+<p>&nbsp; &nbsp;&nbsp;-P=false: Publish all exposed ports to thehost interfaces&nbsp;公布所有显示的端口主机接口</p>
+
+<h2>8、docker常用命令总结</h2>
+
+<p>docker pull &nbsp;&lt;镜像名:tag&gt;&nbsp; #从官网拉取镜像</p>
+
+<p>docker search &lt;镜像名&gt;&nbsp; #搜索在线可用镜像名</p>
+
+<h3>8.1查询容器、镜像、日志</h3>
+
+<p>&nbsp;docker top &lt;container&gt; #显示容器内运行的进程</p>
+
+<p>docker images&nbsp; #查询所有的镜像，默认是最近创建的排在最上。</p>
+
+<p>&nbsp;docker ps&nbsp;#查看正在运行的容器</p>
+
+<p>&nbsp;docker ps -l #查看最后退出的容器的ID</p>
+
+<p>&nbsp;docker ps -a #查看所有的容器，包括退出的。</p>
+
+<p>docker logs&nbsp; {容器ID|容器名称}&nbsp; #查询某个容器的所有操作记录。</p>
+
+<p>&nbsp;docker logs -f &nbsp;{容器ID|容器名称}&nbsp; #实时查看容易的操作记录。</p>
+
+<h3>8.2删除容器与镜像</h3>
+
+<p>docker rm$(docker ps -a -q)&nbsp;&nbsp;#删除所有容器</p>
+
+<p>docker rm &lt;容器名or ID&gt;&nbsp;&nbsp;&nbsp; #删除单个容器</p>
+
+<p>docker rmi &nbsp;&lt;ID&gt;&nbsp; #删除单个镜像</p>
+
+<p>docker rmi$(docker images | grep none | awk &#39;{print $3}&#39; | sort -r)&nbsp;#删除所有镜像</p>
+
+<h3>8.3启动停止容器</h3>
+
+<p>docker stop &nbsp;&lt;容器名or ID&gt;&nbsp; &nbsp;#停止某个容器</p>
+
+<p>docker start &nbsp;&lt;容器名or ID&gt;&nbsp; #启动某个容器</p>
+
+<p>docker kill&nbsp; &nbsp;&nbsp;&lt;容器名or ID&gt;&nbsp; #杀掉某个容器</p>
+
+<h3>8.4容器迁器</h3>
+
+<p>docker export &lt;CONTAINER ID&gt; &gt; /home/export.tar&nbsp; #导出</p>
+
+<p>cat /home/export.tar | sudo docker import &nbsp;- &nbsp;busybox-1-export:latest&nbsp; #&nbsp;导入export.tar文件</p>
+
+<p>docker save debian&gt; /home/save.tar&nbsp;&nbsp; #将debian容器打包</p>
+
+<p>docker load&lt; /home/save.tar&nbsp;&nbsp;&nbsp; #在另一台服务器上加载打包文件</p>
+
+<p>save和export的对比参考地址：</p>
+
+<p><a href="http://www.fanli7.net/a/bianchengyuyan/C__/20140423/452256.html" target="_blank">http://www.fanli7.net/a/bianchengyuyan/C__/20140423/452256.html</a></p>
+
+<h3>8.5运行一个新容器</h3>
+
+<p>#运行一个新容器，同时为它命名、端口映射。以debian02镜像为例</p>
+
+<p>docker run -h=&quot;redis-test&quot;&nbsp; --name redis-test -d -p 51000:22 -p51001:3306 -p 51003:6379 -p 51004:6381&nbsp;-p 51005:80 -p 51006:8000 -p 51007:8888&nbsp;&nbsp;debian02 /etc/rc.local</p>
+
+<p>#从container中拷贝文件，当container已经关闭后，在里面的文件还可以拷贝出来。</p>
+
+<p>sudo docker cp 7bb0e258aefe:/etc/debian_version .&nbsp;&nbsp;&nbsp; #把容器中的/etc/debian_version拷贝到当前目录下。</p>
+
+<h3>8.6 docker Dockfile镜像制作</h3>
+
+<p>root@yangrong:/data# cat Dockerfile</p>
+
+<p>FROM ubuntu/testa&nbsp;&nbsp;&nbsp; &nbsp;#这是基础镜像</p>
+
+<p>CMD [&quot;/root/start.sh&quot;]&nbsp;&nbsp;#这是启动命令</p>
+
+<p>root@yangrong:/data# docker build -t &lt;新镜像名&gt; ./&nbsp;&nbsp;&nbsp; #生成新的镜像</p>
+
+<p>Dockfile更多参数参考：</p>
+
+<p><a href="http://www.tuicool.com/articles/FRvAbe" target="_blank">http://www.tuicool.com/articles/FRvAbe</a></p>
+
+<p><a href="http://www.colorscode.net/2014/01/04/howto-build-image-with-automatic-startup-ssh-service-from-dockerfile/" target="_blank">http://www.colorscode.net/2014/01/04/howto-build-image-with-automatic-startup-ssh-service-from-dockerfile/</a></p>
+
+<p><strong>如果要把docker应用到生产环境，就要好好的规划一下，可参考下面文章：</strong></p>
+
+<p>docker容器端口IP规划及端口动态扩容</p>
