@@ -1,0 +1,809 @@
+<h1>初尝小辣椒 - Apache Cayenne 基本功能介绍</h1>
+
+<p>Cayenne 开发环境搭建及应用示例</p>
+
+<p>系列内容：</p>
+
+<h2><a href="javascript:void();">此内容是该系列&nbsp;2&nbsp;部分中的第&nbsp;1&nbsp;部分：&nbsp;Cayenne，开源 ORM 盛宴中的另道佳肴</a></h2>
+
+<h2>何为 ORM</h2>
+
+<p>在正式介绍 Apache Cayenne 的功能之前，首先让我们先来看一下 ORM 是什么，我们为什么需要 ORM。 大家知道，持久化（persistence）的目的是为了将内存中的数据或对象保存到存储设备上（如磁盘），其中主要的应用就是保存到关系型数据库，或其他类型的数据库中。而在一些大型的应用程序中，软件设计者都会设计一个持久化层来专门做这样的工作，包括持久化和反持久化（将磁盘上或者数据库中的数据反持久化到内存中）。而 ORM，即对象关系映射，就是数据持久化层的一项重要技术。 有了它，软件设计和开发人员就可以更加关注业务逻辑，它会帮助将业务逻辑与数据库操作逻辑分离，实现系统的松耦合关系，从而使得开发人员从繁杂的与有关数据库操作的工作中解脱出来。可以说，一个健壮、优秀的 ORM 框架能够在为我们节省开发时间的同时，还能够提供高效，可靠的数据持久层代码。</p>
+
+<h2>为何 Apache Cayenne</h2>
+
+<p>首先，Cayenne 是一个完全开源的基于 Apache License 的数据持久化框架。除了具有一般 ORM 工具所具有的特性外，它还具有很多非常好的特性，比如可以将一个或多个模式数据库和 Java 对象绑定，可以对提交和回滚操作做原子化管理，可以对数据库表做逆向工程并生成 Java 代码，支持远程对象持久化等。 不仅如此，对于 DBA 所关心的性能问题，Cayenne 同样也有很好的支持，如 Cache 等等。而这些特性都可以通过它的一个非常易用的可视化工具 CayenneModeler 来配置完成。可以说，这降低了学习者的学习曲线，节省了开发时间。因此，我们将非常愿意通过本篇 Apache Cayenne 基础功能介绍和另一篇文章 Apache Cayenne 高级特性 向您介绍 Cayenne，如何使用 Cayenne，并希望在你学习过这两篇文章后，Cayenne 能够成为您开发企业应用数据库持久层框架中的一个选择。</p>
+
+<h2>配置环境和建模</h2>
+
+<h3>工具下载</h3>
+
+<p>可以从 Apache Cayenne 网站上下载稳定版的 Cayenne2.0 安装包。开发工具，我们选择 Eclipse 3.4。因为 Cayenne 是一个数据持久层框架，所以我们还需要一个数据库。这里，我们选择同样开源的且轻量级的 Derby 数据库。</p>
+
+<p>需要下载的产品和技术请参阅参考资源中的&nbsp;<a href="https://www.ibm.com/developerworks/cn/java/j-lo-cayenne1/#artrelatedtopics">&ldquo;获得产品和技术&rdquo;</a>部分。</p>
+
+<h3>搭建环境</h3>
+
+<p>首先，在 Eclipse 中创建一个 Java 工程。然后，将运行 Cayenne 和 Derby 所需要的库文件放到 build path 中。</p>
+
+<h5>图 1. 导入 Cayenne 和 Derby 所需的 lib 文件</h5>
+
+<p><img alt="导入 Cayenne 和 Derby 所需的 lib 文件" src="https://www.ibm.com/developerworks/cn/java/j-lo-cayenne1/importLib.jpg" style="height:193px; width:222px" /></p>
+
+<h5>图 2. 将 lib 文件放到 build path 中</h5>
+
+<p><img alt="将 lib 文件放到 build path 中" src="https://www.ibm.com/developerworks/cn/java/j-lo-cayenne1/loadlibs.jpg" style="height:279px; width:282px" /></p>
+
+<p>完成后，我们再回到 Cayenne 的解压目录下，在 bin 目录中打开 CayenneModeler。</p>
+
+<h5>图 3. 打开 CayenneModeler</h5>
+
+<p><img alt="打开 CayenneModeler" src="https://www.ibm.com/developerworks/cn/java/j-lo-cayenne1/openModeler.jpg" style="height:331px; width:505px" /></p>
+
+<p>我们对于 Cayenne 的了解将从这里开始。打开后，我们新建一个工程，</p>
+
+<h5>图 4. CayenneModeler 主界面</h5>
+
+<p><img alt="CayenneModeler 主界面" src="https://www.ibm.com/developerworks/cn/java/j-lo-cayenne1/newProject.jpg" style="height:353px; width:482px" /></p>
+
+<p>进入到 Cayenne Modeler 的主界面。在导航条上有三个主要的按钮，分别是 Create DataDomain, Create DataNode, Create DataMap。其中，DataDomain， DataNode 和 DataMap 是一个 Cayenne 工程中三个重要的概念。</p>
+
+<h5>图 5. 导航条上的 DataDomain, DataNode 和 DataMap</h5>
+
+<p><img alt="DataDomain, DataNode 和 DataMap" src="https://www.ibm.com/developerworks/cn/java/j-lo-cayenne1/navigator.jpg" style="height:83px; width:476px" /></p>
+
+<p>图 6 说明了这三个概念间的关系</p>
+
+<h5>图 6. DataDomain, DataNode 和 DataMap 的关系</h5>
+
+<p><img alt="DataDomain, DataNode 和 DataMap 关系" src="https://www.ibm.com/developerworks/cn/java/j-lo-cayenne1/relationship.jpg" style="height:177px; width:366px" /></p>
+
+<p>在一个 Cayenne 应用中可以定义多个 Data Domain，同时，作为虚拟数据源的 Domains 也可以包含多个实体数据源（Data Node）。而不同的数据源又可以对应不同的数据库 Schema 和 Java 对象的映射关系，即 Data Map。因此，Cayenne 可以方便灵活的实现应用程序调用不同的数据库操作，而具体细节 Cayenne 都帮我们进行了封装和处理。本文中，为了便于读者理解，我们仅先考虑一个 Data Domain 包含一个 Data Node，以及处理一个 Data Map 的情况。</p>
+
+<p>在 DataDomain Configuration 视图中输入一个名字，如 cayenne-store。接下来，再创建一个 DataNode. 选中根节点 cayenne-store，点击创建 DataNode 按钮。所谓 DataNode Configuration 就是对你所要用的一个实体数据库信息的配置或数据源的配置。这里，我们选择 Embedded Derby。</p>
+
+<h5>图 7. 配置 DataDomain 和 DataNode</h5>
+
+<p><img alt="配置 DataDomain 和 DataNode" src="https://www.ibm.com/developerworks/cn/java/j-lo-cayenne1/configNode.jpg" style="height:359px; width:507px" /></p>
+
+<p>在配置完 JDBC Driver 信息之后，然后先将我们所做的配置信息保存到我们开始建立的一个 Eclipse 工程 Cayenne-store 下面。这里，需要注意的是，Cayenne 的映射文件 cayenne.xml 必须放到程序运行时的 CLASSPATH 中，所以，我们可以将它保存放到所建立的 Java 工程 src 目录下面。</p>
+
+<h5>图 8. 保存 Cayenne 主配置文件</h5>
+
+<p><img alt="保存 Cayenne 主配置文件" src="https://www.ibm.com/developerworks/cn/java/j-lo-cayenne1/saveCayenne.jpg" style="height:321px; width:464px" /></p>
+
+<p>这时，回到 Eclipse 工程里面，就会看到这个应用的主配置文件 cayenne.xml 以及相应的 JDBC Driver 配置文件了。</p>
+
+<h5>图 9. 生成 Cayenne.xml</h5>
+
+<p><img alt="生成 Cayenne.xml" src="https://www.ibm.com/developerworks/cn/java/j-lo-cayenne1/generateCayenne.jpg" style="height:122px; width:271px" /></p>
+
+<p>到此，开发环境的搭建就算完成了。下面，我们将通过一个简单的例子带您逐步的了解 Cayenne，看看它如何帮助我们产生数据持久层的 Java 代码以及数据库表。</p>
+
+<h3>建模</h3>
+
+<p>这个例子很简单，我们以一个购物网站为背景进行数据建模。可以想象，这里我们需要如下四张表，客户信息表 ClientTB，商品信息表 CommodityTB，客户购买商品的订单信息表 OrderTB，还有一个保存订单和订单所包含商品的订单商品表 OrderCommodityTB。它们之间的关系可用如下 E-R 图表示，</p>
+
+<h5>图 9. E-R 图表</h5>
+
+<p><img alt="E-R 图表" src="https://www.ibm.com/developerworks/cn/java/j-lo-cayenne1/e-r.jpg" style="height:240px; width:484px" /></p>
+
+<p>为了在 Cayenne Modeler 中创建 DBEntity 模型，需要先建立一个 DataMap。在 cayenne-storeNode DataNode 下创建 DataMap。如图 10。在 Java Package 输入框中，你可以定义将要存储持久化代码的包名。其余的，可以暂时留空。</p>
+
+<h5>图 10. 建立 DataMap</h5>
+
+<p><img alt="建立 DataMap" src="https://www.ibm.com/developerworks/cn/java/j-lo-cayenne1/datamap.jpg" style="height:414px; width:510px" /></p>
+
+<p>接下来，基于这张 E-R 图，我们就可以在 Cayenne Modeler 中建立 DBEntity 模型了。建立 DBEntity 模型的过程与在一个数据库管理客户端建立表的过程类似。即，需要指定表的名字、字段及字段大小等信息。对表 ClientDB 和 CommodityTB 等表的建模结果如下图所示，</p>
+
+<h5>图 11. 建立 ClientTB 等 DBEntity</h5>
+
+<p><img alt="建立 ClientTB 等 DBEntity" src="https://www.ibm.com/developerworks/cn/java/j-lo-cayenne1/clienttb.jpg" style="height:184px; width:548px" /></p>
+
+<p>这里，需要注意的一点是表间关系的建立。 以 clientTB 和 orderTB 为例，因为 clientTB 和 orderTB 是一对多的关系，所以在 Cayenne Modeler 中需要在 Relationships 面板上建立表间联合关系。</p>
+
+<h5>图 12. 建立 ClientTB 和 OrderTB 的表间关系</h5>
+
+<p><img alt="建立 ClientTB 和 OrderTB 的表间关系" src="https://www.ibm.com/developerworks/cn/java/j-lo-cayenne1/tbrelation.jpg" style="height:179px; width:635px" /></p>
+
+<p>同时，还需要建立从 orderTB 到 clientTB 的反转关系，即多对一的关系。</p>
+
+<h5>图 13. 建立 OrderTB 到 ClientTB 的反转关系</h5>
+
+<p><img alt="建立 OrderTB 到 ClientTB 的反转关系" src="https://www.ibm.com/developerworks/cn/java/j-lo-cayenne1/reverseRe.jpg" style="height:312px; width:500px" /></p>
+
+<p>Cayenne modeler 会自动在 OrderTB 的 Relationships 面板中产生一个表间关系</p>
+
+<h5>图 14. OrderTB 的 Relationships 面板</h5>
+
+<p><img alt="OrderTB 的 Relationships 面板" src="https://www.ibm.com/developerworks/cn/java/j-lo-cayenne1/orderRelationship.jpg" style="height:185px; width:630px" /></p>
+
+<h5>Delete Rule</h5>
+
+<p>在 Cayenne 中，有四种 Delete Rule。&lsquo; No Action &rsquo;，即一个 DataObject 被删除后，与它有关的其它 Object 不会有变化。&lsquo; Nullify Rule &rsquo; , 即一旦 Source Object 被删除，所有指向它的 Target Object 将会被置成 Null。&lsquo; Cascade Rule &rsquo; , 即一旦 Source Object 被删除，所有指向它的 Target Object 将会被删除。&lsquo; Deny Rule &rsquo; , 即当尝试删除 Source Object 而这时 Target Object 至少有一个实例存在，则会抛出 RunTime Exception。</p>
+
+<p>这里，由于篇幅关系，就不将建立其他表和表间关系的步骤列出来了。读者可以依照上述例子将其他 DBEntity 及关系建立起来或者参考附录中的源代码示例。然后，需要我们做的就是产生 ObjEntity，即数据库表到 Java 对象之间的映射。 也很简单，在每个数据库表的 Entity 面板上点击&ldquo;同步 DBEntity 到 ObjEntity&rdquo;按钮即可。只是，要注意在 Relationships 中的 Delete Rule。例如，一旦某个 Client 从表中被删除后，他的相关 Order 记录也需要被级联删除。</p>
+
+<h5>图 15. Modeler 产生的 ObjectEnties</h5>
+
+<p><img alt="Modeler 产生的 ObjectEnties" src="https://www.ibm.com/developerworks/cn/java/j-lo-cayenne1/objentities_rules.jpg" style="height:110px; width:550px" /></p>
+
+<p>到这，建立模型的过程就告一段落了。接下来，我们让 Modeler 来产生 Database Schema 和 Java Classes. 这可以通过在 Tools Menu 下的 Generate Classes 和 Generate Database Schema 两个按钮来完成。</p>
+
+<h5>图 16. 生成 Java 代码和 Database Schema</h5>
+
+<p><img alt="生成 Java 代码和 Database Schema" src="https://www.ibm.com/developerworks/cn/java/j-lo-cayenne1/generateSchemaDB.jpg" style="height:216px; width:533px" /></p>
+
+<p>完成之后，你就会发现在所建的 cayenne-store 工程下面生成了 Java 代码。</p>
+
+<h5>图 17. Eclipse 中生成的 Java 代码</h5>
+
+<p><img alt="Modeler 产生的 ObjectEnties" src="https://www.ibm.com/developerworks/cn/java/j-lo-cayenne1/generateCodes.jpg" style="height:208px; width:261px" /></p>
+
+<p>以及 cayenneStore 数据库文件目录。</p>
+
+<h5>图 18. 文件系统中生成的 Derby 数据库</h5>
+
+<p><img alt="文件系统中生成的 Derby 数据库" src="https://www.ibm.com/developerworks/cn/java/j-lo-cayenne1/db.jpg" style="height:274px; width:386px" /></p>
+
+<p>到此，您可能已经品尝到了 Cayenne 所带来的快捷，比如功能丰富的建模工具 Cayenne Modeler，自动生成 Java 代码等。当然，Cayenne Modeler 还有许多功能和特性。由于篇幅关系，我们就不一一介绍了。读者可以查阅本文所附的&nbsp;<a href="https://www.ibm.com/developerworks/cn/java/j-lo-cayenne1/#artrelatedtopics">&ldquo;参考资料&rdquo;</a>继续深入了解和学习。</p>
+
+<h2>Cayenne API</h2>
+
+<p>那么，在拥有了 Cayenne 为我们自动产生的代码之后，我们还需要做哪些工作呢？如何应用这些产生的代码呢？接下来，让我们看看 Cayenne 所提供的主要的 API。</p>
+
+<h3>DataContext</h3>
+
+<p>DataContext 类是一个取得 Cayenne 所提供功能的一个用户入口 , 它搭建了一个用户与数据库之间的会话通道，用户通过它来实现与数据库相关的各种操作（如 CRUD）。不同的用户可以建立自己的 DataContext。这里，值得注意的是，DataContext 会主动隔离处在不同 context 中的对象（除非是共享的）。所以，在一个会话中要尽量保持一个 DataContext 实例来操作 DataObjects。</p>
+
+<h5>清单 1. 创建一个 DataContext 示例</h5>
+
+<table border="0" cellpadding="0" cellspacing="0">
+	<tbody>
+		<tr>
+			<td>
+			<p>1</p>
+
+			<p>2</p>
+
+			<p>3</p>
+			</td>
+			<td>
+			<p><code>import org.apache.cayenne.access.DataContext; </code></p>
+
+			<p><code>... </code></p>
+
+			<p><code>DataContext context = DataContext.createDataContext();</code></p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<h3>Query</h3>
+
+<p>用户对数据库表的不同操作都可以看成是查询。这里，查询可以分为选择性和非选择性。前者可以看成是对数据库表的读操作，而后者则可看出是对数据库表的插入、删除、更新操作。在 Cayenne 中，有多种 Query 对象可被用户调用。如最常用的 SelectQuery, SQLTemplate Query, ProcedureQuery。 而构建一个 Query 也比较简单。</p>
+
+<h5>清单 2. 创建 Query 示例</h5>
+
+<table border="0" cellpadding="0" cellspacing="0">
+	<tbody>
+		<tr>
+			<td>
+			<p>1</p>
+
+			<p>2</p>
+
+			<p>3</p>
+
+			<p>4</p>
+
+			<p>5</p>
+
+			<p>6</p>
+
+			<p>7</p>
+
+			<p>8</p>
+
+			<p>9</p>
+
+			<p>10</p>
+
+			<p>11</p>
+
+			<p>12</p>
+
+			<p>13</p>
+			</td>
+			<td>
+			<p><code>import org.apache.cayenne.query.SelectQuery; </code></p>
+
+			<p><code>... </code></p>
+
+			<p><code>// this is a valid Cayenne query that would allow to fetch </code></p>
+
+			<p><code>// all records from the ClientTB table as ClientTB objects </code></p>
+
+			<p><code>SelectQuery query = new SelectQuery(ClientTB.class); </code></p>
+
+			<p>&nbsp;</p>
+
+			<p><code>// create a qualifier with one parameter: &quot;clientID&quot; </code></p>
+
+			<p><code>Expression qual = Expression.fromString(&quot;clientID = $clientID); </code></p>
+
+			<p>&nbsp;</p>
+
+			<p><code>// build a query prototype of a query - simply another select query </code></p>
+
+			<p><code>SelectQuery proto = new SelectQuery(ClientTB.class, qual); </code></p>
+
+			<p>&nbsp;</p>
+
+			<p><code>Context.performQuery(proto);</code></p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>当然，也可以在 Cayenne Modeler 中构建 Query。</p>
+
+<h5>图 19. 在 Modeler 中创建 Query</h5>
+
+<p><img alt="在 Modeler 中创建 Query" src="https://www.ibm.com/developerworks/cn/java/j-lo-cayenne1/querys.jpg" style="height:315px; width:525px" /></p>
+
+<p>然后在代码中调用这个 Query</p>
+
+<h5>清单 3. 调用并执行在 Modeler 中创建的 Query</h5>
+
+<table border="0" cellpadding="0" cellspacing="0">
+	<tbody>
+		<tr>
+			<td>
+			<p>1</p>
+
+			<p>2</p>
+
+			<p>3</p>
+
+			<p>4</p>
+			</td>
+			<td>
+			<p><code>Map param = new HashMap(); </code></p>
+
+			<p><code>param.put(&quot;manuName&quot;,&quot;Nokia Beijing&quot;); </code></p>
+
+			<p><code>// 执行&ldquo;getCommodities&rdquo; Query 并不刷新 Cache List </code></p>
+
+			<p><code>context.performQuery(&ldquo;getCommodities&rdquo;, param, false);</code></p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<h3>DataObject</h3>
+
+<p>一个 ORM 框架 , 它的一端连着 Database, 一端连着 Java 对象。因此，这里的 DataObject 可以理解成一个 DB Record 在内存中的对象的映射。它由属性和对象关系组成。在 ORM 中，对数据库表中一行记录的修改转变为对一个 DataObject 属性或关系的修改。其余的操作，包括数据检查，生成 SQL 语句、事务控制、回滚等交由 ORM 框架来完成。</p>
+
+<p>DataObject 可以通过 Query 执行产生，也可以通过用户自己创建产生。</p>
+
+<h5>清单 4. 执行 Query 返回 DataObjects 并修改其属性</h5>
+
+<table border="0" cellpadding="0" cellspacing="0">
+	<tbody>
+		<tr>
+			<td>
+			<p>1</p>
+
+			<p>2</p>
+
+			<p>3</p>
+
+			<p>4</p>
+
+			<p>5</p>
+
+			<p>6</p>
+			</td>
+			<td>
+			<p><code>List &lt;</code><code>ClientTB</code><code>&gt;&nbsp; clients = context.performQuery(&ldquo;allClients&rdquo;,true); </code></p>
+
+			<p><code>// 修改 DataObject 的属性</code></p>
+
+			<p><code>ClientTB clientTB = clients.get(0); </code></p>
+
+			<p><code>clientTB.setClientMail(&ldquo;cayennedemo@hotmail.com&rdquo;); </code></p>
+
+			<p><code>// 提交修改</code></p>
+
+			<p><code>context.commitChanges();</code></p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<h2>一个 Demo</h2>
+
+<p>为了让读者更好的体会 ORM 以及 Cayenne API, 我们来看一个 Demo。在这个 Demo 中，首先会装载一个 SQL 脚本并初始化数据库表中的基础数据。然后查询所有 Client 信息。最后，模拟一个 client 购买两个商品并生成 Order 的过程。另外，考虑到代码的实用性和可读性，我们创建了一些 DAO 类将 ObjEntity 以及数据库操作做进一步的封装。代码的主要文件结构如图 19 所示。读者也可以在源代码中仔细查看它们的类间关系。</p>
+
+<h5>图 19. 工程文件结构</h5>
+
+<p><img alt="工程文件结构" src="https://www.ibm.com/developerworks/cn/java/j-lo-cayenne1/projectStructor.jpg" style="height:444px; width:262px" /></p>
+
+<h3>清空和装载数据</h3>
+
+<p>由于在生成 ObjEntity 时设置了对象间的 Delete Rule, 所以我们可以直接删除 ClientTB 和 CommodityTB 中的数据即可。OrderTB 和 OrderCommodityTB 中的数据将会被级联删除。</p>
+
+<h5>清单 4. 清空数据库表的代码</h5>
+
+<table border="0" cellpadding="0" cellspacing="0">
+	<tbody>
+		<tr>
+			<td>
+			<p>1</p>
+
+			<p>2</p>
+
+			<p>3</p>
+
+			<p>4</p>
+
+			<p>5</p>
+
+			<p>6</p>
+
+			<p>7</p>
+
+			<p>8</p>
+
+			<p>9</p>
+
+			<p>10</p>
+
+			<p>11</p>
+
+			<p>12</p>
+
+			<p>13</p>
+
+			<p>14</p>
+			</td>
+			<td>
+			<p><code>ClientDao clientDao = (ClientDao)DaoManager.getInstance().getDao(ClientDao.class); </code></p>
+
+			<p><code>CommodityDao comDao = (CommodityDao) DaoManager.getInstance().getDao(CommodityDao.class); </code></p>
+
+			<p><code>CayenneStoreDao csd = (CayenneStoreDao)DaoManager.getInstance() </code></p>
+
+			<p><code>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</code><code>.getDao(CayenneStoreDao.class); </code></p>
+
+			<p><code>List&lt;</code><code>ClientTB</code><code>&gt; clients = clientDao.getClients(); </code></p>
+
+			<p><code>for (ClientTB c : clients){ </code></p>
+
+			<p><code>&nbsp;&nbsp;&nbsp;&nbsp;</code><code>csd.getDataContext().deleteObject(c); </code></p>
+
+			<p><code>} </code></p>
+
+			<p><code>SelectQuery queryCom = new SelectQuery(CommodityTB.class); </code></p>
+
+			<p><code>List&lt;</code><code>CommodityTB</code><code>&gt; coms&nbsp; = csd.getDataContext().performQuery(queryCom); </code></p>
+
+			<p><code>for (CommodityTB cd : coms){ </code></p>
+
+			<p><code>&nbsp;&nbsp;&nbsp;&nbsp;</code><code>csd.getDataContext().deleteObject(cd); </code></p>
+
+			<p><code>} </code></p>
+
+			<p><code>csd.commitChanges();</code></p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>装载原始数据时，我们会通过读取一个 SQL 脚本并生成一个 QueryChain。然后调用 DataContext 执行。</p>
+
+<h5>清单 5. 装载数据</h5>
+
+<table border="0" cellpadding="0" cellspacing="0">
+	<tbody>
+		<tr>
+			<td>
+			<p>1</p>
+
+			<p>2</p>
+
+			<p>3</p>
+
+			<p>4</p>
+
+			<p>5</p>
+
+			<p>6</p>
+
+			<p>7</p>
+
+			<p>8</p>
+
+			<p>9</p>
+
+			<p>10</p>
+
+			<p>11</p>
+
+			<p>12</p>
+
+			<p>13</p>
+
+			<p>14</p>
+
+			<p>15</p>
+
+			<p>16</p>
+
+			<p>17</p>
+
+			<p>18</p>
+			</td>
+			<td>
+			<p><code>QueryChain qc = new QueryChain(); </code></p>
+
+			<p><code>BufferedReader in = new BufferedReader(new </code></p>
+
+			<p><code>&nbsp;&nbsp;&nbsp;&nbsp;</code><code>InputStreamReaderDBDataHelper.class.getResourceAsStream(&quot;/loadData.sql&quot;))); </code></p>
+
+			<p><code>String line ; </code></p>
+
+			<p><code>try { </code></p>
+
+			<p><code>while ((line = in.readLine())!=null){ </code></p>
+
+			<p><code>&nbsp;&nbsp;&nbsp;&nbsp;</code><code>if (line.endsWith(&quot;;&quot;)){ </code></p>
+
+			<p><code>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</code><code>line = line.substring(0,line.length()-1); </code></p>
+
+			<p><code>&nbsp;&nbsp;&nbsp;&nbsp;</code><code>} </code></p>
+
+			<p><code>&nbsp;&nbsp;&nbsp;&nbsp;</code><code>qc.addQuery(new SQLTemplate(getDataDomain().getMap(&quot;cayenne-storeMap&quot;), line)); </code></p>
+
+			<p><code>} </code></p>
+
+			<p><code>} catch (IOException e) { </code></p>
+
+			<p><code>&nbsp;&nbsp;&nbsp;&nbsp;</code><code>// TODO Auto-generated catch block </code></p>
+
+			<p><code>&nbsp;&nbsp;&nbsp;&nbsp;</code><code>e.printStackTrace(); </code></p>
+
+			<p><code>} </code></p>
+
+			<p><code>CayenneStoreDao csd&nbsp; = (CayenneStoreDao)DaoManager.getInstance() </code></p>
+
+			<p><code>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</code><code>.getDao(CayenneStoreDao.class); </code></p>
+
+			<p><code>csd.getDataContext().performNonSelectingQuery(qc);</code></p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<h3>查询 Client 信息</h3>
+
+<p>查询客户信息的例子中，我们首先查询出所有 Client 的信息，包括 ClientID,ClientName,ClientMail。然后查询指定 ClientName 的 Client 其所拥有的订单信息。</p>
+
+<h5>清单 6. 查询客户信息</h5>
+
+<table border="0" cellpadding="0" cellspacing="0">
+	<tbody>
+		<tr>
+			<td>
+			<p>1</p>
+
+			<p>2</p>
+
+			<p>3</p>
+
+			<p>4</p>
+
+			<p>5</p>
+
+			<p>6</p>
+
+			<p>7</p>
+
+			<p>8</p>
+
+			<p>9</p>
+
+			<p>10</p>
+
+			<p>11</p>
+
+			<p>12</p>
+
+			<p>13</p>
+
+			<p>14</p>
+
+			<p>15</p>
+
+			<p>16</p>
+
+			<p>17</p>
+
+			<p>18</p>
+
+			<p>19</p>
+
+			<p>20</p>
+
+			<p>21</p>
+
+			<p>22</p>
+
+			<p>23</p>
+
+			<p>24</p>
+
+			<p>25</p>
+
+			<p>26</p>
+
+			<p>27</p>
+			</td>
+			<td>
+			<p><code>ClientDao clientDao = (ClientDao)DaoManager.getInstance().getDao(ClientDao.class); </code></p>
+
+			<p><code>List&lt;</code><code>ClientTB</code><code>&gt; clients = clientDao.getClients(); </code></p>
+
+			<p><code>for (ClientTB ct: clients){ </code></p>
+
+			<p><code>&nbsp;&nbsp;&nbsp;&nbsp;</code><code>System.out.println(&quot;client : &quot;+ct.getObjectId()+ </code></p>
+
+			<p><code>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</code><code>&quot; &quot;+ct.getClientName()+&quot; &quot;+ct.getClientPWD()+&quot; &quot;+ct.getClientMail()); </code></p>
+
+			<p><code>} </code></p>
+
+			<p><code>String clientName = &quot;YingChu&quot;; </code></p>
+
+			<p><code>ClientTB ctt = clientDao.getClient(clientName); </code></p>
+
+			<p><code>System.out.println(&quot;client YingChu &#39;s id , pwd, mail &quot;+ctt.getObjectId()+ </code></p>
+
+			<p><code>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</code><code>&quot; &quot;+ctt.getClientPWD()+&quot; &quot;+ctt.getClientMail()); </code></p>
+
+			<p><code>List&lt;</code><code>OrderTB</code><code>&gt; orders = ctt.getOrdersOwned(); </code></p>
+
+			<p><code>if (orders.size()==0){ </code></p>
+
+			<p><code>&nbsp;&nbsp;&nbsp;&nbsp;</code><code>System.out.println(&quot;The client &quot;+clientName+&quot; doesn&#39;t sign any order&quot;); </code></p>
+
+			<p><code>}else{ </code></p>
+
+			<p><code>&nbsp;&nbsp;&nbsp;&nbsp;</code><code>for (OrderTB order: orders){ </code></p>
+
+			<p><code>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</code><code>List&lt;</code><code>OrderCommodityTB</code><code>&gt; orderedComs = order.getCommoditiesContained(); </code></p>
+
+			<p><code>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</code><code>StringBuffer sb = new StringBuffer(); </code></p>
+
+			<p><code>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</code><code>for (OrderCommodityTB com: orderedComs){ </code></p>
+
+			<p><code>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</code><code>sb.append(com.getCommoditiesBought().getComName()); </code></p>
+
+			<p><code>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</code><code>sb.append(&quot; , &quot;); </code></p>
+
+			<p><code>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</code><code>} </code></p>
+
+			<p><code>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</code><code>if (sb.length()&gt;0) sb.delete(sb.length()-3, sb.length()); </code></p>
+
+			<p><code>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</code><code>System.out.println(&quot;The client &quot;+clientName+</code></p>
+
+			<p><code>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</code><code>&quot; has ordered the following commodities : &quot;+ </code></p>
+
+			<p><code>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</code><code>sb.toString()+&quot; on &quot;+order.getOrderDate().toString()); </code></p>
+
+			<p><code>&nbsp;&nbsp;&nbsp;&nbsp;</code><code>} </code></p>
+
+			<p><code>}</code></p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<h3>模拟客户购买商品生成订单的过程</h3>
+
+<p>在这个例子中，首先指定一个 Client。然后指定购买的商品。之后，就是在 OrderTB 和 OrderCommodityTB 中创建记录的过程。</p>
+
+<h5>清单 7. 模拟客户购买商品生成订单的代码</h5>
+
+<table border="0" cellpadding="0" cellspacing="0">
+	<tbody>
+		<tr>
+			<td>
+			<p>1</p>
+
+			<p>2</p>
+
+			<p>3</p>
+
+			<p>4</p>
+
+			<p>5</p>
+
+			<p>6</p>
+
+			<p>7</p>
+
+			<p>8</p>
+
+			<p>9</p>
+
+			<p>10</p>
+
+			<p>11</p>
+
+			<p>12</p>
+
+			<p>13</p>
+
+			<p>14</p>
+
+			<p>15</p>
+
+			<p>16</p>
+
+			<p>17</p>
+
+			<p>18</p>
+
+			<p>19</p>
+
+			<p>20</p>
+
+			<p>21</p>
+
+			<p>22</p>
+
+			<p>23</p>
+
+			<p>24</p>
+
+			<p>25</p>
+
+			<p>26</p>
+
+			<p>27</p>
+
+			<p>28</p>
+
+			<p>29</p>
+
+			<p>30</p>
+
+			<p>31</p>
+
+			<p>32</p>
+
+			<p>33</p>
+
+			<p>34</p>
+
+			<p>35</p>
+
+			<p>36</p>
+
+			<p>37</p>
+
+			<p>38</p>
+
+			<p>39</p>
+
+			<p>40</p>
+
+			<p>41</p>
+
+			<p>42</p>
+
+			<p>43</p>
+
+			<p>44</p>
+
+			<p>45</p>
+			</td>
+			<td>
+			<p><code>//Assume current client is YingChu </code></p>
+
+			<p><code>ClientDao clientDao = (ClientDao)DaoManager.getInstance().getDao(ClientDao.class); </code></p>
+
+			<p><code>String clientName = &quot;YingChu&quot;; </code></p>
+
+			<p><code>ClientTB ctt = clientDao.getClient(clientName); </code></p>
+
+			<p><code>&nbsp;&nbsp;&nbsp;&nbsp;</code>&nbsp;</p>
+
+			<p><code>//Assume two commodities are chosen, two is Nokia Phone n95, one is Thinkpad t61p </code></p>
+
+			<p><code>CommodityDao comDao = (CommodityDao)DaoManager.getInstance().getDao(CommodityDao.class); </code></p>
+
+			<p><code>CommodityTB nokiacom = comDao.getCommodity(&quot;Nokia Phone n95&quot;); </code></p>
+
+			<p><code>CommodityTB thinkPad = comDao.getCommodity(&quot;ThinkPad T61p&quot;); </code></p>
+
+			<p><code>&nbsp;&nbsp;&nbsp;&nbsp;</code>&nbsp;</p>
+
+			<p><code>//Generate an order record </code></p>
+
+			<p><code>CayenneStoreDao csd=(CayenneStoreDao)DaoManager.getInstance() </code></p>
+
+			<p><code>&nbsp;&nbsp;&nbsp;&nbsp;</code><code>.getDao(CayenneStoreDao.class); </code></p>
+
+			<p><code>OrderTB order = (OrderTB)csd.getDataContext().createAndRegisterNewObject(OrderTB.class); </code></p>
+
+			<p><code>Date dd = Calendar.getInstance().getTime(); </code></p>
+
+			<p><code>order.setOrderDate(dd); </code></p>
+
+			<p><code>&nbsp;&nbsp;&nbsp;&nbsp;</code>&nbsp;</p>
+
+			<p><code>//Add the generated order into the buying list of current client </code></p>
+
+			<p><code>order.setClientBelonged(ctt); </code></p>
+
+			<p><code>&nbsp;&nbsp;&nbsp;&nbsp;</code>&nbsp;</p>
+
+			<p><code>//Generate two records in OrderCommodityTB </code></p>
+
+			<p><code>OrderCommodityTB OCNokia = (OrderCommodityTB)csd.getDataContext() </code></p>
+
+			<p><code>&nbsp;&nbsp;&nbsp;&nbsp;</code><code>.createAndRegisterNewObject(OrderCommodityTB.class); </code></p>
+
+			<p><code>OCNokia.setComNumber(1); </code></p>
+
+			<p><code>OrderCommodityTB OCThinkpad = (OrderCommodityTB)csd.getDataContext() </code></p>
+
+			<p><code>&nbsp;&nbsp;&nbsp;&nbsp;</code><code>.createAndRegisterNewObject(OrderCommodityTB.class); </code></p>
+
+			<p><code>OCThinkpad.setComNumber(1); </code></p>
+
+			<p>&nbsp;</p>
+
+			<p><code>//Create the relationship between OrderTB and OrderCommodityTB </code></p>
+
+			<p><code>OCNokia.setBelongedToOrders(order); </code></p>
+
+			<p><code>OCThinkpad.setBelongedToOrders(order); </code></p>
+
+			<p><code>&nbsp;&nbsp;&nbsp;&nbsp;</code>&nbsp;</p>
+
+			<p><code>//Create the relationship between CommodityTB and OrderCommodityTB </code></p>
+
+			<p><code>OCNokia.setCommoditiesBought(nokiacom); </code></p>
+
+			<p><code>OCThinkpad.setCommoditiesBought(thinkPad); </code></p>
+
+			<p><code>&nbsp;&nbsp;&nbsp;&nbsp;</code>&nbsp;</p>
+
+			<p><code>//Update the quantity number in CommodityTB </code></p>
+
+			<p><code>nokiacom.updateCommodityNumber(1); </code></p>
+
+			<p><code>thinkPad.updateCommodityNumber(1); </code></p>
+
+			<p><code>&nbsp;&nbsp;&nbsp;&nbsp;</code>&nbsp;</p>
+
+			<p><code>//Commit changes </code></p>
+
+			<p><code>csd.commitChanges(); </code></p>
+
+			<p><code>&nbsp;&nbsp;&nbsp;&nbsp;</code>&nbsp;</p>
+
+			<p><code>//Check the result of purchase </code></p>
+
+			<p><code>searchClients ();</code></p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<h2>结束语</h2>
+
+<p>本文主要介绍了 Apache Cayenne 的一些基础特性与应用，包括如何搭建环境、建立模型以及生成 Database Schema 和 Java 代码。最后，本文还通过一个 Demo 介绍了如何使用 Cayenne API 来完成一个简单的数据库操作应用。在第二部分中，我们将主要介绍与 Cayenne 有关的高级特性。包括 Remote Object Persistence 远程访问技术和数据库查询优化等主题。</p>
