@@ -1,0 +1,145 @@
+<h1>Controller层常用标签</h1>
+
+<p>@RequestMapping @ResponseBody 和 @RequestBody 注解的用法与区别</p>
+
+<h2>1.@RequestMapping</h2>
+
+<p>国际惯例先介绍什么是@RequestMapping，@RequestMapping 是一个用来处理请求地址映射的注解，可用于类或方法上。用于类上，表示类中的所有响应请求的方法都是以该地址作为父路径；用于方法上，表示在类的父路径下追加方法上注解中的地址将会访问到该方法，<strong>此处需注意@RequestMapping用在类上可以没用，但是用在方法上必须有</strong>。</p>
+
+<p><strong>例如：</strong></p>
+
+<pre>
+<code>@Controller
+//设置想要跳转的父路径
+@RequestMapping(value = &quot;/Controllers&quot;)
+public class StatisticUserCtrl {
+    //如需注入，则写入需要注入的类
+    //@Autowired
+
+            // 设置方法下的子路经
+            @RequestMapping(value = &quot;/method&quot;)
+            public String helloworld() {
+
+                return &quot;helloWorld&quot;;
+
+            }
+}</code></pre>
+
+<p>其原理也非常好了解，其对应的 action 就是&ldquo; （父路径） controller/（父路径下方法路经）method &rdquo;。因此，在本地服务器上访问方法&nbsp;<a href="http://localhost:8080/controller/method" target="_blank">http://localhost:8080/controller/method</a>&nbsp;就会返回（跳转）到&ldquo; helloWorld.jsp &rdquo;页面。</p>
+
+<p>说到这了，顺便说一下 @PathVariable 注解，其用来获取请求路径（url ）中的动态参数。</p>
+
+<p><strong>页面发出请求：</strong></p>
+
+<pre>
+<code>function login() {
+    var url = &quot;${pageContext.request.contextPath}/person/login/&quot;;
+    var query = $(&#39;#id&#39;).val() + &#39;/&#39; + $(&#39;#name&#39;).val() + &#39;/&#39; + $(&#39;#status&#39;).val();
+    url += query;
+    $.get(url, function(data) {
+        alert(&quot;id: &quot; + data.id + &quot;name: &quot; + data.name + &quot;status: &quot;
+                + data.status);
+    });
+}</code></pre>
+
+<p><strong>例如：</strong></p>
+
+<pre>
+<code>/**
+* @RequestMapping(value = &quot;user/login/{id}/{name}/{status}&quot;) 中的 {id}/{name}/{status}
+* 与 @PathVariable int id、@PathVariable String name、@PathVariable boolean status
+* 一一对应，按名匹配。
+*/
+
+@RequestMapping(value = &quot;user/login/{id}/{name}/{status}&quot;)
+@ResponseBody
+//@PathVariable注解下的数据类型均可用
+public User login(@PathVariable int id, @PathVariable String name, @PathVariable boolean status) {
+//返回一个User对象响应ajax的请求
+    return new User(id, name, status);
+}</code></pre>
+
+<h2>2@ResponseBody</h2>
+
+<p>@Responsebody 注解表示该方法的返回的结果直接写入 HTTP 响应正文（ResponseBody）中，一般在异步获取数据时使用，通常是在使用 @RequestMapping 后，返回值通常解析为跳转路径，加上 @Responsebody 后返回结果不会被解析为跳转路径，而是直接写入HTTP 响应正文中。&nbsp;<br />
+<strong>作用：</strong>&nbsp;<br />
+该注解用于将Controller的方法返回的对象，通过适当的HttpMessageConverter转换为指定格式后，写入到Response对象的body数据区。&nbsp;<br />
+<strong>使用时机：</strong>&nbsp;<br />
+返回的数据不是html标签的页面，而是其他某种格式的数据时（如json、xml等）使用；</p>
+
+<p><strong>当页面发出异步请求：</strong></p>
+
+<pre>
+<code>function login() {
+    var datas = &#39;{&quot;username&quot;:&quot;&#39; + $(&#39;#username&#39;).val() + &#39;&quot;,&quot;userid&quot;:&quot;&#39; + $(&#39;#userid&#39;).val() + &#39;&quot;,&quot;status&quot;:&quot;&#39; + $(&#39;#status&#39;).val() + &#39;&quot;}&#39;;
+    $.ajax({
+        type : &#39;POST&#39;,
+        contentType : &#39;application/json&#39;,
+        url : &quot;${pageContext.request.contextPath}/user/login&quot;,
+        processData : false,
+        dataType : &#39;json&#39;,
+        data : datas,
+        success : function(data) {
+            alert(&quot;userid: &quot; + data.userid + &quot;username: &quot; + data.username + &quot;status: &quot;+ data.status);
+        },
+        error : function(XMLHttpRequest, textStatus, errorThrown) {
+            alert(&quot;出现异常，异常信息：&quot;+textStatus,&quot;error&quot;);
+        }
+    });
+};</code></pre>
+
+<p><strong>例如：</strong></p>
+
+<pre>
+<code>@RequestMapping(value = &quot;user/login&quot;)
+@ResponseBody
+// 将ajax（datas）发出的请求写入 User 对象中,返回json对象响应回去
+public User login(User user) {   
+    User user = new User();
+    user .setUserid(1);
+    user .setUsername(&quot;MrF&quot;);
+    user .setStatus(&quot;1&quot;);
+    return user ;
+}</code></pre>
+
+<p>异步获取 json 数据，加上 @Responsebody 注解后，就会直接返回 json 数据。</p>
+
+<h2>3@RequestBody</h2>
+
+<p>@RequestBody 注解则是将 HTTP 请求正文插入方法中，使用适合的 HttpMessageConverter 将请求体写入某个对象。</p>
+
+<p><strong>作用：</strong></p>
+
+<blockquote>
+<p>1) 该注解用于读取Request请求的body部分数据，使用系统默认配置的HttpMessageConverter进行解析，然后把相应的数据绑定到要返回的对象上；&nbsp;<br />
+2) 再把HttpMessageConverter返回的对象数据绑定到 controller中方法的参数上。</p>
+</blockquote>
+
+<p><strong>使用时机：</strong></p>
+
+<p>A) GET、POST方式提时， 根据request header Content-Type的值来判断:</p>
+
+<blockquote>
+<p>application/x-www-form-urlencoded， 可选（即非必须，因为这种情况的数据@RequestParam, @ModelAttribute也可以处理，当然@RequestBody也能处理）；&nbsp;<br />
+multipart/form-data, 不能处理（即使用@RequestBody不能处理这种格式的数据）；&nbsp;<br />
+其他格式， 必须（其他格式包括application/json, application/xml等。这些格式的数据，必须使用@RequestBody来处理）；</p>
+</blockquote>
+
+<p>B) PUT方式提交时， 根据request header Content-Type的值来判断:</p>
+
+<blockquote>
+<p>application/x-www-form-urlencoded， 必须；multipart/form-data, 不能处理；其他格式， 必须；</p>
+</blockquote>
+
+<p>说明：request的body部分的数据编码格式由header部分的Content-Type指定；</p>
+
+<p><strong>例如：</strong></p>
+
+<pre>
+<code>@RequestMapping(value = &quot;user/login&quot;)
+@ResponseBody
+// 将ajax（datas）发出的请求写入 User 对象中
+public User login(@RequestBody User user) {   
+// 这样就不会再被解析为跳转路径，而是直接将user对象写入 HTTP 响应正文中
+    return user;    
+}</code></pre>

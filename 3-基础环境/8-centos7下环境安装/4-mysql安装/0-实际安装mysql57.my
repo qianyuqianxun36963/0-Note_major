@@ -321,4 +321,39 @@ grant all privileges on jxpt.* to root@&#39;%&#39; identified by &#39;wenhua123&
 
 <p>解决方法：修改相关的文件属组、用户信息。</p>
 
-<p>&nbsp;</p>
+<p>问题四：</p>
+
+<p>数据同步的时候，function、存储过程、视图新建时会带入了权限。需要删除。</p>
+
+<p>标粗的地方删除掉。</p>
+
+<p>DROP FUNCTION IF EXISTS `nextval`;<br />
+DELIMITER ;;<br />
+CREATE <strong>DEFINER=`root`@`%` </strong>FUNCTION `nextval`(v_seq_type VARCHAR(20),v_seq_val VARCHAR(20)) RETURNS int(11)<br />
+begin<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;declare p_increment char(4);<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;declare p_oldYear char(4);<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;declare p_newYear char(4);<br />
+&nbsp; &nbsp; if v_seq_val is null then<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;select val into p_oldYear from roll_serialize_num where type = v_seq_type;&nbsp;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;select increment into p_increment from roll_serialize_num where type = v_seq_type;&nbsp;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;select DATE_FORMAT(NOW(), &#39;%Y&#39;) into p_newYear;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;IF p_oldYear = p_newYear THEN<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;update roll_serialize_num set seq = seq + increment &nbsp;where type = v_seq_type;<br />
+&nbsp; &nbsp; &nbsp; elseif p_oldYear is null then<br />
+&nbsp; &nbsp; &nbsp; &nbsp; insert into roll_serialize_num(id,type,val,seq,increment) value(REPLACE(UUID(), &#39;-&#39;, &#39;&#39;),v_seq_type,p_newYear,1,1);<br />
+&nbsp; &nbsp; &nbsp; else&nbsp;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;update roll_serialize_num set val = p_newYear,seq = 1 &nbsp;where type = v_seq_type;<br />
+&nbsp; &nbsp; &nbsp; END IF;<br />
+&nbsp; &nbsp; else&nbsp;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;select increment into p_increment from roll_serialize_num where type = v_seq_type and val = v_seq_val;&nbsp;<br />
+&nbsp; &nbsp; &nbsp; if p_increment is not null THEN<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;update roll_serialize_num set seq = seq + p_increment &nbsp;where type = v_seq_type and val = v_seq_val;<br />
+&nbsp; &nbsp; &nbsp; ELSE<br />
+&nbsp; &nbsp; &nbsp; &nbsp; insert into roll_serialize_num(id,type,val,seq,increment) value(REPLACE(UUID(), &#39;-&#39;, &#39;&#39;),v_seq_type,v_seq_val,1,1);<br />
+&nbsp; &nbsp; &nbsp; end if;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;end if;<br />
+&nbsp; &nbsp; return currval(v_seq_type,v_seq_val);<br />
+end<br />
+;;<br />
+DELIMITER ;</p>
