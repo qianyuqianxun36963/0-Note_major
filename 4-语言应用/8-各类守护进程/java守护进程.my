@@ -1,0 +1,57 @@
+<h2>java开发守护进程</h2>
+
+<p>其实就是想开发个Windows下系统服务一样的程序。而查了好久资料，没找到java如何开发linux的守护进程。用C语言开发感觉太麻烦了，何况还要嵌入业务。使用Servlet的话也行，但是需要额外安装tomcat。</p>
+
+<p>经过一天实验，终于发现，原来这么简单！</p>
+
+<p>先来段简单代码，每隔5秒更新job.log文件。用来测试一下。</p>
+
+<p>import java.io.BufferedWriter;<br />
+import java.io.File;<br />
+import java.io.FileWriter;<br />
+import java.io.IOException;<br />
+import java.util.Date;</p>
+
+<p>public class Program {<br />
+&nbsp;<br />
+&nbsp; &nbsp; /**<br />
+&nbsp; &nbsp; &nbsp;* @param args<br />
+&nbsp; &nbsp; &nbsp;*/<br />
+&nbsp; &nbsp; public static void main(String[] args) {<br />
+&nbsp; &nbsp; &nbsp; &nbsp; File f = new File(&quot;/home/xieping/job.log&quot;);<br />
+&nbsp; &nbsp; &nbsp; &nbsp; if (!f.exists()) {<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; try {<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; f.createNewFile();<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; } catch (IOException e) {<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; e.printStackTrace();<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; }<br />
+&nbsp; &nbsp; &nbsp; &nbsp; }<br />
+&nbsp; &nbsp; &nbsp; &nbsp; while (true) {<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; try {<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; BufferedWriter output = new BufferedWriter(new FileWriter(f));<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; output.write(new Date().toString());<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; output.close();<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; } catch (IOException e1) {<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; e1.printStackTrace();<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; }<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; try {<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; Thread.sleep(1000 * 5);<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; } catch (InterruptedException e) {<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; e.printStackTrace();<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; }<br />
+&nbsp; &nbsp; &nbsp; &nbsp; }<br />
+&nbsp; &nbsp; }<br />
+}<br />
+打包，我是用eclipse打包的，导出个jar包就行了。<br />
+把文件放到/home/xieping/目录下。文件名 job.jar。<br />
+开始设置为守护进程了！！<br />
+#java -jar job.jar &amp;<br />
+简单吧，就加一个&amp;符号。可以查看下<br />
+#ps aux|grep job<br />
+看到了，果然启动了。<br />
+#more /home/xieping/job.log<br />
+文件的时间也一直换。<br />
+&lt;span style=&quot;color: #800000;&quot;&gt;注意，在开多线程的情况下，进程可能无法终止。&lt;/span&gt;<br />
+&lt;span style=&quot;color: #800000;&quot;&gt;#killall java &nbsp;或者 #kill 进程ID 无效。需要强制终止。&lt;/span&gt;<br />
+&lt;span style=&quot;color: #800000;&quot;&gt;#kill -9 进程ID。&lt;/span&gt;<br />
+&nbsp;</p>

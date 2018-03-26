@@ -1,0 +1,491 @@
+<h1>mysql中授权(grant)和撤销授权(revoke)等命令的用法详解[转]</h1>
+
+<p>MySQL的权限系统围绕着两个概念：&nbsp;</p>
+
+<p>认证-&gt;确定用户是否允许连接数据库服务器&nbsp;</p>
+
+<p>授权-&gt;确定用户是否拥有足够的权限执行查询请求等。</p>
+
+<p>如果认证不成功的话，哪么授权肯定是无法进行的。</p>
+
+<p><strong>revoke 跟 grant 的语法差不多，只需要把关键字 &ldquo;to&rdquo; 换成 &ldquo;from&rdquo;</strong></p>
+
+<p>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 表 GRANT和REVOKE管理的权限</p>
+
+<table border="1" cellpadding="0" cellspacing="0" style="width:553px">
+	<tbody>
+		<tr>
+			<td>
+			<p>权限</p>
+			</td>
+			<td>
+			<p>描述</p>
+			</td>
+		</tr>
+		<tr>
+			<td>
+			<p>ALL PRIVILEGES</p>
+			</td>
+			<td>
+			<p>影响除WITH GRANT OPTION之外的所有权限</p>
+			</td>
+		</tr>
+		<tr>
+			<td>
+			<p>ALTER</p>
+			</td>
+			<td>
+			<p>影响ALTER TABLE命令的使用</p>
+			</td>
+		</tr>
+		<tr>
+			<td>
+			<p>ALTER ROUTINE</p>
+			</td>
+			<td>
+			<p>影响创建存储例程的能力</p>
+			</td>
+		</tr>
+		<tr>
+			<td>
+			<p>CREATE</p>
+			</td>
+			<td>
+			<p>影响CREATE TABLE命令的使用</p>
+			</td>
+		</tr>
+		<tr>
+			<td>
+			<p>CREATE ROUTINE</p>
+			</td>
+			<td>
+			<p>影响更改和弃用存储例程的能力</p>
+			</td>
+		</tr>
+		<tr>
+			<td>
+			<p>CREATE TEMPORARY TABLES</p>
+			</td>
+			<td>
+			<p>影响CREATE TEMPORARY TABLE命令的使用</p>
+			</td>
+		</tr>
+		<tr>
+			<td>
+			<p>CREATE USER</p>
+			</td>
+			<td>
+			<p>影响创建、弃用；重命名和撤销用户权限的能力</p>
+			</td>
+		</tr>
+		<tr>
+			<td>
+			<p>CREATE VIEW</p>
+			</td>
+			<td>
+			<p>影响CREATE VIEW命令的使用</p>
+			</td>
+		</tr>
+		<tr>
+			<td>
+			<p>DELETE</p>
+			</td>
+			<td>
+			<p>影响DELETE命令的使用</p>
+			</td>
+		</tr>
+		<tr>
+			<td>
+			<p>DROP</p>
+			</td>
+			<td>
+			<p>影响DROP TABLE命令的使用</p>
+			</td>
+		</tr>
+		<tr>
+			<td>
+			<p>EXECUTE</p>
+			</td>
+			<td>
+			<p>影响用户运行存储过程的能力</p>
+			</td>
+		</tr>
+		<tr>
+			<td>
+			<p>EVENT</p>
+			</td>
+			<td>
+			<p>影响执行事件的能力（从MySQL5.1.6开始）</p>
+			</td>
+		</tr>
+		<tr>
+			<td>
+			<p>FILE</p>
+			</td>
+			<td>
+			<p>影响SELECT INTO OUTFILE和LOAD DATA INFILE的使用</p>
+			</td>
+		</tr>
+		<tr>
+			<td>
+			<p>GRANT OPTION</p>
+			</td>
+			<td>
+			<p>影响用户委派权限的能力</p>
+			</td>
+		</tr>
+		<tr>
+			<td>
+			<p>INDEX</p>
+			</td>
+			<td>
+			<p>影响CREATE INDEX和DROP INDEX命令的使用</p>
+			</td>
+		</tr>
+		<tr>
+			<td>
+			<p>INSERT</p>
+			</td>
+			<td>
+			<p>影响INSERT命令的使用</p>
+			</td>
+		</tr>
+		<tr>
+			<td>
+			<p>LOCK TABLES</p>
+			</td>
+			<td>
+			<p>影响LOCK TABLES命令的使用</p>
+			</td>
+		</tr>
+		<tr>
+			<td>
+			<p>PROCESS</p>
+			</td>
+			<td>
+			<p>影响SHOW PROCESSLIST命令的使用</p>
+			</td>
+		</tr>
+		<tr>
+			<td>
+			<p>REFERENCES</p>
+			</td>
+			<td>
+			<p>未来MySQL特性的占位符</p>
+			</td>
+		</tr>
+		<tr>
+			<td>
+			<p>RELOAD</p>
+			</td>
+			<td>
+			<p>影响FLUSH命令集的使用</p>
+			</td>
+		</tr>
+		<tr>
+			<td>
+			<p>REPLICATION CLIENT</p>
+			</td>
+			<td>
+			<p>影响用户查询从服务器和主服务器位置的能力</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>（续）</p>
+
+<table border="1" cellpadding="0" cellspacing="0" style="width:553px">
+	<tbody>
+		<tr>
+			<td>
+			<p>权限</p>
+			</td>
+			<td>
+			<p>描述</p>
+			</td>
+		</tr>
+		<tr>
+			<td>
+			<p>REPLICATION SLAVE</p>
+			</td>
+			<td>
+			<p>复制从服务器所需的权限</p>
+			</td>
+		</tr>
+		<tr>
+			<td>
+			<p>SELECT</p>
+			</td>
+			<td>
+			<p>影响SELECT命令的使用</p>
+			</td>
+		</tr>
+		<tr>
+			<td>
+			<p>SHOW DATABASES</p>
+			</td>
+			<td>
+			<p>影响SHOW DATABASES命令的使用</p>
+			</td>
+		</tr>
+		<tr>
+			<td>
+			<p>SHOW VIEW</p>
+			</td>
+			<td>
+			<p>影响SHOW CREATE VIEW命令的使用</p>
+			</td>
+		</tr>
+		<tr>
+			<td>
+			<p>SHUTDOWN</p>
+			</td>
+			<td>
+			<p>影响SHUTDOWN命令的使用</p>
+			</td>
+		</tr>
+		<tr>
+			<td>
+			<p>SUPER</p>
+			</td>
+			<td>
+			<p>影响管理员级命令的使用，如CHANGE、MASTER、KILL thread、mysqladmindebug、PURGE MASTER LOGS和SET GLOBAL</p>
+			</td>
+		</tr>
+		<tr>
+			<td>
+			<p>TRIGGER</p>
+			</td>
+			<td>
+			<p>影响执行触发器的能力（从MySQL5.1.6开始）</p>
+			</td>
+		</tr>
+		<tr>
+			<td>
+			<p>UPDATE</p>
+			</td>
+			<td>
+			<p>影响UPDATE命令的使用</p>
+			</td>
+		</tr>
+		<tr>
+			<td>
+			<p>USAGE</p>
+			</td>
+			<td>
+			<p>只连接，不授予权限</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>1&gt;.改表法。你的帐号不允许从远程登陆MySql服务器，只能在localhost。</p>
+
+<p>&nbsp;&nbsp; 解决办法：</p>
+
+<p>&nbsp;&nbsp; &nbsp;在localhost的那台电脑，登入mysql后，更改 &quot;mysql&quot; 数据库里的 &quot;user&quot; 表里的 &quot;host&quot; 项，从&quot;localhost&quot;改称&quot;%&quot;&nbsp;</p>
+
+<p>&nbsp;&nbsp; (1). mysql -u root -pvmwaremysql&gt;use mysql;&nbsp;</p>
+
+<p>&nbsp;&nbsp; (2). mysql&gt;update user set host = &#39;%&#39; where user = &#39;root&#39;;&nbsp;</p>
+
+<p>&nbsp;&nbsp; (3). mysql&gt;select host, user from user;</p>
+
+<p>2&gt;. 授权法。例如，你想myuser使用mypassword从任何主机连接到mysql服务器的话。</p>
+
+<p>(1). GRANT ALL PRIVILEGES ON *.* TO &#39;myuser&#39;@&#39;%&#39; IDENTIFIED BY &#39;mypassword&#39; WITH GRANT OPTION;&nbsp;</p>
+
+<p>(2). FLUSH &nbsp; PRIVILEGES;</p>
+
+<p>如果你想允许用户myuser从ip为192.168.1.6的主机连接到mysql服务器，并使用mypassword作为密码</p>
+
+<p>&nbsp;&nbsp; (1). GRANT ALL PRIVILEGES ON *.* TO &#39;myuser&#39;@&#39;192.168.1.3&#39; IDENTIFIED BY &#39;mypassword&#39; WITH GRANT OPTION; &nbsp;&nbsp;</p>
+
+<p>&nbsp;&nbsp; (2). FLUSH &nbsp; PRIVILEGES;</p>
+
+<p>如果你想允许用户myuser从ip为192.168.1.6的主机连接到mysql服务器的dk数据库，并使用mypassword作为密码&nbsp;</p>
+
+<p>&nbsp;&nbsp; (1). GRANT ALL PRIVILEGES ON dk.* TO &#39;myuser&#39;@&#39;192.168.1.3&#39; IDENTIFIED BY &#39;mypassword&#39; WITH GRANT OPTION; &nbsp;&nbsp;</p>
+
+<p>&nbsp;&nbsp; (3). FLUSH &nbsp; PRIVILEGES;</p>
+
+<p>&nbsp;&nbsp; 注意:授权后必须FLUSH PRIVILEGES;否则无法立即生效。</p>
+
+<p>另外一种方法:</p>
+
+<p>3&gt;.在安装mysql的机器上运行：&nbsp;</p>
+
+<p>1、d:&quot;mysql&quot;bin&quot;&gt;mysql -h localhost -u root&nbsp;</p>
+
+<p>//这样应该可以进入MySQL服务器&nbsp;</p>
+
+<p>2、mysql&gt;GRANT ALL PRIVILEGES ON *.* TO &#39;root&#39;@&#39;%&#39; WITH GRANT OPTION&nbsp;</p>
+
+<p>//赋予任何主机访问数据的权限&nbsp;</p>
+
+<p>3、mysql&gt;FLUSH PRIVILEGES&nbsp;</p>
+
+<p>//修改生效&nbsp;</p>
+
+<p>4、mysql&gt;EXIT&nbsp;</p>
+
+<p>//退出MySQL服务器&nbsp;</p>
+
+<p>这样就可以在其它任何的主机上以root身份登录啦！</p>
+
+<p>4&gt;.查看 MySQL 用户权限&nbsp;</p>
+
+<p>查看当前用户（自己）权限：&nbsp;</p>
+
+<p>show grants;&nbsp;</p>
+
+<p>查看其他 MySQL 用户权限：&nbsp;</p>
+
+<p>show grants for dba@localhost;</p>
+
+<p>5&gt;.撤销已经赋予给 MySQL 用户权限的权限。&nbsp;</p>
+
+<p>revoke 跟 grant 的语法差不多，只需要把关键字 &ldquo;to&rdquo; 换成 &ldquo;from&rdquo; 即可：&nbsp;</p>
+
+<p>grant all on *.* to dba@localhost;&nbsp;</p>
+
+<p>revoke all on *.* from dba@localhost;</p>
+
+<p>6&gt;.MySQL grant、revoke 用户权限注意事项&nbsp;</p>
+
+<p>1. grant, revoke 用户权限后，该用户只有重新连接 MySQL 数据库，权限才能生效。&nbsp;</p>
+
+<p>2. 如果想让授权的用户，也可以将这些权限 grant 给其他用户，需要选项 &ldquo;grant option&ldquo;&nbsp;</p>
+
+<p>grant select on testdb.* to dba@localhost with grant option;&nbsp;</p>
+
+<p>这个特性一般用不到。实际中，数据库权限最好由 DBA 来统一管理。</p>
+
+<p>7&gt;.用户和权限管理命令：</p>
+
+<p>create user ：用于创建新的用户账户（从5.0版本开始有这个命令），在创建这个用户的时候不分配任何权限，</p>
+
+<p>需要在创建之后通过grant命令来给改用户分配相应的权限。</p>
+
+<p>eg：create user guest@localhost identified by &#39;123456&#39;；&nbsp;</p>
+
+<p>grant select on mydb.* to guest@localhost;</p>
+
+<p>drop user：删除一个用户账户（注意在4.1.1版本之前只能删除没有任何权限的账户，5.0.2之后可以删除任何账户）</p>
+
+<p>eg：drop user guest;</p>
+
+<p>rename user：可以实现重命名一个用户账号。</p>
+
+<p>grant：用于管理访问权限，也就是给用户账号授权。当然它同样可以创建一个新的用户账户。</p>
+
+<p>eg：grant select, insert, update, delete on new_db.* to guest@&#39;%&#39; identified by &#39;88888888&#39;;</p>
+
+<p>grant 权限 on 数据库.表 to 用户 @ 访问方式 identified by 密码</p>
+
+<p>grant select on mydb.* to guest@localhost identified by &#39;123456&#39;;</p>
+
+<p>BTW：如果需要一个空密码或者无密码的账户，必须先用Create User命令，然后通过</p>
+
+<p>grant来分配权限。如果如下操作：</p>
+
+<p>grant all privileges on mydb.* to visitor@&#39;%&#39; ；而在数据库user表中没有先创建visitor</p>
+
+<p>用户，则会发生1133错误&quot;Can&#39;t find any matching row in the user table&quot;。grant只能创</p>
+
+<p>有密码的账户。</p>
+
+<p>revoke：删除一个账户，具体查看MySQL的文档。</p>
+
+<p>8&gt;.mysql中可以给你一个用户授予如select,insert,update,delete等其中的一个或者多个权限,主要使用grant命令,用法格式为：&nbsp;</p>
+
+<p>grant 权限 on 数据库对象 to 用户&nbsp;</p>
+
+<p>grant 普通数据用户，查询、插入、更新、删除 数据库中所有表数据的权利。&nbsp;</p>
+
+<p>grant select on testdb.* to common_user@&rsquo;%&rsquo;&nbsp;</p>
+
+<p>grant insert on testdb.* to common_user@&rsquo;%&rsquo;&nbsp;</p>
+
+<p>grant update on testdb.* to common_user@&rsquo;%&rsquo;&nbsp;</p>
+
+<p>grant delete on testdb.* to common_user@&rsquo;%&rsquo;&nbsp;</p>
+
+<p>或者，用一条 MySQL 命令来替代：&nbsp;</p>
+
+<p>grant select, insert, update, delete on testdb.* to common_user@&rsquo;%&rsquo;</p>
+
+<p>9&gt;.grant 数据库开发人员，创建表、索引、视图、存储过程、函数。。。等权限。&nbsp;</p>
+
+<p>grant 创建、修改、删除 MySQL 数据表结构权限。&nbsp;</p>
+
+<p>grant create on testdb.* to developer@&rsquo;192.168.0.%&rsquo;;&nbsp;</p>
+
+<p>grant alter on testdb.* to developer@&rsquo;192.168.0.%&rsquo;;&nbsp;</p>
+
+<p>grant drop on testdb.* to developer@&rsquo;192.168.0.%&rsquo;;&nbsp;</p>
+
+<p>grant 操作 MySQL 外键权限。&nbsp;</p>
+
+<p>grant references on testdb.* to developer@&rsquo;192.168.0.%&rsquo;;&nbsp;</p>
+
+<p>grant 操作 MySQL 临时表权限。&nbsp;</p>
+
+<p>grant create temporary tables on testdb.* to developer@&rsquo;192.168.0.%&rsquo;;&nbsp;</p>
+
+<p>grant 操作 MySQL 索引权限。&nbsp;</p>
+
+<p>grant index on testdb.* to developer@&rsquo;192.168.0.%&rsquo;;&nbsp;</p>
+
+<p>grant 操作 MySQL 视图、查看视图源代码 权限。&nbsp;</p>
+
+<p>grant create view on testdb.* to developer@&rsquo;192.168.0.%&rsquo;;&nbsp;</p>
+
+<p>grant show view on testdb.* to developer@&rsquo;192.168.0.%&rsquo;;&nbsp;</p>
+
+<p>grant 操作 MySQL 存储过程、函数 权限。&nbsp;</p>
+
+<p>grant create routine on testdb.* to developer@&rsquo;192.168.0.%&rsquo;; -- now, can show procedure status&nbsp;</p>
+
+<p>grant alter routine on testdb.* to developer@&rsquo;192.168.0.%&rsquo;; -- now, you can drop a procedure&nbsp;</p>
+
+<p>grant execute on testdb.* to developer@&rsquo;192.168.0.%&rsquo;;</p>
+
+<p>10&gt;.grant 普通 DBA 管理某个 MySQL 数据库的权限。&nbsp;</p>
+
+<p>grant all privileges on testdb to dba@&rsquo;localhost&rsquo;&nbsp;</p>
+
+<p>其中，关键字 &ldquo;privileges&rdquo; 可以省略。</p>
+
+<p>11&gt;.grant 高级 DBA 管理 MySQL 中所有数据库的权限。&nbsp;</p>
+
+<p>grant all on *.* to dba@&rsquo;localhost&rsquo;</p>
+
+<p>12&gt;.MySQL grant 权限，分别可以作用在多个层次上。&nbsp;</p>
+
+<p>1. grant 作用在整个 MySQL 服务器上：&nbsp;</p>
+
+<p>grant select on *.* to dba@localhost; -- dba 可以查询 MySQL 中所有数据库中的表。&nbsp;</p>
+
+<p>grant all on *.* to dba@localhost; -- dba 可以管理 MySQL 中的所有数据库&nbsp;</p>
+
+<p>2. grant 作用在单个数据库上：&nbsp;</p>
+
+<p>grant select on testdb.* to dba@localhost; -- dba 可以查询 testdb 中的表。&nbsp;</p>
+
+<p>3. grant 作用在单个数据表上：&nbsp;</p>
+
+<p>grant select, insert, update, delete on testdb.orders to dba@localhost;&nbsp;</p>
+
+<p>4. grant 作用在表中的列上：&nbsp;</p>
+
+<p>grant select(id, se, rank) on testdb.apache_log to dba@localhost;&nbsp;</p>
+
+<p>5. grant 作用在存储过程、函数上：&nbsp;</p>
+
+<p>grant execute on procedure testdb.pr_add to &rsquo;dba&rsquo;@&rsquo;localhost&rsquo;&nbsp;</p>
+
+<p>grant execute on function testdb.fn_add to &rsquo;dba&rsquo;@&rsquo;localhost&rsquo;</p>
+
+<p>注意：修改完权限以后 一定要刷新服务，或者重启服务，刷新服务用：FLUSH PRIVILEGES。</p>
