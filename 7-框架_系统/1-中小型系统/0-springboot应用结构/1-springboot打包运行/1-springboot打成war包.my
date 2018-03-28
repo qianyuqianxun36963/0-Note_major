@@ -1,0 +1,73 @@
+<h1>为什么要把SpringBoot打成war包</h1>
+
+<p>正常情况下SpringBoot项目是以jar包的形式，通过命令行：</p>
+
+<pre>
+<code>java -jar demo.jar</code></pre>
+
+<p>来运行的，并且SpringBoot是内嵌Tomcat服务器，所以每次重新启动都是用的新的Tomcat服务器。正因如此，也出现了一个问题：&nbsp;<br />
+上传到项目的文件，如果是保存在项目中的，那么重启过后文件就会丢失。比如我们上传了一个头像，重启项目后，这个头像就没了。而如果将文件保存在本地磁盘中的话，html中标签没办法获取。因此，我们才需要将SpringBoot项目打成war包，放到Tomcat中去运行。</p>
+
+<h2>修改方法</h2>
+
+<p>在pom.xml文件中添加下面的依赖：</p>
+
+<pre>
+<code> &lt;!--因配置外部TOMCAT 而配置--&gt;
+&lt;dependency&gt;
+    &lt;groupId&gt;org.springframework.boot&lt;/groupId&gt;
+    &lt;artifactId&gt;spring-boot-starter-tomcat&lt;/artifactId&gt;
+    &lt;scope&gt;provided&lt;/scope&gt;
+&lt;/dependency&gt;</code></pre>
+
+<p>同时，将pom.xml文件首部的jar改成war</p>
+
+<pre>
+<code>    &lt;groupId&gt;com.star&lt;/groupId&gt;
+    &lt;artifactId&gt;yiyong&lt;/artifactId&gt;
+    &lt;version&gt;0.0.1-SNAPSHOT&lt;/version&gt;
+    &lt;packaging&gt;war&lt;/packaging&gt;
+    &lt;!--&lt;packaging&gt;jar&lt;/packaging&gt;--&gt;
+</code></pre>
+
+<p>最后，将启动类从</p>
+
+<pre>
+<code>@SpringBootApplication
+public class YiyongApplication {
+    public static void main(String[] args) {
+        SpringApplication.run(YiyongApplication.class, args);
+    }
+}
+</code></pre>
+
+<p>修改为</p>
+
+<pre>
+<code>@SpringBootApplication
+public class YiyongApplication extends SpringBootServletInitializer{
+    @Override
+    protected SpringApplicationBuilder configure(SpringApplicationBuilder builder) {
+        return builder.sources(YiyongApplication.class);
+    }
+
+
+    public static void main(String[] args) {
+        SpringApplication.run(YiyongApplication.class, args);
+    }
+}
+</code></pre>
+
+<p>注意：该类继承了SpringBootServletInitializer并且重写了configure方法，这是关键所在。</p>
+
+<h2>打包部署</h2>
+
+<p>在IDEA右侧Maven栏双击package等待Build Success即可。&nbsp;<br />
+<img alt="这里写图片描述" src="https://img-blog.csdn.net/20170909145546525?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQvemhvdWNoZW5nMDVfMTM=/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70/gravity/SouthEast" title="" />&nbsp;<br />
+然后把target目录下的war包放到tomcat的webapps目录下，启动tomcat，即可自动解压部署。&nbsp;<br />
+最后在浏览器中输入</p>
+
+<pre>
+<code>http://localhost:[端口号]/[打包项目名]/</code></pre>
+
+<p>发布成功</p>
