@@ -1,0 +1,500 @@
+<h1><a href="https://blog.csdn.net/z69183787/article/details/40426603">SpringMVC同时支持多视图(JSP,Velocity,Freemarker等)的一种思路实现</a></h1>
+
+<h2><strong>第一种方式：</strong></h2>
+
+<p>在基于SpringMVC的项目中有时需要同时使用多种视图格式，如jsp,velocity及freemarker等，通过不同的请求路径配置规则，映射到不同的视图文件。下面我提供一种思路，通过视图模板文件后缀名的方式来进行处理。例如：</p>
+
+<p>@RequestMapping(value = &quot;/hello&quot;)&nbsp;<br />
+public String jspTest(HttpServletRequest request, ModelMap map) {&nbsp;<br />
+&nbsp;&nbsp;&nbsp; return &quot;demo.jsp&quot;;&nbsp;<br />
+}&nbsp;<br />
+将通过&rdquo;demo.jsp&rdquo;的后缀自动使用jsp的视图解析器。</p>
+
+<p>&nbsp;</p>
+
+<p>下面描述下详细思路：</p>
+
+<h3>一.自定义视图解析器</h3>
+
+<pre>
+package com.jeedev.common.web.springmvc.view;
+
+import java.util.HashMap;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
+
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+import org.springframework.web.servlet.View;
+import org.springframework.web.servlet.ViewResolver;
+
+/**
+ * 自定义视图解析(通过配置实现多视图整合,如jsp,velocity,freemarker,pdf,excel...)
+ * @author huligong
+ *
+ */
+public class JeeDevViewResolver implements ViewResolver  {
+    
+    private static Log logger = LogFactory.getLog(JeeDevViewResolver.class);
+
+    public View resolveViewName(String viewName, Locale locale) throws Exception {
+       for(Map.Entry&lt;Set&lt;String&gt;, ViewResolver&gt; map : viewResolverMap.entrySet()){
+           Set&lt;String&gt; suffixs = map.getKey();
+           for(String suffix : suffixs){
+               if (viewName.endsWith(suffix)){
+                   ViewResolver viewResolver = map.getValue();
+                   if(null != viewResolver){
+                       if (logger.isDebugEnabled()) {
+                            logger.debug(&quot;found viewResolver &#39;&quot; + viewResolver + &quot;&#39; for viewName &#39;&quot; + viewName+ &quot;&#39;&quot;);
+                        }
+                       return viewResolver.resolveViewName(viewName, locale);
+                   }
+               }
+           }
+       }
+       
+       if(defaultViewResolver != null){
+           return defaultViewResolver.resolveViewName(viewName, locale);
+       }
+       // to allow for ViewResolver chaining
+       return null;
+    }
+    
+    
+    private Map&lt;Set&lt;String&gt;,ViewResolver&gt; viewResolverMap = new HashMap&lt;Set&lt;String&gt;,ViewResolver&gt;();
+    
+    private ViewResolver defaultViewResolver = null;
+
+    public Map&lt;Set&lt;String&gt;, ViewResolver&gt; getViewResolverMap() {
+        return viewResolverMap;
+    }
+
+    public void setViewResolverMap(Map&lt;Set&lt;String&gt;, ViewResolver&gt; viewResolverMap) {
+        this.viewResolverMap = viewResolverMap;
+    }
+
+    public ViewResolver getDefaultViewResolver() {
+        return defaultViewResolver;
+    }
+
+    public void setDefaultViewResolver(ViewResolver defaultViewResolver) {
+        this.defaultViewResolver = defaultViewResolver;
+    }
+}
+</pre>
+
+<p>在自定义视图解析器(其实是视图中转器)中，通过对视图文件的后缀判断(而不是请求地址的后缀)而返回给不同的视图解析器处理。</p>
+
+<p>&nbsp;</p>
+
+<h3>二.视图映射配置dispather-servlet.xml</h3>
+
+<pre>
+&lt;bean id=&quot;viewResolver&quot; class=&quot;com.jeedev.common.web.springmvc.view.JeeDevViewResolver&quot;&gt;
+        &lt;property name=&quot;defaultViewResolver&quot; ref=&quot;beanNameViewResolver&quot;/&gt;
+        &lt;property name=&quot;viewResolverMap&quot;&gt;
+            &lt;map&gt;
+                &lt;entry&gt;
+                    &lt;key&gt;
+                        &lt;set&gt;
+                            &lt;value&gt;.jsp&lt;/value&gt;
+                        &lt;/set&gt;
+                    &lt;/key&gt;
+                    &lt;ref bean=&quot;jspViewResolver&quot;/&gt;
+                &lt;/entry&gt;
+                &lt;entry&gt;
+                    &lt;key&gt;
+                        &lt;set&gt;
+                            &lt;value&gt;.vm&lt;/value&gt;
+                            &lt;value&gt;.htm&lt;/value&gt;
+                        &lt;/set&gt;
+                    &lt;/key&gt;
+                    &lt;ref bean=&quot;velocityViewResolver&quot;/&gt;
+                &lt;/entry&gt;
+                &lt;entry&gt;
+                    &lt;key&gt;&lt;value&gt;.ftl&lt;/value&gt;&lt;/key&gt;
+                    &lt;ref bean=&quot;freeMarkerViewResolver&quot;/&gt;
+                &lt;/entry&gt;
+            &lt;/map&gt;
+        &lt;/property&gt;
+    &lt;/bean&gt;
+
+    
+    &lt;bean id=&quot;beanNameViewResolver&quot; class=&quot;org.springframework.web.servlet.view.BeanNameViewResolver&quot;/&gt;
+    
+    &lt;bean id=&quot;jspViewResolver&quot; class=&quot;org.springframework.web.servlet.view.InternalResourceViewResolver&quot;&gt;
+        &lt;property name=&quot;viewClass&quot; value=&quot;org.springframework.web.servlet.view.JstlView&quot;/&gt;
+        &lt;property name=&quot;prefix&quot; value=&quot;/WEB-INF/jsp/&quot;/&gt;
+        &lt;!--&lt;property name=&quot;suffix&quot; value=&quot;.jsp&quot;/&gt;--&gt;
+    &lt;/bean&gt;
+    
+    &lt;!--  Velocity ViewResolver Configuration --&gt;
+    &lt;bean id=&quot;velocityViewResolver&quot; class = &quot;org.springframework.web.servlet.view.velocity.VelocityViewResolver&quot;&gt;
+         &lt;property name=&quot;order&quot; value=&quot;0&quot; /&gt;
+         &lt;property name=&quot;contentType&quot; value=&quot;text/html;charset=UTF-8&quot; /&gt;
+         &lt;property name=&quot;requestContextAttribute&quot; value=&quot;req&quot;/&gt;
+    &lt;/bean&gt;
+
+    &lt;!-- Velocity Configuration --&gt;     
+    &lt;bean id=&quot;velocityConfig&quot; class = &quot;org.springframework.web.servlet.view.velocity.VelocityConfigurer&quot;&gt;
+         &lt;property name=&quot;configLocation&quot; value=&quot;/WEB-INF/velocity.properties&quot;/&gt;
+         &lt;property name=&quot;resourceLoaderPath&quot; value=&quot;/&quot; /&gt;
+    &lt;/bean&gt;
+    
+    &lt;!--  FreeMarker ViewResolver Configuration --&gt;
+    &lt;bean id=&quot;freeMarkerViewResolver&quot; class=&quot;org.springframework.web.servlet.view.freemarker.FreeMarkerViewResolver&quot;&gt;  
+        &lt;property name=&quot;order&quot; value=&quot;0&quot; /&gt;
+        &lt;property name=&quot;viewClass&quot; value=&quot;org.springframework.web.servlet.view.freemarker.FreeMarkerView&quot;/&gt;  
+    &lt;/bean&gt; 
+    
+    
+    &lt;!-- FreeMarker Configuration --&gt;     
+    &lt;bean id=&quot;freemarkerConfig&quot;  class=&quot;org.springframework.web.servlet.view.freemarker.FreeMarkerConfigurer&quot;&gt;  
+       &lt;property name=&quot;configLocation&quot; value=&quot;/WEB-INF/freemarker.properties&quot;/&gt;
+        &lt;property name=&quot;templateLoaderPath&quot; value=&quot;/WEB-INF/ftl/&quot;/&gt;  
+         &lt;property name=&quot;freemarkerVariables&quot;&gt;
+             &lt;map&gt;
+                &lt;entry key=&quot;xml_escape&quot; value-ref=&quot;fmXmlEscape&quot;/&gt;
+            &lt;/map&gt;
+         &lt;/property&gt;
+    &lt;/bean&gt;   
+    
+    &lt;bean id=&quot;fmXmlEscape&quot; class=&quot;freemarker.template.utility.XmlEscape&quot;/&gt;</pre>
+
+<p>这里我配置成所有返回.jsp的视图模板请求都转到JSP视图解析器jspViewResolver中去处理，返回.htm,.vm视图模板请求都转到velocity视图解析器中去处理。</p>
+
+<p>&nbsp;</p>
+
+<h3>三.控制器代码示例</h3>
+
+<pre>
+package com.jeedev.demo.view;
+
+import javax.servlet.http.HttpServletRequest;
+
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+import org.springframework.stereotype.Controller;
+import org.springframework.ui.ModelMap;
+import org.springframework.web.bind.annotation.RequestMapping;
+
+/**
+ * 多视图解析器支持示例
+ * @author huligong
+ *
+ */
+@Controller
+@RequestMapping(value = &quot;/demo&quot;)
+public class JeeDevViewResolverTestController {
+    private static Log logger = LogFactory.getLog(JeeDevViewResolverTestController.class);
+    
+    @RequestMapping(value = &quot;/test1&quot;)
+    public String test1(HttpServletRequest request, ModelMap map) {
+        logger.info(&quot;使用JSP视图解析器&quot;);
+        map.put(&quot;name&quot;, &quot;hello world&quot;);
+        return &quot;jspTest.jsp&quot;;
+    }
+    
+    @RequestMapping(value = &quot;/test2&quot;)
+    public String test2(HttpServletRequest request, ModelMap map) {
+        logger.info(&quot;使用Freemarker视图解析器&quot;);
+        map.put(&quot;name&quot;, &quot;hello world&quot;);
+        return &quot;hello.ftl&quot;;
+    }
+    
+    @RequestMapping(value = &quot;/test3&quot;)
+    public String test3(HttpServletRequest request, ModelMap map) {
+        logger.info(&quot;使用Velocity视图解析器&quot;);
+        map.put(&quot;name&quot;, &quot;hello world&quot;);
+        return &quot;/html/demo.htm&quot;;
+    }
+}</pre>
+
+<p>&nbsp;</p>
+
+<h3>四.测试请求</h3>
+
+<p>我在web.xml里给DispatcherServlet添加了/view/*，所以，只要在请求前加上/view就可以了。</p>
+
+<p><a href="http://localhost:8080/view/demo/test1" target="_blank">http://localhost:8080/view/demo/test1</a></p>
+
+<p><a href="http://localhost:8080/view/demo/test2" target="_blank">http://localhost:8080/view/demo/test2</a></p>
+
+<p><a href="http://localhost:8080/view/demo/test3" target="_blank">http://localhost:8080/view/demo/test3</a></p>
+
+<p>皆验证通过。</p>
+
+<p>&nbsp;</p>
+
+<h2>第二种方式</h2>
+
+<p><a href="http://blog.csdn.net/truong/article/details/17339907" target="_blank">说明一下目录结构<br />
+<img alt="" src="http://www.blogjava.net/images/blogjava_net/sxyx2008/springmvc.jpg" style="height:497px; width:298px" />&nbsp;<br />
+Spring配置文件</a></p>
+
+<p>&lt;?xml&nbsp;version=&quot;1.0&quot;&nbsp;encoding=&quot;UTF-8&quot;?&gt;<br />
+&lt;beans&nbsp;xmlns=&quot;http://www.springframework.org/schema/beans&quot;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;xmlns:xsi=&quot;http://www.w3.org/2001/XMLSchema-instance&quot;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;xmlns:p=&quot;http://www.springframework.org/schema/p&quot;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;xmlns:context=&quot;http://www.springframework.org/schema/context&quot;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;xsi:schemaLocation=&quot;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;http://www.springframework.org/schema/beans<br />
+&nbsp;&nbsp;&nbsp;&nbsp;http://www.springframework.org/schema/beans/spring-beans-3.0.xsd<br />
+&nbsp;&nbsp;&nbsp;&nbsp;http://www.springframework.org/schema/context<br />
+&nbsp;&nbsp;&nbsp;&nbsp;http://www.springframework.org/schema/context/spring-context-3.0.xsd&quot;&gt;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&lt;context:component-scan<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;base-package=&quot;com.spring.action&quot;&nbsp;/&gt;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&lt;!--&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;org.springframework.web.servlet.view.ResourceBundleViewResolver<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;用于多个视图集成时,ResourceBundleViewResolver是通过解析资源文件来解析请求输出文件的。<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;property&nbsp;name=&quot;basename&quot;&nbsp;value=&quot;views&quot;&gt;&lt;/property&gt;,即表示在/WEB-INF/classes路径下有一个<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;views.properties文件,本例中views.properties的内容为<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;welcome.(class)=org.springframework.web.servlet.view.velocity.VelocityView<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;welcome.url=welcome.vm<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;freemarker.(class)=org.springframework.web.servlet.view.freemarker.FreeMarkerView<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;freemarker.url=freemarker.ftl<br />
+&nbsp;&nbsp;&nbsp;&nbsp;--&gt;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&lt;bean&nbsp;class=&quot;org.springframework.web.servlet.view.ResourceBundleViewResolver&quot;&gt;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;property&nbsp;name=&quot;basename&quot;&nbsp;value=&quot;views&quot;&gt;&lt;/property&gt;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;!--&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;property&nbsp;name=&quot;order&quot;&nbsp;value=&quot;0&quot;&gt;&lt;/property&gt;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;--&gt;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&lt;/bean&gt;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&lt;!--&nbsp;jsp视图解析器&nbsp;--&gt;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&lt;bean&nbsp;id=&quot;jspViewResolver&quot;&nbsp;class=&quot;org.springframework.web.servlet.view.InternalResourceViewResolver&quot;&gt;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;property&nbsp;name=&quot;viewClass&quot;&nbsp;value=&quot;org.springframework.web.servlet.view.JstlView&quot;/&gt;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;property&nbsp;name=&quot;prefix&quot;&nbsp;value=&quot;/&quot;/&gt;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;property&nbsp;name=&quot;suffix&quot;&nbsp;value=&quot;.jsp&quot;/&gt;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&lt;/bean&gt;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&lt;!--&nbsp;velocity视图解析器&nbsp;--&gt;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&lt;bean&nbsp;id=&quot;velocityViewResolver&quot;&nbsp;class=&quot;org.springframework.web.servlet.view.velocity.VelocityViewResolver&quot;&gt;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;property&nbsp;name=&quot;cache&quot;&nbsp;value=&quot;true&quot;/&gt;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;property&nbsp;name=&quot;prefix&quot;&nbsp;value=&quot;/&quot;/&gt;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;property&nbsp;name=&quot;suffix&quot;&nbsp;value=&quot;.vm&quot;/&gt;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&lt;/bean&gt;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&lt;!--&nbsp;velocity环境配置&nbsp;--&gt;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&lt;bean&nbsp;id=&quot;velocityConfig&quot;&nbsp;class=&quot;org.springframework.web.servlet.view.velocity.VelocityConfigurer&quot;&gt;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;!--&nbsp;velocity配置文件路径&nbsp;--&gt;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;property&nbsp;name=&quot;configLocation&quot;&nbsp;value=&quot;/WEB-INF/velocity.properties&quot;/&gt;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;!--&nbsp;velocity模板路径&nbsp;--&gt;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;property&nbsp;name=&quot;resourceLoaderPath&quot;&nbsp;value=&quot;/WEB-INF/velocity/&quot;/&gt;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&lt;/bean&gt;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&lt;!--&nbsp;FreeMarker环境配置&nbsp;--&gt;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&lt;bean&nbsp;id=&quot;freemarkerConfig&quot;&nbsp;class=&quot;org.springframework.web.servlet.view.freemarker.FreeMarkerConfigurer&quot;&gt;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;!--&nbsp;freemarker模板位置&nbsp;--&gt;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;property&nbsp;name=&quot;templateLoaderPath&quot;&nbsp;value=&quot;/WEB-INF/freemarker/&quot;/&gt;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&lt;/bean&gt;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&lt;!--&nbsp;FreeMarker视图解析&nbsp;--&gt;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&lt;bean&nbsp;id=&quot;freeMarkerViewResolver&quot;&nbsp;class=&quot;org.springframework.web.servlet.view.freemarker.FreeMarkerViewResolver&quot;&gt;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;property&nbsp;name=&quot;cache&quot;&nbsp;value=&quot;true&quot;/&gt;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;property&nbsp;name=&quot;prefix&quot;&nbsp;value=&quot;/&quot;/&gt;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;property&nbsp;name=&quot;suffix&quot;&nbsp;value=&quot;.ftl&quot;/&gt;<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&lt;/bean&gt;<br />
+&lt;/beans&gt;</p>
+
+<p>views.properties</p>
+
+<p>#welcome为modelAndView.setViewName(&quot;welcome&quot;);中的welcome&nbsp;&nbsp;&nbsp;.(class)固定写法<br />
+welcome.(class)=org.springframework.web.servlet.view.velocity.VelocityView<br />
+#welcome.url&nbsp;路径&nbsp;welcome.vm模板名称<br />
+welcome.url=welcome.vm<br />
+<br />
+#freemarker为modelAndView.setViewName(&quot;freemarker&quot;);中的freemarker&nbsp;&nbsp;&nbsp;.(class)固定写法<br />
+freemarker.(class)=org.springframework.web.servlet.view.freemarker.FreeMarkerView<br />
+#freemarker.url&nbsp;路径&nbsp;freemarker.ftl模板名称<br />
+freemarker.url=freemarker.ftl</p>
+
+<p>&nbsp;</p>
+
+<h2><strong>第三种方式：自适应匹配，不存在则找下一种，使用orders</strong></h2>
+
+<ol start="1">
+	<li>&lt;?xml&nbsp;version=&quot;1.0&quot;&nbsp;encoding=&quot;UTF-8&quot;?&gt;&nbsp;&nbsp;</li>
+	<li>&lt;beans&nbsp;xmlns=&quot;http://www.springframework.org/schema/beans&quot;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;xmlns:xsi=&quot;http://www.w3.org/2001/XMLSchema-instance&quot;&nbsp;xmlns:context=&quot;http://www.springframework.org/schema/context&quot;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;xmlns:mvc=&quot;http://www.springframework.org/schema/mvc&quot;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;xsi:schemaLocation=&quot;http://www.springframework.org/schema/beans&nbsp;http://www.springframework.org/schema/beans/spring-beans.xsd&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;http://www.springframework.org/schema/context&nbsp;http://www.springframework.org/schema/context/spring-context-3.2.xsd&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;http://www.springframework.org/schema/mvc&nbsp;http://www.springframework.org/schema/mvc/spring-mvc-3.2.xsd&quot;&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;context:component-scan&nbsp;base-package=&quot;test.**.controller&quot;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;use-default-filters=&quot;false&quot;&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;context:include-filter&nbsp;type=&quot;annotation&quot;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;expression=&quot;org.springframework.stereotype.Controller&quot;&nbsp;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;/context:component-scan&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;mvc:default-servlet-handler&nbsp;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;mvc:resources&nbsp;location=&quot;/resources/&quot;&nbsp;mapping=&quot;/resources/**&quot;&nbsp;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;mvc:annotation-driven&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;!--&nbsp;&lt;mvc:argument-resolvers&gt;&nbsp;&lt;bean&nbsp;class=&quot;org.springframework.data.web.PagedResourcesAssemblerArgumentResolver&quot;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/&gt;&nbsp;&lt;/mvc:argument-resolvers&gt;&nbsp;--&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;mvc:message-converters&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;bean&nbsp;class=&quot;org.springframework.http.converter.StringHttpMessageConverter&quot;&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;property&nbsp;name=&quot;supportedMediaTypes&quot;&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;list&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;value&gt;text/plain;charset=UTF-8&lt;/value&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;value&gt;text/html;charset=UTF-8&lt;/value&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/list&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/property&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/bean&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;bean&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;class=&quot;org.springframework.http.converter.json.MappingJackson2HttpMessageConverter&quot;&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;property&nbsp;name=&quot;supportedMediaTypes&quot;&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;list&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;value&gt;text/html;charset=UTF-8&lt;/value&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;value&gt;application/json;charset=UTF-8&lt;/value&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/list&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/property&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/bean&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/mvc:message-converters&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;/mvc:annotation-driven&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;bean&nbsp;id=&quot;multipartResolver&quot;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;class=&quot;org.springframework.web.multipart.commons.CommonsMultipartResolver&quot;&nbsp;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;!--&nbsp;FreeMarker视图解析&nbsp;如返回student。。在这里配置后缀名ftl和视图解析器。。--&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;bean&nbsp;id=&quot;freemarkerConfig&quot;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;class=&quot;org.springframework.web.servlet.view.freemarker.FreeMarkerConfigurer&quot;&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;property&nbsp;name=&quot;templateLoaderPath&quot;&gt;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;value&gt;/WEB-INF/ftl/&lt;/value&gt;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/property&gt;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;property&nbsp;name=&quot;defaultEncoding&quot;&nbsp;value=&quot;UTF-8&quot;&nbsp;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;property&nbsp;name=&quot;freemarkerVariables&quot;&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;map&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;entry&nbsp;key=&quot;xml_escape&quot;&nbsp;value-ref=&quot;fmXmlEscape&quot;&nbsp;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/map&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/property&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;property&nbsp;name=&quot;freemarkerSettings&quot;&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;props&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;!--&lt;prop&nbsp;key=&quot;template_update_delay&quot;&gt;3600&lt;/prop&gt;&nbsp;--&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;prop&nbsp;key=&quot;tag_syntax&quot;&gt;auto_detect&lt;/prop&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;!--&nbsp;设置标签类型&nbsp;两种：[]&nbsp;和&nbsp;&lt;&gt;&nbsp;。[]&nbsp;这种标记解析要快些&nbsp;--&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;prop&nbsp;key=&quot;default_encoding&quot;&gt;UTF-8&lt;/prop&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;prop&nbsp;key=&quot;output_encoding&quot;&gt;UTF-8&lt;/prop&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;prop&nbsp;key=&quot;locale&quot;&gt;zh_CN&lt;/prop&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;prop&nbsp;key=&quot;date_format&quot;&gt;yyyy-MM-dd&lt;/prop&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;prop&nbsp;key=&quot;time_format&quot;&gt;HH:mm:ss&lt;/prop&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;prop&nbsp;key=&quot;datetime_format&quot;&gt;yyyy-MM-dd&nbsp;HH:mm:ss&lt;/prop&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;prop&nbsp;key=&quot;number_format&quot;&gt;#.##&lt;/prop&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;!--&nbsp;设置数字格式&nbsp;以免出现&nbsp;000.00&nbsp;--&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;prop&nbsp;key=&quot;classic_compatible&quot;&gt;true&lt;/prop&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;!--&nbsp;可以满足一般需要。默认情况变量为null则替换为空字符串，如果需要自定义，写上${empty!&quot;EmptyValue&nbsp;of&nbsp;fbysss&quot;}的形式即可&nbsp;--&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;prop&nbsp;key=&quot;template_exception_handler&quot;&gt;html_debug&lt;/prop&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;!--&nbsp;ignore,debug,html_debug,rethrow&nbsp;--&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/props&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/property&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;/bean&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;bean&nbsp;id=&quot;fmXmlEscape&quot;&nbsp;class=&quot;freemarker.template.utility.XmlEscape&quot;&nbsp;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;bean&nbsp;id=&quot;viewResolver&quot;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;class=&quot;org.springframework.web.servlet.view.freemarker.FreeMarkerViewResolver&quot;&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;property&nbsp;name=&quot;viewClass&quot;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;value=&quot;org.springframework.web.servlet.view.freemarker.FreeMarkerView&quot;&gt;&lt;/property&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;property&nbsp;name=&quot;suffix&quot;&nbsp;value=&quot;.ftl&quot;&nbsp;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;property&nbsp;name=&quot;contentType&quot;&nbsp;value=&quot;text/html;charset=utf-8&quot;&nbsp;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;property&nbsp;name=&quot;exposeRequestAttributes&quot;&nbsp;value=&quot;true&quot;&nbsp;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;property&nbsp;name=&quot;exposeSessionAttributes&quot;&nbsp;value=&quot;true&quot;&nbsp;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;property&nbsp;name=&quot;exposeSpringMacroHelpers&quot;&nbsp;value=&quot;true&quot;&nbsp;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;property&nbsp;name=&quot;order&quot;&nbsp;value=&quot;0&quot;&nbsp;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;/bean&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;!--&nbsp;--&gt;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;!--&nbsp;Velocity&nbsp;&nbsp;--&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;bean&nbsp;id=&quot;velocityConfig&quot;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;class=&quot;org.springframework.web.servlet.view.velocity.VelocityConfigurer&quot;&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;property&nbsp;name=&quot;configLocation&quot;&nbsp;value=&quot;/WEB-INF/classes/velocity.properties&quot;&nbsp;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;property&nbsp;name=&quot;resourceLoaderPath&quot;&nbsp;value=&quot;/WEB-INF/vm/&quot;&nbsp;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;/bean&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;bean&nbsp;id=&quot;velocityViewResolver&quot;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;class=&quot;org.springframework.web.servlet.view.velocity.VelocityViewResolver&quot;&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;property&nbsp;name=&quot;order&quot;&nbsp;value=&quot;1&quot;&nbsp;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;property&nbsp;name=&quot;contentType&quot;&nbsp;value=&quot;text/html;charset=UTF-8&quot;&nbsp;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;property&nbsp;name=&quot;requestContextAttribute&quot;&nbsp;value=&quot;req&quot;&nbsp;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;property&nbsp;name=&quot;suffix&quot;&nbsp;value=&quot;.vm&quot;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;/bean&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;!--&nbsp;--&gt;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;bean&nbsp;id=&quot;beanNameViewResolver&quot;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;class=&quot;org.springframework.web.servlet.view.BeanNameViewResolver&quot;&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;property&nbsp;name=&quot;order&quot;&nbsp;value=&quot;6&quot;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;/bean&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;bean&nbsp;id=&quot;JSPviewResolver&quot;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;class=&quot;org.springframework.web.servlet.view.InternalResourceViewResolver&quot;&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;property&nbsp;name=&quot;viewClass&quot;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;value=&quot;org.springframework.web.servlet.view.JstlView&quot;&nbsp;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;property&nbsp;name=&quot;prefix&quot;&nbsp;value=&quot;/WEB-INF/jsp/&quot;&nbsp;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;property&nbsp;name=&quot;suffix&quot;&nbsp;value=&quot;.jsp&quot;&nbsp;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;property&nbsp;name=&quot;order&quot;&nbsp;value=&quot;10&quot;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;/bean&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;!--&nbsp;&lt;bean&nbsp;id=&quot;viewResolver&quot;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;class=&quot;org.springframework.web.servlet.view.ContentNegotiatingViewResolver&quot;&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;property&nbsp;name=&quot;defaultContentType&quot;&nbsp;value=&quot;application/json&quot;&nbsp;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;property&nbsp;name=&quot;mediaTypes&quot;&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;map&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;entry&nbsp;key=&quot;html&quot;&nbsp;value=&quot;text/html&quot;&nbsp;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;entry&nbsp;key=&quot;json&quot;&nbsp;value=&quot;application/json&quot;&nbsp;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;entry&nbsp;key=&quot;xml&quot;&nbsp;value=&quot;application/xml&quot;&nbsp;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;entry&nbsp;key=&quot;excel&quot;&nbsp;value=&quot;application/excel&quot;&nbsp;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;entry&nbsp;key=&quot;pdf&quot;&nbsp;value=&quot;application/pdf&quot;&nbsp;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/map&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/property&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;property&nbsp;name=&quot;viewResolvers&quot;&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;list&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;bean&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;class=&quot;org.springframework.web.servlet.view.freemarker.FreeMarkerViewResolver&quot;&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;property&nbsp;name=&quot;viewClass&quot;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;value=&quot;org.springframework.web.servlet.view.freemarker.FreeMarkerView&quot;&gt;&lt;/property&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;property&nbsp;name=&quot;suffix&quot;&nbsp;value=&quot;.ftl&quot;&nbsp;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;property&nbsp;name=&quot;contentType&quot;&nbsp;value=&quot;text/html;charset=utf-8&quot;&nbsp;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;property&nbsp;name=&quot;exposeRequestAttributes&quot;&nbsp;value=&quot;true&quot;&nbsp;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;property&nbsp;name=&quot;exposeSessionAttributes&quot;&nbsp;value=&quot;true&quot;&nbsp;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;property&nbsp;name=&quot;exposeSpringMacroHelpers&quot;&nbsp;value=&quot;true&quot;&nbsp;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/bean&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;bean&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;class=&quot;org.springframework.web.servlet.view.InternalResourceViewResolver&quot;&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;property&nbsp;name=&quot;viewClass&quot;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;value=&quot;org.springframework.web.servlet.view.JstlView&quot;&nbsp;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;property&nbsp;name=&quot;prefix&quot;&nbsp;value=&quot;/WEB-INF/jsp/&quot;&nbsp;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;property&nbsp;name=&quot;suffix&quot;&nbsp;value=&quot;.jsp&quot;&nbsp;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/bean&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/list&gt;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/property&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;property&nbsp;name=&quot;defaultViews&quot;&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;list&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;bean&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;class=&quot;org.springframework.web.servlet.view.json.MappingJackson2JsonView&quot;&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;property&nbsp;name=&quot;prettyPrint&quot;&nbsp;value=&quot;true&quot;&nbsp;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;property&nbsp;name=&quot;contentType&quot;&nbsp;value=&quot;text/plain&quot;&nbsp;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/bean&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/list&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/property&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;/bean&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;--&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;!--定义异常处理页面&nbsp;--&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;bean&nbsp;id=&quot;exceptionResolver&quot;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;class=&quot;org.springframework.web.servlet.handler.SimpleMappingExceptionResolver&quot;&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;property&nbsp;name=&quot;exceptionMappings&quot;&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;props&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;prop&nbsp;key=&quot;java.lang.Exception&quot;&gt;outException&lt;/prop&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/props&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/property&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;/bean&gt;&nbsp;&nbsp;</li>
+	<li>&lt;/beans&gt;&nbsp;&nbsp;</li>
+</ol>

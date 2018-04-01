@@ -1,0 +1,152 @@
+<h1>springmvc的多视图支持</h1>
+
+<p><strong>一、什么是多视图支持</strong></p>
+
+<p>1、多视图指的是各种媒体类型，如：json、xml、pdf等。&nbsp;<br />
+2、springmvc提供的多视图支持是指将一个能够返回数据的请求，根据请求链接(url)不同的后缀，产生不同的数据格式进行返回。如：<a href="http://localhost:8080/springmvc/rest/user/multiView.xml" target="_blank">http://localhost:8080/springmvc/rest/user/multiView.xml</a>返回的是xml格式数据，而<a href="http://localhost:8080/springmvc/rest/user/multiView.json" target="_blank">http://localhost:8080/springmvc/rest/user/multiView.json</a>返回的是json格式数据。</p>
+
+<h3><strong>二、怎么使用多视图支持</strong></h3>
+
+<h4>1、导入jar包</h4>
+
+<p><em>一般需要支持什么视图就导入什么jar包</em></p>
+
+<blockquote>
+<p>json：jackson-core-asl-1.9.11.jar、jackson-mapper-asl-1.9.11.jar&nbsp;<br />
+xml：spring-oxm-3.2.0.RELEASE.jar（在spring的lib包下：spring-framework-3.2.0.RELEASE-dist\spring-framework-3.2.0.RELEASE\libs）</p>
+</blockquote>
+
+<h4>2、配置springmvc的多视图支持</h4>
+
+<p><em>该配置适用于spring3.2及以后的版本</em></p>
+
+<pre>
+<code>&lt;!-- 配置多视图解析 --&gt;
+&lt;bean class=&quot;org.springframework.web.servlet.view.ContentNegotiatingViewResolver&quot;&gt;
+    &lt;property name=&quot;contentNegotiationManager&quot;&gt;
+        &lt;bean class=&quot;org.springframework.web.accept.ContentNegotiationManagerFactoryBean&quot;&gt;
+            &lt;property name=&quot;mediaTypes&quot;&gt;
+                &lt;map&gt;
+                    &lt;entry key=&quot;json&quot; value=&quot;application/json&quot;&gt;&lt;/entry&gt;
+                    &lt;entry key=&quot;xml&quot; value=&quot;application/xml&quot;&gt;&lt;/entry&gt;
+                &lt;/map&gt;
+            &lt;/property&gt;
+        &lt;/bean&gt;
+    &lt;/property&gt;
+    &lt;property name=&quot;defaultViews&quot;&gt;
+        &lt;list&gt;
+            &lt;bean class=&quot;org.springframework.web.servlet.view.json.MappingJacksonJsonView&quot;&gt;&lt;/bean&gt;
+            &lt;bean class=&quot;org.springframework.web.servlet.view.xml.MarshallingView&quot;&gt;
+                &lt;constructor-arg&gt;
+                    &lt;bean class=&quot;org.springframework.oxm.jaxb.Jaxb2Marshaller&quot;&gt;
+                        &lt;property name=&quot;classesToBeBound&quot;&gt;
+                            &lt;list&gt;
+                                &lt;value&gt;POJO类的全限定名(如：com.lqr.domain.User)&lt;/value&gt;
+                                &lt;value&gt;...&lt;/value&gt;
+                            &lt;/list&gt;
+                        &lt;/property&gt;
+                    &lt;/bean&gt;
+                &lt;/constructor-arg&gt;
+            &lt;/bean&gt;
+        &lt;/list&gt;
+    &lt;/property&gt;
+&lt;/bean&gt;
+</code></pre>
+
+<h4>3、对javabean类进行xml注解</h4>
+
+<p><em>该注解会影响@ResponseBody，如果要@ResponseBody请不要使用@XmlRootElement</em></p>
+
+<pre>
+<code>@XmlRootElement
+public class User {
+
+    private Integer id;
+    private String username;
+    private Integer age;
+    private String address;
+
+    public Integer getId() {
+        return id;
+    }
+
+    public void setId(Integer id) {
+        this.id = id;
+    }
+
+    public String getUsername() {
+        return username;
+    }
+
+    public void setUsername(String username) {
+        this.username = username;
+    }
+
+    public Integer getAge() {
+        return age;
+    }
+
+    public void setAge(Integer age) {
+        this.age = age;
+    }
+
+    public String getAddress() {
+        return address;
+    }
+
+    public void setAddress(String address) {
+        this.address = address;
+    }
+
+}</code></pre>
+
+<h4>4、增加springmvc的请求路径</h4>
+
+<p><em>因为spring的官方说明中说到，不同数据格式的数据获取采用的根据后缀名来判定的，所以如果你在web.xml中配置springmvc的url匹配模式是后缀类型（如：*.do），则二者矛盾，故需要增加别的url匹配模式，这样可以保证url的请求是经过springmvc处理的，并不与多视图的访问url冲突。</em></p>
+
+<pre>
+<code>&lt;servlet&gt;
+    &lt;servlet-name&gt;springmvc&lt;/servlet-name&gt;
+    &lt;servlet-class&gt;org.springframework.web.servlet.DispatcherServlet&lt;/servlet-class&gt;
+    &lt;init-param&gt;
+        &lt;param-name&gt;contextConfigLocation&lt;/param-name&gt;
+        &lt;param-value&gt;classpath:springmvc.xml&lt;/param-value&gt;
+    &lt;/init-param&gt;
+&lt;/servlet&gt;
+
+&lt;servlet-mapping&gt;
+    &lt;servlet-name&gt;springmvc&lt;/servlet-name&gt;
+    &lt;url-pattern&gt;*.do&lt;/url-pattern&gt;
+&lt;/servlet-mapping&gt;
+
+&lt;servlet-mapping&gt;
+    &lt;servlet-name&gt;springmvc&lt;/servlet-name&gt;
+    &lt;url-pattern&gt;/rest/*&lt;/url-pattern&gt;
+&lt;/servlet-mapping&gt;</code></pre>
+
+<h4>5、编写Controller类</h4>
+
+<p><em>跟常规的Controller一样</em></p>
+
+<pre>
+<code>@Controller
+@RequestMapping(&quot;user&quot;)
+public class UserController {
+
+    @RequestMapping(&quot;multiView&quot;)
+    public User getUser() {
+        User user = new User();
+        user.setAge(21);
+        user.setAddress(&quot;深圳&quot;);
+        user.setUsername(&quot;CSDN_LQR&quot;);
+        return user;
+    }
+}</code></pre>
+
+<h4>6、在浏览器访问试试</h4>
+
+<p>得到json数据&nbsp;<br />
+<img alt="这里写图片描述" src="https://img-blog.csdn.net/20161120104429852" title="" /></p>
+
+<p>得到xml数据&nbsp;<br />
+<img alt="这里写图片描述" src="https://img-blog.csdn.net/20161120104439729" title="" /></p>

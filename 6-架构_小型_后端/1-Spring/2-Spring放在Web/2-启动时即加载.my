@@ -1,0 +1,693 @@
+<h1><a href="http://www.cnblogs.com/duanxz/p/7493276.html" id="cb_post_title_url">spring4.0之二：@Configuration的使用</a></h1>
+
+<p>　　从Spring3.0，@Configuration用于定义配置类，可替换xml配置文件，被注解的类内部包含有一个或多个被@Bean注解的方法，这些方法将会被AnnotationConfigApplicationContext或AnnotationConfigWebApplicationContext类进行扫描，并用于构建bean定义，初始化Spring容器。</p>
+
+<p><strong>注意</strong>：@Configuration注解的配置类有如下要求：</p>
+
+<ol>
+	<li>@Configuration不可以是final类型；</li>
+	<li>@Configuration不可以是匿名类；</li>
+	<li>嵌套的configuration必须是静态类。</li>
+</ol>
+
+<p>一、用@Configuration加载spring<br />
+1.1、@Configuration配置spring并启动spring容器<br />
+1.2、@Configuration启动容器+@Bean注册Bean<br />
+1.3、@Configuration启动容器+@Component注册Bean<br />
+1.4、<strong>使用 AnnotationConfigApplicationContext 注册 AppContext 类的两种方法</strong><br />
+<strong>1.5、配置Web应用程序(web.xml中配置AnnotationConfigApplicationContext)</strong></p>
+
+<p>二、组合多个配置类<br />
+2.1、在@configuration中引入spring的xml配置文件<br />
+2.2、在@configuration中引入其它注解配置<br />
+2.3、@configuration嵌套（嵌套的Configuration必须是静态类）<br />
+三、@EnableXXX注解<br />
+四、@Profile逻辑组配置<br />
+五、使用外部变量</p>
+
+<h2>一、@Configuation加载Spring方法</h2>
+
+<h3>1.1、@Configuration配置spring并启动spring容器</h3>
+
+<p>@Configuration标注在类上，相当于把该类作为spring的xml配置文件中的<code>&lt;beans&gt;</code>，作用为：配置spring容器(应用上下文)</p>
+
+<pre>
+package com.dxz.demo.configuration;
+
+import org.springframework.context.annotation.Configuration;
+
+@Configuration
+public class TestConfiguration {
+    public TestConfiguration() {
+        System.out.println(&quot;TestConfiguration容器启动初始化。。。&quot;);
+    }
+}
+</pre>
+
+<p>相当于：</p>
+
+<pre>
+&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot;?&gt;
+&lt;beans xmlns=&quot;http://www.springframework.org/schema/beans&quot; xmlns:xsi=&quot;http://www.w3.org/2001/XMLSchema-instance&quot;
+    xmlns:context=&quot;http://www.springframework.org/schema/context&quot; xmlns:jdbc=&quot;http://www.springframework.org/schema/jdbc&quot;  
+    xmlns:jee=&quot;http://www.springframework.org/schema/jee&quot; xmlns:tx=&quot;http://www.springframework.org/schema/tx&quot;
+    xmlns:util=&quot;http://www.springframework.org/schema/util&quot; xmlns:task=&quot;http://www.springframework.org/schema/task&quot; xsi:schemaLocation=&quot;
+        http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-4.0.xsd
+        http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context-4.0.xsd
+        http://www.springframework.org/schema/jdbc http://www.springframework.org/schema/jdbc/spring-jdbc-4.0.xsd
+        http://www.springframework.org/schema/jee http://www.springframework.org/schema/jee/spring-jee-4.0.xsd
+        http://www.springframework.org/schema/tx http://www.springframework.org/schema/tx/spring-tx-4.0.xsd
+        http://www.springframework.org/schema/util http://www.springframework.org/schema/util/spring-util-4.0.xsd
+        http://www.springframework.org/schema/task http://www.springframework.org/schema/task/spring-task-4.0.xsd&quot; default-lazy-init=&quot;false&quot;&gt;
+
+
+&lt;/beans&gt;
+</pre>
+
+<p>主方法进行测试：</p>
+
+<pre>
+package com.dxz.demo.configuration;
+
+import org.springframework.context.ApplicationContext;
+import org.springframework.context.annotation.AnnotationConfigApplicationContext;
+
+public class TestMain {
+    public static void main(String[] args) {
+
+        // @Configuration注解的spring容器加载方式，用AnnotationConfigApplicationContext替换ClassPathXmlApplicationContext
+        ApplicationContext context = new AnnotationConfigApplicationContext(TestConfiguration.class);
+
+        // 如果加载spring-context.xml文件：
+        // ApplicationContext context = new
+        // ClassPathXmlApplicationContext(&quot;spring-context.xml&quot;);
+    }
+}
+</pre>
+
+<p>从运行主方法结果可以看出，spring容器已经启动了：</p>
+
+<p><img alt="" src="https://images2017.cnblogs.com/blog/285763/201709/285763-20170908101629304-1829286984.png" /></p>
+
+<h3>1.2、@Configuration启动容器+@Bean注册Bean，@Bean下管理bean的生命周期</h3>
+
+<p>@Bean标注在方法上(返回某个实例的方法)，等价于spring的xml配置文件中的<code>&lt;bean&gt;</code>，作用为：注册bean对象</p>
+
+<p>bean类：</p>
+
+<pre>
+package com.dxz.demo.configuration;
+
+public class TestBean {
+
+    private String username;
+    private String url;
+    private String password;
+
+    public void sayHello() {
+        System.out.println(&quot;TestBean sayHello...&quot;);
+    }
+
+    public String toString() {
+        return &quot;username:&quot; + this.username + &quot;,url:&quot; + this.url + &quot;,password:&quot; + this.password;
+    }
+
+    public void start() {
+        System.out.println(&quot;TestBean 初始化。。。&quot;);
+    }
+
+    public void cleanUp() {
+        System.out.println(&quot;TestBean 销毁。。。&quot;);
+    }
+}
+</pre>
+
+<p>配置类：</p>
+
+<pre>
+package com.dxz.demo.configuration;
+
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Scope;
+
+@Configuration
+public class TestConfiguration {
+    public TestConfiguration() {
+        System.out.println(&quot;TestConfiguration容器启动初始化。。。&quot;);
+    }
+
+    // @Bean注解注册bean,同时可以指定初始化和销毁方法
+    // @Bean(name=&quot;testBean&quot;,initMethod=&quot;start&quot;,destroyMethod=&quot;cleanUp&quot;)
+    @Bean
+    @Scope(&quot;prototype&quot;)
+    public TestBean testBean() {
+        return new TestBean();
+    }
+}
+</pre>
+
+<p>主方法测试类：</p>
+
+<pre>
+package com.dxz.demo.configuration;
+
+import org.springframework.context.ApplicationContext;
+import org.springframework.context.annotation.AnnotationConfigApplicationContext;
+
+public class TestMain {
+    public static void main(String[] args) {
+
+        // @Configuration注解的spring容器加载方式，用AnnotationConfigApplicationContext替换ClassPathXmlApplicationContext
+        ApplicationContext context = new AnnotationConfigApplicationContext(TestConfiguration.class);
+
+        // 如果加载spring-context.xml文件：
+        // ApplicationContext context = new
+        // ClassPathXmlApplicationContext(&quot;spring-context.xml&quot;);
+        
+         //获取bean
+        TestBean tb = (TestBean) context.getBean(&quot;testBean&quot;);
+        tb.sayHello();
+    }
+}
+</pre>
+
+<p>结果：</p>
+
+<p><img alt="" src="https://images2017.cnblogs.com/blog/285763/201709/285763-20170908102054726-580591415.png" /></p>
+
+<p>注：&nbsp;<br />
+(1)、@Bean注解在返回实例的方法上，如果未通过@Bean指定bean的名称，则默认与标注的方法名相同；&nbsp;<br />
+(2)、@Bean注解默认作用域为单例singleton作用域，可通过@Scope(&ldquo;prototype&rdquo;)设置为原型作用域；&nbsp;<br />
+(3)、既然@Bean的作用是注册bean对象，那么完全可以使用@Component、@Controller、@Service、@Ripository等注解注册bean，当然需要配置@ComponentScan注解进行自动扫描。</p>
+
+<h3>&nbsp;</h3>
+
+<h3><strong>@Bean下管理bean的生命周期</strong></h3>
+
+<p>可以使用基于 Java 的配置来管理 bean 的生命周期。<code>@Bean</code>&nbsp;支持两种属性，即&nbsp;<code>initMethod</code>&nbsp;和<code>destroyMethod</code>，这些属性可用于定义生命周期方法。在实例化 bean 或即将销毁它时，容器便可调用生命周期方法。生命周期方法也称为回调方法，因为它将由容器调用。使用&nbsp;<code>@Bean</code>&nbsp;注释注册的 bean 也支持 JSR-250 规定的标准&nbsp;<code>@PostConstruct</code>&nbsp;和&nbsp;<code>@PreDestroy</code>&nbsp;注释。如果您正在使用 XML 方法来定义 bean，那么就应该使用 bean 元素来定义生命周期回调方法。以下代码显示了在 XML 配置中通常使用 bean 元素定义回调的方法。</p>
+
+<pre>
+@Configuration
+@ComponentScan(basePackages = &quot;com.dxz.demo.configuration&quot;)
+public class TestConfiguration {
+    public TestConfiguration() {
+        System.out.println(&quot;TestConfiguration容器启动初始化。。。&quot;);
+    }
+
+    //@Bean注解注册bean,同时可以指定初始化和销毁方法
+    @Bean(name=&quot;testBean&quot;,initMethod=&quot;start&quot;,destroyMethod=&quot;cleanUp&quot;)
+    @Scope(&quot;prototype&quot;)
+    public TestBean testBean() {
+        return new TestBean();
+    }
+}
+</pre>
+
+<p>启动类：</p>
+
+<pre>
+public class TestMain {
+    public static void main(String[] args) {
+
+        ApplicationContext context = new AnnotationConfigApplicationContext(TestConfiguration.class);
+
+        TestBean tb = (TestBean) context.getBean(&quot;testBean&quot;);
+        tb.sayHello();
+        System.out.println(tb);
+        
+        TestBean tb2 = (TestBean) context.getBean(&quot;testBean&quot;);
+        tb2.sayHello();
+        System.out.println(tb2);
+    }
+}
+</pre>
+
+<p>结果：</p>
+
+<p><img alt="" src="https://images2017.cnblogs.com/blog/285763/201712/285763-20171227095108979-1527113599.png" /></p>
+
+<p>分析：</p>
+
+<p>结果中的1：表明initMethod生效</p>
+
+<p>结果中的2：表明@Scope(&quot;prototype&quot;)生效</p>
+
+<h3>1.3、@Configuration启动容器+@Component注册Bean</h3>
+
+<p>bean类：</p>
+
+<pre>
+package com.dxz.demo.configuration;
+
+import org.springframework.stereotype.Component;
+
+//添加注册bean的注解
+@Component
+public class TestBean {
+
+    private String username;
+    private String url;
+    private String password;
+
+    public void sayHello() {
+        System.out.println(&quot;TestBean sayHello...&quot;);
+    }
+
+    public String toString() {
+        return &quot;username:&quot; + this.username + &quot;,url:&quot; + this.url + &quot;,password:&quot; + this.password;
+    }
+
+    public void start() {
+        System.out.println(&quot;TestBean 初始化。。。&quot;);
+    }
+
+    public void cleanUp() {
+        System.out.println(&quot;TestBean 销毁。。。&quot;);
+    }
+}
+</pre>
+
+<p>配置类：</p>
+
+<pre>
+package com.dxz.demo.configuration;
+
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.ComponentScan;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Scope;
+
+@Configuration
+//添加自动扫描注解，basePackages为TestBean包路径
+@ComponentScan(basePackages = &quot;com.dxz.demo.configuration&quot;)
+public class TestConfiguration {
+    public TestConfiguration() {
+        System.out.println(&quot;TestConfiguration容器启动初始化。。。&quot;);
+    }
+
+    /*// @Bean注解注册bean,同时可以指定初始化和销毁方法
+    // @Bean(name=&quot;testNean&quot;,initMethod=&quot;start&quot;,destroyMethod=&quot;cleanUp&quot;)
+    @Bean
+    @Scope(&quot;prototype&quot;)
+    public TestBean testBean() {
+        return new TestBean();
+    }*/
+}
+</pre>
+
+<p>主方法测试获取bean对象：</p>
+
+<pre>
+package com.dxz.demo.configuration;
+
+import org.springframework.context.ApplicationContext;
+import org.springframework.context.annotation.AnnotationConfigApplicationContext;
+
+public class TestMain {
+    public static void main(String[] args) {
+
+        // @Configuration注解的spring容器加载方式，用AnnotationConfigApplicationContext替换ClassPathXmlApplicationContext
+        ApplicationContext context = new AnnotationConfigApplicationContext(TestConfiguration.class);
+
+        // 如果加载spring-context.xml文件：
+        // ApplicationContext context = new
+        // ClassPathXmlApplicationContext(&quot;spring-context.xml&quot;);
+        
+         //获取bean
+        TestBean tb = (TestBean) context.getBean(&quot;testBean&quot;);
+        tb.sayHello();
+    }
+}
+</pre>
+
+<p>sayHello()方法都被正常调用。</p>
+
+<p><img alt="" src="https://images2017.cnblogs.com/blog/285763/201709/285763-20170908102801913-1944418249.png" /></p>
+
+<h3>1.4、<strong>使用 AnnotationConfigApplicationContext 注册 AppContext 类的两种方法</strong></h3>
+
+<h4>1.4.1、&nbsp;配置类的注册方式是将其传递给&nbsp;<code>AnnotationConfigApplicationContext</code>&nbsp;构造函数</h4>
+
+<pre>
+public static void main(String[] args) {
+
+        // @Configuration注解的spring容器加载方式，用AnnotationConfigApplicationContext替换ClassPathXmlApplicationContext
+        ApplicationContext context = new AnnotationConfigApplicationContext(TestConfiguration.class);
+
+        //获取bean
+        TestBean tb = (TestBean) context.getBean(&quot;testBean&quot;);
+        tb.sayHello();
+    }
+</pre>
+
+<h4>1.4.2、&nbsp;<code>AnnotationConfigApplicationContext</code>&nbsp;的<code>register</code>&nbsp;方法传入配置类来注册配置类</h4>
+
+<pre>
+public static void main(String[] args) {
+  ApplicationContext ctx = new AnnotationConfigApplicationContext();
+  ctx.register(AppContext.class)
+}</pre>
+
+<h3>1.5、配置Web应用程序(web.xml中配置AnnotationConfigApplicationContext)</h3>
+
+<p>过去，您通常要利用 XmlWebApplicationContext 上下文来配置 Spring Web 应用程序，即在 Web 部署描述符文件 web.xml 中指定外部 XML 上下文文件的路径。XMLWebApplicationContext 是 Web 应用程序使用的默认上下文类。以下代码描述了 web.xml 中指向将由 ContextLoaderListener 监听器类载入的外部 XML 上下文文件的元素。</p>
+
+<pre>
+&lt;web-app&gt;
+    &lt;context-param&gt;
+        &lt;param-name&gt;contextConfigLocation&lt;/param-name&gt;
+        &lt;param-value&gt;/WEB-INF/applicationContext.xml&lt;/param-value&gt;
+    &lt;/context-param&gt;
+    &lt;listener&gt;
+        &lt;listener-class&gt;
+            org.springframework.web.context.ContextLoaderListener
+        &lt;/listener-class&gt;
+    &lt;/listener&gt;
+    &lt;servlet&gt;
+    &lt;servlet-name&gt;sampleServlet&lt;/servlet-name&gt;
+    &lt;servlet-class&gt;
+        org.springframework.web.servlet.DispatcherServlet
+    &lt;/servlet-class&gt;
+    &lt;/servlet&gt;
+
+...
+&lt;/web-app&gt;
+</pre>
+
+<p>现在，您要将 web.xml 中的上述代码更改为使用 AnnotationConfigApplicationContext 类。切记，XmlWebApplicationContext 是 Spring 为 Web 应用程序使用的默认上下文实现，因此您永远不必在您的web.xml 文件中显式指定这个上下文类。现在，您将使用基于 Java 的配置，因此在配置 Web 应用程序时，需要在web.xml 文件中指定 AnnotationConfigApplicationContext 类。上述代码将修改如下：</p>
+
+<pre>
+&lt;web-app&gt;
+    &lt;context-param&gt;
+        &lt;param-name&gt;contextClass&lt;/param-name&gt;
+        &lt;param-value&gt;
+            org.springframework.web.context.
+            support.AnnotationConfigWebApplicationContext
+        &lt;/param-value&gt;
+    &lt;/context-param&gt;
+    &lt;context-param&gt;
+        &lt;param-name&gt;contextConfigLocation&lt;/param-name&gt;
+        &lt;param-value&gt;
+            demo.AppContext
+        &lt;/param-value&gt;
+    &lt;/context-param&gt;
+    &lt;listener&gt;
+        &lt;listener-class&gt;
+            org.springframework.web.context.ContextLoaderListener
+        &lt;/listener-class&gt;
+    &lt;/listener&gt;
+    &lt;servlet&gt;
+    &lt;servlet-name&gt;sampleServlet&lt;/servlet-name&gt;
+    &lt;servlet-class&gt;
+        org.springframework.web.servlet.DispatcherServlet
+    &lt;/servlet-class&gt;
+    &lt;init-param&gt;
+        &lt;param-name&gt;contextClass&lt;/param-name&gt;
+        &lt;param-value&gt;
+            org.springframework.web.context.
+            support.AnnotationConfigWebApplicationContext
+        &lt;/param-value&gt;
+    &lt;/init-param&gt;
+    &lt;/servlet&gt;
+
+...
+&lt;/web-app&gt;
+</pre>
+
+<p>以上修改后的&nbsp;<code>web.xml</code>&nbsp;现在定义了&nbsp;<code>AnnotationConfigWebApplicationContext</code>&nbsp;上下文类，并将其作为上下文参数和 servlet 元素的一部分。上下文配置位置现在指向&nbsp;<code>AppContext</code>&nbsp;配置类。这非常简单。下一节将演示 bean 的生命周期回调和范围的实现。</p>
+
+<h3>1.6、@Configuation总结</h3>
+
+<p>&nbsp;@Configuation等价于&lt;Beans&gt;&lt;/Beans&gt;</p>
+
+<p>&nbsp;@Bean等价于&lt;Bean&gt;&lt;/Bean&gt;</p>
+
+<p>&nbsp;@ComponentScan等价于&lt;context:component-scan base-package=&quot;com.dxz.demo&quot;/&gt;</p>
+
+<p>&nbsp;</p>
+
+<h2>二、组合多个配置类</h2>
+
+<h3>2.1、在@configuration中引入spring的xml配置文件</h3>
+
+<pre>
+package com.dxz.demo.configuration2;
+
+import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.ImportResource;
+
+@Configuration
+@ImportResource(&quot;classpath:applicationContext-configuration.xml&quot;)
+public class WebConfig {
+}
+</pre>
+
+<p>bean类：</p>
+
+<pre>
+package com.dxz.demo.configuration2;
+
+public class TestBean2 {
+    private String username;
+    private String url;
+    private String password;
+
+    public void sayHello() {
+        System.out.println(&quot;TestBean2 sayHello...&quot;);
+    }
+
+    public String toString() {
+        return &quot;TestBean2 username:&quot; + this.username + &quot;,url:&quot; + this.url + &quot;,password:&quot; + this.password;
+    }
+
+    public void start() {
+        System.out.println(&quot;TestBean2 初始化。。。&quot;);
+    }
+
+    public void cleanUp() {
+        System.out.println(&quot;TestBean2 销毁。。。&quot;);
+    }
+}
+</pre>
+
+<p>测试类：</p>
+
+<pre>
+package com.dxz.demo.configuration2;
+
+import org.springframework.context.ApplicationContext;
+import org.springframework.context.annotation.AnnotationConfigApplicationContext;
+
+public class TestMain2 {
+    public static void main(String[] args) {
+
+        // @Configuration注解的spring容器加载方式，用AnnotationConfigApplicationContext替换ClassPathXmlApplicationContext
+        ApplicationContext context = new AnnotationConfigApplicationContext(WebConfig.class);
+
+        // 如果加载spring-context.xml文件：
+        // ApplicationContext context = new
+        // ClassPathXmlApplicationContext(&quot;spring-context.xml&quot;);
+
+        // 获取bean
+        TestBean2 tb = (TestBean2) context.getBean(&quot;testBean2&quot;);
+        tb.sayHello();
+    }
+}
+</pre>
+
+<p>结果：</p>
+
+<p><img alt="" src="https://images2017.cnblogs.com/blog/285763/201709/285763-20170908104701335-261091765.png" /></p>
+
+<h3>&nbsp;2.2、在@configuration中引入其它注解配置</h3>
+
+<pre>
+package com.dxz.demo.configuration2;
+
+import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Import;
+import org.springframework.context.annotation.ImportResource;
+
+import com.dxz.demo.configuration.TestConfiguration;
+
+@Configuration
+@ImportResource(&quot;classpath:applicationContext-configuration.xml&quot;)
+@Import(TestConfiguration.class)
+public class WebConfig {
+}
+</pre>
+
+<p>测试类：</p>
+
+<pre>
+package com.dxz.demo.configuration2;
+
+import org.springframework.context.ApplicationContext;
+import org.springframework.context.annotation.AnnotationConfigApplicationContext;
+
+import com.dxz.demo.configuration.TestBean;
+
+public class TestMain2 {
+    public static void main(String[] args) {
+
+        // @Configuration注解的spring容器加载方式，用AnnotationConfigApplicationContext替换ClassPathXmlApplicationContext
+        ApplicationContext context = new AnnotationConfigApplicationContext(WebConfig.class);
+
+        // 如果加载spring-context.xml文件：
+        // ApplicationContext context = new
+        // ClassPathXmlApplicationContext(&quot;spring-context.xml&quot;);
+
+        // 获取bean
+        TestBean2 tb2 = (TestBean2) context.getBean(&quot;testBean2&quot;);
+        tb2.sayHello();
+        
+        TestBean tb = (TestBean) context.getBean(&quot;testBean&quot;);
+        tb.sayHello();
+    }
+}
+</pre>
+
+<p>结果：</p>
+
+<p><img alt="" src="https://images2017.cnblogs.com/blog/285763/201709/285763-20170908110048757-687007437.png" /></p>
+
+<h3>2.3、@configuration嵌套（嵌套的Configuration必须是静态类）</h3>
+
+<p>通过配置类嵌套的配置类，达到组合多个配置类的目的。但注意内部类必须是静态类。</p>
+
+<p>上代码：</p>
+
+<pre>
+package com.dxz.demo.configuration3;
+
+import org.springframework.stereotype.Component;
+
+@Component
+public class TestBean {
+
+    private String username;
+    private String url;
+    private String password;
+
+    public void sayHello() {
+        System.out.println(&quot;TestBean sayHello...&quot;);
+    }
+
+    public String toString() {
+        return &quot;username:&quot; + this.username + &quot;,url:&quot; + this.url + &quot;,password:&quot; + this.password;
+    }
+
+    public void start() {
+        System.out.println(&quot;TestBean start&quot;);
+    }
+
+    public void cleanUp() {
+        System.out.println(&quot;TestBean destory&quot;);
+    }
+}
+</pre>
+
+<pre>
+package com.dxz.demo.configuration3;
+
+public class DataSource {
+
+    private String dbUser;
+    private String dbPass;
+    public String getDbUser() {
+        return dbUser;
+    }
+    public void setDbUser(String dbUser) {
+        this.dbUser = dbUser;
+    }
+    public String getDbPass() {
+        return dbPass;
+    }
+    public void setDbPass(String dbPass) {
+        this.dbPass = dbPass;
+    }
+    @Override
+    public String toString() {
+        return &quot;DataSource [dbUser=&quot; + dbUser + &quot;, dbPass=&quot; + dbPass + &quot;]&quot;;
+    }
+}
+</pre>
+
+<p>配置类：</p>
+
+<pre>
+package com.dxz.demo.configuration3;
+
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.ComponentScan;
+import org.springframework.context.annotation.Configuration;
+
+@Configuration
+@ComponentScan(basePackages = &quot;com.dxz.demo.configuration3&quot;)
+public class TestConfiguration {
+    public TestConfiguration() {
+        System.out.println(&quot;TestConfiguration容器启动初始化。。。&quot;);
+    }
+    
+    @Configuration
+    static class DatabaseConfig {
+        @Bean
+        DataSource dataSource() {
+            return new DataSource();
+        }
+    }
+}
+</pre>
+
+<p>启动类：</p>
+
+<pre>
+package com.dxz.demo.configuration3;
+
+import org.springframework.context.ApplicationContext;
+import org.springframework.context.annotation.AnnotationConfigApplicationContext;
+
+public class TestMain {
+    public static void main(String[] args) {
+
+        // @Configuration注解的spring容器加载方式，用AnnotationConfigApplicationContext替换ClassPathXmlApplicationContexts
+        ApplicationContext context = new AnnotationConfigApplicationContext(TestConfiguration.class);
+
+         //bean
+        TestBean tb = (TestBean) context.getBean(&quot;testBean&quot;);
+        tb.sayHello();
+        
+        DataSource ds = (DataSource) context.getBean(&quot;dataSource&quot;);
+        System.out.println(ds);
+    }
+}
+</pre>
+
+<p>结果：</p>
+
+<pre>
+TestConfiguration容器启动初始化。。。
+TestBean sayHello...
+DataSource [dbUser=null, dbPass=null]</pre>
+
+<h2>3、@EnableXXX注解</h2>
+
+<p>配合@Configuration使用，包括 @EnableAsync, @EnableScheduling, @EnableTransactionManagement, @EnableAspectJAutoProxy, @EnableWebMvc。</p>
+
+<p>@EnableAspectJAutoProxy---《<a href="http://www.cnblogs.com/duanxz/p/5194801.html" id="link_post_title">spring AOP 之：@Aspect注解</a>》</p>
+
+<p>@EnableScheduling--《<a href="http://www.cnblogs.com/duanxz/p/4875156.html" id="cb_post_title_url">Spring 3.1新特性之二：@Enable*注解的源码,spring源码分析之定时任务Scheduled注解</a>》</p>
+
+<h2>4、@Profile逻辑组配置</h2>
+
+<p>见《<a href="http://www.cnblogs.com/duanxz/archive/2012/11/06/2756362.html" id="cb_post_title_url">Spring的@PropertySource + Environment，@PropertySource（PropertySourcesPlaceholderConfigurer）+@Value配合使用</a>》</p>
+
+<h2><em>5、使用外部变量</em></h2>
+
+<p>1、@PropertySource + Environment，通过@PropertySource注解将properties配置文件中的值存储到Spring的 Environment中，Environment接口提供方法去读取配置文件中的值，参数是properties文件中定义的key值。<br />
+2、@PropertySource（PropertySourcesPlaceholderConfigurer）+@Value</p>
+
+<p>见《<a href="http://www.cnblogs.com/duanxz/archive/2012/11/06/2756362.html" id="cb_post_title_url">Spring的@PropertySource + Environment，@PropertySource（PropertySourcesPlaceholderConfigurer）+@Value配合使用</a>》</p>
+
+<p>&nbsp;</p>
