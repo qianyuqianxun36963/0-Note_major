@@ -1,0 +1,734 @@
+<h1>Spring MVC 4 - 多视图输出</h1>
+
+<blockquote>
+<p>这是一个Spring MVC 多种视图输出的Demo.&nbsp;<br />
+全部基于注解的配置方式，输出（JSON,XML,PDF,Excel,Html）。</p>
+</blockquote>
+
+<p>用到的技术：</p>
+
+<ul>
+	<li>Maven 3</li>
+	<li>Intellij IDEA 2016.1</li>
+	<li>JDK 1.8</li>
+	<li>jetty-maven-plugin 9.2.9.v20160517</li>
+	<li>Spring MVC 4.2.2.RELEASE</li>
+	<li>jackson-core 2.8.5</li>
+	<li>jackson-databind 2.8.5</li>
+	<li>spring-oxm 4.2.4.RELEASE</li>
+	<li>itextpdf 5.5.10</li>
+	<li>itext 2.1.7</li>
+	<li>poi 3.15</li>
+</ul>
+
+<h1>1.项目结构</h1>
+
+<p><img alt="这里写图片描述" src="https://img-blog.csdn.net/20161223134520183?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQvamVpa2VyeGlhbw==/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70/gravity/SouthEast" title="" /></p>
+
+<h1>2.pom.xml文件</h1>
+
+<pre>
+<code>&lt;project xmlns=&quot;http://maven.apache.org/POM/4.0.0&quot; xmlns:xsi=&quot;http://www.w3.org/2001/XMLSchema-instance&quot;
+  xsi:schemaLocation=&quot;http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd&quot;&gt;
+  &lt;modelVersion&gt;4.0.0&lt;/modelVersion&gt;
+  &lt;groupId&gt;com.jeiker.demo&lt;/groupId&gt;
+  &lt;artifactId&gt;spring-views&lt;/artifactId&gt;
+  &lt;packaging&gt;war&lt;/packaging&gt;
+  &lt;version&gt;1.0-SNAPSHOT&lt;/version&gt;
+  &lt;name&gt;spring-views Maven Webapp&lt;/name&gt;
+  &lt;url&gt;http://maven.apache.org&lt;/url&gt;
+
+  &lt;properties&gt;
+    &lt;jdk.version&gt;1.8&lt;/jdk.version&gt;
+    &lt;spring.version&gt;4.2.2.RELEASE&lt;/spring.version&gt;
+    &lt;jackson.version&gt;2.8.5&lt;/jackson.version&gt;
+    &lt;logback.version&gt;1.1.7&lt;/logback.version&gt;
+    &lt;jcl.slf4j.version&gt;1.7.21&lt;/jcl.slf4j.version&gt;
+    &lt;jstl.version&gt;1.2&lt;/jstl.version&gt;
+    &lt;servletapi.version&gt;3.1.0&lt;/servletapi.version&gt;
+    &lt;junit.version&gt;3.8.1&lt;/junit.version&gt;
+  &lt;/properties&gt;
+
+  &lt;dependencies&gt;
+    &lt;!-- 单元测试 --&gt;
+    &lt;dependency&gt;
+      &lt;groupId&gt;junit&lt;/groupId&gt;
+      &lt;artifactId&gt;junit&lt;/artifactId&gt;
+      &lt;version&gt;${junit.version}&lt;/version&gt;
+      &lt;scope&gt;test&lt;/scope&gt;
+    &lt;/dependency&gt;
+
+    &lt;!-- spring-webmvc 排除日志依赖--&gt;
+    &lt;dependency&gt;
+      &lt;groupId&gt;org.springframework&lt;/groupId&gt;
+      &lt;artifactId&gt;spring-webmvc&lt;/artifactId&gt;
+      &lt;version&gt;${spring.version}&lt;/version&gt;
+      &lt;exclusions&gt;
+        &lt;exclusion&gt;
+          &lt;groupId&gt;commons-logging&lt;/groupId&gt;
+          &lt;artifactId&gt;commons-logging&lt;/artifactId&gt;
+        &lt;/exclusion&gt;
+      &lt;/exclusions&gt;
+    &lt;/dependency&gt;
+
+    &lt;!-- json转对象 ,对象转json --&gt;
+    &lt;dependency&gt;
+      &lt;groupId&gt;com.fasterxml.jackson.core&lt;/groupId&gt;
+      &lt;artifactId&gt;jackson-core&lt;/artifactId&gt;
+      &lt;version&gt;${jackson.version}&lt;/version&gt;
+    &lt;/dependency&gt;
+
+    &lt;dependency&gt;
+      &lt;groupId&gt;com.fasterxml.jackson.core&lt;/groupId&gt;
+      &lt;artifactId&gt;jackson-databind&lt;/artifactId&gt;
+      &lt;version&gt;${jackson.version}&lt;/version&gt;
+    &lt;/dependency&gt;
+
+    &lt;!-- XML视图 --&gt;
+    &lt;dependency&gt;
+      &lt;groupId&gt;org.springframework&lt;/groupId&gt;
+      &lt;artifactId&gt;spring-oxm&lt;/artifactId&gt;
+      &lt;version&gt;${spring.version}&lt;/version&gt;
+    &lt;/dependency&gt;
+
+    &lt;!-- PDF视图 --&gt;
+    &lt;dependency&gt;
+      &lt;groupId&gt;com.lowagie&lt;/groupId&gt;
+      &lt;artifactId&gt;itext&lt;/artifactId&gt;
+      &lt;version&gt;2.1.7&lt;/version&gt;
+    &lt;/dependency&gt;
+
+    &lt;dependency&gt;
+      &lt;groupId&gt;com.itextpdf&lt;/groupId&gt;
+      &lt;artifactId&gt;itextpdf&lt;/artifactId&gt;
+      &lt;version&gt;5.5.10&lt;/version&gt;
+    &lt;/dependency&gt;
+
+    &lt;!-- Excel视图 --&gt;
+    &lt;dependency&gt;
+      &lt;groupId&gt;org.apache.poi&lt;/groupId&gt;
+      &lt;artifactId&gt;poi&lt;/artifactId&gt;
+      &lt;version&gt;3.15&lt;/version&gt;
+    &lt;/dependency&gt;
+
+    &lt;!-- view层的 jsp标准函数库 --&gt;
+    &lt;dependency&gt;
+      &lt;groupId&gt;javax.servlet&lt;/groupId&gt;
+      &lt;artifactId&gt;jstl&lt;/artifactId&gt;
+      &lt;version&gt;${jstl.version}&lt;/version&gt;
+    &lt;/dependency&gt;
+
+    &lt;!-- 日志 --&gt;
+    &lt;dependency&gt;
+      &lt;groupId&gt;org.slf4j&lt;/groupId&gt;
+      &lt;artifactId&gt;jcl-over-slf4j&lt;/artifactId&gt;
+      &lt;version&gt;${jcl.slf4j.version}&lt;/version&gt;
+    &lt;/dependency&gt;
+
+    &lt;dependency&gt;
+      &lt;groupId&gt;ch.qos.logback&lt;/groupId&gt;
+      &lt;artifactId&gt;logback-classic&lt;/artifactId&gt;
+      &lt;version&gt;${logback.version}&lt;/version&gt;
+    &lt;/dependency&gt;
+
+    &lt;!-- 仅在编译时使用, 布署不用,布署时容器会提供 --&gt;
+    &lt;dependency&gt;
+      &lt;groupId&gt;javax.servlet&lt;/groupId&gt;
+      &lt;artifactId&gt;javax.servlet-api&lt;/artifactId&gt;
+      &lt;version&gt;${servletapi.version}&lt;/version&gt;
+      &lt;scope&gt;provided&lt;/scope&gt;
+    &lt;/dependency&gt;
+
+  &lt;/dependencies&gt;
+
+  &lt;build&gt;
+    &lt;finalName&gt;spring-views&lt;/finalName&gt;
+
+    &lt;plugins&gt;
+
+      &lt;!--编译插件--&gt;
+      &lt;plugin&gt;
+        &lt;groupId&gt;org.apache.maven.plugins&lt;/groupId&gt;
+        &lt;artifactId&gt;maven-compiler-plugin&lt;/artifactId&gt;
+        &lt;configuration&gt;
+          &lt;source&gt;${jdk.version}&lt;/source&gt;
+          &lt;target&gt;${jdk.version}&lt;/target&gt;
+        &lt;/configuration&gt;
+      &lt;/plugin&gt;
+
+      &lt;!-- 部署至本机 --&gt;
+      &lt;plugin&gt;
+        &lt;groupId&gt;org.eclipse.jetty&lt;/groupId&gt;
+        &lt;artifactId&gt;jetty-maven-plugin&lt;/artifactId&gt;
+        &lt;version&gt;9.3.9.v20160517&lt;/version&gt;
+        &lt;configuration&gt;
+          &lt;httpConnector&gt;
+            &lt;port&gt;8080&lt;/port&gt;
+          &lt;/httpConnector&gt;
+          &lt;webAppConfig&gt;
+            &lt;contextPath&gt;/&lt;/contextPath&gt;
+          &lt;/webAppConfig&gt;
+        &lt;/configuration&gt;
+      &lt;/plugin&gt;
+
+    &lt;/plugins&gt;
+  &lt;/build&gt;
+&lt;/project&gt;
+</code></pre>
+
+<h1>3.servlet配置文件</h1>
+
+<p>AppInitializer.java</p>
+
+<pre>
+<code>package com.jeiker.config;
+
+import org.springframework.web.servlet.support.AbstractAnnotationConfigDispatcherServletInitializer;
+
+/**
+ * @Author : xiao
+ * @Date : 16/12/22 下午6:50
+ */
+public class AppInitializer extends AbstractAnnotationConfigDispatcherServletInitializer {
+
+    @Override
+    protected Class&lt;?&gt;[] getRootConfigClasses() {
+        return new Class[] { AppConfig.class };
+    }
+
+    @Override
+    protected Class&lt;?&gt;[] getServletConfigClasses() {
+        return null;
+    }
+
+    @Override
+    protected String[] getServletMappings() {
+        return new String[] { &quot;/&quot; };
+    }
+
+}
+</code></pre>
+
+<h1>4.spring配置文件</h1>
+
+<p>AppConfig.java</p>
+
+<pre>
+<code>package com.jeiker.config;
+
+import com.jeiker.web.model.Student;
+import com.jeiker.web.viewresolver.ExcelViewResolver;
+import com.jeiker.web.viewresolver.JsonViewResolver;
+import com.jeiker.web.viewresolver.PdfViewResolver;
+import com.jeiker.web.viewresolver.XmlViewResolver;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.ComponentScan;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.http.MediaType;
+import org.springframework.oxm.jaxb.Jaxb2Marshaller;
+import org.springframework.web.accept.ContentNegotiationManager;
+import org.springframework.web.servlet.ViewResolver;
+import org.springframework.web.servlet.config.annotation.ContentNegotiationConfigurer;
+import org.springframework.web.servlet.config.annotation.EnableWebMvc;
+import org.springframework.web.servlet.config.annotation.WebMvcConfigurerAdapter;
+import org.springframework.web.servlet.view.ContentNegotiatingViewResolver;
+import org.springframework.web.servlet.view.InternalResourceViewResolver;
+import org.springframework.web.servlet.view.JstlView;
+
+import java.util.ArrayList;
+import java.util.List;
+
+/**
+ * @Author : xiao
+ * @Date : 16/12/22 下午6:50
+ */
+@Configuration
+@EnableWebMvc
+@ComponentScan(basePackages = &quot;com.jeiker.web&quot;)
+public class AppConfig extends WebMvcConfigurerAdapter{
+
+    /**
+     * Configure ContentNegotiationManager
+     */
+    @Override
+    public void configureContentNegotiation(ContentNegotiationConfigurer configurer) {
+        configurer.ignoreAcceptHeader(true).defaultContentType(MediaType.TEXT_HTML);
+    }
+
+    /**
+     * Configure ContentNegotiatingViewResolver
+     */
+    @Bean
+    public ViewResolver contentNegotiatingViewResolver(ContentNegotiationManager manager) {
+        ContentNegotiatingViewResolver resolver = new ContentNegotiatingViewResolver();
+        resolver.setContentNegotiationManager(manager);
+
+        // 定义所有的视图解析器
+        List&lt;ViewResolver&gt; resolverList = new ArrayList&lt;ViewResolver&gt;();
+
+        resolverList.add(jspViewResolver());
+        resolverList.add(xmlViewResolver());
+        resolverList.add(jsonViewResolver());
+        resolverList.add(excelViewResolver());
+        resolverList.add(pdfViewResolver());
+
+        resolver.setViewResolvers(resolverList);
+        return resolver;
+    }
+
+    /**
+     * XML视图解析器
+     */
+    @Bean
+    public ViewResolver xmlViewResolver() {
+        Jaxb2Marshaller marshaller = new Jaxb2Marshaller();
+        marshaller.setClassesToBeBound(Student.class);
+        return new XmlViewResolver(marshaller);
+    }
+
+    /**
+     * JSON视图解析器
+     */
+    @Bean
+    public ViewResolver jsonViewResolver() {
+        return new JsonViewResolver();
+    }
+
+    /**
+     * PDF视图解析器
+     */
+    @Bean
+    public ViewResolver pdfViewResolver() {
+        return new PdfViewResolver();
+    }
+
+    /**
+     * excel视图解析器
+     */
+    @Bean
+    public ViewResolver excelViewResolver() {
+        return new ExcelViewResolver();
+    }
+
+    /**
+     * jsp视图解析器
+     */
+    @Bean
+    public ViewResolver jspViewResolver() {
+        InternalResourceViewResolver viewResolver = new InternalResourceViewResolver();
+        viewResolver.setViewClass(JstlView.class);
+        viewResolver.setPrefix(&quot;/WEB-INF/views/&quot;);
+        viewResolver.setSuffix(&quot;.jsp&quot;);
+        return viewResolver;
+    }
+}
+</code></pre>
+
+<h1>5.web-controller层</h1>
+
+<p>AppController.java</p>
+
+<pre>
+<code>package com.jeiker.web.controller;
+
+import com.jeiker.web.model.Student;
+import org.springframework.stereotype.Controller;
+import org.springframework.ui.ModelMap;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestMethod;
+
+/**
+ * @Author : xiao
+ * @Date : 16/12/22 下午6:50
+ */
+@Controller
+public class AppController {
+
+    @RequestMapping(value = &quot;/student/{studentName}&quot;, method = RequestMethod.GET)
+    public String getStudent(@PathVariable String studentName, ModelMap modelMap) {
+        Student student = new Student(studentName);
+        modelMap.addAttribute(&quot;student&quot;, student);
+        return &quot;student&quot;;
+    }
+
+}
+</code></pre>
+
+<h1>6.web-model层</h1>
+
+<p>Student.java</p>
+
+<pre>
+<code>package com.jeiker.web.model;
+
+import javax.xml.bind.annotation.XmlElement;
+import javax.xml.bind.annotation.XmlRootElement;
+import java.util.ArrayList;
+import java.util.List;
+
+/**
+ * @Author : xiao
+ * @Date : 16/12/22 下午6:51
+ */
+@XmlRootElement(name = &quot;student&quot;)
+public class Student {
+
+    private String name;
+
+    private String sex;
+
+    private List&lt;String&gt; hobbies = new ArrayList&lt;&gt;();
+
+    public Student() {
+
+    }
+
+    public Student(String name) {
+        this.name = name;
+        this.sex = &quot;male&quot;;
+        this.hobbies.add(&quot;Movies&quot;);
+        this.hobbies.add(&quot;Football&quot;);
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    @XmlElement
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    public String getSex() {
+        return sex;
+    }
+
+    @XmlElement
+    public void setSex(String sex) {
+        this.sex = sex;
+    }
+
+    public List&lt;String&gt; getHobbies() {
+        return hobbies;
+    }
+
+    @XmlElement
+    public void setHobbies(List&lt;String&gt; hobbies) {
+        this.hobbies = hobbies;
+    }
+}
+</code></pre>
+
+<h1>7.web-view层</h1>
+
+<h2>7.1 ExcelView.java</h2>
+
+<pre>
+<code>package com.jeiker.web.viewresolver;
+
+import java.util.Map;
+
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+
+import com.jeiker.web.model.Student;
+import org.apache.poi.hssf.usermodel.HSSFWorkbook;
+import org.apache.poi.ss.usermodel.Cell;
+import org.apache.poi.ss.usermodel.CellStyle;
+import org.apache.poi.ss.usermodel.IndexedColors;
+import org.apache.poi.ss.usermodel.Row;
+import org.apache.poi.ss.usermodel.Sheet;
+import org.springframework.web.servlet.view.document.AbstractExcelView;
+
+/**
+ * @Author : xiao
+ * @Date : 16/12/22 下午6:51
+ */
+public class ExcelView extends AbstractExcelView {
+
+    @Override
+    protected void buildExcelDocument(Map&lt;String, Object&gt; model,
+                                      HSSFWorkbook workbook, HttpServletRequest request,
+                                      HttpServletResponse response) throws Exception {
+
+        Student student = (Student) model.get(&quot;student&quot;);
+
+        Sheet sheet = workbook.createSheet(&quot;sheet 1&quot;);
+        CellStyle style = workbook.createCellStyle();
+        style.setFillForegroundColor(IndexedColors.GREY_40_PERCENT.index);
+        style.setFillPattern(CellStyle.SOLID_FOREGROUND);
+        style.setAlignment(CellStyle.ALIGN_CENTER);
+        Row row = null;
+        Cell cell = null;
+        int rowCount = 0;
+        int colCount = 0;
+
+        // Create header cells
+        row = sheet.createRow(rowCount++);
+
+        cell = row.createCell(colCount++);
+        cell.setCellStyle(style);
+        cell.setCellValue(&quot;Name&quot;);
+
+        cell = row.createCell(colCount++);
+        cell.setCellStyle(style);
+        cell.setCellValue(&quot;Sex&quot;);
+
+        cell = row.createCell(colCount++);
+        cell.setCellStyle(style);
+        cell.setCellValue(&quot;Hobbies&quot;);
+
+        // Create data cells
+        row = sheet.createRow(rowCount++);
+        colCount = 0;
+        row.createCell(colCount++).setCellValue(student.getName());
+        row.createCell(colCount++).setCellValue(student.getSex());
+
+        StringBuffer toppings = new StringBuffer(&quot;&quot;);
+        for (String topping : student.getHobbies()) {
+            toppings.append(topping);
+            toppings.append(&quot; &quot;);
+        }
+        row.createCell(colCount++).setCellValue(toppings.toString());
+
+        for (int i = 0; i &lt; 3; i++)
+            sheet.autoSizeColumn(i, true);
+    }
+
+}
+</code></pre>
+
+<h2>7.2 ExcelViewResolver.java</h2>
+
+<pre>
+<code>package com.jeiker.web.viewresolver;
+
+import org.springframework.web.servlet.View;
+import org.springframework.web.servlet.ViewResolver;
+
+import java.util.Locale;
+
+/**
+ * @Author : xiao
+ * @Date : 16/12/22 下午6:51
+ */
+public class ExcelViewResolver implements ViewResolver {
+
+    @Override
+    public View resolveViewName(String viewName, Locale locale) throws Exception {
+        ExcelView view = new ExcelView();
+        return view;
+    }
+
+}
+</code></pre>
+
+<h2>7.3 JsonViewResolver.java</h2>
+
+<pre>
+<code>package com.jeiker.web.viewresolver;
+
+import org.springframework.web.servlet.View;
+import org.springframework.web.servlet.ViewResolver;
+import org.springframework.web.servlet.view.json.MappingJackson2JsonView;
+
+import java.util.Locale;
+
+/**
+ * @Author : xiao
+ * @Date : 16/12/22 下午6:52
+ */
+public class JsonViewResolver implements ViewResolver {
+
+    @Override
+    public View resolveViewName(String viewName, Locale locale) throws Exception {
+        MappingJackson2JsonView view = new MappingJackson2JsonView();
+        view.setPrettyPrint(true);
+        return view;
+    }
+}
+</code></pre>
+
+<h2>7.4 PdfView.java</h2>
+
+<pre>
+<code>package com.jeiker.web.viewresolver;
+
+import com.jeiker.web.model.Student;
+
+import com.itextpdf.text.Element;
+import com.lowagie.text.Document;
+import com.lowagie.text.pdf.PdfWriter;
+import com.lowagie.text.pdf.PdfPTable;
+
+import org.springframework.web.servlet.view.document.AbstractPdfView;
+
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import java.awt.*;
+import java.util.Map;
+
+/**
+ * @Author : xiao
+ * @Date : 16/12/22 下午6:52
+ */
+public class PdfView extends AbstractPdfView {
+
+    @Override
+    protected void buildPdfDocument(Map&lt;String, Object&gt; model,
+                                    Document document,
+                                    PdfWriter writer,
+                                    HttpServletRequest request,
+                                    HttpServletResponse response) throws Exception {
+
+        Student student = (Student) model.get(&quot;student&quot;);
+
+        PdfPTable table = new PdfPTable(3);
+        table.getDefaultCell().setHorizontalAlignment(Element.ALIGN_CENTER);
+        table.getDefaultCell().setVerticalAlignment(Element.ALIGN_MIDDLE);
+        table.getDefaultCell().setBackgroundColor(Color.lightGray);
+
+        table.addCell(&quot;Name&quot;);
+        table.addCell(&quot;Sex&quot;);
+        table.addCell(&quot;Hobbies&quot;);
+
+        table.addCell(student.getName());
+        table.addCell(student.getSex());
+
+        StringBuffer toppings = new StringBuffer(&quot;&quot;);
+        for (String topping : student.getHobbies()) {
+            toppings.append(topping);
+            toppings.append(&quot; &quot;);
+        }
+        table.addCell(toppings.toString());
+        document.add(table);
+
+    }
+
+}</code></pre>
+
+<h2>7.5 PdfViewResolver.java</h2>
+
+<pre>
+<code>package com.jeiker.web.viewresolver;
+
+import org.springframework.web.servlet.View;
+import org.springframework.web.servlet.ViewResolver;
+
+import java.util.Locale;
+
+/**
+ * @Author : xiao
+ * @Date : 16/12/22 下午6:52
+ */
+public class PdfViewResolver implements ViewResolver{
+
+    @Override
+    public View resolveViewName(String viewName, Locale locale) throws Exception {
+        PdfView view = new PdfView();
+        return view;
+    }
+}
+</code></pre>
+
+<h2>7.6 XmlViewResolver.java</h2>
+
+<pre>
+<code>package com.jeiker.web.viewresolver;
+
+import org.springframework.oxm.Marshaller;
+import org.springframework.web.servlet.View;
+import org.springframework.web.servlet.ViewResolver;
+import org.springframework.web.servlet.view.xml.MarshallingView;
+
+import java.util.Locale;
+
+/**
+ * @Author : xiao
+ * @Date : 16/12/22 下午6:52
+ */
+public class XmlViewResolver implements ViewResolver{
+
+    private Marshaller marshaller;
+
+    public XmlViewResolver(Marshaller marshaller) {
+        this.marshaller = marshaller;
+    }
+
+    @Override
+    public View resolveViewName(String viewName, Locale locale) throws Exception {
+        MarshallingView view = new MarshallingView();
+        view.setMarshaller(marshaller);
+        return view;
+    }
+}
+</code></pre>
+
+<h1>8.web页面</h1>
+
+<p>Student.jsp</p>
+
+<pre>
+<code>
+&lt;%@ page language=&quot;java&quot; contentType=&quot;text/html; charset=ISO-8859-1&quot;  pageEncoding=&quot;ISO-8859-1&quot;%&gt;
+&lt;%@ taglib prefix=&quot;c&quot; uri=&quot;http://java.sun.com/jsp/jstl/core&quot; %&gt;
+
+&lt;html&gt;
+&lt;head&gt;
+    &lt;meta http-equiv=&quot;Content-Type&quot; content=&quot;text/html; charset=ISO-8859-1&quot;&gt;
+    &lt;title&gt;Student JSP View&lt;/title&gt;
+&lt;/head&gt;
+&lt;body&gt;
+&lt;table border=&quot;1&quot;&gt;
+    &lt;tr&gt;
+        &lt;td&gt;NAME&lt;/td&gt;
+        &lt;td&gt;Sex&lt;/td&gt;
+        &lt;td&gt;Hobbies&lt;/td&gt;
+    &lt;/tr&gt;
+    &lt;tr&gt;
+        &lt;td&gt;${student.name}&lt;/td&gt;
+        &lt;td&gt;${student.sex}&lt;/td&gt;
+        &lt;td&gt;
+            &lt;c:forEach var=&quot;item&quot; items=&quot;${student.hobbys}&quot;&gt;
+                &lt;c:out value=&quot;${item}&quot;/&gt;
+            &lt;/c:forEach&gt;
+        &lt;/td&gt;
+    &lt;/tr&gt;
+&lt;/table&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+
+</code></pre>
+
+<h1>9.运行结果</h1>
+
+<h2>9.1 Html视图</h2>
+
+<p>测试地址：<a href="http://localhost:8080/student/jeikerxiao" target="_blank">http://localhost:8080/student/jeikerxiao</a></p>
+
+<p><img alt="这里写图片描述" src="https://img-blog.csdn.net/20161223135147561?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQvamVpa2VyeGlhbw==/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70/gravity/SouthEast" title="" /></p>
+
+<h2>9.2 Json视图</h2>
+
+<p>测试地址：<a href="http://localhost:8080/student/jeikerxiao.json" target="_blank">http://localhost:8080/student/jeikerxiao.json</a></p>
+
+<p><img alt="这里写图片描述" src="https://img-blog.csdn.net/20161223135216592?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQvamVpa2VyeGlhbw==/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70/gravity/SouthEast" title="" /></p>
+
+<h2>9.3 XML视图</h2>
+
+<p>测试地址：<a href="http://localhost:8080/student/jeikerxiao.xml" target="_blank">http://localhost:8080/student/jeikerxiao.xml</a></p>
+
+<p><img alt="这里写图片描述" src="https://img-blog.csdn.net/20161223135228723?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQvamVpa2VyeGlhbw==/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70/gravity/SouthEast" title="" /></p>
+
+<h2>9.4 PDF视图</h2>
+
+<p>测试地址：<a href="http://localhost:8080/student/jeikerxiao.pdf" target="_blank">http://localhost:8080/student/jeikerxiao.pdf</a></p>
+
+<p><img alt="这里写图片描述" src="https://img-blog.csdn.net/20161223135242218?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQvamVpa2VyeGlhbw==/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70/gravity/SouthEast" title="" /></p>
+
+<h2>9.5 Excel视图</h2>
+
+<p>测试地址：<a href="http://localhost:8080/student/jeikerxiao.xls" target="_blank">http://localhost:8080/student/jeikerxiao.xls</a></p>
+
+<p><img alt="这里写图片描述" src="https://img-blog.csdn.net/20161223135252379?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQvamVpa2VyeGlhbw==/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70/gravity/SouthEast" title="" /></p>

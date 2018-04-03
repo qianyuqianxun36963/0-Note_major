@@ -1,0 +1,246 @@
+<h1><a href="https://blog.csdn.net/qwe6112071/article/details/51081917">springMVC4(15)RestFul多视图混合输出</a></h1>
+
+<p>4# 混合使用多种视图技术。&nbsp;<br />
+在前面文章里，我们对jsp、json、xml个中视图都进行了较为详细的实例解析，但涉及到的都是单视图使用配置。在实际开发中，我们可能需要混合是使用多种视图技术。尤其是针对REST编程风格，我们可以通过<strong>一个URL、多种视图</strong>来切合REST风格的<strong>同一资源、多种表述</strong>。&nbsp;<br />
+现在加入我们要输出JSP、JSON、XML多种视图技术，如果使用我之前文章<a href="http://blog.csdn.net/qwe6112071/article/details/51039511" target="_blank">《springMVC4(4)json与对象互转实例解析请求响应数据转换器 》</a>提到的HttpMessageConvert来完成数据类型输出切换。它相对于多视图输出的局限性是：&nbsp;<br />
+1. 必须通过HTTP请求头的Accept来控制转换器的使用类型，如果客户端是安卓等还能通过HttpClient、RestTemplate等控制，但如果客户端是游览器，除非使用AJAX技术，否则很难控制请求头内容&nbsp;<br />
+2. 无法通过URL扩展名或请求参数来控制服务端的资源输出类型。而使用多种视图技术，我们可以通过以下形式控制输出不同视图：&nbsp;<br />
+1. 扩展名：&nbsp;<br />
+1. /user.xml 呈现xml文件&nbsp;<br />
+2. /user.json 呈现json格式&nbsp;<br />
+3. /user.xls 呈现excel文件&nbsp;<br />
+4. /user.pdf 呈现pdf文件&nbsp;<br />
+5. /user 使用默认view呈现，比如jsp等&nbsp;<br />
+2. 请求参数：&nbsp;<br />
+1. /user?type=xml 呈现xml文件&nbsp;<br />
+2. /user?type=json 呈现json格式&nbsp;<br />
+3. /user?type=xls 呈现excel文件&nbsp;<br />
+4. /user?type=pdf 呈现pdf文件&nbsp;<br />
+5. /user? 使用默认view呈现，比如jsp等</p>
+
+<h1>ContentNegotiatingViewResolver</h1>
+
+<p>我们使用ContentNegotiatingViewResolver视图解析器来完成多种视图混合解析，从它的名字上看，它是一个视图协调器，负责根据请求信息从当前环境选择一个最合适的解析器进行解析，也即是说，它本身并不负责解析视图。&nbsp;<br />
+它有3个关键属性：&nbsp;<br />
+1. favorPathExtension:如果设置为true(默认为true),则根据URL中的文件拓展名来确定MIME类型&nbsp;<br />
+2. favorPathExtension:如果设置为true(默认为false),可以指定一个请求参数确定MIME类型，默认的请求参数为format,可以通过parameterName属性指定一个自定义属性。&nbsp;<br />
+3. ignoreAcceptHeader(默认为false)，则采用Accept请求报文头的值确定MIME类型。由于不同游览器产生的Accept头不一致，不建议采用Accept确定MIME类型。&nbsp;<br />
+在实际流程中，ContentNegotiatingViewResolver也是根据以上三个<strong>互斥</strong>属性的配置情况来确定视图类型，其中属性1优先级最高，属性3优先级最低</p>
+
+<p>除了以上三个属性，还有一个关键属性是mediaTypes，用来配置不同拓展名或参数值映射到不同的MIME类型&nbsp;<br />
+<strong>在前面，我们展示了使用jsp/模板、json、xml、Excel等来呈现我们的视图，下面我们通过整合上述视图来分析我们的多视图混合技术</strong>。</p>
+
+<h1>多视图混合Rest呈现实例</h1>
+
+<h2>1. 配置视图解析器</h2>
+
+<pre>
+<code>&lt;!-- 根据确定出的不同MIME名，使用不同视图解析器解析视图 --&gt;
+&lt;bean class=&quot;org.springframework.web.servlet.view.ContentNegotiatingViewResolver&quot;&gt;
+    &lt;!-- 设置优先级 --&gt;
+    &lt;property name=&quot;order&quot; value=&quot;1&quot; /&gt;
+    &lt;!-- 设置默认的MIME类型，如果没有指定拓展名或请求参数，则使用此默认MIME类型解析视图 --&gt;
+    &lt;property name=&quot;defaultContentType&quot; value=&quot;text/html&quot; /&gt;
+    &lt;!-- 是否不适用请求头确定MIME类型 --&gt;
+    &lt;property name=&quot;ignoreAcceptHeader&quot; value=&quot;true&quot; /&gt;
+     &lt;!-- 是否根据路径拓展名确定MIME类型 --&gt;
+    &lt;property name=&quot;favorPathExtension&quot; value=&quot;false&quot; /&gt;
+   &lt;!-- 是否使用参数来确定MIME类型 --&gt;
+    &lt;property name=&quot;favorParameter&quot; value=&quot;true&quot; /&gt; 
+    &lt;!-- 上一个属性配置为true,我们指定type请求参数判断MIME类型 --&gt;
+    &lt;property name=&quot;parameterName&quot; value=&quot;type&quot; /&gt;
+    &lt;!-- 根据请求参数或拓展名映射到相应的MIME类型 --&gt;
+    &lt;property name=&quot;mediaTypes&quot;&gt;
+        &lt;map&gt;
+            &lt;entry key=&quot;html&quot; value=&quot;text/html&quot; /&gt;
+            &lt;entry key=&quot;xml&quot; value=&quot;application/xml&quot; /&gt;
+            &lt;entry key=&quot;json&quot; value=&quot;application/json&quot; /&gt;
+            &lt;entry key=&quot;excel&quot; value=&quot;application/vnd.ms-excel&quot;&gt;&lt;/entry&gt;
+        &lt;/map&gt;
+    &lt;/property&gt;
+    &lt;!-- 设置默认的候选视图，如果有合适的MIME类型，将优先从以下选择视图，找不到再在整个Spring容器里寻找已注册的合适视图 --&gt;
+    &lt;property name=&quot;defaultViews&quot;&gt;
+        &lt;list&gt;
+            &lt;bean class=&quot;org.springframework.web.servlet.view.InternalResourceView&quot;&gt;
+                &lt;property name=&quot;url&quot; value=&quot;WEB-INF/views/hello.jsp&quot;&gt;&lt;/property&gt;
+            &lt;/bean&gt;
+            &lt;bean
+                class=&quot;org.springframework.web.servlet.view.json.MappingJacksonJsonView&quot; /&gt;
+            &lt;ref local=&quot;myXmlView&quot; /&gt;
+            &lt;bean class=&quot;com.mvc.view.ExcelView&quot; /&gt;
+
+        &lt;/list&gt;
+    &lt;/property&gt;
+&lt;/bean&gt;
+&lt;!-- Excel视图 --&gt;
+&lt;bean class=&quot;com.mvc.view.ExcelView&quot; id=&quot;excelView&quot; /&gt;&lt;!-- 注册自定义视图 --&gt;
+&lt;bean class=&quot;org.springframework.web.servlet.view.xml.MarshallingView&quot;
+    id=&quot;myXmlView&quot;&gt;
+    &lt;property name=&quot;modelKey&quot; value=&quot;articles&quot; /&gt;
+    &lt;property name=&quot;marshaller&quot; ref=&quot;xmlMarshaller&quot; /&gt;
+&lt;/bean&gt;
+&lt;bean class=&quot;org.springframework.oxm.xstream.XStreamMarshaller&quot;
+    id=&quot;xmlMarshaller&quot;&gt;&lt;!-- 将模型数据转换为XML格式 --&gt;
+    &lt;property name=&quot;streamDriver&quot;&gt;
+        &lt;bean class=&quot;com.thoughtworks.xstream.io.xml.StaxDriver&quot; /&gt;
+    &lt;/property&gt;
+&lt;/bean&gt;</code></pre>
+
+<p>关于以上视图文件的配置实体讲解可移步参考我前面的文章</p>
+
+<h2>2. jsp视图文件</h2>
+
+<pre>
+<code>&lt;%@page import=&quot;com.mvc.model.Article&quot;%&gt;
+&lt;%@ page language=&quot;java&quot; import=&quot;java.util.*&quot; pageEncoding=&quot;UTF-8&quot;%&gt;
+&lt;%@taglib prefix=&quot;c&quot; uri=&quot;http://java.sun.com/jsp/jstl/core&quot; %&gt;
+&lt;!DOCTYPE HTML PUBLIC &quot;-//W3C//DTD HTML 4.01 Transitional//EN&quot;&gt;
+&lt;html&gt;
+  &lt;head&gt;
+    &lt;base href=&quot;&lt;%=basePath%&gt;&quot;&gt;
+    &lt;title&gt;hello spring mvc&lt;/title&gt;
+  &lt;/head&gt;
+  &lt;body&gt;
+  &lt;c:out value=&quot;${articles}&quot;&gt;&lt;/c:out&gt;
+  &lt;/body&gt;
+&lt;/html&gt;</code></pre>
+
+<h2>3. Excel配置文件</h2>
+
+<pre>
+<code>package com.mvc.view;
+
+import java.util.List;
+import java.util.Map;
+
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+
+import org.apache.poi.hssf.usermodel.HSSFRow;
+import org.apache.poi.hssf.usermodel.HSSFSheet;
+import org.apache.poi.hssf.usermodel.HSSFWorkbook;
+import org.springframework.web.servlet.view.document.AbstractExcelView;
+
+import com.mvc.model.Article;
+
+public class ExcelView extends AbstractExcelView {
+
+    @Override
+    protected void buildExcelDocument(Map&lt;String, Object&gt; model,
+            HSSFWorkbook workbook, HttpServletRequest request,
+            HttpServletResponse response) throws Exception {
+         List&lt;Article&gt; articles= (List&lt;Article&gt;) model.get(&quot;articles&quot;);
+
+         HSSFSheet sheet = workbook.createSheet(&quot;文章列表&quot;);//创建一页
+         HSSFRow header = sheet.createRow(0);//创建第一行
+         header.createCell(0).setCellValue(&quot;标题&quot;);
+         header.createCell(1).setCellValue(&quot;正文&quot;);
+         for( int i = 0; i &lt; articles.size();i++){
+             HSSFRow row = sheet.createRow(i + 1);
+             Article article = articles.get(i);
+             row.createCell(0).setCellValue(article.getTitle());
+             row.createCell(1).setCellValue(article.getContent());
+         }
+    }
+
+}</code></pre>
+
+<h2>4. Article POJO类</h2>
+
+<pre>
+<code>package com.mvc.model;
+
+public class Article {
+    private String title;
+    private String content;
+
+    //忽略get和set方法
+    @Override
+    public String toString() {
+        return &quot;Article [ title=&quot; + title + &quot;, content=&quot;
+                + content + &quot;]&quot;;
+    }
+
+}</code></pre>
+
+<h2>5. 控制器测试方法</h2>
+
+<pre>
+<code>@RequestMapping(&quot;views&quot;)
+public String views(ModelMap map,HttpServletRequest request){
+    List&lt;Article&gt;articles = new ArrayList&lt;Article&gt;();
+    for(int i = 0 ; i &lt; 5; i ++){
+        Article article = new Article();
+        article.setTitle(&quot;title&quot; +i);
+        article.setContent(&quot;content&quot; + i);
+        articles.add(article);
+    }
+    map.addAttribute(&quot;articles&quot;,articles);//将文章对象绑定到
+    return &quot;views&quot;;
+}</code></pre>
+
+<h2>6. 进行测试</h2>
+
+<p>我们使用了参数type来映射不同的视图类型：</p>
+
+<h3>1. 默认参数类型：</h3>
+
+<p><img alt="这里写图片描述" src="https://img-blog.csdn.net/20160403231025469" title="" /></p>
+
+<h3>2. html参数类型</h3>
+
+<p><img alt="这里写图片描述" src="https://img-blog.csdn.net/20160403230202918" title="" /></p>
+
+<h3>3. json参数类型</h3>
+
+<p><img alt="这里写图片描述" src="https://img-blog.csdn.net/20160403230214153" title="" /></p>
+
+<h3>4. xml参数类型</h3>
+
+<p><img alt="这里写图片描述" src="https://img-blog.csdn.net/20160403230222575" title="" /></p>
+
+<h3>5. excel参数类型</h3>
+
+<p><img alt="这里写图片描述" src="https://img-blog.csdn.net/20160403230231700" title="" />&nbsp;<br />
+点击下载后打开如下图所示：&nbsp;<br />
+<img alt="这里写图片描述" src="https://img-blog.csdn.net/20160403230238622" title="" /></p>
+
+<h2>7. 使用拓展名类型</h2>
+
+<p>上面我们使用参数的方法访问，如果我们改成使用拓展名的形式，如下所示，只需去掉其中的4行配置：</p>
+
+<pre>
+<code>&lt;bean class=&quot;org.springframework.web.servlet.view.ContentNegotiatingViewResolver&quot;&gt;&lt;!-- 根据确定出的不同MIME名，使用不同视图解析器解析视图 --&gt;
+    &lt;property name=&quot;order&quot; value=&quot;1&quot; /&gt;&lt;!-- 设置优先级 --&gt;
+    &lt;property name=&quot;defaultContentType&quot; value=&quot;text/html&quot; /&gt;&lt;!-- 设置默认的MIME类型，如果没有指定拓展名或请求参数，则使用此默认MIME类型解析视图 --&gt;
+    &lt;property name=&quot;mediaTypes&quot;&gt;&lt;!-- 根据请求参数映射到相应的MIME类型 --&gt;
+        &lt;map&gt;
+            &lt;entry key=&quot;html&quot; value=&quot;text/html&quot; /&gt;
+            &lt;entry key=&quot;xml&quot; value=&quot;application/xml&quot; /&gt;
+            &lt;entry key=&quot;json&quot; value=&quot;application/json&quot; /&gt;
+            &lt;entry key=&quot;excel&quot; value=&quot;application/vnd.ms-excel&quot;&gt;&lt;/entry&gt;
+        &lt;/map&gt;
+    &lt;/property&gt;
+    &lt;property name=&quot;defaultViews&quot;&gt;&lt;!-- 设置默认的候选视图，如果有合适的MIME类型，将优先从以下选择视图，找不到再在整个Spring容器里寻找已注册的合适视图 --&gt;
+        &lt;list&gt;
+            &lt;bean class=&quot;org.springframework.web.servlet.view.InternalResourceView&quot;&gt;
+                &lt;property name=&quot;url&quot; value=&quot;WEB-INF/views/hello.jsp&quot;&gt;&lt;/property&gt;
+            &lt;/bean&gt;
+            &lt;bean
+                class=&quot;org.springframework.web.servlet.view.json.MappingJacksonJsonView&quot; /&gt;
+            &lt;ref local=&quot;myXmlView&quot; /&gt;
+            &lt;bean class=&quot;com.mvc.view.ExcelView&quot; /&gt;
+        &lt;/list&gt;
+    &lt;/property&gt;
+&lt;/bean&gt;</code></pre>
+
+<p>这个时候，我们就可以使用：&nbsp;<br />
+<a href="http://localhost:8080/springMVC/views" target="_blank">http://localhost:8080/springMVC/views</a>&nbsp;<br />
+<a href="http://localhost:8080/springMVC/views.html" target="_blank">http://localhost:8080/springMVC/views.html</a>,&nbsp;<br />
+<a href="http://localhost:8080/springMVC/views.json" target="_blank">http://localhost:8080/springMVC/views.json</a>，&nbsp;<br />
+<a href="http://localhost:8080/springMVC/views.xml" target="_blank">http://localhost:8080/springMVC/views.xml</a>&nbsp;<br />
+来对应得到与上面相同的内容。感兴趣的朋友可在下面下载源码自行测试</p>
+
+<h1>源码下载</h1>
+
+<p>本节内容源码可到<a href="http://github.com/jeanhao/spring" target="_blank">http://github.com/jeanhao/spring</a>的multiViews文件夹下下载</p>
