@@ -1,0 +1,343 @@
+<p>&nbsp;</p>
+
+<h1><a href="https://blog.csdn.net/classicer/article/details/50753019">Spring MVC 无XML配置入门示例</a></h1>
+
+<p>Spring MVC 无XML（纯 Java）配置入门示例</p>
+
+<blockquote>
+<p>本示例是从<a href="https://www.manning.com/books/spring-in-action-fourth-edition" target="_blank">《Spring in Action, Fourth Edition》</a>一书而来，涉及的是书中5.1节部分内容，书中其实说的很详细，但是没有工程实现细节的描述，这篇博文记录了我自己的实现过程，也算是书本的一(gou)种(wei)拓(xu)展(diao)吧。由于本人也是初学(看在下内容惨淡的博客页面=.=)，所以有什么写得不对的地方还忘各位看官海涵。</p>
+</blockquote>
+
+<hr />
+<h2>(1) Spring MVC对 request 做了什么？</h2>
+
+<p>当一个&nbsp;<strong>Request</strong>&nbsp;离开浏览器（下图标号1）时，携带了用户的请求信息，包括url以及表单等，它到达的第一站就是&nbsp;<strong>DispatcherServlet</strong>&nbsp;。像大多数基于 Java 的 web 框架一样，Spring MVC 首先通过一个前端控制器处理，把&nbsp;<strong>Request</strong>&nbsp;交给其他组件处理（类似于前台姐姐把客户带到要去的各种部门），在 Spring MVC 里面，充当前端控制器这一角色的就是&nbsp;<strong>DispatcherServlet</strong>&nbsp;。</p>
+
+<p><img alt="用户发出的一个request像快递员一样经过Spring MVC各组件，最后被转化成用户想要的结果" src="https://img-blog.csdn.net/20160226221900897" title="" /></p>
+
+<p><strong>DispatcherServlet</strong>&nbsp;目的是把&nbsp;<strong>Request</strong>&nbsp;送到其他的&nbsp;<strong>Controller</strong>，对&nbsp;<strong>Request</strong>&nbsp;作进一步处理，但是一般情况下程序中会有很多的&nbsp;<strong>Controller</strong>，它们各自负责处理不同的&nbsp;<strong>Request</strong>&nbsp;，于是&nbsp;<strong>DispatcherServlet</strong>&nbsp;需要一些协助来决定一个&nbsp;<strong>Request</strong>&nbsp;应该送到哪个&nbsp;<strong>Controller</strong>&nbsp;。因此&nbsp;<strong>DispatcherServlet</strong>&nbsp;会询问&nbsp;<strong>Handler mappings</strong>&nbsp;（上图标号2），一个&nbsp;<strong>Request</strong>&nbsp;应该何去何从，<strong>Handler mappings</strong>&nbsp;谢邀之后不敢怠慢，通过验看&nbsp;<strong>Request</strong>&nbsp;携带的 URL 进行抉择。</p>
+
+<p><strong>Handler mappings</strong>&nbsp;的结果出来之后，<strong>DispatcherServlet</strong>&nbsp;欢天喜地地把&nbsp;<strong>Request</strong>&nbsp;送给对应的&nbsp;<strong>Controller</strong>&nbsp;（如上图标号3）。到达之后，<strong>Request</strong>&nbsp;卸下重担（携带着的由用户提交的信息）并耐心地等待&nbsp;<strong>Controller</strong>&nbsp;处理这些信息（而实际上，一个机智的<strong>Controller</strong>&nbsp;自己几乎不做任何处理，而是把活儿交给其他负责业务逻辑的 service 对象）。</p>
+
+<p><strong>Controller</strong>&nbsp;处理完后得到的结果往往需要返回给用户并在浏览器中显示，这个结果被称作&nbsp;<strong>model</strong>， 它比较粗糙，需要补充额外信息转换成用户友好型的格式，例如 HTML 。出于这个目的呢，这一&nbsp;<strong>model</strong>&nbsp;需要交给一个&nbsp;<strong>view</strong>&nbsp;, 典型的有 JavaServer Page (JSP)。</p>
+
+<p>所以，<strong>Controller</strong>&nbsp;最后需要做的就是把&nbsp;<strong>model</strong>&nbsp;数据打包并且确定一个到时候用来渲染这个&nbsp;<strong>model</strong>&nbsp;的&nbsp;<strong>view</strong>，然后把&nbsp;<strong>Request</strong>、<strong>model</strong>&nbsp;数据以及&nbsp;<strong>view</strong>&nbsp;的名字一块发送回&nbsp;<strong>DispatcherServlet</strong>（如上图标号4）。</p>
+
+<p>因此&nbsp;<strong>Controller</strong>&nbsp;实现了与特定&nbsp;<strong>view</strong>&nbsp;的解耦，&nbsp;<strong>DispatcherServlet</strong>&nbsp;拿到的&nbsp;<strong>view</strong>&nbsp;名也并不直接确定这个&nbsp;<strong>view</strong>&nbsp;是 JSP，<strong>DispatcherServlet</strong>&nbsp;只知道凭借这一&nbsp;<strong>view</strong>&nbsp;名找到的&nbsp;<strong>view</strong>&nbsp;可以处理手头上的&nbsp;<strong>model</strong>&nbsp;数据，于是它把&nbsp;<strong>view</strong>名给&nbsp;<strong>view resolver</strong>&nbsp;来帮它找到对应的&nbsp;<strong>view</strong>（如上图标号5） 。</p>
+
+<p><strong>DispatcherServlet</strong>&nbsp;终于得到了渲染&nbsp;<strong>model</strong>&nbsp;数据的&nbsp;<strong>view</strong>，<strong>Request</strong>&nbsp;的旅程也即将走到尽头， 它的最后一站是在&nbsp;<strong>view</strong>&nbsp;的实现部分（上图标号6），而<strong>view</strong>&nbsp;的实现典型的有 JSP ；这一步使用&nbsp;<strong>model</strong>&nbsp;数据进行输出结果的渲染，之后通过响应对象把渲染结果送回到客户端。</p>
+
+<hr />
+<h2>(2) Spring MVC 入门工程实现的准备工作；</h2>
+
+<h3>需要的工具</h3>
+
+<p><a href="http://www.eclipse.org/downloads/packages/eclipse-ide-java-ee-developers/mars2" target="_blank">Eclipse IDE for Java EE Developers</a>&nbsp;;&nbsp;<br />
+<a href="http://tomcat.apache.org/download-70.cgi" target="_blank">Apache Tomcat</a>&nbsp;;&nbsp;<br />
+<a href="http://www.cnblogs.com/exmyth/p/3507010.html" target="_blank">Spring framework 工具包</a>，例如&nbsp;<a href="http://repo.springsource.org/libs-release-local/org/springframework/spring/4.2.5.RELEASE/" target="_blank">spring-framework-4.2.5.RELEASE-dist.zip</a>&nbsp;;&nbsp;<br />
+以及其他一些依赖包：commons-logging-1.1.3.jar，jstl-1.2.jar，log4j-1.2.17.jar；（没有的请自行查找，不知道上哪找？&nbsp;<a href="http://mvnrepository.com/" target="_blank">看这里看这里</a>，具体版本不一定按照这里列出的）</p>
+
+<h3>建立 Eclipse 工程</h3>
+
+<p>推荐使用优雅的 Maven，但这里没有&hellip;请稍后自行建立&hellip;</p>
+
+<p>File-&gt;New-&gt;Other&hellip;-&gt;Web-&gt;Dynamic Web project-&gt;Next；</p>
+
+<p>弹出了一个框，工程命名为 spittr（不要在意，原作者奇思妙想取的&hellip;下文会有介绍），没什么其他事的话直接 Finish；</p>
+
+<p><img alt="这里写图片描述" src="https://img-blog.csdn.net/20160228154748017" title="" /></p>
+
+<p>完了之后，找到 spittr\WebContent\WEB-INF\lib，把 jar 包们 copy 进去&hellip;.找目录的时候可以直接在lib上右键-&gt;show in-&gt;system explorer ( 对于windows系统来说 )，Spring 的那些 jar 包们在spring-framework-x.x.x.RELEASE\libs下（不管三七21一个 *RELEASE.jar 搜索，将代码包全部Copy过来了，其他包日后也会用得到吧&hellip;.）</p>
+
+<p><img alt="这里写图片描述" src="https://img-blog.csdn.net/20160301090817920" title="" /></p>
+
+<p>这一切做完应该就可以开始写代码了&hellip;</p>
+
+<h2>(3) Spring MVC的Java配置；</h2>
+
+<p>经过开头那幅图的一通介绍，看起来 Spring MVC 需要的配置会很复杂&hellip;相对来说，以前确实很复杂（用 xml 配置），然而现在只需简单几步就能搞定。</p>
+
+<h3>配置 DispatcherServlet</h3>
+
+<p>DispatcherServlet 是 Spring MVC 的核心组件，它是一个 request 首先到达的地方，负责 request 在其他各个组件间的传递加工，在过去，像DispatcherServlet 这样的 servlets 是使用 web.xml 文件配置的，当然现在也可以这样做&hellip;.但是由于时代的进步，基于 Servlet 3 和 Spring 3.1 的一些新特性，我们可以用更简单的方式来配置，即使用 Java 代码。</p>
+
+<h4>代码清单1：SpittrWebAppInitializer.java</h4>
+
+<pre>
+<code>package spittr.config;
+
+import org.springframework.web.servlet.support.AbstractAnnotationConfigDispatcherServletInitializer;
+
+public class SpittrWebAppInitializer extends AbstractAnnotationConfigDispatcherServletInitializer  {
+
+    @Override
+    protected Class&lt;?&gt;[] getRootConfigClasses() {
+        return new Class&lt;?&gt;[] {RootConfig.class};
+    }
+
+    @Override
+    protected Class&lt;?&gt;[] getServletConfigClasses() {
+        return new Class&lt;?&gt;[] {WebConfig.class};
+    }
+
+    @Override
+    protected String[] getServletMappings() {
+        return new String[] {&quot;/&quot;};
+    }
+
+}</code></pre>
+
+<p>或许建工程的时候你就很在意 spittr 是干嘛的，但还是那句话，下文有介绍&hellip;先看代码&hellip;代码里是一个叫做 SpittrWebAppInitializer 的类，在spittr.config包里，顾名思义，它是起一个初始化配置的作用，并且相当于一个程序的入口类，在整个程序启动时加载。</p>
+
+<p>首先需要介绍的就是这个名字很拉风的类，即被 SpittrWebAppInitializer 继承的 AbstractAnnotationConfigDispatcherServletInitializer ，乍看一头雾水&hellip;..哥们你干嘛的&hellip;.简单来说，它自动被加载，负责应用程序中 servlet 上下文中的 DispatcherServlet 和 Spring 其他上下文的配置。</p>
+
+<blockquote>
+<p>关于&nbsp;<strong>AbstractAnnotationConfigDispatcherServletInitializer</strong></p>
+
+<p>各位好，如果以上介绍不过瘾，这里是复杂来说&hellip;</p>
+
+<p>在 Servlet 3.0 环境下，Servlet 容器会在 classpath 下搜索实现了 javax.servlet&nbsp;<br />
+.ServletContainerInitializer 接口的任何类，找到之后用它来初始化 Servlet 容器。</p>
+
+<p>Spring 实现了以上接口，实现类叫做 SpringServletContainerInitializer， 它会依次搜寻实现了 WebApplicationInitializer的任何类，并委派这个类实现配置。之后，Spring 3.2 开始引入一个简易的 WebApplicationInitializer 实现类，这就是 AbstractAnnotationConfigDispatcherServletInitializer。</p>
+
+<p>所以 SpittrWebAppInitializer 继承 AbstractAnnotationConfigDispatcherServletInitializer之后，也就是间接实现了 WebApplicationInitializer，在 Servlet 3.0 容器中，它会被自动搜索到，被用来配置 servlet 上下文。</p>
+</blockquote>
+
+<p>当然可以直接实现 WebApplicationInitializer，但作为入门来说，AbstractAnnotationConfigDispatcherServletInitializer 是一个不错的选择。</p>
+
+<p>回到代码，SpittrWebAppInitializer 需要重写3个方法，第一个，getServletMappings()，为 DispatcherServlet 提供一个或更多的Servlet 映射；这里是被映射到 /，指示它为默认的 servlet，用来操作所有来到程序的 Request。为了理解另外两个方法的作用，需要先明白 DispatcherServlet 和一个叫做 ContextLoaderListener 的 servlet 监听器之间的关系。</p>
+
+<blockquote>
+<p>A TALE OF TWO APPLICATION CONTEXTS<a href="https://blog.csdn.net/classicer/article/details/50753019#fn:footnote" id="fnref:footnote" target="_self" title="See footnote">1</a></p>
+
+<p>DispatcherServlet 开始启动时，会产生一个 Spring 应用程序上下文，把它和配置文件中声明的 bean 或者类一起加载进来。通过getServletConfigClasses() 方法，设置 DispatcherServlet 通过 WebConfig 配置类来完成 Spring 上下文和 bean 的加载。</p>
+
+<p>但是在 Spring web 程序中，往往还有另外一个应用程序上下文，它是由 ContextLoaderListener 产生的。通过调用 getRootConfigClasses()方法返回的类就是用来配置 ContextLoaderListener 产生的上下文。</p>
+
+<p>其中，DispatcherServlet 是用来加载涉及 web 功能的 beans，例如 controllers， view resolvers， 和 handler mappings；而 ContextLoaderListener 则是用来载入程序中其余的 beans，例如一些中间层和数据层组件，完成的是程序后端功能。</p>
+</blockquote>
+
+<p>于是，我们知道，AbstractAnnotationConfigDispatcherServletInitializer 产生了一个 DispatcherServlet 和一个 ContextLoaderListener，以上代码清单1通过两个方法分别得到两个上下文的配置类（使用<strong>@Configuration</strong>注解）。和 web.xml 的配置方法不一样的是，这种方法只适用于使用了 Servlet 3.0 的服务器，例如 Apache Tomcat 7 或 7+。不过 Servlet 3.0 规范在 2009 年 12 月形成最终版本, 几乎不用担心遇到不支持 Servlet 3.0 的 servlet 容器 。</p>
+
+<p>但是，如果你的服务器实在是不能支持 Servlet 3.0，那么 Java 配置的方法不适用于你了，你适合使用 web.xml 的配置方法，在原作者书中，第七章有介绍，不过本文不讨论这种方法，因为这种方法已经很成熟&hellip;网上一搜一大堆，请自行搜索&hellip;.</p>
+
+<h3>启用 Spring MVC 功能</h3>
+
+<p>基于 Java 的方式超级简单，你的配置类只需要带有一个<strong>@EnableWebMvc</strong>注解，就像这样子：</p>
+
+<pre>
+<code>package spittr.config;
+
+import org.springframework.context.annotation.Configuration;
+import org.springframework.web.servlet.config.annotation.EnableWebMvc;
+
+@Configuration
+@EnableWebMvc
+public class WebConfig {}</code></pre>
+
+<p>是不是很简洁？这样就可以开始使用 Spring MVC 框架了，但是各种组件还没配置：</p>
+
+<ul>
+	<li>
+	<p>View Resolver：虽然 Spring 会默认使用 BeanNameViewResolver，它会搜索 ID 和 view 名一致并且实现了 view 接口的 bean。</p>
+	</li>
+	<li>
+	<p>Controller：要让 Spring 能够加载各种 Controllers，必须对它们进行显式声明，然后启用 Component-scanning 功能自动搜索。</p>
+	</li>
+	<li>
+	<p>完善 Request 的映射： 按照之前的配置，对于一些静态资源（图片、样式表等）也是映射到默认的 Servlet，而这显然是不合理的。</p>
+	</li>
+</ul>
+
+<p>完善之后就是像下面这样子：</p>
+
+<h4>代码清单2：WebConfig.java</h4>
+
+<pre>
+<code>package spittr.config;
+
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.ComponentScan;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.web.servlet.ViewResolver;
+import org.springframework.web.servlet.config.annotation.
+DefaultServletHandlerConfigurer;
+import org.springframework.web.servlet.config.annotation.EnableWebMvc;
+import org.springframework.web.servlet.config.annotation.
+WebMvcConfigurerAdapter;
+import org.springframework.web.servlet.view.
+InternalResourceViewResolver;
+
+@Configuration
+@EnableWebMvc
+@ComponentScan(&quot;spittr.web&quot;)
+public class WebConfig extends WebMvcConfigurerAdapter {
+
+    @Bean
+    public ViewResolver viewResolver() {
+        InternalResourceViewResolver resolver = new InternalResourceViewResolver();
+        resolver.setPrefix(&quot;/WEB-INF/views/&quot;);
+        resolver.setSuffix(&quot;.jsp&quot;);
+        resolver.setExposeContextBeansAsAttributes(true);
+        return resolver;
+    }
+
+    @Override
+    public void configureDefaultServletHandling(DefaultServletHandlerConfigurer configurer) {
+        configurer.enable();
+    }
+}</code></pre>
+
+<p>首先可以发现的是，代码中添加了<strong>@ComponentScan</strong>注解，因此spitter.web 包将会被扫描以搜索 Controller。</p>
+
+<p>然后，代码添加了一个 ViewResolver bean， 具体来说是一个 InternalResourceViewResolver，再具体的话这里不再讨论，请查阅其他资料&hellip;.或参看原书第六章，就这里而言，只需要知道它是用来查找 view（JSP）的，并且会对 view 的名字使用前缀和后缀进行包裹就行了 ( 举个栗子，在上述代码中，名字为&nbsp;<strong>home</strong>&nbsp;的 view 将被转换为&nbsp;<strong>/WEB-INF/views/home.jsp</strong>&nbsp;)。</p>
+
+<p>最后， WebConfig 类继承 WebMvcConfigurerAdapter 并重写了它的 configureDefaultServletHandling() 方法，通过调用所给的DefaultServletHandlerConfigurer 对象的 enable() 方法，告诉DispatcherServlet 转发对静态资源的 Request 到 Servlet 容器的默认Servlet， 而不是自己处理。</p>
+
+<p>搞定了 WebConfig ，接下来搞定 RootConfig，由于这里集中讨论 Spring 的 web 开发，所以简单贴出 RootConfig的代码，不做额外解释了：</p>
+
+<h4>代码清单3：RootConfig.java</h4>
+
+<pre>
+<code>package spittr.config;
+
+import org.springframework.context.annotation.ComponentScan;
+import org.springframework.context.annotation.ComponentScan.Filter;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.FilterType;
+import org.springframework.web.servlet.config.annotation.EnableWebMvc;
+
+@Configuration
+@ComponentScan(basePackages={&quot;spittr&quot;},
+excludeFilters={
+    @Filter(type=FilterType.ANNOTATION, value=EnableWebMvc.class)
+})
+
+public class RootConfig {}</code></pre>
+
+<h3>Spittr 的介绍</h3>
+
+<p>是的，终于到了这里。</p>
+
+<p>之前所做的已经足够了，现在可以开始去构思一个 web 程序的实现了，按照原作者的说法，原作者打算做一个简易的 Twitter，于是，对 Twitter 和 Spring 各取一半就有了 Spitter，为了逼格更高一点，参考热门的 Flickr，扔掉一个 e 就有了 Spittr。Spittr 的用户叫做 spitters，他们发布的状态叫做spittles，是不是很有意思？</p>
+
+<p>好了，就到这里，接下来写完一个简单的 Controller 就收工&hellip;..</p>
+
+<h2>(4) 一个简单的Controller；</h2>
+
+<p>在 Spring MVC中，Controller 就是类，只是类中的方法们带有<strong>@RequestMapping</strong>注解，以表明它们各自处理什么样的 Request。</p>
+
+<p>让我们看一个简单的Controller示例，它用来处理目标路径是/的 Request：</p>
+
+<h4>代码清单4： HomeController</h4>
+
+<pre>
+<code>package spittr.web;
+
+import static org.springframework.web.bind.annotation.RequestMethod.*;
+import org.springframework.stereotype.Controller;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestMethod;
+
+@Controller
+public class HomeController {
+
+    @RequestMapping(value=&quot;/&quot;, method=GET)
+    public String home() {
+        return &quot;home&quot;;
+    }
+
+}</code></pre>
+
+<p>第一眼你注意到的应该就是这个<strong>@Controller</strong>注解，显然它是用来声明一个 Controller，然而它和 Spring MVC 却没有什么关系，它的功能和&nbsp;<strong>@Component</strong>&nbsp;一致，都是便于component-scanning 能够查找到它所注解的类。唯一不用&nbsp;<strong>@Component</strong>&nbsp;的原因是，它的表现力没有这么强，你不会一眼就知道这个它所标注的类是在起到一个 Controller 的作用。</p>
+
+<p>HomeController 唯一的方法是 home()， 使用了<strong>@RequestMapping</strong>注解，其中 value 属性指定了方法所操作的 Request 路径，即&ldquo;/&rdquo;；method 属性则说明了它所接受的HTTP访问方式。</p>
+
+<p>每当一个 HTTP GET Request 访问 / 路径的时候，home() 方法就会被调用：返回一个&ldquo;home&rdquo;的String字符串。接着 Spring MVC 将&ldquo;home&rdquo;作为view 名，之前说过，DispatcherServlet 会找 view resolver ，把逻辑上的 view 名映射到一个实际的 view。</p>
+
+<p>按照已配置的 InternalResourceViewResolver，&ldquo;home&rdquo;将被映射到 /WEB-INF/views/home.jsp，所以接下来的工作就是 home.jsp 的编写：</p>
+
+<h4>代码清单5： home.jsp</h4>
+
+<pre>
+<code>&lt;%@ taglib uri=&quot;http://java.sun.com/jsp/jstl/core&quot; prefix=&quot;c&quot; %&gt;
+&lt;%@ page session=&quot;false&quot; %&gt;
+&lt;html&gt;
+    &lt;head&gt;
+        &lt;title&gt;Spittr&lt;/title&gt;
+    &lt;/head&gt;
+    &lt;body&gt;
+        &lt;h1&gt;Welcome to Spittr&lt;/h1&gt;
+    &lt;/body&gt;
+&lt;/html&gt;</code></pre>
+
+<p>是的，以上代码几乎什么都没有，只是象征性的类似于&ldquo;helloworld&rdquo;，想要跟着原作者开发出简易Twitter的童鞋们请跟着他继续吧&hellip;..</p>
+
+<h2>(5)尾声</h2>
+
+<h3>一些补充</h3>
+
+<p>必要的代码们已经贴完了，在工程里面的结构是这样子（不要在意spittr.test，自行查看原书&hellip;与最基本的运行无关&hellip;）：</p>
+
+<p><img alt="这里写图片描述" src="https://img-blog.csdn.net/20160228205306619" title="" /></p>
+
+<p>啊&hellip;.还有一个log4j配置文件，贴在下面自行添加&hellip;..</p>
+
+<h4>代码清单6： log4j.properties</h4>
+
+<pre>
+<code># 设定logger的root level为INFO，指定的输出目的地（appender）为file,并在控制台输出stdout(Console)
+log4j.rootLogger=DEBUG,file,stdout
+
+# 设定stdout控制台 
+log4j.appender.stdout=org.apache.log4j.ConsoleAppender
+log4j.appender.stdout.layout=org.apache.log4j.PatternLayout
+log4j.appender.stdout.layout.ConversionPattern=[%d{HH\:mm\:ss}] %5p %F\:%L &quot;%m&quot;%n
+
+# 设定输出位置，此处设定tomcat目录的logs下,文件名为projectLogs.log 
+log4j.appender.file=org.apache.log4j.DailyRollingFileAppender
+log4j.appender.file.append = true
+log4j.appender.file.encoding=UTF-8
+log4j.appender.file.File=${catalina.home}/logs/demos.log
+log4j.appender.file.datePattern=&#39;.&#39;yyyy-MM-dd
+log4j.appender.file.BufferedIO=true
+log4j.appender.file.BufferSize=8192
+
+# 设定制定的file使用的PatternLayout. 
+# 有关ConversionPattern中的转义字符的含义参考说明 
+log4j.appender.file.layout=org.apache.log4j.PatternLayout 
+log4j.appender.file.layout.ConversionPattern=%d{yyyy/MM/dd HH:mm:ss} %-5p [%C:%M:%L] %m%n
+
+log4j.logger.org.apache.commons.httpclient=INFO
+log4j.logger.org.springframework=WARN
+log4j.logger.com.mchange=WARN
+log4j.logger.org.apache.hadoop.hbase.ipc=DEBUG
+log4j.logger.org.apache.hadoop.hbase=DEBUG
+log4j.logger.org.apache.hadoop.conf=DEBUG
+log4j.logger.org.apache.zookeeper=WARN
+log4j.logger.org.apache.activemq=WARN
+log4j.logger.org.apache.kahadb=WARN
+log4j.logger.org.apache.http=WARN
+log4j.logger.org.hibernate.loader=WARN
+log4j.logger.org.hibernate.engine=WARN
+log4j.logger.org.hibernate.cfg=WARN
+log4j.logger.org.hibernate.jdbc.AbstractBatcher=WARN
+log4j.logger.org.hibernate.transaction=WARN
+log4j.logger.org.hibernate.jdbc.ConnectionManager=WARN
+log4j.logger.org.hibernate.event=WARN
+log4j.logger.org.hibernate.id=WARN
+log4j.logger.org.hibernate.hql=WARN
+log4j.logger.org.hibernate.persister=WARN
+log4j.logger.org.hibernate.impl=WARN
+log4j.logger.org.hibernate.transform=WARN
+log4j.logger.org.hibernate.validator=WARN
+</code></pre>
+
+<h3>测试页面</h3>
+
+<p>之后 run as-&gt;run on server，使用配置好的 tomcat 运行，没配的话自行查找资料&hellip;.正确的页面就像这样&hellip;.</p>
+
+<p><img alt="这里写图片描述" src="https://img-blog.csdn.net/20160228210526432" title="" /></p>
+
+<p>好了，到这里就不往下啰嗦了&hellip;..</p>
