@@ -1,0 +1,100 @@
+<h1><a href="https://blog.csdn.net/u011244682/article/details/76213224">maven 项目拆分配置文件为单独的项目</a></h1>
+
+<p><a href="https://blog.csdn.net/u011244682/article/details/76213224">（即maven项目如何依赖另一个项目的配置文件）</a></p>
+
+<p>&nbsp; 在学习dubbo 分布式框架的时候，需要把一个大的项目分割成多个服务，例如：用户服务模块（包括权限、用户登录、用户增删）、公共服务模块（包括文件上传等），这些服务模块之间可能需要依赖公共的配置文件，例如redis配置、数据库配置、第三方配置，系统数据配置，我们不可能把配置文件在每个需要的服务项目上都放置一份，这样维护起来很麻烦，所以就想把公共的配置文件单独分离处理，做成一个单独的project,然后打成jar包，某个服务需要这个配置的话，直接引用这个jar包就好了。</p>
+
+<p>我的项目结构如下：</p>
+
+<p><img alt="" src="https://img-blog.csdn.net/20170728082957572?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQvdTAxMTI0NDY4Mg==/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70/gravity/Center" /></p>
+
+<p><img alt="" src="https://blog.csdn.net/u011244682/article/details/76213224" /></p>
+
+<p>项目结构划分：</p>
+
+<p>yt-common: 这个工程包含所有服务公用的工具类、实体对象等。</p>
+
+<p>yt-common-config: 这个是公用的配置工程，这个project只包含配置文件</p>
+
+<p>yt-facade-common:dubbo api 接口，里面定义一些各个服务之间公用的接口方法。</p>
+
+<p>yt-facade-user: dubbo 用户接口API，里面定义了用户服务模块的相关操作。</p>
+
+<p>yt-service-web-common:dubbo 公用服务实现工程,这是web工程，这个里面实现都是yt-facade-common API 里面定义的方法，例如：文件上传服务。</p>
+
+<p>yt-service-web-user: 用户服务实现工程，这个里面都是有关yt-facade-user的实现。</p>
+
+<p>yt-web-clound-sound:这是个后台web工程，包括页面、控制层，会调用dubbo服务去实现业务逻辑功能。</p>
+
+<p>&nbsp;</p>
+
+<p>我在&nbsp;yt-facade-user 里面引入了yt-common-config 的配置,见：</p>
+
+<p><img alt="" src="https://img-blog.csdn.net/20170728083205809?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQvdTAxMTI0NDY4Mg==/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70/gravity/Center" /></p>
+
+<p>&nbsp;</p>
+
+<p><img alt="" src="https://img-blog.csdn.net/20170728083224954?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQvdTAxMTI0NDY4Mg==/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70/gravity/Center" /></p>
+
+<p><img alt="" src="https://blog.csdn.net/u011244682/article/details/76213224" /></p>
+
+<p>yt-common-config 这个项目的配置文件定义了数据库连接、缓存、系统配置等操作，在yt-facade-user 里面需要这些配置，把项目通过myeclipse 部署到tomcat 下面运行正常，能够访问数据库，yt-common-config 下面定义的配置文件会加载到classpath 下面：</p>
+
+<p><img alt="" src="https://img-blog.csdn.net/20170728083346284?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQvdTAxMTI0NDY4Mg==/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70/gravity/Center" /></p>
+
+<p><img alt="" src="https://blog.csdn.net/u011244682/article/details/76213224" /></p>
+
+<p>&nbsp;</p>
+
+<p>但是问题来了：我利用maven 构建项目，然后把war 包部署到tomcat 下面，运行项目，发现user 服务报错了，我打开tomcat 下面部署的yt-service-web-user项目，发现在classpath下面只有它本身的配置文件，它所依赖的配置文件工程中的配置文件并没有被copy 到classpath下面，所以数据库配置、系统配置都读不到了，然后玩不起来了，我有点想哭。</p>
+
+<p>解决办法：常用的解决办法是百度了，于是乎百度，好在我找到和我有一样想法的童鞋：</p>
+
+<p><strong>1、有人问：<a href="http://www.zuidaima.com/question/3151472153562112.htm" target="_blank">maven项目如何依赖另一个项目的配置文件</a>&nbsp;，刷刷的看完，然后我再次想哭，没有答案啊。</strong></p>
+
+<p><strong>2、有人问：<a href="https://www.oschina.net/question/2285131_2201889" target="_blank">maven 项目拆分配置文件为单独的项目</a>，看到这个我想说还有有人帮我问了，但是拉倒头，发现也只是问了，大神门都不回答啊，好吧，只有靠自己了。</strong></p>
+
+<p>&nbsp;</p>
+
+<p>最终的解决办法是：</p>
+
+<p>&nbsp;</p>
+
+<p><strong>Maven 打包是由很多插件构成的，我百度的时候发现有这么一个插件：&nbsp;</strong>&nbsp;</p>
+
+<p><a href="http://blog.csdn.net/xiao_jun_0820/article/details/50603137" target="_blank">maven-dependency-plugin插件的使用</a>&nbsp;，这个插件是用来项目打包时copy,unpack...jar 包的，对了，unpack，那我可以把配置文件那个jar包解压到classpath下面啊，这样就和myelipse 直接部署的效果一样了，我在yt-facade-user项目的pom.xml 文件配置如下：</p>
+
+<ol start="1">
+	<li>&lt;plugin&gt;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;groupId&gt;org.apache.maven.plugins&lt;/groupId&gt;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;artifactId&gt;maven-dependency-plugin&lt;/artifactId&gt;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;executions&gt;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;execution&gt;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;id&gt;unpack&lt;/id&gt;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;phase&gt;generate-resources&lt;/phase&gt;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;goals&gt;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;goal&gt;unpack&lt;/goal&gt;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/goals&gt;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;configuration&gt;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;artifactItems&gt;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;artifactItem&gt;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;groupId&gt;com.hzlh&lt;/groupId&gt;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;artifactId&gt;yt-common-config&lt;/artifactId&gt;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;version&gt;0.0.1-SNAPSHOT&lt;/version&gt;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;type&gt;jar&lt;/type&gt;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;overWrite&gt;true&lt;/overWrite&gt;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;outputDirectory&gt;${project.build.directory}/classes&lt;/outputDirectory&gt;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;includes&gt;**/system/*.properties,**/spring/*.xml&lt;/includes&gt;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/artifactItem&gt;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/artifactItems&gt;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/configuration&gt;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/execution&gt;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/executions&gt;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&lt;/plugin&gt;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+</ol>
+
+<p>这里指定把：yt-common-config 这个jar包解压到项目的classpath下面，并只copy中system、spring文件下面的指定的文件，配置好后，clean-installl 这个project ，查看build后的工程目录：</p>
+
+<p>发现配置工程中的配置文件果然解压过来了，然后把war包丢到tomcat中跑起来，顿时我就开心的下班了。</p>
+
+<p>PS:有点啰嗦，但是不要喷我啊！</p>
