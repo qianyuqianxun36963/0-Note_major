@@ -1,0 +1,746 @@
+<h1><a href="http://www.cnblogs.com/best/p/5736422.html" id="cb_post_title_url">Spring实现AOP的多种方式</a></h1>
+
+<p><strong>目录</strong></p>
+
+<ul>
+	<li><a href="https://www.cnblogs.com/best/p/5736422.html#_label0">一、基于XML配置的Spring AOP</a></li>
+	<li><a href="https://www.cnblogs.com/best/p/5736422.html#_label1">二、使用注解配置AOP</a></li>
+	<li><a href="https://www.cnblogs.com/best/p/5736422.html#_label2">三、AspectJ切点函数</a></li>
+	<li><a href="https://www.cnblogs.com/best/p/5736422.html#_label3">四、AspectJ通知注解</a></li>
+	<li><a href="https://www.cnblogs.com/best/p/5736422.html#_label4">五、零配置实现Spring IoC与AOP</a></li>
+	<li><a href="https://www.cnblogs.com/best/p/5736422.html#_label5">六、示例下载</a></li>
+</ul>
+
+<p>AOP（Aspect Oriented Programming）面向切面编程，通过预编译方式和运行期动态代理实现程序功能的横向多模块统一控制的一种技术。AOP是OOP的补充，是Spring框架中的一个重要内容。利用AOP可以对业务逻辑的各个部分进行隔离，从而使得业务逻辑各部分之间的耦合度降低，提高程序的可重用性，同时提高了开发的效率。AOP可以分为静态织入与动态织入，静态织入即在编译前将需织入内容写入目标模块中，这样成本非常高。动态织入则不需要改变目标模块。Spring框架实现了AOP，使用注解配置完成AOP比使用XML配置要更加方便与直观。<a href="http://www.cnblogs.com/best/p/5679656.html" target="_blank">上一篇随笔中已经详细讲了代理模式</a>。</p>
+
+<p><img alt="" src="https://images2015.cnblogs.com/blog/63651/201607/63651-20160728151810934-376938146.png" /></p>
+
+<h1>一、基于XML配置的Spring AOP</h1>
+
+<p>在讲注解实现AOP功能前先用前面学习过的使用xml配置Spring AOP功能，这样是为了对比以便更好的理解。</p>
+
+<p>1.1、新建一个Maven项目，添加引用，项目的pom.xml文件如下：</p>
+
+<p><img alt="" src="https://images2015.cnblogs.com/blog/63651/201606/63651-20160630203951937-1177457148.png" /></p>
+
+<pre>
+&lt;project xmlns=&quot;http://maven.apache.org/POM/4.0.0&quot; xmlns:xsi=&quot;http://www.w3.org/2001/XMLSchema-instance&quot;
+  xsi:schemaLocation=&quot;http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd&quot;&gt;
+  &lt;modelVersion&gt;4.0.0&lt;/modelVersion&gt;
+
+  &lt;groupId&gt;com.zhangguo&lt;/groupId&gt;
+  &lt;artifactId&gt;Spring052&lt;/artifactId&gt;
+  &lt;version&gt;0.0.1-SNAPSHOT&lt;/version&gt;
+  &lt;packaging&gt;jar&lt;/packaging&gt;
+
+  &lt;name&gt;Spring052&lt;/name&gt;
+  &lt;url&gt;http://maven.apache.org&lt;/url&gt;
+
+  &lt;properties&gt;
+        &lt;project.build.sourceEncoding&gt;UTF-8&lt;/project.build.sourceEncoding&gt;
+        &lt;spring.version&gt;4.3.0.RELEASE&lt;/spring.version&gt;
+    &lt;/properties&gt;
+    &lt;dependencies&gt;
+        &lt;dependency&gt;
+            &lt;groupId&gt;junit&lt;/groupId&gt;
+            &lt;artifactId&gt;junit&lt;/artifactId&gt;
+            &lt;scope&gt;test&lt;/scope&gt;
+            &lt;version&gt;4.10&lt;/version&gt;
+        &lt;/dependency&gt;
+        &lt;dependency&gt;
+            &lt;groupId&gt;org.springframework&lt;/groupId&gt;
+            &lt;artifactId&gt;spring-context&lt;/artifactId&gt;
+            &lt;version&gt;${spring.version}&lt;/version&gt;
+        &lt;/dependency&gt;
+        &lt;dependency&gt;
+            &lt;groupId&gt;org.aspectj&lt;/groupId&gt;
+            &lt;artifactId&gt;aspectjweaver&lt;/artifactId&gt;
+            &lt;version&gt;1.8.9&lt;/version&gt;
+        &lt;/dependency&gt;
+        &lt;dependency&gt;
+            &lt;groupId&gt;cglib&lt;/groupId&gt;
+            &lt;artifactId&gt;cglib&lt;/artifactId&gt;
+            &lt;version&gt;3.2.4&lt;/version&gt;
+        &lt;/dependency&gt;
+    &lt;/dependencies&gt;
+&lt;/project&gt;
+</pre>
+
+<p>1.2、创建要被代理的Math类，代码如下：</p>
+
+<pre>
+package com.zhangguo.Spring052.aop01;
+
+/**
+ * 被代理的目标类
+ */
+public class Math{
+    //加
+    public int add(int n1,int n2){
+        int result=n1+n2;
+        System.out.println(n1+&quot;+&quot;+n2+&quot;=&quot;+result);
+        return result;
+    }
+    
+    //减
+    public int sub(int n1,int n2){
+        int result=n1-n2;
+        System.out.println(n1+&quot;-&quot;+n2+&quot;=&quot;+result);
+        return result;
+    }
+    
+    //乘
+    public int mut(int n1,int n2){
+        int result=n1*n2;
+        System.out.println(n1+&quot;X&quot;+n2+&quot;=&quot;+result);
+        return result;
+    }
+    
+    //除
+    public int div(int n1,int n2){
+        int result=n1/n2;
+        System.out.println(n1+&quot;/&quot;+n2+&quot;=&quot;+result);
+        return result;
+    }
+}
+</pre>
+
+<p>1.3、编辑AOP中需要使用到的通知类Advices.java代码如下：</p>
+
+<pre>
+package com.zhangguo.Spring052.aop01;
+
+import org.aspectj.lang.JoinPoint;
+
+/**
+ * 通知类，横切逻辑
+ *
+ */
+public class Advices {
+    
+    public void before(JoinPoint jp){
+        System.out.println(&quot;----------前置通知----------&quot;);
+        System.out.println(jp.getSignature().getName());
+    }
+    
+    public void after(JoinPoint jp){
+        System.out.println(&quot;----------最终通知----------&quot;);
+    }
+}
+</pre>
+
+<p>1.4、配置容器初始化时需要的XML文件，aop01.xml文件内容如下：</p>
+
+<pre>
+&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot;?&gt;
+&lt;beans xmlns=&quot;http://www.springframework.org/schema/beans&quot;
+    xmlns:xsi=&quot;http://www.w3.org/2001/XMLSchema-instance&quot; 
+    xmlns:p=&quot;http://www.springframework.org/schema/p&quot;<strong>
+    xmlns:aop=&quot;http://www.springframework.org/schema/aop&quot;</strong>
+    xsi:schemaLocation=&quot;http://www.springframework.org/schema/beans
+        http://www.springframework.org/schema/beans/spring-beans.xsd
+        <strong>http://www.springframework.org/schema/aop
+        http://www.springframework.org/schema/aop/spring-aop-4.3.xsd</strong>&quot;&gt;
+       
+    &lt;!-- 被代理对象 --&gt;
+    &lt;bean id=&quot;math&quot; class=&quot;com.zhangguo.Spring052.aop01.Math&quot;&gt;&lt;/bean&gt;
+    
+    &lt;!-- 通知 --&gt;
+    &lt;bean id=&quot;advices&quot; class=&quot;com.zhangguo.Spring052.aop01.Advices&quot;&gt;&lt;/bean&gt;
+    
+    &lt;!-- aop配置 --&gt;
+    &lt;aop:config proxy-target-class=&quot;true&quot;&gt;
+        &lt;!--切面 --&gt;
+        &lt;aop:aspect ref=&quot;advices&quot;&gt;
+            &lt;!-- 切点 --&gt;
+            &lt;aop:pointcut expression=&quot;execution(* com.zhangguo.Spring052.aop01.Math.*(..))&quot; id=&quot;pointcut1&quot;/&gt;
+            &lt;!--连接通知方法与切点 --&gt;
+            &lt;aop:before method=&quot;before&quot; pointcut-ref=&quot;pointcut1&quot;/&gt;
+            &lt;aop:after method=&quot;after&quot; pointcut-ref=&quot;pointcut1&quot;/&gt;
+        &lt;/aop:aspect&gt;
+    &lt;/aop:config&gt;
+
+&lt;/beans&gt;
+</pre>
+
+<p>1.5、测试代码Test.java如下：</p>
+
+<pre>
+package com.zhangguo.Spring052.aop01;
+
+import org.springframework.context.ApplicationContext;
+import org.springframework.context.support.ClassPathXmlApplicationContext;
+
+public class Test {
+
+    public static void main(String[] args) {
+        ApplicationContext ctx = new ClassPathXmlApplicationContext(&quot;aop01.xml&quot;);
+        Math math = ctx.getBean(&quot;math&quot;, Math.class);
+        int n1 = 100, n2 = 5;
+        math.add(n1, n2);
+        math.sub(n1, n2);
+        math.mut(n1, n2);
+        math.div(n1, n2);
+    }
+
+}
+</pre>
+
+<p>运行结果：</p>
+
+<p><img alt="" src="https://images2015.cnblogs.com/blog/63651/201606/63651-20160630152710734-1878010738.png" style="height:251px; width:156px" /></p>
+
+<h1><strong>二、使用注解配置AOP</strong></h1>
+
+<p><strong><img alt="" src="https://images2015.cnblogs.com/blog/63651/201606/63651-20160630211512187-1115670038.png" /></strong></p>
+
+<p>2.1、在上一个示例中修改被代理的类Math,为了实现IOC扫描在Math类上注解了@Service并命名bean为math。相当于上一个示例中在xml配置文件中增加了一个bean，&lt;!-- 被代理对象 --&gt;&lt;bean id=&quot;math&quot; class=&quot;com.zhangguo.Spring052.aop01.Math&quot;&gt;&lt;/bean&gt;，Math类的代码如下：</p>
+
+<pre>
+package com.zhangguo.Spring052.aop02;
+
+import org.springframework.stereotype.Service;
+
+/**
+ * 被代理的目标类
+ */
+@Service(&quot;math&quot;)
+public class Math{
+    //加
+    public int add(int n1,int n2){
+        int result=n1+n2;
+        System.out.println(n1+&quot;+&quot;+n2+&quot;=&quot;+result);
+        return result;
+    }
+    
+    //减
+    public int sub(int n1,int n2){
+        int result=n1-n2;
+        System.out.println(n1+&quot;-&quot;+n2+&quot;=&quot;+result);
+        return result;
+    }
+    
+    //乘
+    public int mut(int n1,int n2){
+        int result=n1*n2;
+        System.out.println(n1+&quot;X&quot;+n2+&quot;=&quot;+result);
+        return result;
+    }
+    
+    //除
+    public int div(int n1,int n2){
+        int result=n1/n2;
+        System.out.println(n1+&quot;/&quot;+n2+&quot;=&quot;+result);
+        return result;
+    }
+}
+</pre>
+
+<p>&nbsp;2.2、修改通知类Advices，代码中有3个注解，@Component表示该类的实例会被Spring IOC容器管理；@Aspect表示声明一个切面；@Before表示before为前置通知，通过参数execution声明一个切点，Advices.java代码如下所示：</p>
+
+<pre>
+package com.zhangguo.Spring052.aop02;
+
+import org.aspectj.lang.JoinPoint;
+import org.aspectj.lang.annotation.After;
+import org.aspectj.lang.annotation.Aspect;
+import org.aspectj.lang.annotation.Before;
+import org.springframework.stereotype.Component;
+
+/**
+ * 通知类，横切逻辑
+ *
+ */
+@Component
+@Aspect
+public class Advices {
+    @Before(&quot;execution(* com.zhangguo.Spring052.aop02.Math.*(..))&quot;)
+    public void before(JoinPoint jp){
+        System.out.println(&quot;----------前置通知----------&quot;);
+        System.out.println(jp.getSignature().getName());
+    }
+    
+    @After(&quot;execution(* com.zhangguo.Spring052.aop02.Math.*(..))&quot;)
+    public void after(JoinPoint jp){
+        System.out.println(&quot;----------最终通知----------&quot;);
+    }
+}
+</pre>
+
+<p>&nbsp;上面的代码与下面的配置基本等同</p>
+
+<pre>
+    &lt;!-- 通知 --&gt;
+    &lt;bean id=&quot;advices&quot; class=&quot;com.zhangguo.Spring052.aop01.Advices&quot;&gt;&lt;/bean&gt;
+    
+    &lt;!-- aop配置 --&gt;
+    &lt;aop:config proxy-target-class=&quot;true&quot;&gt;
+        &lt;!--切面 --&gt;
+        &lt;aop:aspect ref=&quot;advices&quot;&gt;
+            &lt;!-- 切点 --&gt;
+            &lt;aop:pointcut expression=&quot;execution(* com.zhangguo.Spring052.aop01.Math.*(..))&quot; id=&quot;pointcut1&quot;/&gt;
+            &lt;!--连接通知方法与切点 --&gt;
+            &lt;aop:before method=&quot;before&quot; pointcut-ref=&quot;pointcut1&quot;/&gt;
+            &lt;aop:after method=&quot;after&quot; pointcut-ref=&quot;pointcut1&quot;/&gt;
+        &lt;/aop:aspect&gt;
+    &lt;/aop:config&gt;
+</pre>
+
+<p>2.3、新增配置文件aop02.xml，在配置IOC的基础上增加了aop:aspectj-autoproxy节点，Spring框架会自动为与AspectJ切面配置的Bean创建代理，proxy-target-class=&quot;true&quot;属性表示被代理的目标对象是一个类，而非实现了接口的类，主要是为了选择不同的代理方式。</p>
+
+<pre>
+&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot;?&gt;
+&lt;beans xmlns=&quot;http://www.springframework.org/schema/beans&quot;
+    xmlns:xsi=&quot;http://www.w3.org/2001/XMLSchema-instance&quot; 
+    xmlns:p=&quot;http://www.springframework.org/schema/p&quot;
+    xmlns:aop=&quot;http://www.springframework.org/schema/aop&quot;
+    xmlns:context=&quot;http://www.springframework.org/schema/context&quot;
+    xsi:schemaLocation=&quot;http://www.springframework.org/schema/beans
+        http://www.springframework.org/schema/beans/spring-beans.xsd
+        http://www.springframework.org/schema/context
+        http://www.springframework.org/schema/context/spring-context-4.3.xsd
+        http://www.springframework.org/schema/aop
+        http://www.springframework.org/schema/aop/spring-aop-4.3.xsd&quot;&gt;
+        &lt;context:component-scan base-package=&quot;com.zhangguo.Spring052.aop02&quot;&gt;
+        &lt;/context:component-scan&gt;
+<strong>        &lt;aop:aspectj-autoproxy proxy-target-class=&quot;true&quot;&gt;&lt;/aop:aspectj-autoproxy&gt;</strong>
+&lt;/beans&gt;
+</pre>
+
+<p>2.4、测试运行代码Test.java如下：</p>
+
+<pre>
+package com.zhangguo.Spring052.aop02;
+
+import org.springframework.context.ApplicationContext;
+import org.springframework.context.support.ClassPathXmlApplicationContext;
+
+public class Test {
+
+    public static void main(String[] args) {
+        ApplicationContext ctx = new ClassPathXmlApplicationContext(&quot;aop02.xml&quot;);
+        Math math = ctx.getBean(&quot;math&quot;, Math.class);
+        int n1 = 100, n2 = 5;
+        math.add(n1, n2);
+        math.sub(n1, n2);
+        math.mut(n1, n2);
+        math.div(n1, n2);
+    }
+
+}
+</pre>
+
+<p>运行结果：</p>
+
+<p><img alt="" src="https://images2015.cnblogs.com/blog/63651/201606/63651-20160630153627671-2035089290.png" style="height:330px; width:442px" /></p>
+
+<h1><strong>三、AspectJ切点函数</strong></h1>
+
+<p>切点函数可以定位到准确的横切逻辑位置，在前面的示例中我们只使用过execution(* com.zhangguo.Spring052.aop02.Math.*(..))，execution就是一个切点函数，但该函数只什么方法一级，如果我们要织入的范围是类或某个注解则execution就不那么好用了，其实一共有9个切点函数，有不同的针对性。</p>
+
+<p>@AspectJ使用AspectJ专门的切点表达式描述切面，Spring所支持的AspectJ表达式可分为四类:<br />
+方法切点函数：通过描述目标类方法信息定义连接点。<br />
+方法参数切点函数：通过描述目标类方法入参信息定义连接点。<br />
+目标类切点函数：通过描述目标类类型信息定义连接点。<br />
+代理类切点函数：通过描述代理类信息定义连接点。</p>
+
+<p>常见的AspectJ表达式函数：<br />
+execution()：满足匹配模式字符串的所有目标类方法的连接点<br />
+@annotation()：任何标注了指定注解的目标方法链接点<br />
+args()：目标类方法运行时参数的类型指定连接点<br />
+@args()：目标类方法参数中是否有指定特定注解的连接点<br />
+within()：匹配指定的包的所有连接点<br />
+target()：匹配指定目标类的所有方法<br />
+@within()：匹配目标对象拥有指定注解的类的所有方法<br />
+@target()：匹配当前目标对象类型的执行方法，其中目标对象持有指定的注解<br />
+this()：匹配当前AOP代理对象类型的所有执行方法</p>
+
+<p>最常用的是：execution(&lt;修饰符模式&gt;?&lt;返回类型模式&gt;&lt;方法名模式&gt;(&lt;参数模式&gt;)&lt;异常模式&gt;?)切点函数，可以满足多数需求。</p>
+
+<p>为了展示各切点函数的功能现在新增一个类StrUtil，类如下：</p>
+
+<pre>
+package com.zhangguo.Spring052.aop03;
+
+import org.springframework.stereotype.Component;
+
+@Component(&quot;strUtil&quot;)
+public class StrUtil {
+    public void show(){
+        System.out.println(&quot;Hello StrUtil!&quot;);
+    }
+}
+</pre>
+
+<p>测试代码如下：</p>
+
+<pre>
+package com.zhangguo.Spring052.aop03;
+
+import org.springframework.context.ApplicationContext;
+import org.springframework.context.support.ClassPathXmlApplicationContext;
+
+public class Test {
+
+    public static void main(String[] args) {
+        ApplicationContext ctx = new ClassPathXmlApplicationContext(&quot;aop03.xml&quot;);
+        IMath math = ctx.getBean(&quot;math&quot;, Math.class);
+        int n1 = 100, n2 = 5;
+        math.add(n1, n2);
+        math.sub(n1, n2);
+        math.mut(n1, n2);
+        math.div(n1, n2);
+        
+        StrUtil strUtil=ctx.getBean(&quot;strUtil&quot;,StrUtil.class);
+        strUtil.show();
+    }
+
+}
+</pre>
+
+<p>3.1、切点函数execution，通知与切面的定义如下：</p>
+
+<pre>
+package com.zhangguo.Spring052.aop03;
+
+import org.aspectj.lang.JoinPoint;
+import org.aspectj.lang.annotation.After;
+import org.aspectj.lang.annotation.Aspect;
+import org.aspectj.lang.annotation.Before;
+import org.springframework.stereotype.Component;
+
+/**
+ * 通知类，横切逻辑
+ *
+ */
+@Component
+@Aspect
+public class Advices {
+    @Before(&quot;execution(* com.zhangguo.Spring052.aop03.Math.*(..))&quot;)
+    public void before(JoinPoint jp){
+        System.out.println(&quot;----------前置通知----------&quot;);
+        System.out.println(jp.getSignature().getName());
+    }
+    
+    //execution切点函数
+    //com.zhangguo.Spring052.aop03包下所有类的所有方法被切入
+    @After(&quot;execution(* com.zhangguo.Spring052.aop03.*.*(..))&quot;)
+    public void after(JoinPoint jp){
+        System.out.println(&quot;----------最终通知----------&quot;);
+    }
+}
+</pre>
+
+<p>运行结果如下：</p>
+
+<p><img alt="" src="https://images2015.cnblogs.com/blog/63651/201607/63651-20160701092739921-1901678242.png" style="height:277px; width:151px" /></p>
+
+<p>execution(&lt;修饰符模式&gt;?&lt;返回类型模式&gt;&lt;方法名模式&gt;(&lt;参数模式&gt;)&lt;异常模式&gt;?)</p>
+
+<p>3.2、切点函数within</p>
+
+<pre>
+    //within切点函数
+    //com.zhangguo.Spring052.aop03包下所有类的所有方法被切入
+    @After(&quot;within(com.zhangguo.Spring052.aop03.*)&quot;)
+    public void after(JoinPoint jp){
+        System.out.println(&quot;----------最终通知----------&quot;);
+    }
+</pre>
+
+<p>&nbsp;<img alt="" src="https://images2015.cnblogs.com/blog/63651/201607/63651-20160701092739921-1901678242.png" style="height:277px; width:151px" /></p>
+
+<p>3.3、this切点函数</p>
+
+<pre>
+    //this切点函数
+    //实现了IMath接口的代理对象的任意连接点
+    @After(&quot;this(com.zhangguo.Spring052.aop03.IMath)&quot;)
+    public void after(JoinPoint jp){
+        System.out.println(&quot;----------最终通知----------&quot;);
+    }
+</pre>
+
+<p><strong><img alt="" src="https://images2015.cnblogs.com/blog/63651/201607/63651-20160701093243781-1832748892.png" style="height:270px; width:151px" /></strong></p>
+
+<p>3.4、args切点函数</p>
+
+<pre>
+    //args切点函数
+    //要求方法有两个int类型的参考才会被织入横切逻辑
+    @After(&quot;args(int,int)&quot;)
+    public void after(JoinPoint jp){
+        System.out.println(&quot;----------最终通知----------&quot;);
+    }
+</pre>
+
+<p>&nbsp;<img alt="" src="https://images2015.cnblogs.com/blog/63651/201607/63651-20160701093407656-668582006.png" style="height:240px; width:150px" /></p>
+
+<p>如果参数类型不是基本数据类型则需要包名。</p>
+
+<p>3.5、@annotation切点函数</p>
+
+<p>先自定义一个可以注解在方法上的注解</p>
+
+<pre>
+package com.zhangguo.Spring052.aop03;
+
+import java.lang.annotation.Documented;
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
+
+@Target({ElementType.METHOD})
+@Retention(RetentionPolicy.RUNTIME)
+@Documented
+public @interface MyAnno {
+}
+</pre>
+
+<pre>
+    //@annotation切点函数
+    //要求方法必须被注解com.zhangguo.Spring052.aop03.MyAnno才会被织入横切逻辑
+    @After(&quot;@annotation(com.zhangguo.Spring052.aop03.MyAnno)&quot;)
+    public void after(JoinPoint jp){
+        System.out.println(&quot;----------最终通知----------&quot;);
+    }
+</pre>
+
+<pre>
+package com.zhangguo.Spring052.aop03;
+
+import org.springframework.stereotype.Component;
+
+@Component(&quot;strUtil&quot;)
+public class StrUtil {
+    @MyAnno
+    public void show(){
+        System.out.println(&quot;Hello StrUtil!&quot;);
+    }
+}
+</pre>
+
+<p><strong>运行结果：</strong></p>
+
+<p><strong><img alt="" src="https://images2015.cnblogs.com/blog/63651/201607/63651-20160701094846343-1607868540.png" style="height:185px; width:125px" /></strong></p>
+
+<p>其它带@的切点函数都是针对注解的</p>
+
+<h1><strong>四、AspectJ通知注解</strong></h1>
+
+<p>AspectJ通知注解共有6个，常用5个，引介少用一些。</p>
+
+<p>先解决定义切点复用的问题，如下代码所示，切点函数的内容完全一样：</p>
+
+<pre>
+package com.zhangguo.Spring052.aop04;
+
+import org.aspectj.lang.JoinPoint;
+import org.aspectj.lang.annotation.After;
+import org.aspectj.lang.annotation.Aspect;
+import org.aspectj.lang.annotation.Before;
+import org.springframework.stereotype.Component;
+
+/**
+ * 通知类，横切逻辑
+ *
+ */
+@Component
+@Aspect
+public class Advices {
+    @Before(&quot;execution(* com.zhangguo.Spring052.aop04.Math.*(..))&quot;)
+    public void before(JoinPoint jp){
+        System.out.println(&quot;----------前置通知----------&quot;);
+        System.out.println(jp.getSignature().getName());
+    }
+    
+    @After(&quot;execution(* com.zhangguo.Spring052.aop04.Math.*(..))&quot;)
+    public void after(JoinPoint jp){
+        System.out.println(&quot;----------最终通知----------&quot;);
+    }
+}
+</pre>
+
+<p>可以先定义一个切点然后复用，如下所示：</p>
+
+<pre>
+package com.zhangguo.Spring052.aop04;
+
+import org.aspectj.lang.JoinPoint;
+import org.aspectj.lang.annotation.After;
+import org.aspectj.lang.annotation.Aspect;
+import org.aspectj.lang.annotation.Before;
+import org.aspectj.lang.annotation.Pointcut;
+import org.springframework.stereotype.Component;
+
+/**
+ * 通知类，横切逻辑
+ */
+@Component
+@Aspect
+public class Advices {
+    //切点
+    @Pointcut(&quot;execution(* com.zhangguo.Spring052.aop04.Math.*(..))&quot;)
+    public void pointcut(){
+    }
+    
+    @Before(&quot;pointcut()&quot;)
+    public void before(JoinPoint jp){
+        System.out.println(&quot;----------前置通知----------&quot;);
+        System.out.println(jp.getSignature().getName());
+    }
+    
+    @After(&quot;pointcut()&quot;)
+    public void after(JoinPoint jp){
+        System.out.println(&quot;----------最终通知----------&quot;);
+    }
+}
+</pre>
+
+<p>修改Advices.java文件，增加各种通知类型如下：</p>
+
+<pre>
+package com.zhangguo.Spring052.aop04;
+
+import org.aspectj.lang.JoinPoint;
+import org.aspectj.lang.ProceedingJoinPoint;
+import org.aspectj.lang.annotation.After;
+import org.aspectj.lang.annotation.AfterReturning;
+import org.aspectj.lang.annotation.AfterThrowing;
+import org.aspectj.lang.annotation.Around;
+import org.aspectj.lang.annotation.Aspect;
+import org.aspectj.lang.annotation.Before;
+import org.aspectj.lang.annotation.Pointcut;
+import org.springframework.stereotype.Component;
+
+/**
+ * 通知类，横切逻辑
+ */
+@Component
+@Aspect
+public class Advices {
+    //切点
+    @Pointcut(&quot;execution(* com.zhangguo.Spring052.aop04.Math.a*(..))&quot;)
+    public void pointcut(){
+    }
+    
+    //前置通知
+    @Before(&quot;pointcut()&quot;)
+    public void before(JoinPoint jp){
+        System.out.println(jp.getSignature().getName());
+        System.out.println(&quot;----------前置通知----------&quot;);
+    }
+    
+    //最终通知
+    @After(&quot;pointcut()&quot;)
+    public void after(JoinPoint jp){
+        System.out.println(&quot;----------最终通知----------&quot;);
+    }
+    
+    //环绕通知
+    @Around(&quot;execution(* com.zhangguo.Spring052.aop04.Math.s*(..))&quot;)
+    public Object around(ProceedingJoinPoint pjp) throws Throwable{
+        System.out.println(pjp.getSignature().getName());
+        System.out.println(&quot;----------环绕前置----------&quot;);
+        Object result=pjp.proceed();
+        System.out.println(&quot;----------环绕后置----------&quot;);
+        return result;
+    }
+    
+    //返回结果通知
+    @AfterReturning(pointcut=&quot;execution(* com.zhangguo.Spring052.aop04.Math.m*(..))&quot;,returning=&quot;result&quot;)
+    public void afterReturning(JoinPoint jp,Object result){
+        System.out.println(jp.getSignature().getName());
+        System.out.println(&quot;结果是：&quot;+result);
+        System.out.println(&quot;----------返回结果----------&quot;);
+    }
+    
+    //异常后通知
+    @AfterThrowing(pointcut=&quot;execution(* com.zhangguo.Spring052.aop04.Math.d*(..))&quot;,throwing=&quot;exp&quot;)
+    public void afterThrowing(JoinPoint jp,Exception exp){
+        System.out.println(jp.getSignature().getName());
+        System.out.println(&quot;异常消息：&quot;+exp.getMessage());
+        System.out.println(&quot;----------异常通知----------&quot;);
+    }
+}
+</pre>
+
+<p>运行结果：</p>
+
+<p><img alt="" src="https://images2015.cnblogs.com/blog/63651/201607/63651-20160701101555124-888694955.png" style="height:284px; width:183px" /></p>
+
+<h1><strong>五、零配置实现Spring IoC与AOP</strong></h1>
+
+<p>为了实现零配置在原有示例的基础上我们新增一个类User，如下所示：</p>
+
+<pre>
+package com.zhangguo.Spring052.aop05;
+
+public class User {
+    public void show(){
+        System.out.println(&quot;一个用户对象&quot;);
+    }
+}
+</pre>
+
+<p>该类并未注解，容器不会自动管理。因为没有xml配置文件，则使用一个作为配置信息，ApplicationCfg.java文件如下：</p>
+
+<pre>
+package com.zhangguo.Spring052.aop05;
+
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.ComponentScan;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.EnableAspectJAutoProxy;
+
+@Configuration  //用于表示当前类为容器的配置类，类似&lt;beans/&gt;
+@ComponentScan(basePackages=&quot;com.zhangguo.Spring052.aop05&quot;)  //扫描的范围，相当于xml配置的结点&lt;context:component-scan/&gt;
+@EnableAspectJAutoProxy(proxyTargetClass=true)  //自动代理，相当于&lt;aop:aspectj-autoproxy proxy-target-class=&quot;true&quot;&gt;&lt;/aop:aspectj-autoproxy&gt;
+public class ApplicationCfg {
+    //在配置中声明一个bean，相当于&lt;bean id=getUser class=&quot;com.zhangguo.Spring052.aop05.User&quot;/&gt;
+    @Bean
+    public User getUser(){
+        return new User();
+    }
+}
+</pre>
+
+<p>该类的每一部分内容基本都与xml 配置有一对一的关系，请看注释，这样做要比写xml方便，但不便发布后修改。测试代码如下：</p>
+
+<pre>
+package com.zhangguo.Spring052.aop05;
+
+import org.springframework.context.ApplicationContext;
+import org.springframework.context.annotation.AnnotationConfigApplicationContext;
+import org.springframework.context.support.ClassPathXmlApplicationContext;
+
+public class Test {
+
+    public static void main(String[] args) {
+        // 通过类初始化容器
+        ApplicationContext ctx = new AnnotationConfigApplicationContext(ApplicationCfg.class);
+        Math math = ctx.getBean(&quot;math&quot;, Math.class);
+        int n1 = 100, n2 = 0;
+        math.add(n1, n2);
+        math.sub(n1, n2);
+        math.mut(n1, n2);
+        try {
+            math.div(n1, n2);
+        } catch (Exception e) {
+        }
+        
+        User user=ctx.getBean(&quot;getUser&quot;,User.class);
+        user.show();
+    }
+
+}
+</pre>
+
+<p>&nbsp;advices.java 同上，没有任何变化，运行结果如下：</p>
+
+<p><img alt="" src="https://images2015.cnblogs.com/blog/63651/201607/63651-20160701104742921-1651488908.png" style="height:281px; width:166px" /></p>
+
+<h1>六、示例下载</h1>
+
+<p><a href="http://files.cnblogs.com/files/best/Spring052.rar" target="_blank">点击下载</a></p>

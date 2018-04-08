@@ -1,0 +1,214 @@
+<h1>Spring MVC 根应用上下文在Web容器中的启动及其销毁</h1>
+
+<p>&nbsp; &nbsp; Ioc容器启动过程就是建立上下文的过程。Spring MVC提供了两种启动上下文的方式，一种是通过ContextLoaderListener启动的上下文，称为根上下文，每个Web应用只有一个这种上下文，是与ServletContext相伴而生的。另一个是与Web MVC相关的上下文用来保存、管理控制器DispatcherServlet需要的MVC对象，作为根上下文的子上下文，这个上下文与DispatcherServlet启动相对应产生，因此一个Web应用可以有对个这样的上下文。这样根上下文和子上下文构成了一个层次上下文关系。</p>
+
+<h2>1、根应用上下文的启动</h2>
+
+<p>&nbsp; &nbsp; &nbsp; 但我们在web.xml配置了ContextLoaderListener后，如下：</p>
+
+<ol start="1">
+	<li>&lt;listener&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&lt;listener-class&gt;org.springframework.web.context.ContextLoaderListener&lt;/listener-class&gt;&nbsp;&nbsp;</li>
+	<li>&lt;/listener&gt;&nbsp;&nbsp;</li>
+</ol>
+
+<p>这个ContextLoaderListener是Spring提供，它实现了ServletContextListener接口，这个接口在Servlet API中定义，用于监听WEB应用ServletContext的启动及其销毁。</p>
+
+<h3>1）ContextLoaderListener类实现继承体系</h3>
+
+<p>&nbsp;</p>
+
+<p>&nbsp;<img alt="" src="https://img-blog.csdn.net/20160702173112203?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQv/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70/gravity/Center" /></p>
+
+<p>&nbsp;</p>
+
+<p>&nbsp; &nbsp; 具体的启动过程是交由ContxtLoader类来完成，在ContextLoader类中，完成两个主要的任务，一个是在web容器中建立根应用上下文Ioc容器，另一个是配置并初始化这个根WebApplicationContext。</p>
+
+<h3>2）根WebApplicationContext启动流程</h3>
+
+<p><img alt="" src="https://img-blog.csdn.net/20160702173134368?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQv/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70/gravity/Center" /></p>
+
+<p>&nbsp; &nbsp;在web应用启动时，web容器将创建ServletContext，ServletContextListener是ServletContext的监听者，将监听相关事件。因此web应用启动，ServletContextListener将执行contextInitialized(ServletContextEvent event)方法：</p>
+
+<ol start="1">
+	<li>/**&nbsp;</li>
+	<li>&nbsp;*&nbsp;Initialize&nbsp;the&nbsp;root&nbsp;web&nbsp;application&nbsp;context.&nbsp;</li>
+	<li>&nbsp;*/&nbsp;&nbsp;</li>
+	<li>@Override&nbsp;&nbsp;</li>
+	<li>public&nbsp;void&nbsp;contextInitialized(ServletContextEvent&nbsp;event)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;initWebApplicationContext(event.getServletContext());&nbsp;&nbsp;</li>
+	<li>}&nbsp;&nbsp;</li>
+</ol>
+
+<p>可以看到，contextInitialized方法中将执行委派给其基类ContextLoader，执行initWebApplicationContext()方法完成根上下文的创建，这个根上下文是web容器中唯一的实例，创建完成后会保存在web容器的ServletContext中，供需要时使用，索引是ROOT_WEB_APPLICATION_CONTEXT_ATTRIBUTE&nbsp;= WebApplicationContext.class.getName() +&nbsp;&quot;.ROOT&quot;。</p>
+
+<ol start="1">
+	<li>public&nbsp;WebApplicationContext&nbsp;initWebApplicationContext(ServletContext&nbsp;servletContext)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;//判断servletContext是否已有根上下文&nbsp;&nbsp;</li>
+	<li>if&nbsp;(servletContext.getAttribute(WebApplicationContext.ROOT_WEB_APPLICATION_CONTEXT_ATTRIBUTE)&nbsp;!=&nbsp;null)&nbsp;{&nbsp;&nbsp;</li>
+	<li>throw&nbsp;new&nbsp;IllegalStateException(&nbsp;&nbsp;</li>
+	<li>&quot;Cannot&nbsp;initialize&nbsp;context&nbsp;because&nbsp;there&nbsp;is&nbsp;already&nbsp;a&nbsp;root&nbsp;application&nbsp;context&nbsp;present&nbsp;-&nbsp;&quot;&nbsp;+&nbsp;&nbsp;</li>
+	<li>&quot;check&nbsp;whether&nbsp;you&nbsp;have&nbsp;multiple&nbsp;ContextLoader*&nbsp;definitions&nbsp;in&nbsp;your&nbsp;web.xml!&quot;);&nbsp;&nbsp;</li>
+	<li>}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;Log&nbsp;logger&nbsp;=&nbsp;LogFactory.getLog(ContextLoader.class);&nbsp;&nbsp;</li>
+	<li>servletContext.log(&quot;Initializing&nbsp;Spring&nbsp;root&nbsp;WebApplicationContext&quot;);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;if&nbsp;(logger.isInfoEnabled())&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;logger.info(&quot;Root&nbsp;WebApplicationContext:&nbsp;initialization&nbsp;started&quot;);&nbsp;&nbsp;</li>
+	<li>}&nbsp;&nbsp;</li>
+	<li>long&nbsp;startTime&nbsp;=&nbsp;System.currentTimeMillis();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;try&nbsp;{&nbsp;&nbsp;</li>
+	<li>//&nbsp;Store&nbsp;context&nbsp;in&nbsp;local&nbsp;instance&nbsp;variable,&nbsp;to&nbsp;guarantee&nbsp;that&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//&nbsp;it&nbsp;is&nbsp;available&nbsp;on&nbsp;ServletContext&nbsp;shutdown.&nbsp;&nbsp;</li>
+	<li>if&nbsp;(this.context&nbsp;==&nbsp;null)&nbsp;{&nbsp;&nbsp;</li>
+	<li>//这里创建根web上下文&nbsp;&nbsp;</li>
+	<li>this.context&nbsp;=&nbsp;createWebApplicationContext(servletContext);&nbsp;&nbsp;</li>
+	<li>}&nbsp;&nbsp;</li>
+	<li>if&nbsp;(this.context&nbsp;instanceof&nbsp;ConfigurableWebApplicationContext)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ConfigurableWebApplicationContext&nbsp;cwac&nbsp;=&nbsp;(ConfigurableWebApplicationContext)&nbsp;this.context;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if&nbsp;(!cwac.isActive())&nbsp;{&nbsp;&nbsp;</li>
+	<li>//&nbsp;The&nbsp;context&nbsp;has&nbsp;not&nbsp;yet&nbsp;been&nbsp;refreshed&nbsp;-&gt;&nbsp;provide&nbsp;services&nbsp;such&nbsp;as&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//&nbsp;setting&nbsp;the&nbsp;parent&nbsp;context,&nbsp;setting&nbsp;the&nbsp;application&nbsp;context&nbsp;id,&nbsp;etc&nbsp;&nbsp;</li>
+	<li>if&nbsp;(cwac.getParent()&nbsp;==&nbsp;null)&nbsp;{&nbsp;&nbsp;</li>
+	<li>//&nbsp;The&nbsp;context&nbsp;instance&nbsp;was&nbsp;injected&nbsp;without&nbsp;an&nbsp;explicit&nbsp;parent&nbsp;-&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//&nbsp;determine&nbsp;parent&nbsp;for&nbsp;root&nbsp;web&nbsp;application&nbsp;context,&nbsp;if&nbsp;any.&nbsp;&nbsp;</li>
+	<li>ApplicationContext&nbsp;parent&nbsp;=&nbsp;loadParentContext(servletContext);&nbsp;&nbsp;</li>
+	<li>cwac.setParent(parent);&nbsp;&nbsp;</li>
+	<li>}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;//这里开始配置、初始化上下文&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;configureAndRefreshWebApplicationContext(cwac,&nbsp;servletContext);&nbsp;&nbsp;</li>
+	<li>}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;//&nbsp;将创建的上下文放入servletContext中&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;servletContext.setAttribute(WebApplicationContext.ROOT_WEB_APPLICATION_CONTEXT_ATTRIBUTE,&nbsp;this.context);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>ClassLoader&nbsp;ccl&nbsp;=&nbsp;Thread.currentThread().getContextClassLoader();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if&nbsp;(ccl&nbsp;==&nbsp;ContextLoader.class.getClassLoader())&nbsp;{&nbsp;&nbsp;</li>
+	<li>currentContext&nbsp;=&nbsp;this.context;&nbsp;&nbsp;</li>
+	<li>}&nbsp;&nbsp;</li>
+	<li>else&nbsp;if&nbsp;(ccl&nbsp;!=&nbsp;null)&nbsp;{&nbsp;&nbsp;</li>
+	<li>currentContextPerThread.put(ccl,&nbsp;this.context);&nbsp;&nbsp;</li>
+	<li>}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>if&nbsp;(logger.isDebugEnabled())&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;logger.debug(&quot;Published&nbsp;root&nbsp;WebApplicationContext&nbsp;as&nbsp;ServletContext&nbsp;attribute&nbsp;with&nbsp;name&nbsp;[&quot;&nbsp;+&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;WebApplicationContext.ROOT_WEB_APPLICATION_CONTEXT_ATTRIBUTE&nbsp;+&nbsp;&quot;]&quot;);&nbsp;&nbsp;</li>
+	<li>}&nbsp;&nbsp;</li>
+	<li>if&nbsp;(logger.isInfoEnabled())&nbsp;{&nbsp;&nbsp;</li>
+	<li>long&nbsp;elapsedTime&nbsp;=&nbsp;System.currentTimeMillis()&nbsp;-&nbsp;startTime;&nbsp;&nbsp;</li>
+	<li>logger.info(&quot;Root&nbsp;WebApplicationContext:&nbsp;initialization&nbsp;completed&nbsp;in&nbsp;&quot;&nbsp;+&nbsp;elapsedTime&nbsp;+&nbsp;&quot;&nbsp;ms&quot;);&nbsp;&nbsp;</li>
+	<li>}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>return&nbsp;this.context;&nbsp;&nbsp;</li>
+	<li>}&nbsp;&nbsp;</li>
+	<li>catch&nbsp;(RuntimeException&nbsp;ex)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;logger.error(&quot;Context&nbsp;initialization&nbsp;failed&quot;,&nbsp;ex);&nbsp;&nbsp;</li>
+	<li>servletContext.setAttribute(WebApplicationContext.ROOT_WEB_APPLICATION_CONTEXT_ATTRIBUTE,&nbsp;ex);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;throw&nbsp;ex;&nbsp;&nbsp;</li>
+	<li>}&nbsp;&nbsp;</li>
+	<li>catch&nbsp;(Error&nbsp;err)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;logger.error(&quot;Context&nbsp;initialization&nbsp;failed&quot;,&nbsp;err);&nbsp;&nbsp;</li>
+	<li>servletContext.setAttribute(WebApplicationContext.ROOT_WEB_APPLICATION_CONTEXT_ATTRIBUTE,&nbsp;err);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;throw&nbsp;err;&nbsp;&nbsp;</li>
+	<li>}&nbsp;&nbsp;</li>
+	<li>}&nbsp;&nbsp;</li>
+</ol>
+
+<p>创建根web上下文如下:</p>
+
+<ol start="1">
+	<li>protected&nbsp;WebApplicationContext&nbsp;createWebApplicationContext(ServletContext&nbsp;sc)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;//这里判断确定，web上下文class，默认是org.springframework.web.context.support.XmlWebApplicationContext&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;Class&lt;?&gt;&nbsp;contextClass&nbsp;=&nbsp;determineContextClass(sc);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;if&nbsp;(!ConfigurableWebApplicationContext.class.isAssignableFrom(contextClass))&nbsp;{&nbsp;&nbsp;</li>
+	<li>throw&nbsp;new&nbsp;ApplicationContextException(&quot;Custom&nbsp;context&nbsp;class&nbsp;[&quot;&nbsp;+&nbsp;contextClass.getName()&nbsp;+&nbsp;&nbsp;</li>
+	<li>&quot;]&nbsp;is&nbsp;not&nbsp;of&nbsp;type&nbsp;[&quot;&nbsp;+&nbsp;ConfigurableWebApplicationContext.class.getName()&nbsp;+&nbsp;&quot;]&quot;);&nbsp;&nbsp;</li>
+	<li>}&nbsp;&nbsp;</li>
+	<li>&nbsp;//通过BeanUtils工具反射创建WebApplicationContext对象，并返回&nbsp;&nbsp;</li>
+	<li>return&nbsp;(ConfigurableWebApplicationContext)&nbsp;BeanUtils.instantiateClass(contextClass);&nbsp;&nbsp;</li>
+	<li>}&nbsp;&nbsp;</li>
+	<li>创建完成后，调用configureAndRefreshWebApplicationContext()方法，完成配置，以及初始化:&nbsp;&nbsp;</li>
+	<li>protected&nbsp;void&nbsp;configureAndRefreshWebApplicationContext(ConfigurableWebApplicationContext&nbsp;wac,&nbsp;ServletContext&nbsp;sc)&nbsp;{&nbsp;&nbsp;</li>
+	<li>if&nbsp;(ObjectUtils.identityToString(wac).equals(wac.getId()))&nbsp;{&nbsp;&nbsp;</li>
+	<li>//&nbsp;The&nbsp;application&nbsp;context&nbsp;id&nbsp;is&nbsp;still&nbsp;set&nbsp;to&nbsp;its&nbsp;original&nbsp;default&nbsp;value&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//&nbsp;-&gt;&nbsp;assign&nbsp;a&nbsp;more&nbsp;useful&nbsp;id&nbsp;based&nbsp;on&nbsp;available&nbsp;information&nbsp;&nbsp;</li>
+	<li>String&nbsp;idParam&nbsp;=&nbsp;sc.getInitParameter(CONTEXT_ID_PARAM);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if&nbsp;(idParam&nbsp;!=&nbsp;null)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;wac.setId(idParam);&nbsp;&nbsp;</li>
+	<li>}&nbsp;&nbsp;</li>
+	<li>else&nbsp;{&nbsp;&nbsp;</li>
+	<li>//&nbsp;Generate&nbsp;default&nbsp;id...&nbsp;&nbsp;</li>
+	<li>wac.setId(ConfigurableWebApplicationContext.APPLICATION_CONTEXT_ID_PREFIX&nbsp;+&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ObjectUtils.getDisplayString(sc.getContextPath()));&nbsp;&nbsp;</li>
+	<li>}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;wac.setServletContext(sc);&nbsp;&nbsp;</li>
+	<li>String&nbsp;configLocationParam&nbsp;=&nbsp;sc.getInitParameter(CONFIG_LOCATION_PARAM);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;if&nbsp;(configLocationParam&nbsp;!=&nbsp;null)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;wac.setConfigLocation(configLocationParam);&nbsp;&nbsp;</li>
+	<li>}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>//&nbsp;The&nbsp;wac&nbsp;environment&#39;s&nbsp;#initPropertySources&nbsp;will&nbsp;be&nbsp;called&nbsp;in&nbsp;any&nbsp;case&nbsp;when&nbsp;the&nbsp;context&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;//&nbsp;is&nbsp;refreshed;&nbsp;do&nbsp;it&nbsp;eagerly&nbsp;here&nbsp;to&nbsp;ensure&nbsp;servlet&nbsp;property&nbsp;sources&nbsp;are&nbsp;in&nbsp;place&nbsp;for&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;//&nbsp;use&nbsp;in&nbsp;any&nbsp;post-processing&nbsp;or&nbsp;initialization&nbsp;that&nbsp;occurs&nbsp;below&nbsp;prior&nbsp;to&nbsp;#refresh&nbsp;&nbsp;</li>
+	<li>ConfigurableEnvironment&nbsp;env&nbsp;=&nbsp;wac.getEnvironment();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;if&nbsp;(env&nbsp;instanceof&nbsp;ConfigurableWebEnvironment)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;((ConfigurableWebEnvironment)&nbsp;env).initPropertySources(sc,&nbsp;null);&nbsp;&nbsp;</li>
+	<li>}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;customizeContext(sc,&nbsp;wac);&nbsp;&nbsp;</li>
+	<li>wac.refresh();&nbsp;&nbsp;</li>
+	<li>}&nbsp;&nbsp;</li>
+</ol>
+
+<p>可以看到对上下文进行了相关配置，设置ServletContext，设置初始化参数等，最后通过调用容器的refresh()方法启动整个容器，就像一般的IoC容器初始化过程一样。</p>
+
+<h2>2、根WebApplicationContext销毁流程</h2>
+
+<p>&nbsp;</p>
+
+<p><img alt="" src="https://img-blog.csdn.net/20160702173359762?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQv/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70/gravity/Center" /></p>
+
+<p>&nbsp;</p>
+
+<p>&nbsp;在web应用销毁时，ServletContextListener将执行contextDestroyed(ServletContextEvent event)方法：</p>
+
+<ol start="1">
+	<li>@Override&nbsp;&nbsp;</li>
+	<li>public&nbsp;void&nbsp;contextDestroyed(ServletContextEvent&nbsp;event)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;closeWebApplicationContext(event.getServletContext());&nbsp;&nbsp;</li>
+	<li>ContextCleanupListener.cleanupAttributes(event.getServletContext());&nbsp;&nbsp;</li>
+	<li>}&nbsp;&nbsp;</li>
+</ol>
+
+<p>该方法同样委派其基类ContextLoader来执行销毁操作，调用closeWebApplicationContext()方法：</p>
+
+<ol start="1">
+	<li>public&nbsp;void&nbsp;closeWebApplicationContext(ServletContext&nbsp;servletContext)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;servletContext.log(&quot;Closing&nbsp;Spring&nbsp;root&nbsp;WebApplicationContext&quot;);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;try&nbsp;{&nbsp;&nbsp;</li>
+	<li>if&nbsp;(this.context&nbsp;instanceof&nbsp;ConfigurableWebApplicationContext)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;//调用容器的close（）方法，关闭容器，并释放资源&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;((ConfigurableWebApplicationContext)&nbsp;this.context).close();&nbsp;&nbsp;</li>
+	<li>}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>finally&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ClassLoader&nbsp;ccl&nbsp;=&nbsp;Thread.currentThread().getContextClassLoader();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if&nbsp;(ccl&nbsp;==&nbsp;ContextLoader.class.getClassLoader())&nbsp;{&nbsp;&nbsp;</li>
+	<li>currentContext&nbsp;=&nbsp;null;&nbsp;&nbsp;</li>
+	<li>}&nbsp;&nbsp;</li>
+	<li>else&nbsp;if&nbsp;(ccl&nbsp;!=&nbsp;null)&nbsp;{&nbsp;&nbsp;</li>
+	<li>currentContextPerThread.remove(ccl);&nbsp;&nbsp;</li>
+	<li>}&nbsp;&nbsp;</li>
+	<li>//移除servletContext保存的ROOT_WEB_APPLICATION_CONTEXT_ATTRIBUTE索引的根上下文&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;servletContext.removeAttribute(WebApplicationContext.ROOT_WEB_APPLICATION_CONTEXT_ATTRIBUTE);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if&nbsp;(this.parentContextRef&nbsp;!=&nbsp;null)&nbsp;{&nbsp;&nbsp;</li>
+	<li>this.parentContextRef.release();&nbsp;&nbsp;</li>
+	<li>}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>}&nbsp;&nbsp;</li>
+</ol>
+
+<p>&nbsp;</p>
