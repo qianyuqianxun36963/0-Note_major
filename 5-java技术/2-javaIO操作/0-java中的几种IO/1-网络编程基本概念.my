@@ -1,0 +1,719 @@
+<h1><a href="https://blog.csdn.net/haoyuyang/article/details/53231585">网络编程基本概念</a></h1>
+
+<h2><strong>1.阻塞IO&mdash;Socket</strong></h2>
+
+<p>Socket又称&ldquo;套接字&rdquo;，应用程序通常通过&ldquo;套接字&rdquo;向网络发出请求或应答网络请求。</p>
+
+<p>Socket和ServerSocket类库位于java.net包中。ServerSocket用于服务器端，Socket是建立网络连接时使用的。在连接成功时，应用程序两端都会产生一个Socket实例，操作这个实例，完成所需的会话。对于一个网络连接来说，套接字是平等的，不会因为在服务器端或在客户端而产生不同的级别。不管是ServerSocket还是Socket，它们的工作都是通过SocketImpl类及其子类完成的。</p>
+
+<p>套接字的连接过程可以分为四个步骤：服务器监听、客户端请求服务器、服务器端连接确认、客户端连接确认并进行通信。</p>
+
+<p>（1）服务器监听：服务器端套接字并不定位具体的客户端套接字，而是出于等待连接的状态，实时监控网络状态。</p>
+
+<p>（2）客户端请求：客户端的套接字提出连接请求，要连接的目标是服务器端的套接字。为此，客户端的套接字必须首先描述要连接的服务器端的套接字，指出服务器端的套接字的地址和端口号，然后向服务器端套接字提出连接请求。</p>
+
+<p>（3）服务器端连接确认：当服务器端的套接字监听到或者说接收到客户端套接字的连接请求，它就响应客户端套接字的请求，建立一个新的线程，把服务器端套接字的描述发送给客户端。</p>
+
+<p>（4）客户端连接确认：一旦客户端确认了此描述，连接就建立好了，双方开始通信。而服务器端套接字继续处于监听状态，继续接收其他客户端套接字的连接请求。</p>
+
+<p>借用一下网上的Socket通信模型图片：</p>
+
+<p><img alt="" src="https://img-blog.csdn.net/20161119184425747?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQv/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70/gravity/Center" /></p>
+
+<p><img alt="" src="https://blog.csdn.net/haoyuyang/article/details/53231585" /></p>
+
+<p>Socket通信步骤：</p>
+
+<p>①创建ServerSocket和Socket</p>
+
+<p>②打开连接到Socket的输入/输出流</p>
+
+<p>③按照协议对Socket进行读写操作</p>
+
+<p>④关闭输入输出流、关闭Socket</p>
+
+<p>服务器端：</p>
+
+<p>①创建ServerSocket对象，绑定监听端口</p>
+
+<p>②通过accept()方法监听客户端请求</p>
+
+<p>③建立连接后，通过输入流读取客户端发送的请求信息</p>
+
+<p>④通过输出流向客户端发送响应信息</p>
+
+<p>⑤关闭相关资源</p>
+
+<p>客户端：</p>
+
+<p>①创建Socket对象，指明需要连接的服务器的地址和端口号</p>
+
+<p>②连接建立后，通过输出流向服务器端发送请求信息</p>
+
+<p>③通过输入流获取服务器响应信息</p>
+
+<p>④关闭响应资源</p>
+
+<p>下面看一个简单的小例子：</p>
+
+<p>服务器端响应工具类：</p>
+
+<ol start="1">
+	<li>public&nbsp;class&nbsp;ServerHandler&nbsp;implements&nbsp;Runnable&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;private&nbsp;Socket&nbsp;socket;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;ServerHandler(Socket&nbsp;socket)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;this.socket&nbsp;=&nbsp;socket;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;@Override&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;void&nbsp;run()&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;BufferedReader&nbsp;bufferedReader&nbsp;=&nbsp;null;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;PrintWriter&nbsp;printWriter&nbsp;=&nbsp;null;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;try&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;bufferedReader&nbsp;=&nbsp;new&nbsp;BufferedReader(new&nbsp;InputStreamReader(socket.getInputStream()));&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;printWriter&nbsp;=&nbsp;new&nbsp;PrintWriter(socket.getOutputStream(),&nbsp;true);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;while&nbsp;(true)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;String&nbsp;info&nbsp;=&nbsp;bufferedReader.readLine();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if(info&nbsp;==&nbsp;null)&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;break;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;System.out.println(&quot;客户端发送的消息：&quot;&nbsp;+&nbsp;info);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;printWriter.println(&quot;服务器端响应了客户端请求....&quot;);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;catch&nbsp;(Exception&nbsp;e)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;e.printStackTrace();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;finally&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if(bufferedReader&nbsp;!=&nbsp;null){&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;try&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;bufferedReader.close();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;catch&nbsp;(IOException&nbsp;e)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;e.printStackTrace();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if(printWriter&nbsp;!=&nbsp;null){&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;try&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;printWriter.close();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;catch&nbsp;(Exception&nbsp;e)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;e.printStackTrace();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if(socket&nbsp;!=&nbsp;null){&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;try&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;socket.close();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;catch&nbsp;(IOException&nbsp;e)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;e.printStackTrace();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;socket&nbsp;=&nbsp;null;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>}&nbsp;&nbsp;</li>
+</ol>
+
+<p>服务器端：</p>
+
+<ol start="1">
+	<li>public&nbsp;class&nbsp;Server&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;private&nbsp;static&nbsp;int&nbsp;PORT&nbsp;=&nbsp;8379;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;static&nbsp;void&nbsp;main(String[]&nbsp;args)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ServerSocket&nbsp;serverSocket&nbsp;=&nbsp;null;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;try&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;serverSocket&nbsp;=&nbsp;new&nbsp;ServerSocket(PORT);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;System.out.println(&quot;服务器端启动了....&quot;);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//进行阻塞&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Socket&nbsp;socket&nbsp;=&nbsp;serverSocket.accept();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//启动一个线程来处理客户端请求&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;new&nbsp;Thread(new&nbsp;ServerHandler(socket)).start();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;catch&nbsp;(Exception&nbsp;e)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;e.printStackTrace();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;finally&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if(serverSocket&nbsp;!=&nbsp;null){&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;try&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;serverSocket.close();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;catch&nbsp;(IOException&nbsp;e)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;e.printStackTrace();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;serverSocket&nbsp;=&nbsp;null;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>}&nbsp;&nbsp;</li>
+</ol>
+
+<p>客户端：</p>
+
+<ol start="1">
+	<li>public&nbsp;class&nbsp;Client&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;private&nbsp;static&nbsp;int&nbsp;PORT&nbsp;=&nbsp;8379;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;private&nbsp;static&nbsp;String&nbsp;IP&nbsp;=&nbsp;&quot;127.0.0.1&quot;;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;static&nbsp;void&nbsp;main(String[]&nbsp;args)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;BufferedReader&nbsp;bufferedReader&nbsp;=&nbsp;null;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;PrintWriter&nbsp;printWriter&nbsp;=&nbsp;null;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Socket&nbsp;socket&nbsp;=&nbsp;null;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;try&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;socket&nbsp;=&nbsp;new&nbsp;Socket(IP,&nbsp;PORT);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;printWriter&nbsp;=&nbsp;new&nbsp;PrintWriter(socket.getOutputStream(),&nbsp;true);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;bufferedReader&nbsp;=&nbsp;new&nbsp;BufferedReader(new&nbsp;InputStreamReader(socket.getInputStream()));&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;printWriter.println(&quot;客户端请求了服务器....&quot;);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;String&nbsp;response&nbsp;=&nbsp;bufferedReader.readLine();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;System.out.println(&quot;Client：&quot;&nbsp;+&nbsp;response);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;catch&nbsp;(Exception&nbsp;e)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;e.printStackTrace();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;finally&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if(bufferedReader&nbsp;!=&nbsp;null){&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;try&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;bufferedReader.close();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;catch&nbsp;(IOException&nbsp;e)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;e.printStackTrace();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if(printWriter&nbsp;!=&nbsp;null){&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;try&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;printWriter.close();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;catch&nbsp;(Exception&nbsp;e)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;e.printStackTrace();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if(socket&nbsp;!=&nbsp;null){&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;try&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;socket.close();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;catch&nbsp;(IOException&nbsp;e)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;e.printStackTrace();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;else&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;socket&nbsp;=&nbsp;null;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>}&nbsp;&nbsp;</li>
+</ol>
+
+<p>运行结果：</p>
+
+<p><img alt="" src="https://img-blog.csdn.net/20161119184542481?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQv/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70/gravity/Center" style="height:101px; width:800px" /><br />
+<img alt="" src="https://blog.csdn.net/haoyuyang/article/details/53231585" /></p>
+
+<p><img alt="" src="https://img-blog.csdn.net/20161119184602718?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQv/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70/gravity/Center" /></p>
+
+<p>以上的代码有个问题，就是每次有客户端请求服务器端都会创建一个线程，当线程过多时，服务器端可能会宕机。解决这个问题，可以使用JDK提供的线程池（伪异步）。其它地方都不变，将服务器端的代码修改成如下即可：</p>
+
+<ol start="1">
+	<li>public&nbsp;class&nbsp;Server&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;private&nbsp;static&nbsp;int&nbsp;PORT&nbsp;=&nbsp;8379;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;static&nbsp;void&nbsp;main(String[]&nbsp;args)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ServerSocket&nbsp;serverSocket&nbsp;=&nbsp;null;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;try&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;serverSocket&nbsp;=&nbsp;new&nbsp;ServerSocket(PORT);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;System.out.println(&quot;服务器端启动了....&quot;);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//进行阻塞&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Socket&nbsp;socket&nbsp;=&nbsp;null;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//启动一个线程来处理客户端请求&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//new&nbsp;Thread(new&nbsp;ServerHandler(socket)).start();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;span&nbsp;style=&quot;color:#ff0000;&quot;&gt;HandlerExecutorPool&nbsp;pool&nbsp;=&nbsp;new&nbsp;HandlerExecutorPool(50,&nbsp;1000);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;while&nbsp;(true)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;socket&nbsp;=&nbsp;serverSocket.accept();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;pool.execute(new&nbsp;ServerHandler(socket));&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&lt;/span&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;catch&nbsp;(Exception&nbsp;e)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;e.printStackTrace();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;finally&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if(serverSocket&nbsp;!=&nbsp;null){&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;try&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;serverSocket.close();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;catch&nbsp;(IOException&nbsp;e)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;e.printStackTrace();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;serverSocket&nbsp;=&nbsp;null;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>}&nbsp;&nbsp;</li>
+</ol>
+
+<p>其中HandlerExecutorPool为自定义的线程池，代码如下：</p>
+
+<p>&nbsp;</p>
+
+<ol start="1">
+	<li>public&nbsp;class&nbsp;HandlerExecutorPool&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;private&nbsp;ExecutorService&nbsp;executor;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;HandlerExecutorPool(int&nbsp;maxSize,&nbsp;int&nbsp;queueSize)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;this.executor&nbsp;=&nbsp;new&nbsp;ThreadPoolExecutor(Runtime.getRuntime().availableProcessors(),&nbsp;maxSize,&nbsp;120L,&nbsp;TimeUnit.SECONDS,&nbsp;&nbsp;</li>
+</ol>
+
+<p>&nbsp;</p>
+
+<ol start="1">
+	<li>&lt;span&nbsp;style=&quot;white-space:pre;&quot;&gt;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/span&gt;&nbsp;new&nbsp;ArrayBlockingQueue&lt;&gt;(queueSize));&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;void&nbsp;execute(Runnable&nbsp;task)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;executor.execute(task);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>}&nbsp;&nbsp;</li>
+</ol>
+
+<h2><strong>2.IO（BIO）与NIO的区别</strong></h2>
+
+<p>其本质就是阻塞和非阻塞的区别。</p>
+
+<p>阻塞概念：应用程序在获取网络数据的时候，如果网络传输数据很慢，那么程序就一直等着，直到传输完毕为止。</p>
+
+<p>非阻塞概念：应用程序直接可以获取已经准备就绪的数据，无需等待。</p>
+
+<p>IO为同步阻塞形式，NIO为同步非阻塞形式。NIO没有实现异步，在JDK1.7之后，升级了NIO库包，支持异步非阻塞通信模型，即NIO2.0(AIO)。</p>
+
+<p>同步和异步：同步和异步一般是面向操作系统与应用程序对IO操作的层面上来区别的。①同步时，应用程序会直接参与IO读写操作，并且应用程序会直接阻塞到某一个方法上，直到数据准备就绪（BIO）；或者采用轮询的策略实时检查数据的就绪状态，如果就绪则获取数据（NIO）。②异步时，则所有的IO读写操作都交给操作系统处理，与应用程序没有直接关系，应用程序并不关心IO读写，当操作系统完成IO读写操作时，会向应用程序发出通知，应用程序直接获取数据即可。</p>
+
+<p>同步说的是Server服务端的执行方式，阻塞说的是具体的技术，接收数据的方式、状态（io、nio）。</p>
+
+<p>3.NIO编程介绍</p>
+
+<p>学习NIO编程，首先需要了解几个概念：</p>
+
+<p>（1）Buffer（缓冲区）</p>
+
+<p>Buffer是一个对象，它包含一些需要写入或者读取的数据。在NIO类库中加入Buffer对象，体现了新类库与原IO的一个重要区别。在面向流的IO中，可以直接将数据写入或读取到Stream对象中。在NIO类库中，所有的数据都是用缓冲区处理的（读写）。&nbsp;缓冲区实质上是一个数组，通常它是一个字节数组（ByteBuffer），也可以使用其他类型的数组。这个数组为缓冲区提供了访问数据的读写等操作属性，如位置、容量、上限等概念，具体的可以参考API文档。</p>
+
+<p>Buffer类型：最常使用的是ByteBuffer，实际上每一种java基本类型都对应了一种缓存区（除了Boolean类型）。</p>
+
+<p>①ByteBuffer②CharBuffer③ShortBuffer④IntBuffer⑤LongBuffer⑥FloatBuffer⑦DoubleBuffer</p>
+
+<p>（2）Channel（管道、通道）</p>
+
+<p>Channel就像自来水管道一样，网络数据通过Channel读取和写入，通道与流的不同之处在于通道是双向的，而流只能在一个方向上移动（一个流必须是InputStream或者OutputStream的子类），而通道可以用于读、写或者二者同时进行，最关键的是可以和多路复用器集合起来，有多种的状态位，方便多路复用器去识别。通道分为两大类：一类是用于网络读写的SelectableChannel，另一类是用于文件操作的FileChannel，我们使用的SocketChannel和ServerSocketChannel都是SelectableChannel的子类。</p>
+
+<p>&nbsp;</p>
+
+<p>（3）Selector（选择器、多路复用器）</p>
+
+<p>是NIO编程的基础，非常重要。多路复用器提供选择已经就绪的任务的能力。简单说，就是Selector会不断的轮询注册在其上的通道（Channel），如果某个通道发生了读写操作，这个通道就处于就绪状态，会被Selector轮询出来，然后通过SelectionKey可以取得就绪的Channel集合，从而进行后续的IO操作。一个多路复用器（Selector）可以负责成千上万的通道（Channel），没有上限。这也是JDK使用了epoll代替传统的select实现，获得连接句柄（客户端）没有限制。那也就意味着我们只要一个线程负责Selector的轮询，就可以接入成千上万个客户端，这是JDK NIO库的巨大进步。</p>
+
+<p>Selector线程类似一个管理者（Master），管理了成千上万个管道，然后轮询哪个管道的数据已经准备好了，通知CPU执行IO的读取或写入操作。</p>
+
+<p>Selector模式：当IO事件（管道）注册到选择器以后，Selector会分配给每个管道一个key值，相当于标签。Selector选择器是以轮询的方式进行查找注册的所有IO事件（管道），当IO事件（管道）准备就绪后，Selector就会识别，会通过key值来找到相应的管道，进行相关的数据处理操作（从管道中读取或写入数据，写到缓冲区中）。每个管道都会对选择器进行注册不同的事件状态，以便选择器查找。</p>
+
+<p>事件状态：</p>
+
+<p>SelectionKey.OP_CONNECT</p>
+
+<p>SelectionKey.OP_ACCEPT</p>
+
+<p>SelectionKey.OP_READ</p>
+
+<p>SelectionKey.OP_WRITE</p>
+
+<p>NIO通信模型图解：</p>
+
+<p><img alt="" src="https://img-blog.csdn.net/20161119210915533" style="height:325px; width:800px" /></p>
+
+<p>（虚线表示不直接相关联）</p>
+
+<p>下面用代码来演示一下Buffer、Channel、Selector的使用。</p>
+
+<p>以IntBuffer为例，讲解一下Buffer的常用API：</p>
+
+<p>&nbsp;</p>
+
+<ol start="1">
+	<li>public&nbsp;class&nbsp;IntBufferTest&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;static&nbsp;void&nbsp;main(String[]&nbsp;args)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//1、基本操作&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//创建指定长度的缓冲区&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/*IntBuffer&nbsp;buffer&nbsp;=&nbsp;IntBuffer.allocate(10);&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;buffer.put(11);&nbsp;//position位置：0-&gt;1&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;buffer.put(5);&nbsp;//position位置：1-&gt;2&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;buffer.put(32);&nbsp;//position位置：2-&gt;3&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;System.out.println(&quot;未调用flip复位方法前的buffer：&quot;&nbsp;+&nbsp;buffer);&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//把位置复位为0，也就是position位置由3-&gt;0&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;buffer.flip();&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//比较未调用flip方法和调用之后buffer的limit可以发现，不进行复位操作的话，position的值为3，limit的值为10&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//&nbsp;因为缓冲区中已有11、5、32三个元素，也就意味着put()方法会使position向后递增1&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;System.out.println(&quot;调用flip复位方法后的buffer：&quot;&nbsp;+&nbsp;buffer);&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;System.out.println(&quot;buffer容量为：&quot;&nbsp;+&nbsp;buffer.capacity());&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;System.out.println(&quot;buffer限制为：&quot;&nbsp;+&nbsp;buffer.limit());&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;System.out.println(&quot;获取下标为1的元素：&quot;&nbsp;+&nbsp;buffer.get(1));&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;System.out.println(&quot;调用get(index)方法后的buffer：&quot;&nbsp;+&nbsp;buffer);&nbsp;//调用get(index)方法，不会改变position的值&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;buffer.put(1,&nbsp;4);&nbsp;//将buffer位置为1的值替换为4，调用put(index，value)不会改变position的值&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;System.out.println(&quot;调用put(index,&nbsp;value)方法后的buffer：&quot;&nbsp;+&nbsp;buffer);&nbsp;</li>
+	<li>&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;for(int&nbsp;i=0;&nbsp;i&lt;buffer.limit();&nbsp;i++)&nbsp;{&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//调用get方法会使缓冲区的位置(position)向后递增一位&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;System.out.print(buffer.get()&nbsp;+&nbsp;&quot;\t&quot;);&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;System.out.println(&quot;\nbuffer对象遍历之后buffer为：&quot;&nbsp;+&nbsp;buffer);*/&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//2、wrap方法的使用&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/*int[]&nbsp;arr&nbsp;=&nbsp;new&nbsp;int[]{1,&nbsp;2,&nbsp;3};&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;IntBuffer&nbsp;buffer&nbsp;=&nbsp;IntBuffer.wrap(arr);&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;System.out.println(&quot;wrap(arr)方法：&quot;&nbsp;+&nbsp;buffer);&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//IntBuffer.wrap(array,&nbsp;postion,&nbsp;length)表示容量为array的长度，但是可操作的元素为位置postion到length的数组元素&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;buffer&nbsp;=&nbsp;IntBuffer.wrap(arr,&nbsp;0,&nbsp;2);&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;System.out.println(&quot;wrap(arr,&nbsp;0,&nbsp;2)：&quot;&nbsp;+&nbsp;buffer);*/&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//3、其他方法&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;IntBuffer&nbsp;buffer&nbsp;=&nbsp;IntBuffer.allocate(10);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;int[]&nbsp;arr&nbsp;=&nbsp;new&nbsp;int[]{1,&nbsp;2,&nbsp;3};&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;buffer.put(arr);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;System.out.println(&quot;调用put(arr)方法后的buffer：&quot;&nbsp;+&nbsp;buffer);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//一种复制方法，buffer1的pos、lim、cap与buffer的一样&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;IntBuffer&nbsp;buffer1&nbsp;=&nbsp;buffer.duplicate();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;System.out.println(&quot;buffer1：&quot;&nbsp;+&nbsp;buffer1);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;buffer.position(1);&nbsp;//将buffer的position设置为1，不建议使用。功能相当于flip()方法，但是从运行结果可以看出，lim依然等于10&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;System.out.println(&quot;调用position()方法后的buffer：&quot;&nbsp;+&nbsp;buffer);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;System.out.println(&quot;buffer的可读数据量：&quot;&nbsp;+&nbsp;buffer.remaining());&nbsp;//计算出从pos到lim的长度&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;int[]&nbsp;arr1&nbsp;=&nbsp;new&nbsp;int[buffer.remaining()];&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//将缓冲区的数据放入arr1中&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;buffer.get(arr1);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;for(Integer&nbsp;i&nbsp;:&nbsp;arr1)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;System.out.print(Integer.toString(i)&nbsp;+&nbsp;&quot;,&quot;);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;System.out.println();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//比较flip()方法和position(index)方法的区别&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;buffer1.flip();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;System.out.println(&quot;buffer1的可读数量：&quot;&nbsp;+&nbsp;buffer1.remaining());&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;arr1&nbsp;=&nbsp;new&nbsp;int[buffer1.remaining()];&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;buffer1.get(arr1);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;for(Integer&nbsp;i&nbsp;:&nbsp;arr1)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;System.out.print(Integer.toString(i)&nbsp;+&nbsp;&quot;,&quot;);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>}&nbsp;&nbsp;</li>
+</ol>
+
+<p>运行结果：</p>
+
+<p>&nbsp;</p>
+
+<p><img alt="" src="https://img-blog.csdn.net/20161119230855583" /></p>
+
+<p><img alt="" src="https://img-blog.csdn.net/20161119230903318" /></p>
+
+<p><img alt="" src="https://img-blog.csdn.net/20161119230911174" /></p>
+
+<p>接下来是Buffer、Channel、Selector的一个入门的小例子：</p>
+
+<p>Server端：</p>
+
+<ol start="1">
+	<li>public&nbsp;class&nbsp;Server&nbsp;implements&nbsp;Runnable&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;private&nbsp;Selector&nbsp;selector;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;private&nbsp;ByteBuffer&nbsp;buffer&nbsp;=&nbsp;ByteBuffer.allocate(1024);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;Server(int&nbsp;port)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;try&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//1&nbsp;打开多复用器&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;selector&nbsp;=&nbsp;Selector.open();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//2&nbsp;打开服务器通道&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ServerSocketChannel&nbsp;ssc&nbsp;=&nbsp;ServerSocketChannel.open();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//3&nbsp;设置服务器通道为非阻塞方式&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ssc.configureBlocking(false);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//4&nbsp;绑定地址&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ssc.bind(new&nbsp;InetSocketAddress(port));&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//5&nbsp;把服务器通道注册到多路复用选择器上，并监听阻塞状态&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ssc.register(selector,&nbsp;SelectionKey.OP_ACCEPT);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;System.out.println(&quot;Server&nbsp;start,&nbsp;port：&quot;&nbsp;+&nbsp;port);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;catch&nbsp;(IOException&nbsp;e)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;e.printStackTrace();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;@Override&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;void&nbsp;run()&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;while&nbsp;(true)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;try&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//1&nbsp;必须让多路复用选择器开始监听&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;selector.select();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//2&nbsp;返回所有已经注册到多路复用选择器上的通道的SelectionKey&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Iterator&lt;SelectionKey&gt;&nbsp;keys&nbsp;=&nbsp;selector.selectedKeys().iterator();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//3&nbsp;遍历keys&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;while&nbsp;(keys.hasNext())&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;SelectionKey&nbsp;key&nbsp;=&nbsp;keys.next();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;keys.remove();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if(key.isValid())&nbsp;{&nbsp;//如果key的状态是有效的&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if(key.isAcceptable())&nbsp;{&nbsp;//如果key是阻塞状态，则调用accept()方法&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;accept(key);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if(key.isReadable())&nbsp;{&nbsp;//如果key是可读状态，则调用read()方法&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;read(key);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;catch&nbsp;(IOException&nbsp;e)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;e.printStackTrace();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;private&nbsp;void&nbsp;accept(SelectionKey&nbsp;key)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;try&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//1&nbsp;获取服务器通道&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ServerSocketChannel&nbsp;ssc&nbsp;=&nbsp;(ServerSocketChannel)&nbsp;key.channel();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//2&nbsp;执行阻塞方法&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;SocketChannel&nbsp;sc&nbsp;=&nbsp;ssc.accept();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//3&nbsp;设置阻塞模式为非阻塞&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;sc.configureBlocking(false);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//4&nbsp;注册到多路复用选择器上，并设置读取标识&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;sc.register(selector,&nbsp;SelectionKey.OP_READ);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;catch&nbsp;(Exception&nbsp;e)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;e.printStackTrace();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;private&nbsp;void&nbsp;read(SelectionKey&nbsp;key)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;try&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//1&nbsp;清空缓冲区中的旧数据&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;buffer.clear();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//2&nbsp;获取之前注册的SocketChannel通道&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;SocketChannel&nbsp;sc&nbsp;=&nbsp;(SocketChannel)&nbsp;key.channel();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//3&nbsp;将sc中的数据放入buffer中&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;int&nbsp;count&nbsp;=&nbsp;sc.read(buffer);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if(count&nbsp;==&nbsp;-1)&nbsp;{&nbsp;//&nbsp;==&nbsp;-1表示通道中没有数据&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;key.channel().close();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;key.cancel();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//读取到了数据，将buffer的position复位到0&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;buffer.flip();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;byte[]&nbsp;bytes&nbsp;=&nbsp;new&nbsp;byte[buffer.remaining()];&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//将buffer中的数据写入byte[]中&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;buffer.get(bytes);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;String&nbsp;body&nbsp;=&nbsp;new&nbsp;String(bytes).trim();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;System.out.println(&quot;Server：&quot;&nbsp;+&nbsp;body);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;catch&nbsp;(Exception&nbsp;e)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;e.printStackTrace();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;static&nbsp;void&nbsp;main(String[]&nbsp;args)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;new&nbsp;Thread(new&nbsp;Server(8379)).start();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>}&nbsp;&nbsp;</li>
+</ol>
+
+<p>客户端：</p>
+
+<ol start="1">
+	<li>public&nbsp;class&nbsp;Client&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;static&nbsp;void&nbsp;main(String[]&nbsp;args)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;InetSocketAddress&nbsp;address&nbsp;=&nbsp;new&nbsp;InetSocketAddress(&quot;127.0.0.1&quot;,&nbsp;8379);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;SocketChannel&nbsp;sc&nbsp;=&nbsp;null;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ByteBuffer&nbsp;buffer&nbsp;=&nbsp;ByteBuffer.allocate(1024);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;try&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//打开通道&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;sc&nbsp;=&nbsp;SocketChannel.open();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//建立连接&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;sc.connect(address);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;while&nbsp;(true)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;byte[]&nbsp;bytes&nbsp;=&nbsp;new&nbsp;byte[1024];&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;System.in.read(bytes);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//把输入的数据放入buffer缓冲区&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;buffer.put(bytes);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//复位操作&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;buffer.flip();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//将buffer的数据写入通道&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;sc.write(buffer);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//清空缓冲区中的数据&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;buffer.clear();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;catch&nbsp;(Exception&nbsp;e)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;e.printStackTrace();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;finally&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if(sc&nbsp;!=&nbsp;null)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;try&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;sc.close();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;catch&nbsp;(IOException&nbsp;e)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;e.printStackTrace();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>}&nbsp;&nbsp;</li>
+</ol>
+
+<p>运行结果：</p>
+
+<p>&nbsp;</p>
+
+<p><img alt="" src="https://img-blog.csdn.net/20161120160204869" /></p>
+
+<h2><img alt="" src="https://img-blog.csdn.net/20161120160212885" /><br />
+<strong>3、AIO</strong></h2>
+
+<p>在NIO的基础上引入了异步通道的概念，并提供了异步文件和异步套接字通道的实现，从而在真正意义上实现了异步非阻塞，之前的NIO只是非阻塞而并非异步。AIO不需要通过对多路复用器对注册的通道进行轮询操作即可实现异步读写，从而简化NIO编程模型。</p>
+
+<p>①AsynchronousServerSocketChannel</p>
+
+<p>②AsynchronousSocketChannel</p>
+
+<p>下面看代码：</p>
+
+<p>Server端：</p>
+
+<p>&nbsp;</p>
+
+<ol start="1">
+	<li>public&nbsp;class&nbsp;Server&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;//线程池&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;private&nbsp;ExecutorService&nbsp;executorService;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;//线程组&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;private&nbsp;AsynchronousChannelGroup&nbsp;channelGroup;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;//服务器通道&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;AsynchronousServerSocketChannel&nbsp;channel;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;Server(int&nbsp;port)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;try&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//创建线程池&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;executorService&nbsp;&nbsp;=&nbsp;Executors.newCachedThreadPool();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//创建线程组&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;channelGroup&nbsp;=&nbsp;AsynchronousChannelGroup.withCachedThreadPool(executorService,&nbsp;1);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//创建服务器通道&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;channel&nbsp;=&nbsp;AsynchronousServerSocketChannel.open(channelGroup);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//绑定地址&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;channel.bind(new&nbsp;InetSocketAddress(port));&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;System.out.println(&quot;server&nbsp;start,&nbsp;port：&quot;&nbsp;+&nbsp;port);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;channel.accept(this,&nbsp;new&nbsp;ServerCompletionHandler());&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Thread.sleep(Integer.MAX_VALUE);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;catch&nbsp;(Exception&nbsp;e)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;e.printStackTrace();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;static&nbsp;void&nbsp;main(String[]&nbsp;args)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Server&nbsp;server&nbsp;=&nbsp;new&nbsp;Server(8379);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>}&nbsp;&nbsp;</li>
+</ol>
+
+<p>ServerCompletionHandler类：</p>
+
+<ol start="1">
+	<li>public&nbsp;class&nbsp;ServerCompletionHandler&nbsp;implements&nbsp;CompletionHandler&lt;AsynchronousSocketChannel,&nbsp;Server&gt;&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;@Override&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;void&nbsp;completed(AsynchronousSocketChannel&nbsp;channel,&nbsp;Server&nbsp;attachment)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//当有下一个客户端接入的时候，直接调用Server的accept方法，这样反复执行下去，保证多个客户端都可以阻塞&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;attachment.channel.accept(attachment,&nbsp;this);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;read(channel);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;private&nbsp;void&nbsp;read(AsynchronousSocketChannel&nbsp;channel)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//读取数据&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ByteBuffer&nbsp;buffer&nbsp;=&nbsp;ByteBuffer.allocate(1024);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;channel.read(buffer,&nbsp;buffer,&nbsp;new&nbsp;CompletionHandler&lt;Integer,&nbsp;ByteBuffer&gt;()&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;@Override&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;void&nbsp;completed(Integer&nbsp;resultSize,&nbsp;ByteBuffer&nbsp;attachment)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;attachment.flip();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;System.out.println(&quot;Server-&gt;&quot;&nbsp;+&nbsp;&quot;收到客户端发送的数据长度为：&quot;&nbsp;+&nbsp;resultSize);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;String&nbsp;data&nbsp;=&nbsp;new&nbsp;String(buffer.array()).trim();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;System.out.println(&quot;Server-&gt;&quot;&nbsp;+&nbsp;&quot;收到客户端发送的数据为：&quot;&nbsp;+&nbsp;data);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;String&nbsp;response&nbsp;=&nbsp;&quot;服务器端响应了客户端。。。。。。&quot;;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;write(channel,&nbsp;response);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;@Override&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;void&nbsp;failed(Throwable&nbsp;exc,&nbsp;ByteBuffer&nbsp;attachment)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;exc.printStackTrace();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;});&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;private&nbsp;void&nbsp;write(AsynchronousSocketChannel&nbsp;channel,&nbsp;String&nbsp;response)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;try&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ByteBuffer&nbsp;buffer&nbsp;=&nbsp;ByteBuffer.allocate(1024);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;buffer.put(response.getBytes());&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;buffer.flip();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;channel.write(buffer).get();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;catch&nbsp;(Exception&nbsp;e)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;e.printStackTrace();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;@Override&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;void&nbsp;failed(Throwable&nbsp;exc,&nbsp;Server&nbsp;attachment)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;exc.printStackTrace();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>}&nbsp;&nbsp;</li>
+</ol>
+
+<p>客户端：</p>
+
+<ol start="1">
+	<li>public&nbsp;class&nbsp;Client&nbsp;implements&nbsp;Runnable&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;private&nbsp;AsynchronousSocketChannel&nbsp;channel;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;Client()&nbsp;throws&nbsp;IOException&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;channel&nbsp;=&nbsp;AsynchronousSocketChannel.open();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;void&nbsp;connect()&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;channel.connect(new&nbsp;InetSocketAddress(&quot;127.0.0.1&quot;,&nbsp;8379));&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;void&nbsp;write(String&nbsp;data)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;try&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;channel.write(ByteBuffer.wrap(data.getBytes())).get();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;read();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;catch&nbsp;(Exception&nbsp;e)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;e.printStackTrace();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;void&nbsp;read()&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ByteBuffer&nbsp;buffer&nbsp;=&nbsp;ByteBuffer.allocate(1024);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;try&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;channel.read(buffer).get();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;buffer.flip();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;byte[]&nbsp;bytes&nbsp;=&nbsp;new&nbsp;byte[buffer.remaining()];&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;buffer.get(bytes);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;String&nbsp;data&nbsp;=&nbsp;new&nbsp;String(bytes,&nbsp;&quot;UTF-8&quot;).trim();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;System.out.println(data);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;catch&nbsp;(Exception&nbsp;e)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;e.printStackTrace();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;@Override&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;void&nbsp;run()&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;while&nbsp;(true)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;static&nbsp;void&nbsp;main(String[]&nbsp;args)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;try&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Client&nbsp;c1&nbsp;=&nbsp;new&nbsp;Client();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Client&nbsp;c2&nbsp;=&nbsp;new&nbsp;Client();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Client&nbsp;c3&nbsp;=&nbsp;new&nbsp;Client();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;c1.connect();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;c2.connect();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;c3.connect();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;new&nbsp;Thread(c1).start();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;new&nbsp;Thread(c2).start();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;new&nbsp;Thread(c3).start();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Thread.sleep(1000);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;c1.write(&quot;c1&nbsp;aaa&quot;);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;c2.write(&quot;c2&nbsp;bbbb&quot;);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;c3.write(&quot;c3&nbsp;ccccc&quot;);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;catch&nbsp;(Exception&nbsp;e)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;e.printStackTrace();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>}&nbsp;&nbsp;</li>
+</ol>
+
+<p>运行结果：</p>
