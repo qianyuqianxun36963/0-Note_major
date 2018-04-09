@@ -1,0 +1,604 @@
+<h1>&nbsp;ViewResolver</h1>
+
+<p>原创&nbsp;2016年08月16日 21:55:55</p>
+
+<ul>
+	<li>标签：</li>
+	<li><a href="http://so.csdn.net/so/search/s.do?q=SpringMVC&amp;t=blog" target="_blank">SpringMVC</a>&nbsp;/</li>
+	<li><a href="http://so.csdn.net/so/search/s.do?q=%E8%A7%86%E5%9B%BE%E8%A7%A3%E6%9E%90&amp;t=blog" target="_blank">视图解析</a></li>
+</ul>
+
+<ul>
+	<li>5097</li>
+</ul>
+
+<h2><a name="t0"></a><strong>基本概念</strong></h2>
+
+<p>所有的&nbsp;<strong>MVC</strong>&nbsp;框架都有一套它自己的解析视图的机制，SpringMVC 也不例外。</p>
+
+<p>它使用&nbsp;<strong>ViewResolver</strong>&nbsp;进行视图解析，让用户在浏览器中渲染模型。</p>
+
+<p><strong>ViewResolver</strong>&nbsp;接口在视图名称和真正的视图之间提供映射，它是一种开箱即用的技术，能够解析 JSP、Velocity 模板和 XSLT 等多种视图：</p>
+
+<p>视图解析器在 SpringMVC 中配置如下（以&nbsp;<strong>InternalResourceViewResolver</strong>&nbsp;为例 ）：</p>
+
+<pre>
+<code>&lt;bean class=&quot;org.springframework.web.servlet.view.InternalResourceViewResolver&quot;&gt;
+    &lt;property name=&quot;viewClass&quot; value=&quot;org.springframework.web.servlet.view.JstlView&quot; /&gt;
+    &lt;property name=&quot;prefix&quot; value=&quot;/WEB-INF/page/&quot; /&gt;
+    &lt;property name=&quot;suffix&quot; value=&quot;.jsp&quot; /&gt;
+&lt;/bean&gt;</code></pre>
+
+<ul>
+	<li>1</li>
+	<li>2</li>
+	<li>3</li>
+	<li>4</li>
+	<li>5</li>
+</ul>
+
+<ul>
+	<li>
+	<p><strong>bean</strong>：表示指定的视图解析器</p>
+	</li>
+	<li>
+	<p><strong>viewClass</strong>： 表示要解析的视图类型</p>
+	</li>
+	<li>
+	<p><strong>prefix/suffix</strong>： 表示路径前缀/后缀，假设 ViewName 为 hello，则完整路径为 /WEB-INF/page/hello.jsp</p>
+	</li>
+</ul>
+
+<hr />
+<h2><a name="t1"></a><strong>内部构造</strong></h2>
+
+<p>ViewResolver ，即视图解析器，该接口的主要作用就是根据视图名 （ViewName），返回视图 （View）。下面来它的源码：</p>
+
+<pre>
+<code>public interface ViewResolver {
+    View resolveViewName(String viewName, Locale locale) throws Exception;
+}</code></pre>
+
+<ul>
+	<li>1</li>
+	<li>2</li>
+	<li>3</li>
+</ul>
+
+<p>再它的继承关系：</p>
+
+<p><img alt="这里写图片描述" src="https://img-blog.csdn.net/20160816215424296" title="" /></p>
+
+<hr />
+<h2><a name="t2"></a><strong>AbstractCachingViewResolver</strong></h2>
+
+<p>该类是&nbsp;<strong>ViewResolver</strong>&nbsp;接口的抽象实现类，用来表示一个<strong>带有缓存功能</strong>的视图解析器。</p>
+
+<p>下面来看它的 resolveViewName：</p>
+
+<pre>
+<code>// 成员变量
+private boolean cacheUnresolved = true;
+
+public View resolveViewName(String viewName, Locale locale) throws Exception {
+
+    // 1.判断缓存是否打开
+    if (!isCache()) {
+        // 2.缓存关闭，则创建视图
+        return createView(viewName, locale);
+    } else {
+
+        // 3.1.缓存开启，从 viewAccessCache 取出视图
+        Object cacheKey = getCacheKey(viewName, locale);
+        View view = this.viewAccessCache.get(cacheKey);
+
+        // 3.2.为空，从 viewCreationCache 取出视图
+        if (view == null) {
+            synchronized (this.viewCreationCache) {
+                // 3.3.仍然为空，则创建视图
+                view = this.viewCreationCache.get(cacheKey);
+                if (view == null) {
+                    view = createView(viewName, locale);
+
+                    // 3.3.1.仍然为空，标记为[不可解析视图]
+                    if (view == null &amp;&amp; this.cacheUnresolved) {
+                        view = UNRESOLVED_VIEW;
+                    }
+
+                    // 3.3.2.不为空，添加进缓存
+                    if (view != null) {
+                        this.viewAccessCache.put(cacheKey, view);
+                        this.viewCreationCache.put(cacheKey, view);
+                        // 省略部分代码...
+                    }
+                }
+            }
+        }
+
+        return ( view != UNRESOLVED_VIEW ? view : null );
+    }
+}</code></pre>
+
+<ul>
+	<li>1</li>
+	<li>2</li>
+	<li>3</li>
+	<li>4</li>
+	<li>5</li>
+	<li>6</li>
+	<li>7</li>
+	<li>8</li>
+	<li>9</li>
+	<li>10</li>
+	<li>11</li>
+	<li>12</li>
+	<li>13</li>
+	<li>14</li>
+	<li>15</li>
+	<li>16</li>
+	<li>17</li>
+	<li>18</li>
+	<li>19</li>
+	<li>20</li>
+	<li>21</li>
+	<li>22</li>
+	<li>23</li>
+	<li>24</li>
+	<li>25</li>
+	<li>26</li>
+	<li>27</li>
+	<li>28</li>
+	<li>29</li>
+	<li>30</li>
+	<li>31</li>
+	<li>32</li>
+	<li>33</li>
+	<li>34</li>
+	<li>35</li>
+	<li>36</li>
+	<li>37</li>
+	<li>38</li>
+	<li>39</li>
+	<li>40</li>
+	<li>41</li>
+</ul>
+
+<p>再来看看它的&nbsp;<strong>createView</strong>&nbsp;方法，该方法负责视图的创建。</p>
+
+<pre>
+<code>protected View createView(String viewName, Locale locale) throws Exception {
+    // 空方法
+    return loadView(viewName, locale);
+}</code></pre>
+
+<ul>
+	<li>1</li>
+	<li>2</li>
+	<li>3</li>
+	<li>4</li>
+</ul>
+
+<p>观察代码，可以该类的视图解析过程如下：</p>
+
+<ul>
+	<li>
+	<p>缓存关闭，则创建视图。</p>
+	</li>
+	<li>
+	<p>缓存开启，则步骤如下：</p>
+
+	<ul>
+		<li>依次从 viewCreationCache，viewCreationCache 缓存中查找。</li>
+		<li>存在，则返回视图；不存在，则创建视图。</li>
+		<li>创建视图完再次判断，为空则标记为不可解析视图，否则添加到两个缓存。</li>
+	</ul>
+	</li>
+</ul>
+
+<hr />
+<h2><a name="t3"></a><strong>UrlBasedViewResolver</strong></h2>
+
+<p>继承自&nbsp;<strong>AbstractCachingViewResolver</strong>&nbsp;抽象类、并实现&nbsp;<strong>Ordered</strong>&nbsp;接口的类，是 ViewResolver 接口简单的实现类，该类重写了 createView、loadView 这两个方法。</p>
+
+<p>首先来看它的签名：</p>
+
+<pre>
+<code>public class UrlBasedViewResolver extends AbstractCachingViewResolver implements Ordered</code></pre>
+
+<ul>
+	<li>1</li>
+</ul>
+
+<hr />
+<h3><a name="t4"></a><strong>1.createView</strong></h3>
+
+<pre>
+<code>public static final String REDIRECT_URL_PREFIX = &quot;redirect:&quot;;
+public static final String FORWARD_URL_PREFIX = &quot;forward:&quot;;
+
+protected View createView(String viewName, Locale locale) throws Exception {
+
+    // 是否支持该视图的名的处理
+    if (!canHandle(viewName, locale)) {
+        return null;
+    }
+
+    // 判断视图名是否以 redirect: 开头
+    if (viewName.startsWith(REDIRECT_URL_PREFIX)) {
+
+        // 获取真正的视图名
+        String redirectUrl = viewName.substring(REDIRECT_URL_PREFIX.length());
+
+        RedirectView view = new RedirectView(redirectUrl,
+            isRedirectContextRelative(), isRedirectHttp10Compatible());
+
+        return applyLifecycleMethods(viewName, view);
+    }
+
+    // 判断视图名是否以 forward: 开头
+    if (viewName.startsWith(FORWARD_URL_PREFIX)) {
+        String forwardUrl = viewName.substring(FORWARD_URL_PREFIX.length());
+
+        // 返回视图
+        return new InternalResourceView(forwardUrl);
+    }
+
+    // 其他情况由父类处理，其实就是调用该类的 loadView 方法
+    return super.createView(viewName, locale);
+}</code></pre>
+
+<ul>
+	<li>1</li>
+	<li>2</li>
+	<li>3</li>
+	<li>4</li>
+	<li>5</li>
+	<li>6</li>
+	<li>7</li>
+	<li>8</li>
+	<li>9</li>
+	<li>10</li>
+	<li>11</li>
+	<li>12</li>
+	<li>13</li>
+	<li>14</li>
+	<li>15</li>
+	<li>16</li>
+	<li>17</li>
+	<li>18</li>
+	<li>19</li>
+	<li>20</li>
+	<li>21</li>
+	<li>22</li>
+	<li>23</li>
+	<li>24</li>
+	<li>25</li>
+	<li>26</li>
+	<li>27</li>
+	<li>28</li>
+	<li>29</li>
+	<li>30</li>
+	<li>31</li>
+	<li>32</li>
+	<li>33</li>
+</ul>
+
+<p>再来看看&nbsp;<strong>applyLifecycleMethods</strong>&nbsp;方法：</p>
+
+<pre>
+<code>private View applyLifecycleMethods(String viewName, AbstractView view) {
+    // 从 SpringMVC 容器中手动获取 Bean
+    return (View) getApplicationContext().getAutowireCapableBeanFactory().
+        initializeBean(view, viewName);
+}</code></pre>
+
+<ul>
+	<li>1</li>
+	<li>2</li>
+	<li>3</li>
+	<li>4</li>
+	<li>5</li>
+</ul>
+
+<hr />
+<h3><a name="t5"></a><strong>2.loadView</strong></h3>
+
+<p>再来看看它 的&nbsp;<strong>loadView</strong>&nbsp;方法，如果视图名不包含&nbsp;<strong>redirect，forward</strong>&nbsp;时，调用父类的&nbsp;<strong>createView</strong>&nbsp;的时会调用到它。</p>
+
+<pre>
+<code>protected View loadView(String viewName, Locale locale) throws Exception {
+    // 创建 View
+    AbstractUrlBasedView view = buildView(viewName);
+
+    // 从 SpringMVC 容器中获取 View
+    View result = applyLifecycleMethods(viewName, view);
+
+    return ( view.checkResource(locale) ? result : null );
+}</code></pre>
+
+<ul>
+	<li>1</li>
+	<li>2</li>
+	<li>3</li>
+	<li>4</li>
+	<li>5</li>
+	<li>6</li>
+	<li>7</li>
+	<li>8</li>
+	<li>9</li>
+</ul>
+
+<p>再来看看 buildView 方法：</p>
+
+<pre>
+<code>protected AbstractUrlBasedView buildView(String viewName) throws Exception {
+
+    // 1.创建 View ，利用反射实例类
+    AbstractUrlBasedView view = 
+        (AbstractUrlBasedView) BeanUtils.instantiateClass(getViewClass());
+
+    // 2.设置 View 的 url
+    view.setUrl(getPrefix() + viewName + getSuffix());
+
+    // 3.设置 View 的 contentType  
+    String contentType = getContentType();
+    if (contentType != null) {
+        view.setContentType(contentType);
+    }
+
+    // 4.设置 View 的其他相关属性
+
+    view.setRequestContextAttribute(getRequestContextAttribute());
+    view.setAttributesMap(getAttributesMap());
+
+    Boolean exposePathVariables = getExposePathVariables();
+    if (exposePathVariables != null) {
+        view.setExposePathVariables(exposePathVariables);
+    }
+
+    Boolean exposeContextBeansAsAttributes = getExposeContextBeansAsAttributes();
+    if (exposeContextBeansAsAttributes != null) {
+        view.setExposeContextBeansAsAttributes(exposeContextBeansAsAttributes);
+    }
+
+    String [ ] exposedContextBeanNames = getExposedContextBeanNames();
+    if (exposedContextBeanNames != null) {
+        view.setExposedContextBeanNames(exposedContextBeanNames);
+    }
+
+    return view;
+}</code></pre>
+
+<ul>
+	<li>1</li>
+	<li>2</li>
+	<li>3</li>
+	<li>4</li>
+	<li>5</li>
+	<li>6</li>
+	<li>7</li>
+	<li>8</li>
+	<li>9</li>
+	<li>10</li>
+	<li>11</li>
+	<li>12</li>
+	<li>13</li>
+	<li>14</li>
+	<li>15</li>
+	<li>16</li>
+	<li>17</li>
+	<li>18</li>
+	<li>19</li>
+	<li>20</li>
+	<li>21</li>
+	<li>22</li>
+	<li>23</li>
+	<li>24</li>
+	<li>25</li>
+	<li>26</li>
+	<li>27</li>
+	<li>28</li>
+	<li>29</li>
+	<li>30</li>
+	<li>31</li>
+	<li>32</li>
+	<li>33</li>
+	<li>34</li>
+	<li>35</li>
+	<li>36</li>
+	<li>37</li>
+</ul>
+
+<hr />
+<h2><a name="t6"></a><strong>实例探究</strong></h2>
+
+<p>利用&nbsp;<strong>ContentNegotiatingViewResolver</strong>&nbsp;集成多种视图</p>
+
+<ul>
+	<li>首先来看配置文件（这里集成&nbsp;<strong>vm，jsp，json，xml</strong>&nbsp;这四种视图显示）</li>
+</ul>
+
+<pre>
+<code>&lt;bean class=&quot;org.springframework.web.servlet.view.ContentNegotiatingViewResolver&quot;&gt;
+    &lt;!-- 内容协商管理器 --&gt;
+    &lt;property name=&quot;contentNegotiationManager&quot;  ref=&quot;contentNegotiationManager&quot;/&gt;
+    &lt;!-- 视图解析器  --&gt;
+    &lt;property name=&quot;viewResolvers&quot;&gt;
+        &lt;list&gt;
+            &lt;!--Veocity 视图解析器  --&gt;
+            &lt;bean class=&quot;org.springframework.web.servlet.view.velocity.VelocityViewResolver&quot;&gt;
+                &lt;property name=&quot;order&quot; value=&quot;0&quot;/&gt;
+                &lt;property name=&quot;cache&quot; value=&quot;false&quot; /&gt;
+                &lt;property name=&quot;suffix&quot; value=&quot;.vm&quot; /&gt;
+            &lt;/bean&gt;
+            &lt;!--JSP 视图解析器  --&gt;
+            &lt;bean class=&quot;org.springframework.web.servlet.view.InternalResourceViewResolver&quot;&gt;
+                &lt;property name=&quot;viewClass&quot; value=&quot;org.springframework.web.servlet.view.JstlView&quot;/&gt;
+                &lt;property name=&quot;prefix&quot; value=&quot;/WEB-INF/page/&quot;/&gt;
+                &lt;property name=&quot;suffix&quot; value=&quot;.jsp&quot;&gt;&lt;/property&gt;
+            &lt;/bean&gt;
+        &lt;/list&gt;
+    &lt;/property&gt;
+
+    &lt;!-- 默认视图 --&gt;
+    &lt;property name=&quot;defaultViews&quot;&gt;
+        &lt;list&gt;
+            &lt;!-- json 视图解析 --&gt;
+            &lt;bean class=&quot;org.springframework.web.servlet.view.json.MappingJackson2JsonView&quot; /&gt;
+            &lt;!-- xml 视图解析  --&gt;
+            &lt;bean class=&quot;org.springframework.web.servlet.view.xml.MarshallingView&quot; &gt;
+                &lt;property name=&quot;marshaller&quot;&gt;
+                    &lt;bean class=&quot;org.springframework.oxm.xstream.XStreamMarshaller&quot;/&gt;
+                &lt;/property&gt;
+            &lt;/bean&gt;
+        &lt;/list&gt;
+    &lt;/property&gt;
+&lt;/bean&gt;
+
+&lt;bean id=&quot;contentNegotiationManager&quot;  class=&quot;org.springframework.web.accept.ContentNegotiationManagerFactoryBean&quot;&gt;
+    &lt;!-- 根据请求参数或拓展名映射到相应的MIME类型 --&gt;
+    &lt;property name=&quot;mediaTypes&quot;&gt;
+        &lt;map&gt;
+            &lt;entry key=&quot;json&quot;  value=&quot;application/json&quot;/&gt;
+            &lt;entry key=&quot;xml&quot;  value=&quot;application/xml&quot;/&gt;
+        &lt;/map&gt;
+    &lt;/property&gt;
+    &lt;!-- 设置默认的MIME类型，如果没有指定拓展名或请求参数，则使用此默认MIME类型解析视图 --&gt;
+    &lt;property name=&quot;defaultContentType&quot;  value=&quot;text/html&quot;/&gt; 
+    &lt;!-- 是否不适用请求头确定MIME类型 --&gt;
+    &lt;property name=&quot;ignoreAcceptHeader&quot;  value=&quot;true&quot;/&gt; 
+    &lt;!-- 是否根据路径拓展名确定MIME类型 --&gt;
+    &lt;property name=&quot;favorPathExtension&quot;  value=&quot;true&quot;/&gt; 
+     &lt;!-- 是否使用参数来确定MIME类型 --&gt;
+    &lt;property name=&quot;favorParameter&quot; value=&quot;false&quot; /&gt; 
+&lt;/bean&gt;
+
+&lt;!-- Veocity 模版配置 --&gt;
+&lt;bean class=&quot;org.springframework.web.servlet.view.velocity.VelocityConfigurer&quot;&gt;
+    &lt;property name=&quot;configLocation&quot; value=&quot;/WEB-INF/velocity.properties&quot; /&gt;
+&lt;/bean&gt;</code></pre>
+
+<ul>
+	<li>1</li>
+	<li>2</li>
+	<li>3</li>
+	<li>4</li>
+	<li>5</li>
+	<li>6</li>
+	<li>7</li>
+	<li>8</li>
+	<li>9</li>
+	<li>10</li>
+	<li>11</li>
+	<li>12</li>
+	<li>13</li>
+	<li>14</li>
+	<li>15</li>
+	<li>16</li>
+	<li>17</li>
+	<li>18</li>
+	<li>19</li>
+	<li>20</li>
+	<li>21</li>
+	<li>22</li>
+	<li>23</li>
+	<li>24</li>
+	<li>25</li>
+	<li>26</li>
+	<li>27</li>
+	<li>28</li>
+	<li>29</li>
+	<li>30</li>
+	<li>31</li>
+	<li>32</li>
+	<li>33</li>
+	<li>34</li>
+	<li>35</li>
+	<li>36</li>
+	<li>37</li>
+	<li>38</li>
+	<li>39</li>
+	<li>40</li>
+	<li>41</li>
+	<li>42</li>
+	<li>43</li>
+	<li>44</li>
+	<li>45</li>
+	<li>46</li>
+	<li>47</li>
+	<li>48</li>
+	<li>49</li>
+	<li>50</li>
+	<li>51</li>
+	<li>52</li>
+	<li>53</li>
+	<li>54</li>
+	<li>55</li>
+	<li>56</li>
+	<li>57</li>
+	<li>58</li>
+</ul>
+
+<ul>
+	<li>Velocity 属性文件配置</li>
+</ul>
+
+<pre>
+<code>input.encoding=UTF-8
+output.encoding=UTF-8
+contentType=text/html;charset=UTF-8  
+resource.loader=webapp
+webapp.resource.loader.class=org.apache.velocity.tools.view.WebappResourceLoader
+webapp.resource.loader.path=/WEB-INF/velocity/</code></pre>
+
+<ul>
+	<li>1</li>
+	<li>2</li>
+	<li>3</li>
+	<li>4</li>
+	<li>5</li>
+	<li>6</li>
+</ul>
+
+<ul>
+	<li>测试</li>
+</ul>
+
+<pre>
+<code>// 先用 velocity 视图解析（order = 0），然后再用 jsp 视图解析
+http://localhost:8080/demo/hello
+
+// 返回 json 视图
+http://localhost:8080/demo/hello.json
+
+// 返回 xml 视图
+http://localhost:8080/demo/hello.xml</code></pre>
+
+<ul>
+	<li>1</li>
+	<li>2</li>
+	<li>3</li>
+	<li>4</li>
+	<li>5</li>
+	<li>6</li>
+	<li>7</li>
+	<li>8</li>
+</ul>
+
+<p>注意：</p>
+
+<ul>
+	<li>
+	<p>这里利用路径扩展名（<strong>favorPathExtension</strong>）区分&nbsp;<strong>MIME</strong>&nbsp;类型，以此确定要返回的视图类型。也可以利用参数（默认为&nbsp;<strong>fomart</strong>）来区分。</p>
+	</li>
+	<li>
+	<p><strong>VelocityViewResolver</strong>（velocity 视图解析）的&nbsp;<strong>order</strong>&nbsp;优先级必须比&nbsp;<strong>InternalResourceViewResolver</strong>（jsp 视图解析器）高。因为&nbsp;<strong>InternalResourceViewResolver</strong>&nbsp;不管路径下是否存在指定 jsp 文件都会返回 View（视图），这样会导致&nbsp;<strong>VelocityViewResolver</strong>&nbsp;不生效。</p>
+	</li>
+</ul>
+
+<hr />
+<h2><a name="t7"></a><strong>参考</strong></h2>
+
+<ul>
+	<li><a href="http://www.cnblogs.com/fangjian0423/p/springMVC-view-viewResolver.html" target="_blank">http://www.cnblogs.com/fangjian0423/p/springMVC-view-viewResolver.html</a></li>
+</ul>

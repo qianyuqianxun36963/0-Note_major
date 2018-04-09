@@ -1,0 +1,242 @@
+<h1><a href="http://www.cnblogs.com/superAnny/p/6491135.html" id="cb_post_title_url">ViewResolver 视图解析器</a></h1>
+
+<h2>前言</h2>
+
+<p>&nbsp;&nbsp;&nbsp;在前一篇博客中讲了&nbsp;<a href="http://haohaoxuexi.iteye.com/blog/1753271" target="_blank">SpringMVC&nbsp;的Controller&nbsp;控制器&nbsp;</a>，在这篇博客中将接着介绍一下&nbsp;SpringMVC&nbsp;视图解析器。当我们对SpringMVC控制的资源发起请求时，这些请求都会被SpringMVC的DispatcherServlet处理，接着Spring会分析看哪一个HandlerMapping定义的所有请求映射中存在对该请求的最合理的映射。然后通过该HandlerMapping取得其对应的Handler，接着再通过相应的HandlerAdapter处理该Handler。HandlerAdapter在对Handler进行处理之后会返回一个ModelAndView对象。在获得了ModelAndView对象之后，Spring就需要把该View渲染给用户，即返回给浏览器。在这个渲染的过程中，发挥作用的就是ViewResolver和View。当Handler返回的ModelAndView中不包含真正的视图，只返回一个逻辑视图名称的时候，ViewResolver就会把该逻辑视图名称解析为真正的视图View对象。View是真正进行视图渲染，把结果返回给浏览器的。</p>
+
+<h2>ViewResolver&nbsp;和&nbsp;View&nbsp;介绍</h2>
+
+<p>SpringMVC&nbsp;用于处理视图最重要的两个接口是&nbsp;ViewResolver&nbsp;和&nbsp;View&nbsp;。&nbsp;ViewResolver&nbsp;的主要作用是把一个逻辑上的视图名称解析为一个真正的视图，&nbsp;SpringMVC&nbsp;中用于把&nbsp;View&nbsp;对象呈现给客户端的是&nbsp;View&nbsp;对象本身，而&nbsp;ViewResolver&nbsp;只是把逻辑视图名称解析为对象的&nbsp;View&nbsp;对象。&nbsp;View&nbsp;接口的主要作用是用于处理视图，然后返回给客户端。</p>
+
+<p>Spring&nbsp;为我们提供了非常多的视图解析器，下面将列举一些视图解析器。</p>
+
+<p><strong>AbstractCachingViewResolver&nbsp;</strong>：这是一个抽象类，这种视图解析器会把它曾经解析过的视图保存起来，然后每次要解析视图的时候先从缓存里面找，如果找到了对应的视图就直接返回，如果没有就创建一个新的视图对象，然后把它放到一个用于缓存的&nbsp;map&nbsp;中，接着再把新建的视图返回。使用这种视图缓存的方式可以把解析视图的性能问题降到最低。</p>
+
+<p><strong>UrlBasedViewResolver&nbsp;</strong>：它是对&nbsp;ViewResolver&nbsp;的一种简单实现，而且继承了&nbsp;AbstractCachingViewResolver&nbsp;，主要就是提供的一种拼接&nbsp;URL&nbsp;的方式来解析视图，它可以让我们通过&nbsp;prefix&nbsp;属性指定一个指定的前缀，通过&nbsp;suffix&nbsp;属性指定一个指定的后缀，然后把返回的逻辑视图名称加上指定的前缀和后缀就是指定的视图&nbsp;URL&nbsp;了。如&nbsp;prefix=/WEB-INF/jsps/&nbsp;，&nbsp;suffix=.jsp&nbsp;，返回的视图名称&nbsp;viewName=test/indx&nbsp;，则&nbsp;UrlBasedViewResolver&nbsp;解析出来的视图&nbsp;URL&nbsp;就是&nbsp;/WEB-INF/jsps/test/index.jsp&nbsp;。默认的&nbsp;prefix&nbsp;和&nbsp;suffix&nbsp;都是空串。&nbsp;URLBasedViewResolver&nbsp;支持返回的视图名称中包含&nbsp;redirect:&nbsp;前缀，这样就可以支持&nbsp;URL&nbsp;在客户端的跳转，如当返回的视图名称是&nbsp;&rdquo;redirect:test.do&rdquo;&nbsp;的时候，&nbsp;URLBasedViewResolver&nbsp;发现返回的视图名称包含&nbsp;&rdquo;redirect:&rdquo;&nbsp;前缀，于是把返回的视图名称前缀&nbsp;&rdquo;redirect:&rdquo;&nbsp;去掉，取后面的&nbsp;test.do&nbsp;组成一个&nbsp;RedirectView&nbsp;，&nbsp;RedirectView&nbsp;中将把请求返回的模型属性组合成查询参数的形式组合到&nbsp;redirect&nbsp;的&nbsp;URL&nbsp;后面，然后调用&nbsp;HttpServletResponse&nbsp;对象的&nbsp;sendRedirect&nbsp;方法进行重定向。同样&nbsp;URLBasedViewResolver&nbsp;还支持&nbsp;forword:&nbsp;前缀，对于视图名称中包含&nbsp;forword:&nbsp;前缀的视图名称将会被封装成一个&nbsp;InternalResourceView&nbsp;对象，然后在服务器端利用&nbsp;RequestDispatcher&nbsp;的&nbsp;forword&nbsp;方式跳转到指定的地址。使用&nbsp;UrlBasedViewResolver&nbsp;的时候必须指定属性&nbsp;viewClass&nbsp;，表示解析成哪种视图，一般使用较多的就是&nbsp;InternalResourceView&nbsp;，利用它来展现&nbsp;jsp&nbsp;，但是当我们使用&nbsp;JSTL&nbsp;的时候我们必须使用&nbsp;JstlView&nbsp;。下面是一段&nbsp;UrlBasedViewResolver&nbsp;的定义，根据该定义，当返回的逻辑视图名称是&nbsp;test&nbsp;的时候，&nbsp;UrlBasedViewResolver&nbsp;将把逻辑视图名称加上定义好的前缀和后缀，即&ldquo;&nbsp;/WEB-INF/test.jsp&nbsp;&rdquo;，然后新建一个&nbsp;viewClass&nbsp;属性指定的视图类型予以返回，即返回一个&nbsp;url&nbsp;为&ldquo;&nbsp;/WEB-INF/test.jsp&nbsp;&rdquo;的&nbsp;InternalResourceView&nbsp;对象。</p>
+
+<pre>
+&lt;bean
+       class=&quot;org.springframework.web.servlet.view.UrlBasedViewResolver&quot;&gt;
+       &lt;property name=&quot;prefix&quot; value=&quot;/WEB-INF/&quot; /&gt;
+       &lt;property name=&quot;suffix&quot; value=&quot;.jsp&quot; /&gt;
+       &lt;property name=&quot;viewClass&quot; value=&quot;org.springframework.web.servlet.view.InternalResourceView&quot;/&gt;
+    &lt;/bean&gt;</pre>
+
+<p>&nbsp;</p>
+
+<p><strong>InternalResourceViewResolver&nbsp;</strong>：它是&nbsp;URLBasedViewResolver&nbsp;的子类，所以&nbsp;URLBasedViewResolver&nbsp;支持的特性它都支持。在实际应用中&nbsp;InternalResourceViewResolver&nbsp;也是使用的最广泛的一个视图解析器。那么&nbsp;InternalResourceViewResolver&nbsp;有什么自己独有的特性呢？单从字面意思来看，我们可以把&nbsp;InternalResourceViewResolver&nbsp;解释为内部资源视图解析器，这就是&nbsp;InternalResourceViewResolver&nbsp;的一个特性。&nbsp;InternalResourceViewResolver&nbsp;会把返回的视图名称都解析为InternalResourceView&nbsp;对象，&nbsp;InternalResourceView&nbsp;会把&nbsp;Controller&nbsp;处理器方法返回的模型属性都存放到对应的&nbsp;request&nbsp;属性中，然后通过&nbsp;RequestDispatcher&nbsp;在服务器端把请求&nbsp;forword&nbsp;重定向到目标&nbsp;URL&nbsp;。比如在&nbsp;InternalResourceViewResolver&nbsp;中定义了&nbsp;prefix=/WEB-INF/&nbsp;，&nbsp;suffix=.jsp&nbsp;，然后请求的&nbsp;Controller&nbsp;处理器方法返回的视图名称为&nbsp;test&nbsp;，那么这个时候&nbsp;InternalResourceViewResolver&nbsp;就会把&nbsp;test&nbsp;解析为一个&nbsp;InternalResourceView&nbsp;对象，先把返回的模型属性都存放到对应的&nbsp;HttpServletRequest&nbsp;属性中，然后利用&nbsp;RequestDispatcher&nbsp;在服务器端把请求&nbsp;forword&nbsp;到&nbsp;/WEB-INF/test.jsp&nbsp;。这就是&nbsp;InternalResourceViewResolver&nbsp;一个非常重要的特性，我们都知道存放在&nbsp;/WEB-INF/&nbsp;下面的内容是不能直接通过&nbsp;request&nbsp;请求的方式请求到的，为了安全性考虑，我们通常会把&nbsp;jsp&nbsp;文件放在&nbsp;WEB-INF&nbsp;目录下，而&nbsp;InternalResourceView&nbsp;在服务器端跳转的方式可以很好的解决这个问题。下面是一个&nbsp;InternalResourceViewResolver&nbsp;的定义，根据该定义当返回的逻辑视图名称是&nbsp;test&nbsp;的时候，&nbsp;InternalResourceViewResolver&nbsp;会给它加上定义好的前缀和后缀，组成&ldquo;&nbsp;/WEB-INF/test.jsp&nbsp;&rdquo;的形式，然后把它当做一个&nbsp;InternalResourceView&nbsp;的&nbsp;url&nbsp;新建一个&nbsp;InternalResourceView对象返回。</p>
+
+<pre>
+&lt;bean class=&quot;org.springframework.web.servlet.view.InternalResourceViewResolver&quot;&gt;
+       &lt;property name=&quot;prefix&quot; value=&quot;/WEB-INF/&quot;/&gt;
+       &lt;property name=&quot;suffix&quot; value=&quot;.jsp&quot;&gt;&lt;/property&gt;
+    &lt;/bean&gt;</pre>
+
+<p>&nbsp;</p>
+
+<p><strong>XmlViewResolver&nbsp;</strong>：它继承自&nbsp;AbstractCachingViewResolver&nbsp;抽象类，所以它也是支持视图缓存的。&nbsp;XmlViewResolver&nbsp;需要给定一个&nbsp;xml&nbsp;配置文件，该文件将使用和&nbsp;Spring&nbsp;的&nbsp;bean&nbsp;工厂配置文件一样的&nbsp;DTD&nbsp;定义，所以其实该文件就是用来定义视图的&nbsp;bean&nbsp;对象的。在该文件中定义的每一个视图的&nbsp;bean&nbsp;对象都给定一个名字，然后&nbsp;XmlViewResolver&nbsp;将根据&nbsp;Controller&nbsp;处理器方法返回的逻辑视图名称到&nbsp;XmlViewResolver&nbsp;指定的配置文件中寻找对应名称的视图&nbsp;bean&nbsp;用于处理视图。该配置文件默认是&nbsp;/WEB-INF/views.xml&nbsp;文件，如果不使用默认值的时候可以在&nbsp;XmlViewResolver&nbsp;的&nbsp;location&nbsp;属性中指定它的位置。&nbsp;XmlViewResolver&nbsp;还实现了&nbsp;Ordered&nbsp;接口，因此我们可以通过其&nbsp;order&nbsp;属性来指定在&nbsp;ViewResolver&nbsp;链中它所处的位置，&nbsp;order&nbsp;的值越小优先级越高。以下是使用&nbsp;XmlViewResolver&nbsp;的一个示例：</p>
+
+<p>（&nbsp;1&nbsp;）在&nbsp;SpringMVC&nbsp;的配置文件中加入&nbsp;XmlViewResolver&nbsp;的&nbsp;bean&nbsp;定义。使用&nbsp;location&nbsp;属性指定其配置文件所在的位置，&nbsp;order&nbsp;属性指定当有多个&nbsp;ViewResolver&nbsp;的时候其处理视图的优先级。关于&nbsp;ViewResolver&nbsp;链的问题将在后续内容中讲到。</p>
+
+<pre>
+&lt;bean class=&quot;org.springframework.web.servlet.view.XmlViewResolver&quot;&gt;
+       &lt;property name=&quot;location&quot; value=&quot;/WEB-INF/views.xml&quot;/&gt;
+       &lt;property name=&quot;order&quot; value=&quot;1&quot;/&gt;
+    &lt;/bean&gt;</pre>
+
+<p>&nbsp;</p>
+
+<p>（&nbsp;2&nbsp;）在&nbsp;XmlViewResolver&nbsp;对应的配置文件中配置好所需要的视图定义。在下面的代码中我们就配置了一个名为&nbsp;internalResource&nbsp;的&nbsp;InternalResourceView&nbsp;，其&nbsp;url&nbsp;属性为&ldquo;&nbsp;/index.jsp&nbsp;&rdquo;。</p>
+
+<pre>
+&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot;?&gt;
+&lt;beans xmlns=&quot;http://www.springframework.org/schema/beans&quot;
+    xmlns:xsi=&quot;http://www.w3.org/2001/XMLSchema-instance&quot;
+    xsi:schemaLocation=&quot;http://www.springframework.org/schema/beans
+     http://www.springframework.org/schema/beans/spring-beans-3.0.xsd&quot;&gt;
+    &lt;bean id=&quot;internalResource&quot; class=&quot;org.springframework.web.servlet.view.InternalResourceView&quot;&gt;
+       &lt;property name=&quot;url&quot; value=&quot;/index.jsp&quot;/&gt;
+    &lt;/bean&gt;
+&lt;/beans&gt;</pre>
+
+<p>&nbsp;</p>
+
+<p>（&nbsp;3&nbsp;）定义一个返回的逻辑视图名称为在&nbsp;XmlViewResolver&nbsp;配置文件中定义的视图名称&mdash;&mdash;&nbsp;internalResource&nbsp;。</p>
+
+<pre>
+@RequestMapping(&quot;/xmlViewResolver&quot;)
+    public String testXmlViewResolver() {
+       return &quot;internalResource&quot;;
+    }</pre>
+
+<p>&nbsp;</p>
+
+<p>（&nbsp;4&nbsp;）这样当我们访问到上面定义好的&nbsp;testXmlViewResolver&nbsp;处理器方法的时候返回的逻辑视图名称为&ldquo;&nbsp;internalResource&nbsp;&rdquo;，这时候&nbsp;Spring&nbsp;就会到定义好的&nbsp;views.xml&nbsp;中寻找&nbsp;id&nbsp;或&nbsp;name为&ldquo;&nbsp;internalResource&nbsp;&rdquo;的&nbsp;bean&nbsp;对象予以返回，这里&nbsp;Spring&nbsp;找到的是一个&nbsp;url&nbsp;为&ldquo;&nbsp;/index.jsp&rdquo;的&nbsp;InternalResourceView&nbsp;对象。</p>
+
+<p><strong>BeanNameViewResolver&nbsp;</strong>：这个视图解析器跟&nbsp;XmlViewResolver&nbsp;有点类似，也是通过把返回的逻辑视图名称去匹配定义好的视图&nbsp;bean&nbsp;对象。不同点有二，一是&nbsp;BeanNameViewResolver&nbsp;要求视图&nbsp;bean&nbsp;对象都定义在&nbsp;Spring&nbsp;的&nbsp;application context&nbsp;中，而&nbsp;XmlViewResolver&nbsp;是在指定的配置文件中寻找视图&nbsp;bean&nbsp;对象，二是&nbsp;BeanNameViewResolver&nbsp;不会进行视图缓存。看一个例子，在&nbsp;SpringMVC&nbsp;的配置文件中定义了一个&nbsp;BeanNameViewResolver&nbsp;视图解析器和一个&nbsp;id&nbsp;为&nbsp;test&nbsp;的InternalResourceview bean&nbsp;对象。</p>
+
+<pre>
+&lt;bean class=&quot;org.springframework.web.servlet.view.BeanNameViewResolver&quot;&gt;
+       &lt;property name=&quot;order&quot; value=&quot;1&quot;/&gt;
+    &lt;/bean&gt;
+
+    &lt;bean id=&quot;test&quot; class=&quot;org.springframework.web.servlet.view.InternalResourceView&quot;&gt;
+       &lt;property name=&quot;url&quot; value=&quot;/index.jsp&quot;/&gt;
+    &lt;/bean&gt;</pre>
+
+<p>&nbsp;</p>
+
+<p>这样当返回的逻辑视图名称是&nbsp;test&nbsp;的时候，就会解析为上面定义好&nbsp;id&nbsp;为&nbsp;test&nbsp;的&nbsp;InternalResourceView&nbsp;。</p>
+
+<p><strong>ResourceBundleViewResolver&nbsp;</strong>：它和&nbsp;XmlViewResolver&nbsp;一样，也是继承自&nbsp;AbstractCachingViewResolver&nbsp;，但是它缓存的不是视图，这个会在后面有说到。和&nbsp;XmlViewResolver&nbsp;一样它也需要有一个配置文件来定义逻辑视图名称和真正的&nbsp;View&nbsp;对象的对应关系，不同的是&nbsp;ResourceBundleViewResolver&nbsp;的配置文件是一个属性文件，而且必须是放在&nbsp;classpath&nbsp;路径下面的，默认情况下这个配置文件是在&nbsp;classpath&nbsp;根目录下的&nbsp;views.properties&nbsp;文件，如果不使用默认值的话，则可以通过属性&nbsp;baseName&nbsp;或&nbsp;baseNames&nbsp;来指定。&nbsp;baseName&nbsp;只是指定一个基名称，&nbsp;Spring&nbsp;会在指定的&nbsp;classpath&nbsp;根目录下寻找以指定的&nbsp;baseName&nbsp;开始的属性文件进行&nbsp;View&nbsp;解析，如指定的&nbsp;baseName&nbsp;是&nbsp;base&nbsp;，那么&nbsp;base.properties&nbsp;、&nbsp;baseabc.properties&nbsp;等等以&nbsp;base&nbsp;开始的属性文件都会被&nbsp;Spring&nbsp;当做&nbsp;ResourceBundleViewResolver&nbsp;解析视图的资源文件。&nbsp;ResourceBundleViewResolver&nbsp;使用的属性配置文件的内容类似于这样：</p>
+
+<pre>
+resourceBundle.(class)=org.springframework.web.servlet.view.InternalResourceView
+resourceBundle.url=/index.jsp
+test.(class)=org.springframework.web.servlet.view.InternalResourceView
+test.url=/test.jsp</pre>
+
+<p>&nbsp;</p>
+
+<p>在这个配置文件中我们定义了两个&nbsp;InternalResourceView&nbsp;对象，一个的名称是&nbsp;resourceBundle，对应&nbsp;URL&nbsp;是&nbsp;/index.jsp&nbsp;，另一个名称是&nbsp;test&nbsp;，对应的&nbsp;URL&nbsp;是&nbsp;/test.jsp&nbsp;。从这个定义来看我们可以知道&nbsp;resourceBundle&nbsp;是对应的视图名称，使用&nbsp;resourceBundle.(class)&nbsp;来指定它对应的视图类型，&nbsp;resourceBundle.url&nbsp;指定这个视图的&nbsp;url&nbsp;属性。会思考的读者看到这里可能会有这样一个问题：为什么&nbsp;resourceBundle&nbsp;的&nbsp;class&nbsp;属性要用小括号包起来，而它的&nbsp;url&nbsp;属性就不需要呢？这就需要从&nbsp;ResourceBundleViewResolver&nbsp;进行视图解析的方法来说了。&nbsp;ResourceBundleViewResolver还是通过&nbsp;bean&nbsp;工厂来获得对应视图名称的视图&nbsp;bean&nbsp;对象来解析视图的。那么这些&nbsp;bean&nbsp;从哪里来呢？就是从我们定义的&nbsp;properties&nbsp;属性文件中来。在&nbsp;ResourceBundleViewResolver&nbsp;第一次进行视图解析的时候会先&nbsp;new&nbsp;一个&nbsp;BeanFactory&nbsp;对象，然后把&nbsp;properties&nbsp;文件中定义好的属性按照它自身的规则生成一个个的&nbsp;bean&nbsp;对象注册到该&nbsp;BeanFactory&nbsp;中，之后会把该&nbsp;BeanFactory&nbsp;对象保存起来，所以&nbsp;ResourceBundleViewResolver&nbsp;缓存的是&nbsp;BeanFactory&nbsp;，而不是直接的缓存从&nbsp;BeanFactory&nbsp;中取出的视图&nbsp;bean&nbsp;。然后会从&nbsp;bean&nbsp;工厂中取出名称为逻辑视图名称的视图&nbsp;bean&nbsp;进行返回。接下来就讲讲&nbsp;Spring&nbsp;通过&nbsp;properties&nbsp;文件生成&nbsp;bean&nbsp;的规则。它会把&nbsp;properties&nbsp;文件中定义的属性名称按最后一个点&ldquo;&nbsp;.&nbsp;&rdquo;进行分割，把点前面的内容当做是&nbsp;bean&nbsp;名称，点后面的内容当做是&nbsp;bean&nbsp;的属性。这其中有几个特别的属性，&nbsp;Spring&nbsp;把它们用小括号包起来了，这些特殊的属性一般是对应的&nbsp;attribute&nbsp;，但不是&nbsp;bean&nbsp;对象所有的&nbsp;attribute&nbsp;都可以这样用。其中&nbsp;(class)&nbsp;是一个，除了&nbsp;(class)&nbsp;之外，还有&nbsp;(scope)&nbsp;、&nbsp;(parent)&nbsp;、&nbsp;(abstract)&nbsp;、&nbsp;(lazy-init)&nbsp;。而除了这些特殊的属性之外的其他属性，&nbsp;Spring&nbsp;会把它们当做&nbsp;bean&nbsp;对象的一般属性进行处理，就是&nbsp;bean&nbsp;对象对应的&nbsp;property&nbsp;。所以根据上面的属性配置文件将生成如下两个&nbsp;bean&nbsp;对象：</p>
+
+<pre>
+&lt;bean id=&quot;resourceBundle&quot; class=&quot;org.springframework.web.servlet.view.InternalResourceView&quot;&gt;
+       &lt;property name=&quot;url&quot; value=&quot;/index.jsp&quot;/&gt;
+    &lt;/bean&gt;
+
+    &lt;bean id=&quot;test&quot; class=&quot;org.springframework.web.servlet.view.InternalResourceView&quot;&gt;
+       &lt;property name=&quot;url&quot; value=&quot;/test.jsp&quot;/&gt;
+    &lt;/bean&gt;</pre>
+
+<p>&nbsp;</p>
+
+<p>从&nbsp;ResourceBundleViewResolver&nbsp;使用的配置文件我们可以看出，它和&nbsp;XmlViewResolver&nbsp;一样可以解析多种不同类型的&nbsp;View&nbsp;，因为它们的&nbsp;View&nbsp;是通过配置的方式指定的，这也就意味着我们可以指定&nbsp;A&nbsp;视图是&nbsp;InternalResourceView&nbsp;，&nbsp;B&nbsp;视图是&nbsp;JstlView&nbsp;。</p>
+
+<p>来看下面这个一个例子，我在&nbsp;SpringMVC&nbsp;的配置文件中定义了一个&nbsp;ResourceBundleViewResolver&nbsp;对象，指定其&nbsp;baseName&nbsp;为&nbsp;views&nbsp;，然后&nbsp;order&nbsp;为&nbsp;1&nbsp;。</p>
+
+<pre>
+&lt;bean class=&quot;org.springframework.web.servlet.view.ResourceBundleViewResolver&quot;&gt;
+       &lt;property name=&quot;basename&quot; value=&quot;views&quot;/&gt;
+       &lt;property name=&quot;order&quot; value=&quot;1&quot;/&gt;
+    &lt;/bean&gt;</pre>
+
+<p>&nbsp;</p>
+
+<p>我在&nbsp;classpath&nbsp;的根目录下有两个属性文件，一个是&nbsp;views.properties&nbsp;，一个是&nbsp;views_abc.properties&nbsp;，它们的内容分别如下：</p>
+
+<p>views.properties&nbsp;：</p>
+
+<pre>
+resourceBundle.(class)=org.springframework.web.servlet.view.InternalResourceView
+resourceBundle.url=/index.jsp
+test.(class)=org.springframework.web.servlet.view.InternalResourceView
+test.url=/test.jsp</pre>
+
+<p>&nbsp;</p>
+
+<p>views_abc.properties&nbsp;：</p>
+
+<pre>
+abc.(class)=org.springframework.web.servlet.view.InternalResourceView
+abc.url=/abc.jsp</pre>
+
+<p>&nbsp;</p>
+
+<p>定义了如下这样一个&nbsp;Controller&nbsp;，它有三个处理器方法。</p>
+
+<pre>
+@Controller
+@RequestMapping(&quot;/mytest&quot;)
+public class MyController {
+    @RequestMapping(&quot;resourceBundle&quot;)
+    public String resourceBundle() {
+       return &quot;resourceBundle&quot;;
+    }
+
+    @RequestMapping(&quot;testResourceBundle&quot;)
+    public String testResourceBundle() {
+       return &quot;test&quot;;
+    }
+
+    @RequestMapping(&quot;abc&quot;)
+    public String abc() {
+       return &quot;abc&quot;;
+    }
+
+}</pre>
+
+<p>那么当我们请求&nbsp;/mytest/resourceBundle.do&nbsp;的时候，&nbsp;ResourceBundleViewResolver&nbsp;会首先尝试着来解析该视图，这里&nbsp;Controller&nbsp;处理器方法返回的逻辑视图名称是&nbsp;resourceBundle&nbsp;，&nbsp;ResourceBundleViewResolver&nbsp;按照上面提到的解析方法进行解析，这个时候它发现它是可以解析的，然后就返回了一个&nbsp;url&nbsp;为&nbsp;/index.jsp&nbsp;的&nbsp;InternalResourceView&nbsp;对象。同样，请求&nbsp;/mytest/testResourceBundle.do&nbsp;返回的逻辑视图&nbsp;test&nbsp;和&nbsp;/mytest/abc.do&nbsp;返回的逻辑视图&nbsp;abc&nbsp;它都可以解析。当我们把&nbsp;basename&nbsp;指定为包的形式，如&ldquo;&nbsp;com.tiantian.views&nbsp;&rdquo;，的时候&nbsp;Spring&nbsp;会按照点&ldquo;&nbsp;.&nbsp;&rdquo;划分为目录的形式，到&nbsp;classpath&nbsp;相应目录下去寻找&nbsp;basename&nbsp;开始的配置文件，如上面我们指定&nbsp;basename&nbsp;为&ldquo;&nbsp;com.tiantian.views&nbsp;&rdquo;，那么&nbsp;spring&nbsp;就会到&nbsp;classpath&nbsp;下的&nbsp;com/tiantian&nbsp;目录下寻找文件名以&nbsp;views&nbsp;开始的&nbsp;properties&nbsp;文件作为解析视图的配置文件。</p>
+
+<p><strong>FreeMarkerViewResolver&nbsp;</strong><strong>、&nbsp;</strong><strong>VolocityViewResolver&nbsp;</strong>：这两个视图解析器都是&nbsp;UrlBasedViewResolver&nbsp;的子类。&nbsp;FreeMarkerViewResolver&nbsp;会把&nbsp;Controller&nbsp;处理方法返回的逻辑视图解析为&nbsp;FreeMarkerView&nbsp;，而&nbsp;VolocityViewResolver&nbsp;会把返回的逻辑视图解析为&nbsp;VolocityView&nbsp;。因为这两个视图解析器类似，所以这里我就只挑&nbsp;FreeMarkerViewResolver&nbsp;来做一个简单的讲解。&nbsp;FreeMarkerViewResolver&nbsp;和&nbsp;VilocityViewResolver&nbsp;都继承了&nbsp;UrlBasedViewResolver&nbsp;。</p>
+
+<p>对于&nbsp;FreeMarkerViewResolver&nbsp;而言，它会按照&nbsp;UrlBasedViewResolver&nbsp;拼接&nbsp;URL&nbsp;的方式进行视图路径的解析。但是使用&nbsp;FreeMarkerViewResolver&nbsp;的时候不需要我们指定其&nbsp;viewClass&nbsp;，因为&nbsp;FreeMarkerViewResolver&nbsp;中已经把&nbsp;viewClass&nbsp;定死为&nbsp;FreeMarkerView&nbsp;了。</p>
+
+<p>我们先在&nbsp;SpringMVC&nbsp;的配置文件里面定义一个&nbsp;FreeMarkerViewResolver&nbsp;视图解析器，并定义其解析视图的&nbsp;order&nbsp;顺序为&nbsp;1&nbsp;。</p>
+
+<pre>
+&lt;bean class=&quot;org.springframework.web.servlet.view.freemarker.FreeMarkerViewResolver&quot;&gt;
+       &lt;property name=&quot;prefix&quot; value=&quot;fm_&quot;/&gt;
+       &lt;property name=&quot;suffix&quot; value=&quot;.ftl&quot;/&gt;
+       &lt;property name=&quot;order&quot; value=&quot;1&quot;/&gt;
+&lt;/bean&gt;</pre>
+
+<p>那么当我们请求的处理器方法返回一个逻辑视图名称&nbsp;viewName&nbsp;的时候，就会被该视图处理器加上前后缀解析为一个&nbsp;url&nbsp;为&ldquo;&nbsp;fm_viewName.ftl&nbsp;&rdquo;的&nbsp;FreeMarkerView&nbsp;对象。对于&nbsp;FreeMarkerView&nbsp;我们需要给定一个&nbsp;FreeMarkerConfig&nbsp;的&nbsp;bean&nbsp;对象来定义&nbsp;FreeMarker&nbsp;的配置信息。&nbsp;FreeMarkerConfig&nbsp;是一个接口，&nbsp;Spring&nbsp;已经为我们提供了一个实现，它就是&nbsp;FreeMarkerConfigurer&nbsp;。我们可以通过在&nbsp;SpringMVC&nbsp;的配置文件里面定义该&nbsp;bean&nbsp;对象来定义&nbsp;FreeMarker&nbsp;的配置信息，该配置信息将会在&nbsp;FreeMarkerView&nbsp;进行渲染的时候使用到。对于&nbsp;FreeMarkerConfigurer&nbsp;而言，我们最简单的配置就是配置一个&nbsp;templateLoaderPath&nbsp;，告诉&nbsp;Spring&nbsp;应该到哪里寻找&nbsp;FreeMarker&nbsp;的模板文件。这个&nbsp;templateLoaderPath&nbsp;也支持使用&ldquo;&nbsp;classpath:&nbsp;&rdquo;和&ldquo;&nbsp;file:&nbsp;&rdquo;前缀。当&nbsp;FreeMarker&nbsp;的模板文件放在多个不同的路径下面的时候，我们可以使用&nbsp;templateLoaderPaths&nbsp;属性来指定多个路径。在这里我们指定模板文件是放在&ldquo;&nbsp;/WEB-INF/freemarker/template&nbsp;&rdquo;下面的。</p>
+
+<pre>
+&lt;bean class=&quot;org.springframework.web.servlet.view.freemarker.FreeMarkerConfigurer&quot;&gt;
+   &lt;property name=&quot;templateLoaderPath&quot; value=&quot;/WEB-INF/freemarker/template&quot;/&gt;
+&lt;/bean&gt;</pre>
+
+<p>接下来我们定义如下一个&nbsp;Controller&nbsp;：</p>
+
+<pre>
+@Controller
+@RequestMapping(&quot;/mytest&quot;)
+public class MyController {
+
+    @RequestMapping(&quot;freemarker&quot;)
+    public ModelAndView freemarker() {
+       ModelAndView mav = new ModelAndView();
+       mav.addObject(&quot;hello&quot;, &quot;andy&quot;);
+       mav.setViewName(&quot;freemarker&quot;);
+       return mav;
+    }
+
+}</pre>
+
+<p>由上面的定义我们可以看到这个&nbsp;Controller&nbsp;的处理器方法&nbsp;freemarker&nbsp;返回的逻辑视图名称是&ldquo;&nbsp;freemarker&nbsp;&rdquo;。那么如果我们需要把该&nbsp;freemarker&nbsp;视图交给&nbsp;FreeMarkerViewResolver&nbsp;来解析的话，我们就需要根据上面的定义，在模板路径下定义视图对应的模板，即在&ldquo;&nbsp;/WEB-INF/freemarker/template&nbsp;&rdquo;目录下建立&nbsp;fm_freemarker.ftl&nbsp;模板文件。这里我们定义其内容如下：</p>
+
+<pre>
+&lt;html&gt;
+    &lt;head&gt;
+       &lt;title&gt;FreeMarker&lt;/title&gt;
+    &lt;/head&gt;
+    &lt;body&gt;
+       &lt;b&gt;Hello World&lt;/b&gt;
+       &lt;font color=&quot;red&quot;&gt;Hello World!&lt;/font&gt;
+       ${hello}
+    &lt;/body&gt;
+&lt;/html&gt;</pre>
+
+<p>经过上面的定义当我们访问&nbsp;/mytest/freemarker.do&nbsp;的时候就会返回一个逻辑视图名称为&ldquo;&nbsp;freemarker&nbsp;&rdquo;的&nbsp;ModelAndView&nbsp;对象，根据定义好的视图解析的顺序，首先进行视图解析的是&nbsp;FreeMarkerViewResolver&nbsp;，这个时候&nbsp;FreeMarkerViewResolver&nbsp;会试着解析该视图，根据它自身的定义，它会先解析到该视图的&nbsp;URL&nbsp;为&nbsp;fm_freemarker.ftl&nbsp;，然后它会看是否能够实例化该视图对象，即在定义好的模板路径下是否有该模板存在，如果有则返回该模板对应的&nbsp;FreeMarkerView&nbsp;。在这里的话&nbsp;/WEB-INF/freemarker/template&nbsp;目录下是存在模板文件&nbsp;fm_freemarker.ftl&nbsp;的，所以会返回一个&nbsp;url&nbsp;为&nbsp;fm_freemarker.ftl&nbsp;的&nbsp;FreeMarkerView&nbsp;对象。接着&nbsp;FreeMarkerView&nbsp;就可以利用该模板文件进行视图的渲染了。所以访问结果应该如下所示：&nbsp;<br />
+<img alt="" src="http://img1.tuicool.com/aQBZ7r.png!web" />&nbsp;</p>
+
+<h2>视图解析器链</h2>
+
+<p>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;在&nbsp;SpringMVC&nbsp;中可以同时定义多个&nbsp;ViewResolver&nbsp;视图解析器，然后它们会组成一个&nbsp;ViewResolver&nbsp;链。当&nbsp;Controller&nbsp;处理器方法返回一个逻辑视图名称后，&nbsp;ViewResolver&nbsp;链将根据其中&nbsp;ViewResolver&nbsp;的优先级来进行处理。所有的&nbsp;ViewResolver&nbsp;都实现了&nbsp;Ordered&nbsp;接口，在&nbsp;Spring&nbsp;中实现了这个接口的类都是可以排序的。在&nbsp;ViewResolver&nbsp;中是通过&nbsp;order&nbsp;属性来指定顺序的，默认都是最大值。所以我们可以通过指定&nbsp;ViewResolver&nbsp;的&nbsp;order&nbsp;属性来实现&nbsp;ViewResolver&nbsp;的优先级，&nbsp;order&nbsp;属性是&nbsp;Integer&nbsp;类型，&nbsp;order&nbsp;越小，对应的&nbsp;ViewResolver&nbsp;将有越高的解析视图的权利，所以第一个进行解析的将是&nbsp;ViewResolver&nbsp;链中&nbsp;order&nbsp;值最小的那个。当一个&nbsp;ViewResolver&nbsp;在进行视图解析后返回的&nbsp;View&nbsp;对象是&nbsp;null&nbsp;的话就表示该&nbsp;ViewResolver&nbsp;不能解析该视图，这个时候如果还存在其他&nbsp;order&nbsp;值比它大的&nbsp;ViewResolver&nbsp;就会调用剩余的&nbsp;ViewResolver&nbsp;中的&nbsp;order&nbsp;值最小的那个来解析该视图，依此类推。当&nbsp;ViewResolver&nbsp;在进行视图解析后返回的是一个非空的&nbsp;View&nbsp;对象的时候，就表示该&nbsp;ViewResolver&nbsp;能够解析该视图，那么视图解析这一步就完成了，后续的&nbsp;ViewResolver&nbsp;将不会再用来解析该视图。当定义的所有&nbsp;ViewResolver&nbsp;都不能解析该视图的时候，&nbsp;Spring就会抛出一个异常。</p>
+
+<p>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;基于&nbsp;Spring&nbsp;支持的这种&nbsp;ViewResolver&nbsp;链模式，我们就可以在&nbsp;SpringMVC&nbsp;应用中同时定义多个&nbsp;ViewResolver&nbsp;，给定不同的&nbsp;order&nbsp;值，这样我们就可以对特定的视图特定处理，以此来支持同一应用中有多种视图类型。注意：像&nbsp;InternalResourceViewResolver&nbsp;这种能解析所有的视图，即永远能返回一个非空&nbsp;View&nbsp;对象的&nbsp;ViewResolver&nbsp;一定要把它放在&nbsp;ViewResolver&nbsp;链的最后面。</p>
+
+<pre>
+    &lt;bean class=&quot;org.springframework.web.servlet.view.XmlViewResolver&quot;&gt;
+       &lt;property name=&quot;location&quot; value=&quot;/WEB-INF/views.xml&quot;/&gt;
+       &lt;property name=&quot;order&quot; value=&quot;1&quot;/&gt;
+    &lt;/bean&gt;
+
+    &lt;bean
+       class=&quot;org.springframework.web.servlet.view.UrlBasedViewResolver&quot;&gt;
+       &lt;property name=&quot;prefix&quot; value=&quot;/WEB-INF/&quot; /&gt;
+       &lt;property name=&quot;suffix&quot; value=&quot;.jsp&quot; /&gt;
+       &lt;property name=&quot;viewClass&quot; value=&quot;org.springframework.web.servlet.view.InternalResourceView&quot;/&gt;
+    &lt;/bean&gt;</pre>
