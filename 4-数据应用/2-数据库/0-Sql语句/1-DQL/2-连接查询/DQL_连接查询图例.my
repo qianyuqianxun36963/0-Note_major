@@ -1,0 +1,445 @@
+<h1><a href="https://segmentfault.com/a/1190000010871612">【MySQL笔记】七种JOIN的SQL</a></h1>
+
+<h2>准备数据</h2>
+
+<p>以一个简易问答系统为例，包括问题表和问题所属标签，问题表如下：</p>
+
+<pre>
+<code>CREATE TABLE `t_qa` (
+  `id` bigint(20) NOT NULL AUTO_INCREMENT,
+  `title` varchar(200) NOT NULL DEFAULT &#39;&#39; COMMENT &#39;标题&#39;,
+  `answer_count` int(5) unsigned NOT NULL DEFAULT &#39;0&#39; COMMENT &#39;回答个数&#39;,
+  `label_id` bigint(20) unsigned NOT NULL DEFAULT &#39;0&#39; COMMENT &#39;标签id&#39;,
+  `create_by` bigint(20) unsigned NOT NULL DEFAULT &#39;0&#39; COMMENT &#39;创建人&#39;,
+  `create_date` datetime NOT NULL DEFAULT &#39;0000-00-00 00:00:00&#39; COMMENT &#39;创建时间&#39;,
+  `update_by` bigint(20) unsigned DEFAULT NULL COMMENT &#39;更新人&#39;,
+  `update_date` datetime DEFAULT NULL COMMENT &#39;更新时间&#39;,
+  `del_flag` tinyint(1) unsigned NOT NULL DEFAULT &#39;0&#39; COMMENT &#39;0：不删除，1：删除&#39;,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+
+INSERT INTO `t_qa` (`id`, `title`, `answer_count`, `label_id`, `create_by`, `create_date`, `update_by`, `update_date`, `del_flag`)
+VALUES
+    (1, &#39;Java是什么？&#39;, 5, 1, 0, &#39;2017-08-24 17:43:53&#39;, 0, &#39;2017-08-24 17:43:53&#39;, 0),
+    (2, &#39;PHP是什么？&#39;, 4, 2, 0, &#39;2017-08-24 17:43:53&#39;, 0, &#39;2017-08-24 17:43:53&#39;, 0),
+    (3, &#39;前端是什么？&#39;, 3, 3, 0, &#39;2017-08-24 17:43:53&#39;, 0, &#39;2017-08-24 17:43:53&#39;, 0),
+    (4, &#39;nodejs是什么？&#39;, 2, 0, 0, &#39;2017-08-24 17:43:53&#39;, 0, &#39;2017-08-24 17:43:53&#39;, 0),
+    (5, &#39;css是什么？&#39;, 1, 0, 0, &#39;2017-08-24 17:43:53&#39;, 0, &#39;2017-08-24 17:43:53&#39;, 0),
+    (6, &#39;JavaScript是什么？&#39;, 0, 0, 0, &#39;2017-08-24 17:43:53&#39;, 0, &#39;2017-08-24 17:43:53&#39;, 0);
+</code></pre>
+
+<p>标签表如下：</p>
+
+<pre>
+<code>CREATE TABLE `t_label` (
+  `id` bigint(20) NOT NULL AUTO_INCREMENT,
+  `name` varchar(50) NOT NULL DEFAULT &#39;&#39; COMMENT &#39;名称&#39;,
+  `create_by` bigint(20) unsigned NOT NULL DEFAULT &#39;0&#39; COMMENT &#39;创建人&#39;,
+  `create_date` datetime NOT NULL DEFAULT &#39;0000-00-00 00:00:00&#39; COMMENT &#39;创建时间&#39;,
+  `update_by` bigint(20) unsigned DEFAULT NULL COMMENT &#39;更新人&#39;,
+  `update_date` datetime DEFAULT NULL COMMENT &#39;更新时间&#39;,
+  `del_flag` tinyint(1) unsigned NOT NULL DEFAULT &#39;0&#39; COMMENT &#39;0：不删除，1：删除&#39;,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+
+INSERT INTO `t_label` (`id`, `name`, `create_by`, `create_date`, `update_by`, `update_date`, `del_flag`)
+VALUES
+    (1, &#39;java&#39;, 0, &#39;2017-08-24 17:43:53&#39;, 0, &#39;2017-08-24 17:43:53&#39;, 0),
+    (2, &#39;php&#39;, 0, &#39;2017-08-24 17:43:53&#39;, 0, &#39;2017-08-24 17:43:53&#39;, 0),
+    (3, &#39;大前端&#39;, 0, &#39;2017-08-24 17:43:53&#39;, 0, &#39;2017-08-24 17:43:53&#39;, 0),
+    (4, &#39;mybatis&#39;, 0, &#39;2017-08-24 17:43:53&#39;, 0, &#39;2017-08-24 17:43:53&#39;, 0),
+    (5, &#39;python&#39;, 0, &#39;2017-08-24 17:43:53&#39;, 0, &#39;2017-08-24 17:43:53&#39;, 0),
+    (6, &#39;多线程&#39;, 0, &#39;2017-08-24 17:43:53&#39;, 0, &#39;2017-08-24 17:43:53&#39;, 0);
+</code></pre>
+
+<h2>一、左连接（LEFT JOIN）</h2>
+
+<p><img src="https://segmentfault.com/img/bVTLZy?w=333&amp;h=200" /></p>
+
+<table>
+	<thead>
+		<tr>
+			<th>问题</th>
+			<th>回答个数</th>
+			<th>标签id</th>
+			<th>标签名称</th>
+		</tr>
+	</thead>
+	<tbody>
+		<tr>
+			<td>Java是什么？</td>
+			<td>5</td>
+			<td>1</td>
+			<td><code>java</code></td>
+		</tr>
+		<tr>
+			<td>PHP是什么？</td>
+			<td>4</td>
+			<td>2</td>
+			<td><code>php</code></td>
+		</tr>
+		<tr>
+			<td>前端是什么？</td>
+			<td>3</td>
+			<td>3</td>
+			<td><code>大前端</code></td>
+		</tr>
+		<tr>
+			<td>nodejs是什么？</td>
+			<td>2</td>
+			<td>NULL</td>
+			<td>NULL</td>
+		</tr>
+		<tr>
+			<td>css是什么？</td>
+			<td>1</td>
+			<td>NULL</td>
+			<td>NULL</td>
+		</tr>
+		<tr>
+			<td>JavaScript是什么？</td>
+			<td>1</td>
+			<td>NULL</td>
+			<td>NULL</td>
+		</tr>
+	</tbody>
+</table>
+
+<pre>
+<code>SELECT 
+    tq.title, tq.answer_count, tl.id, tl.name
+FROM 
+    t_qa tq LEFT JOIN t_label tl ON tq.label_id = tl.id</code></pre>
+
+<h2>二、右连接（RIGHT JOIN）</h2>
+
+<p><img src="https://segmentfault.com/img/bVTLZD?w=333&amp;h=200" /></p>
+
+<table>
+	<thead>
+		<tr>
+			<th>问题</th>
+			<th>回答个数</th>
+			<th>标签id</th>
+			<th>标签名称</th>
+		</tr>
+	</thead>
+	<tbody>
+		<tr>
+			<td>Java是什么？</td>
+			<td>5</td>
+			<td>1</td>
+			<td><code>java</code></td>
+		</tr>
+		<tr>
+			<td>PHP是什么？</td>
+			<td>4</td>
+			<td>2</td>
+			<td><code>php</code></td>
+		</tr>
+		<tr>
+			<td>前端是什么？</td>
+			<td>3</td>
+			<td>3</td>
+			<td><code>大前端</code></td>
+		</tr>
+		<tr>
+			<td>NULL</td>
+			<td>NULL</td>
+			<td>4</td>
+			<td><code>mybatis</code></td>
+		</tr>
+		<tr>
+			<td>NULL</td>
+			<td>NULL</td>
+			<td>5</td>
+			<td><code>python</code></td>
+		</tr>
+		<tr>
+			<td>NULL</td>
+			<td>NULL</td>
+			<td>6</td>
+			<td><code>多线程</code></td>
+		</tr>
+	</tbody>
+</table>
+
+<pre>
+<code>SELECT 
+    tq.title, tq.answer_count, tl.id, tl.name
+FROM 
+    t_qa tq RIGHT JOIN t_label tl ON tq.label_id = tl.id</code></pre>
+
+<h2>三、内连接（INNER JOIN）</h2>
+
+<p><img src="https://segmentfault.com/img/bVTMhV?w=333&amp;h=200" /></p>
+
+<table>
+	<thead>
+		<tr>
+			<th>问题</th>
+			<th>回答个数</th>
+			<th>标签id</th>
+			<th>标签名称</th>
+		</tr>
+	</thead>
+	<tbody>
+		<tr>
+			<td>Java是什么？</td>
+			<td>5</td>
+			<td>1</td>
+			<td><code>java</code></td>
+		</tr>
+		<tr>
+			<td>PHP是什么？</td>
+			<td>4</td>
+			<td>2</td>
+			<td><code>php</code></td>
+		</tr>
+		<tr>
+			<td>前端是什么？</td>
+			<td>3</td>
+			<td>3</td>
+			<td><code>大前端</code></td>
+		</tr>
+	</tbody>
+</table>
+
+<pre>
+<code>SELECT 
+    tq.title, tq.answer_count, tl.id, tl.name
+FROM 
+    t_qa tq INNER JOIN t_label tl ON tq.label_id = tl.id</code></pre>
+
+<h2>四、左独有连接（LEFT JOIN）</h2>
+
+<p><img src="https://segmentfault.com/img/bVTMiI?w=333&amp;h=200" /></p>
+
+<table>
+	<thead>
+		<tr>
+			<th>问题</th>
+			<th>回答个数</th>
+			<th>标签id</th>
+			<th>标签名称</th>
+		</tr>
+	</thead>
+	<tbody>
+		<tr>
+			<td>nodejs是什么？</td>
+			<td>2</td>
+			<td>NULL</td>
+			<td>NULL</td>
+		</tr>
+		<tr>
+			<td>css是什么？</td>
+			<td>1</td>
+			<td>NULL</td>
+			<td>NULL</td>
+		</tr>
+		<tr>
+			<td>JavaScript是什么？</td>
+			<td>0</td>
+			<td>NULL</td>
+			<td>NULL</td>
+		</tr>
+	</tbody>
+</table>
+
+<pre>
+<code>SELECT 
+    tq.title, tq.answer_count, tl.id, tl.name
+FROM 
+    t_qa tq LEFT JOIN t_label tl ON tq.label_id = tl.id
+WHERE
+    tl.id IS NULL</code></pre>
+
+<h2>五、右独有连接（RIGHT JOIN）</h2>
+
+<p><img src="https://segmentfault.com/img/bVTMiO?w=333&amp;h=200" /></p>
+
+<table>
+	<thead>
+		<tr>
+			<th>问题</th>
+			<th>回答个数</th>
+			<th>标签id</th>
+			<th>标签名称</th>
+		</tr>
+	</thead>
+	<tbody>
+		<tr>
+			<td>NULL</td>
+			<td>NULL</td>
+			<td>4</td>
+			<td><code>mybatis</code></td>
+		</tr>
+		<tr>
+			<td>NULL</td>
+			<td>NULL</td>
+			<td>5</td>
+			<td><code>python</code></td>
+		</tr>
+		<tr>
+			<td>NULL</td>
+			<td>NULL</td>
+			<td>6</td>
+			<td><code>多线程</code></td>
+		</tr>
+	</tbody>
+</table>
+
+<pre>
+<code>SELECT 
+    tq.title, tq.answer_count, tl.id, tl.name
+FROM 
+    t_qa tq RIGHT JOIN t_label tl ON tq.label_id = tl.id
+WHERE
+    tq.label_id IS NULL</code></pre>
+
+<h2>六、全连接（FULL JOIN）</h2>
+
+<p><img src="https://segmentfault.com/img/bVTMl3?w=333&amp;h=200" /></p>
+
+<p>由于MySQL不支持<code>FULL OUTER JOIN</code>，所以如果有全连接需求时，可用表达式：<code>full outer join = left outer join UNION right outer join</code>来实现。</p>
+
+<table>
+	<thead>
+		<tr>
+			<th>问题</th>
+			<th>回答个数</th>
+			<th>标签id</th>
+			<th>标签名称</th>
+		</tr>
+	</thead>
+	<tbody>
+		<tr>
+			<td>Java是什么？</td>
+			<td>5</td>
+			<td>1</td>
+			<td><code>java</code></td>
+		</tr>
+		<tr>
+			<td>PHP是什么？</td>
+			<td>4</td>
+			<td>2</td>
+			<td><code>php</code></td>
+		</tr>
+		<tr>
+			<td>前端是什么？</td>
+			<td>3</td>
+			<td>3</td>
+			<td><code>大前端</code></td>
+		</tr>
+		<tr>
+			<td>nodejs是什么？</td>
+			<td>2</td>
+			<td>NULL</td>
+			<td>NULL</td>
+		</tr>
+		<tr>
+			<td>css是什么？</td>
+			<td>1</td>
+			<td>NULL</td>
+			<td>NULL</td>
+		</tr>
+		<tr>
+			<td>JavaScript是什么？</td>
+			<td>0</td>
+			<td>NULL</td>
+			<td>NULL</td>
+		</tr>
+		<tr>
+			<td>NULL</td>
+			<td>NULL</td>
+			<td>4</td>
+			<td><code>mybatis</code></td>
+		</tr>
+		<tr>
+			<td>NULL</td>
+			<td>NULL</td>
+			<td>5</td>
+			<td><code>python</code></td>
+		</tr>
+		<tr>
+			<td>NULL</td>
+			<td>NULL</td>
+			<td>6</td>
+			<td><code>多线程</code></td>
+		</tr>
+	</tbody>
+</table>
+
+<pre>
+<code>SELECT tq.title, tq.answer_count, tl.id, tl.name FROM t_qa tq LEFT JOIN t_label tl ON tq.label_id = tl.id
+UNION
+SELECT tq.title, tq.answer_count, tl.id, tl.name FROM t_qa tq RIGHT JOIN t_label tl ON tq.label_id = tl.id </code></pre>
+
+<h2>七、全连接去交集（FULL JOIN）</h2>
+
+<p><img src="https://segmentfault.com/img/bVTMmr?w=333&amp;h=200" /></p>
+
+<table>
+	<thead>
+		<tr>
+			<th>问题</th>
+			<th>回答个数</th>
+			<th>标签id</th>
+			<th>标签名称</th>
+		</tr>
+	</thead>
+	<tbody>
+		<tr>
+			<td>nodejs是什么？</td>
+			<td>2</td>
+			<td>NULL</td>
+			<td>NULL</td>
+		</tr>
+		<tr>
+			<td>css是什么？</td>
+			<td>1</td>
+			<td>NULL</td>
+			<td>NULL</td>
+		</tr>
+		<tr>
+			<td>JavaScript是什么？</td>
+			<td>0</td>
+			<td>NULL</td>
+			<td>NULL</td>
+		</tr>
+		<tr>
+			<td>NULL</td>
+			<td>NULL</td>
+			<td>4</td>
+			<td><code>mybatis</code></td>
+		</tr>
+		<tr>
+			<td>NULL</td>
+			<td>NULL</td>
+			<td>5</td>
+			<td><code>python</code></td>
+		</tr>
+		<tr>
+			<td>NULL</td>
+			<td>NULL</td>
+			<td>6</td>
+			<td><code>多线程</code></td>
+		</tr>
+	</tbody>
+</table>
+
+<pre>
+<code>SELECT tq.title, tq.answer_count, tl.id, tl.name FROM t_qa tq LEFT JOIN t_label tl ON tq.label_id = tl.id WHERE tl.id IS NULL
+UNION
+SELECT tq.title, tq.answer_count, tl.id, tl.name FROM t_qa tq RIGHT JOIN t_label tl ON tq.label_id = tl.id WHERE tq.label_id IS NULL</code>
+</pre>
+
+<p>本机练习代码：</p>
+
+<p>select * from student s LEFT outer JOIN studentcourse sc on s.studentid = sc.studentid<br />
+union<br />
+select * from student s Right outer JOIN studentcourse sc on s.studentid = sc.studentid</p>
+
+<p>&nbsp;</p>
+
+<p>注意，这里需要取出的字段，最后别太少，不然不显示多条。</p>
