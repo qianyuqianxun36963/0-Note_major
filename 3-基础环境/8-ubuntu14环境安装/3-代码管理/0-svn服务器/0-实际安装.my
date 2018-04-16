@@ -1,0 +1,127 @@
+<h1>Ubuntu 14.04 下搭建SVN服务器</h1>
+
+<h2>预先处理</h2>
+
+<p>直接输入 svn 查看是否已安装</p>
+
+<p>如果显示信息说明已安装，可以使用以下命令进行卸载：</p>
+
+<p>sudo apt-get remove --purge subversion</p>
+
+<p>(&ndash;purge 选项表示彻底删除改软件和相关文件)</p>
+
+<h2>安装软件包</h2>
+
+<p>sudo apt-get install subversion</p>
+
+<h2>新建目录</h2>
+
+<p>之后选择SVN服务文件及配置文件的放置位置。我放在了/srv下的svn目录。</p>
+
+<p>cd /srv</p>
+
+<p>sudo mkdir svn</p>
+
+<p>我的svn版本仓库叫 store</p>
+
+<p>cd /srv/svn</p>
+
+<p>sudo mkdir store</p>
+
+<h2>创建版本仓库</h2>
+
+<p>sudo svnadmin create /srv/svn/store</p>
+
+<p>执行之后 tone_src下文件结构如下：　　</p>
+
+<p>tone@ubuntu:/srv/svn/store$ ls -l<br />
+总用量 24<br />
+drwxr-xr-x 2 root root 4096&nbsp; 1月 15 10:52 conf<br />
+drwxr-sr-x 6 root root 4096&nbsp; 1月 15 14:52 db<br />
+-r--r--r-- 1 root root&nbsp; &nbsp; 2&nbsp; 1月 15 10:50 format<br />
+drwxr-xr-x 2 root root 4096&nbsp; 1月 15 10:50 hooks<br />
+drwxr-xr-x 2 root root 4096&nbsp; 1月 15 10:50 locks<br />
+-rw-r--r-- 1 root root&nbsp; 246&nbsp; 1月 15 10:50 README.txt</p>
+
+<h2>下面进行配置：</h2>
+
+<p>我们需要修改conf目录下的三个文件，authz;passwd;svnserve.conf</p>
+
+<h3>编辑svnserve.conf</h3>
+
+<p>[general]<br />
+#匿名用户不可读<br />
+anon-access = none<br />
+#权限用户可写<br />
+auth-access = write<br />
+#密码文件为passwd<br />
+password-db = <strong>passwd&nbsp;&nbsp;//与配置文件平级目录下文件名要保持一致。</strong><br />
+#权限文件为authz<br />
+authz-db = <strong>authz&nbsp; //与配置文件平级目录下文件名要保持一致。</strong></p>
+
+<h3>编辑authz 授权文件</h3>
+
+<p>编辑authz 制定管理员组 即admin组的用户为tone admin组有rw（读写权限） 所有人有r（读权限）</p>
+
+<p>[groups]<br />
+admin = wang,root,admin<br />
+visitor = visitor,chen</p>
+
+<p>[repository:store]<br />
+<strong>@</strong>admin &nbsp; = rw&nbsp; //注意这里的<strong>&#39;@&#39;</strong>，代表分组<br />
+<strong>@</strong>visitor = r</p>
+
+<p>[/jwpt]<br />
+admin = rw<br />
+* = r</p>
+
+<p>这里组的名字 不一定叫admin 你的管理员组名 可以叫做任意的名字，另外比如admin组还有其他用户，可以这样制定 admin=tone，tone1,tone2 类似这样的写法</p>
+
+<h3>编制passwd 文件</h3>
+
+<p>设定用户密码</p>
+
+<p>[users]<br />
+root &nbsp; &nbsp;= root<br />
+wang &nbsp; &nbsp;= wang<br />
+admin &nbsp; = admin<br />
+visitor = visitor</p>
+
+<p>root 的密码为 root 对 没看错 明文的。</p>
+
+<h2>启动svn服务</h2>
+
+<p>以上都做完之后，就可以开启你的svn服务器了。</p>
+
+<p>sudo svnserve -d -r [-T]&nbsp;/srv/svn/</p>
+
+<p>-d 已守护模式启动</p>
+
+<p>-T 表示以线程模式运行，增加效率</p>
+
+<p>-r 制定svn版本库根目录 这样是便于客户端不用输入全路径 就可以访问版本库了</p>
+
+<h2>访问svn服务</h2>
+
+<p>例如：svn：//127.0.0.1/store&nbsp;&nbsp;</p>
+
+<p>本机：svn://192.168.146.129/store 其实访问的就是&nbsp;/srv/svn/[启动参数里的]&nbsp;+ /store[此处的]&nbsp;目录下</p>
+
+<p>值得注意的是 我这里是用sudo 启动的&nbsp; 因为之前的svn目录 及tone_src目录 我都是在sudo下创建的。目录的所属权限都是root</p>
+
+<p>如果我以 下面的方式启动 是可以的 但是当客户段提交文件的时候 会出问题，因为此时的svnserve 服务对svn版本库目录没有写的权限<br />
+svnserve -d -r /erv/svn/</p>
+
+<p>&nbsp;</p>
+
+<h2>关于代码新建问题</h2>
+
+<p>sudo svnadmin create /srv/svn/store</p>
+
+<p>其实这里，store就是一个 <strong>名为store的repository&nbsp;</strong></p>
+
+<p><strong>何为repository，其实就是一个有着特定文件结构的文件夹！文件夹里包括conf文件，其中就包括了上文中的所有配置文件。</strong></p>
+
+<p><strong>即repository是一个可以独立授权的文件代码文件夹。</strong></p>
+
+<p><strong>在windows下，新建一个空白文件夹 -&gt; 右击-&gt; tortoiseSVN&nbsp;-&gt; create repository here&nbsp;-&gt; 此时目录下会出现特定文件结构。&nbsp;</strong></p>
