@@ -1,0 +1,305 @@
+<h1>Spring工作原理与单例</h1>
+
+<p>最近看到spring管理的bean为单例的，当它与web容器整合的时候始终搞不太清除，就网上搜索写资料，</p>
+
+<h2><strong>Tomcat与多线程</strong>，</h2>
+
+<p>servlet是多线程执行的，多线程是容器提供的能力。 servlet为了能并发执行， 是因为servlet被这些thread使用，tomcat里创建响应的socketServer线程类接收请求连接，然后在再创建或引用对应的servlet实例来处理请求连接。servlet是单例的，只创建一次。所以最好不要使用serlvet中的实例字段。</p>
+
+<p>spring中的bean对象默认是单例的，如果不想单例需要如下配置：</p>
+
+<p>　　&lt;bean id=&quot;user&quot; class=&quot;...&quot; singleton=&quot;false&quot;/&gt;</p>
+
+<p>　　<em><em><em>singleton就是配置这个bean是否是单例的，如果不写，就是默认值true</em></em></em></p>
+
+<p>当在多线程环境下，因为在spring中我们使用的bean都是无状态的&nbsp; 如service、dao，可以保证线程安全，如果你用如struts2 action&nbsp; 它可能是由状态的， 所以必须是prototype，当单例的bean需要有共享变量是，譬如使用一个并发队列，必须自己来保证线程安全问题，</p>
+
+<h2><strong>一、Spring单例模式与线程安全</strong></h2>
+
+<p>Spring框架里的bean，或者说组件，获取实例的时候都是<strong>默认的单例模式</strong>，这是在多线程开发的时候要尤其注意的地方。</p>
+
+<p>单例模式的意思就是只有一个实例。单例模式确保某一个类只有一个实例，而且自行实例化并向整个系统提供这个实例。这个类称为单例类。</p>
+
+<p>当多用户同时请求一个服务时，<strong>容器</strong>会给每一个请求分配一个线程，这是<strong>多个线程会并发执行</strong>该请求多对应的业务逻辑（<strong>成员方法</strong>），此时就要注意了，如果该处理逻辑中有对该单列状态的修改（体现为该单列的成员属性），则必须考虑线程同步问题。（看这个bean是否需要状态成员变量，秒杀中的并发队列是需要状态的一种情况）</p>
+
+<h3>同步机制的比较</h3>
+
+<p>ThreadLocal和线程同步机制相比有什么优势呢？ThreadLocal和线程同步机制都是为了解决多线程中相同变量的访问冲突问题。&nbsp;</p>
+
+<p>　　在同步机制中，通过<strong>对象的锁机制</strong>保证同一时间只有一个线程访问变量。这时该变量是多个线程共享的，使用同步机制要求程序慎密地分析什么时候对变量进行读写，什么时候需要锁定某个对象，什么时候释放对象锁等繁杂的问题，程序设计和编写难度相对较大。&nbsp;</p>
+
+<p>　　而ThreadLocal则从另一个角度来解决多线程的并发访问。ThreadLocal会为每一个线程提供一个<strong>独立的变量副本</strong>，从而隔离了多个线程对数据的访问冲突。因为每一个线程都拥有自己的变量副本，从而也就没有必要对该变量进行同步了。<strong>ThreadLocal提供了线程安全的共享对象</strong>，在编写多线程代码时，可以把不安全的变量封装进ThreadLocal。&nbsp;</p>
+
+<p>　　由于ThreadLocal中可以持有任何类型的对象，低版本JDK所提供的get()返回的是Object对象，需要强制类型转换。但JDK 5.0通过泛型很好的解决了这个问题，在一定程度地简化ThreadLocal的使用</p>
+
+<p>　概括起来说，对于多线程资源共享的问题，同步机制采用了&ldquo;以时间换空间&rdquo;的方式，而ThreadLocal采用了&ldquo;以空间换时间&rdquo;的方式。前者仅提供一份变量，让不同的线程排队访问，而后者为每一个线程都提供了一份变量，因此可以同时访问而互不影响。&nbsp;</p>
+
+<h3>Spring使用ThreadLocal解决线程安全问题&nbsp;</h3>
+
+<p>　　我们知道在一般情况下，<strong>只有无状态的Bean才可以在多线程环境下共享</strong>，在Spring中，绝大部分Bean都可以声明为singleton作用域。就是因为Spring对一些Bean（如<strong>RequestContextHolder</strong>、<strong>TransactionSynchronizationManager</strong>、<strong>LocaleContextHolder</strong>等）中<strong>非线程安全状态</strong>采用ThreadLocal进行处理，让它们也成为线程安全的状态，因为有状态的Bean就可以在多线程中共享了。&nbsp;</p>
+
+<p>　　一般的Web应用划分为展现层、服务层和持久层三个层次，在不同的层中编写对应的逻辑，下层通过接口向上层开放功能调用。在一般情况下，从接收请求到返回响应所经过的所有程序调用都同属于一个线程</p>
+
+<p>ThreadLocal是解决线程安全问题一个很好的思路，它通过为每个线程提供一个独立的变量副本解决了变量并发访问的冲突问题。在很多情况下，ThreadLocal比直接使用synchronized同步机制解决线程安全问题更简单，更方便，且结果程序拥有更高的并发性。&nbsp;</p>
+
+<p>如果你的代码所在的进程中有多个线程在同时运行，而这些线程可能会同时运行这段代码。如果每次运行结果和单线程运行的结果是一样的，而且其他的变量的值也和预期的是一样的，就是线程安全的。 或者说:一个类或者程序所提供的接口对于线程来说是原子操作或者多个线程之间的切换不会导致该接口的执行结果存在二义性,也就是说我们不用考虑同步的问题。 　<strong>线程安全问题都是由全局变量及静态变量引起的。</strong>&nbsp;&nbsp;</p>
+
+<p>若每个线程中对全局变量、静态变量只有读操作，而无写操作，一般来说，这个全局变量是线程安全的；若有多个线程同时执行写操作，一般都需要考虑线程同步，否则就可能影响线程安全。</p>
+
+<p>1） 常量始终是线程安全的，因为只存在读操作。&nbsp;</p>
+
+<p>2）每次调用方法前都新建一个实例是线程安全的，因为不会访问共享的资源。</p>
+
+<p>3）<strong>局部变量是线程安全的</strong>。因为每执行一个方法，都会在独立的空间创建局部变量，它不是共享的资源。局部变量包括方法的参数变量和方法内变量。</p>
+
+<p>有状态就是有数据存储功能。</p>
+
+<p>　　<em>有状态对象</em>(Stateful Bean)，就是有实例变量的对象 &nbsp;，可以保存数据，是非线程安全的。在不同方法调用间不保留任何状态。</p>
+
+<p>无状态就是一次操作，不能保存数据。</p>
+
+<p>　　<em>无状态对象(</em>Stateless Bean)，就是没有实例变量的对象 &nbsp;.不能保存数据，是不变类，是线程安全的。</p>
+
+<p>有状态对象:</p>
+
+<p>无状态的Bean适合用不变模式，技术就是单例模式，这样可以共享实例，提高性能。有状态的Bean，多线程环境下不安全，那么适合用Prototype原型模式。Prototype: 每次对bean的请求都会创建一个新的bean实例。</p>
+
+<p>Struts2默认的实现是Prototype模式。也就是每个请求都新生成一个Action实例，所以不存在线程安全问题。需要注意的是，如果由Spring管理action的生命周期， scope要配成prototype作用域。</p>
+
+<h2><strong>二、线程安全案例：</strong></h2>
+
+<p>SimpleDateFormat(下面简称sdf)类内部有一个Calendar对象引用,它用来储存和这个sdf相关的日期信息,例如sdf.parse(dateStr), sdf.format(date) 诸如此类的方法参数传入的日期相关String, Date等等, 都是交友Calendar引用来储存的.这样就会导致一个问题,如果你的sdf是个static的, 那么多个thread 之间就会共享这个sdf, 同时也是共享这个Calendar引用, 并且, 观察 sdf.parse() 方法,你会发现有如下的调用:</p>
+
+<p>Date parse() {</p>
+
+<p>&nbsp; calendar.clear(); // 清理calendar</p>
+
+<p>&nbsp; ... // 执行一些操作, 设置 calendar 的日期什么的</p>
+
+<p>&nbsp; calendar.getTime(); // 获取calendar的时间</p>
+
+<p>}</p>
+
+<p>这里会导致的问题就是, 如果 线程A 调用了 sdf.parse(), 并且进行了 calendar.clear()后还未执行calendar.getTime()的时候,线程B又调用了sdf.parse(), 这时候线程B也执行了sdf.clear()方法, 这样就导致线程A的的calendar数据被清空了(实际上A,B的同时被清空了). 又或者当 A 执行了calendar.clear() 后被挂起, 这时候B 开始调用sdf.parse()并顺利i结束, 这样 A 的 calendar内存储的的date 变成了后来B设置的calendar的date</p>
+
+<p>这个问题背后隐藏着一个更为重要的问题--无状态：无状态方法的好处之一，就是它在各种环境下，都可以安全的调用。衡量一个方法是否是有状态的，就看它是否改动了其它的东西，比如全局变量，比如实例的字段。format方法在运行过程中改动了SimpleDateFormat的calendar字段，所以，它是有状态的。</p>
+
+<p>　　这也同时提醒我们在开发和设计系统的时候注意下一下三点:</p>
+
+<p>　　1.自己写公用类的时候，要对多线程调用情况下的后果在注释里进行明确说明</p>
+
+<p>　　2.对线程环境下，对每一个共享的可变变量都要注意其线程安全性</p>
+
+<p>　　3.我们的类和方法在做设计的时候，要尽量设计成无状态的</p>
+
+<h2>三.解决办法</h2>
+
+<p>　　1.需要的时候创建新实例：</p>
+
+<p>　　说明：在需要用到SimpleDateFormat 的地方新建一个实例，不管什么时候，将有线程安全问题的对象由共享变为局部私有都能避免多线程问题，不过也加重了创建对象的负担。在一般情况下，这样其实对性能影响比不是很明显的。</p>
+
+<p>　　2.使用同步：同步SimpleDateFormat对象</p>
+
+<p>public class DateSyncUtil {</p>
+
+<p>&nbsp; &nbsp; private static SimpleDateFormat sdf = new SimpleDateFormat(&quot;yyyy-MM-dd HH:mm:ss&quot;);</p>
+
+<p>&nbsp; &nbsp; public static String formatDate(Date date)throws ParseException{</p>
+
+<p>&nbsp; &nbsp; &nbsp; &nbsp; synchronized(sdf){</p>
+
+<p>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; return sdf.format(date);</p>
+
+<p>&nbsp; &nbsp; &nbsp; &nbsp; } &nbsp;</p>
+
+<p>&nbsp; &nbsp; }</p>
+
+<p>&nbsp; &nbsp; public static Date parse(String strDate) throws ParseException{</p>
+
+<p>&nbsp; &nbsp; &nbsp; &nbsp; synchronized(sdf){</p>
+
+<p>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; return sdf.parse(strDate);</p>
+
+<p>&nbsp; &nbsp; &nbsp; &nbsp; }</p>
+
+<p>&nbsp; &nbsp; }&nbsp;</p>
+
+<p>}</p>
+
+<p>　　说明：当线程较多时，当一个线程调用该方法时，其他想要调用此方法的线程就要block，多线程并发量大的时候会对性能有一定的影响。</p>
+
+<p>3.使用ThreadLocal：　</p>
+
+<p>public class ConcurrentDateUtil {</p>
+
+<p>&nbsp; &nbsp; private static ThreadLocal&lt;DateFormat&gt; threadLocal = new ThreadLocal&lt;DateFormat&gt;() {</p>
+
+<p>&nbsp; &nbsp; &nbsp; &nbsp; @Override</p>
+
+<p>&nbsp; &nbsp; &nbsp; &nbsp; protected DateFormat initialValue() {</p>
+
+<p>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; return new SimpleDateFormat(&quot;yyyy-MM-dd HH:mm:ss&quot;);</p>
+
+<p>&nbsp; &nbsp; &nbsp; &nbsp; }</p>
+
+<p>&nbsp; &nbsp; };</p>
+
+<p>&nbsp; &nbsp; public static Date parse(String dateStr) throws ParseException {</p>
+
+<p>&nbsp; &nbsp; &nbsp; &nbsp; return threadLocal.get().parse(dateStr);</p>
+
+<p>&nbsp; &nbsp; }</p>
+
+<p>&nbsp; &nbsp; public static String format(Date date) {</p>
+
+<p>&nbsp; &nbsp; &nbsp; &nbsp; return threadLocal.get().format(date);</p>
+
+<p>&nbsp; &nbsp; }</p>
+
+<p>}</p>
+
+<p>或</p>
+
+<p>public class ThreadLocalDateUtil {</p>
+
+<p>&nbsp; &nbsp; private static final String date_format = &quot;yyyy-MM-dd HH:mm:ss&quot;;</p>
+
+<p>&nbsp; &nbsp; private static ThreadLocal&lt;DateFormat&gt; threadLocal = new ThreadLocal&lt;DateFormat&gt;();&nbsp;</p>
+
+<p>&nbsp;</p>
+
+<p>&nbsp; &nbsp; public static DateFormat getDateFormat() &nbsp;&nbsp;</p>
+
+<p>&nbsp; &nbsp; { &nbsp;</p>
+
+<p>&nbsp; &nbsp; &nbsp; &nbsp; DateFormat df = threadLocal.get(); &nbsp;</p>
+
+<p>&nbsp; &nbsp; &nbsp; &nbsp; if(df==null){ &nbsp;</p>
+
+<p>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; df = new SimpleDateFormat(date_format); &nbsp;</p>
+
+<p>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; threadLocal.set(df); &nbsp;</p>
+
+<p>&nbsp; &nbsp; &nbsp; &nbsp; } &nbsp;</p>
+
+<p>&nbsp; &nbsp; &nbsp; &nbsp; return df; &nbsp;</p>
+
+<p>&nbsp; &nbsp; } &nbsp;</p>
+
+<p>&nbsp;</p>
+
+<p>&nbsp; &nbsp; public static String formatDate(Date date) throws ParseException {</p>
+
+<p>&nbsp; &nbsp; &nbsp; &nbsp; return getDateFormat().format(date);</p>
+
+<p>&nbsp; &nbsp; }</p>
+
+<p>&nbsp;</p>
+
+<p>&nbsp; &nbsp; public static Date parse(String strDate) throws ParseException {</p>
+
+<p>&nbsp; &nbsp; &nbsp; &nbsp; return getDateFormat().parse(strDate);</p>
+
+<p>&nbsp; &nbsp; } &nbsp;&nbsp;</p>
+
+<p>}</p>
+
+<p>　　说明：使用ThreadLocal, 也是将共享变量变为独享，线程独享肯定能比方法独享在并发环境中能减少不少创建对象的开销。如果对性能要求比较高的情况下，一般推荐使用这种方法。</p>
+
+<p>　　4.抛弃JDK，使用其他类库中的时间格式化类：</p>
+
+<p>　　1.使用Apache commons 里的FastDateFormat，宣称是既快又线程安全的SimpleDateFormat, 可惜它只能对日期进行format, 不能对日期串进行解析。</p>
+
+<p>　　2.使用Joda-Time类库来处理时间相关问题</p>
+
+<p>　　做一个简单的压力测试，方法一最慢，方法三最快，但是就算是最慢的方法一性能也不差，一般系统方法一和方法二就可以满足，所以说在这个点很难成为你系统的瓶颈所在。从简单的角度来说，建议使用方法一或者方法二，如果在必要的时候，追求那么一点性能提升的话，可以考虑用方法三，用ThreadLocal做缓存。</p>
+
+<p>　　Joda-Time类库对时间处理方式比较完美，建议使用。</p>
+
+<p><strong>=======singleton bean和singleton模式区别=============================&nbsp;</strong><br />
+spring&nbsp;<br />
+项目加载的时候bean（一个bean对应某个类）自动创建（初始化，建一个实例），而后是每次调用bean的时候是注入的（不是重新new。。所有整个系统都是这个实例，，而且是spring自动提供的）&nbsp;<br />
+<br />
+<br />
+一：对于Spring中实现Singleton模式，是以<strong>IOC容器为单位</strong>（就是说在这个容器里面bean实现Singleton），换句话说，<em>一个JVM可能有多个IOC容器</em>，而在这个容器里实现了singleton bean，&nbsp;<br />
+而Java中实现Singleton模式而言，只有一个JVM，jvm中某个class只有一个实例&nbsp;<br />
+二：&nbsp;<br />
+singleton模式中，singleton的class在整个JVM中只有一个instance，&nbsp;<br />
+Spring的Bean，你可以一个class配置多个Bean，这个class就有了多个instance。&nbsp;<br />
+<br />
+这个singleton是指在spring容器中，这个Bean是单实例的，是线程共享的。所以要求这些类都是线程安全的。也就是说，不能出现修改Bean属性的方法，当然除了设值得那些setter。只要满足线程安全，这些bean都可以用singleton。而且我们在绝大多数使用上，也是这样用的，包括dao,service。&nbsp;<br />
+Beanfactory是Spring初始以静态方式载入的,Spring的单例IOC是基于容器级的,所以这你都不用担心与考虑.</p>
+
+<h2><strong>Spring工作原理</strong>&nbsp;</h2>
+
+<p>一、 IoC(Inversion of control): 控制反转&nbsp;<br />
+　　1、IoC：&nbsp;<br />
+　　概念：控制权由对象本身转向容器；由容器根据配置文件去创建实例并创建各个实例之间的依赖关系&nbsp;<br />
+　　核心：bean工厂；在Spring中，bean工厂创建的各个实例称作bean&nbsp;<br />
+二、AOP(Aspect-Oriented Programming): 面向方面编程&nbsp;<br />
+　　1、 代理的两种方式：&nbsp;<br />
+　　　　静态代理：&nbsp;<br />
+　　　　 针对每个具体类分别编写代理类；&nbsp;<br />
+　　　　 针对一个接口编写一个代理类；&nbsp;<br />
+　　　　动态代理：&nbsp;<br />
+　　　　针对一个方面编写一个InvocationHandler，然后借用JDK反射包中的Proxy类为各种接口动态生成相应的代理类&nbsp;<br />
+　　2、 AOP的主要原理：动态代理&nbsp;<br />
+<br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Spring 已经用过一段时间了，感觉Spring是个很不错的框架。内部最核心的就是IOC了，&nbsp;<br />
+动态注入，让一个对象的创建不用new了，可以自动的生产，这其实就是利用java里的反射&nbsp;<br />
+反射其实就是在运行时动态的去创建、调用对象，Spring就是在运行时，跟xml&nbsp; Spring的配置&nbsp;<br />
+文件来动态的创建对象，和调用对象里的方法的 。&nbsp;<br />
+&nbsp;&nbsp;&nbsp;&nbsp; Spring还有一个核心就是AOP这个就是面向切面编程，可以为某一类对象 进行监督和控制（也就是&nbsp;<br />
+在调用这类对象的具体方法的前后去调用你指定的 模块）从而达到对一个模块扩充的功能。这些都是通过&nbsp;<br />
+配置类达到的。&nbsp;<br />
+&nbsp;&nbsp; Spring目的：就是让对象与对象（模块与模块）之间的关系没有通过代码来关联，都是通过配置类说明&nbsp;<br />
+管理的（Spring根据这些配置 内部通过<strong>反射</strong>去动态的组装对象）&nbsp;<br />
+&nbsp;&nbsp; 要记住：Spring是一个容器，凡是在容器里的对象才会有Spring所提供的这些服务和功能。&nbsp;<br />
+Spring里用的最经典的一个设计模式就是：模板方法模式。（这里我都不介绍了，是一个很常用的设计模式）&nbsp;<br />
+&nbsp; Spring里的配置是很多的，很难都记住，但是Spring里的精华也无非就是以上的两点，把以上两点跟理解了&nbsp;<br />
+也就基本上掌握了Spring.&nbsp;</p>
+
+<p><strong>各个部分的作用：</strong></p>
+
+<p>　　1.springmvc请所有的请求都提交给DispatcherServlet,它会委托应用系统的其他模块负责负责对请求进行真正的处理工作。&nbsp;<br />
+<br />
+　　2.DispatcherServlet查询一个或多个HandlerMapping,找到处理请求的Controller.&nbsp;<br />
+<br />
+　　3.DispatcherServlet请请求提交到目标Controller&nbsp;<br />
+<br />
+　　4.Controller进行业务逻辑处理后，会返回一个ModelAndView&nbsp;<br />
+<br />
+　　5.Dispathcher查询一个或多个ViewResolver视图解析器,找到ModelAndView对象指定的视图对象&nbsp;<br />
+<br />
+　　6.视图对象负责渲染返回给客户端。&nbsp;<br />
+<br />
+为什么要使用Spring：&nbsp;<br />
+<br />
+　　AOP 让开发人员可以创建非行为性的关注点，称为横切关注点，并将它们插入到应用程序代码中。使用 AOP后，公共服务（比如日志、持久性、事务等）就可以分解成方面并应用到域对象上，同时不会增加域对象的对象模型的复杂性。&nbsp;<br />
+<br />
+　　IOC 允许创建一个可以构造对象的应用环境，然后向这些对象传递它们的协作对象。正如单词 倒置 所表明的，IOC 就像反过来的JNDI。没有使用一堆抽象工厂、服务定位器、单元素（singleton）和直接构造（straightconstruction），每一个对象都是用其协作对象构造的。因此是由容器管理协作对象（collaborator）。&nbsp;<br />
+<br />
+　　Spring即使一个AOP框架，也是一IOC容器。 Spring 最好的地方是它有助于您替换对象。有了Spring，只要用JavaBean属性和配置文件加入依赖性（协作对象）。然后可以很容易地在需要时替换具有类似接口的协作对象。&nbsp;<br />
+<br />
+　　Spring 框架是一个分层架构，由 7 个定义良好的模块组成。Spring模块构建在核心容器之上，核心容器定义了创建、配置和管理bean 的方式，如图 1 所示。&nbsp;<br />
+<br />
+　　组成 Spring 框架的每个模块（或组件）都可以单独存在，或者与其他一个或多个模块联合实现。每个模块的功能如下：&nbsp;<br />
+<br />
+　　核心容器：核心容器提供 Spring框架的基本功能。核心容器的主要组件是BeanFactory，它是工厂模式的实现。BeanFactory使用控制反转（IOC）模式将应用程序的配置和依赖性规范与实际的应用程序代码分开。&nbsp;<br />
+<br />
+　　Spring 上下文：Spring 上下文是一个配置文件，向 Spring框架提供上下文信息。Spring上下文包括企业服务，例如 JNDI、EJB、电子邮件、国际化、校验和调度功能。&nbsp;<br />
+<br />
+　　Spring AOP：通过配置管理特性，Spring AOP 模块直接将面向方面的编程功能集成到了Spring框架中。所以，可以很容易地使 Spring 框架管理的任何对象支持 AOP。Spring AOP 模块为基于Spring的应用程序中的对象提供了事务管理服务。通过使用 Spring AOP，不用依赖EJB组件，就可以将声明性事务管理集成到应用程序中。&nbsp;<br />
+<br />
+　　Spring&nbsp; DAO：JDBCDAO抽象层提供了有意义的异常层次结构，可用该结构来管理异常处理和不同数据库供应商抛出的错误消息。异常层次结构简化了错误处理，并且极大地降低了需要编写的异常代码数量（例如打开和关闭连接）。SpringDAO的面向 JDBC 的异常遵从通用的 DAO 异常层次结构。&nbsp;<br />
+<br />
+　　Spring ORM：Spring 框架插入了若干个 ORM 框架，从而提供了 ORM的对象关系工具，其中包括JDO、Hibernate 和 iBatis SQL Map。所有这些都遵从 Spring 的通用事务和DAO异常层次结构。&nbsp;<br />
+<br />
+　　Spring Web 模块：Web 上下文模块建立在应用程序上下文模块之上，为基于Web的应用程序提供了上下文。所以，Spring 框架支持与 Jakarta Struts的集成。Web模块还简化了处理多部分请求以及将请求参数绑定到域对象的工作。&nbsp;<br />
+<br />
+　　Spring MVC 框架：MVC 框架是一个全功能的构建 Web 应用程序的 MVC实现。通过策略接口，MVC框架变成为高度可配置的，MVC 容纳了大量视图技术，其中包括JSP、Velocity、Tiles、iText 和 POI。&nbsp;<br />
+&nbsp;</p>
+
+<p>　　Spring 框架的功能可以用在任何 J2EE服务器中，大多数功能也适用于不受管理的环境。Spring的核心要点是：支持不绑定到特定 J2EE服务的可重用业务和数据访问对象。毫无疑问，这样的对象可以在不同 J2EE 环境 （Web或EJB）、独立应用程序、测试环境之间重用。</p>
+
+<p>&nbsp;</p>
