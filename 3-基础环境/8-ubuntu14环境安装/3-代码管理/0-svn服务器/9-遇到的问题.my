@@ -1,0 +1,36 @@
+<h1>客户端提交时报错</h1>
+
+<h2>&ldquo;Can&rsquo;t open file &lsquo;.svn/lock&rsquo;: Permission denied&rdquo;问题解决</h2>
+
+<p>做linux自动化运维SVN自动更新的时候，发现无法同步，只能登陆服务器运行svn co&nbsp;<a href="http://192.168.1.10/svn/debao%E6%89%8D%E8%83%BD%E6%9B%B4%E6%96%B0%EF%BC%8C%E5%BC%80%E5%8F%91%E7%BB%84%E9%82%A3%E8%BE%B9windows%E6%9C%BA%E5%99%A8%E6%89%A7%E8%A1%8Cpost-commit%E7%9A%84%E6%97%B6%E5%80%99%E8%99%BD%E7%84%B6%E6%8F%90%E4%BA%A4%E5%88%B0SVN%E6%9C%8D%E5%8A%A1%E5%99%A8%EF%BC%8C%E4%BD%86%E6%98%AF%E6%97%A0%E6%B3%95%E8%87%AA%E5%8A%A8%E5%9C%A8web%E6%9C%8D%E5%8A%A1%E5%99%A8%E6%98%BE%E7%A4%BA" rel="nofollow">http://192.168.1.10/svn/debao才能更新，开发组那边windows机器执行post-commit的时候虽然提交到SVN服务器，但是无法自动在web服务器显示</a><br />
+1.第一次在web服务器checkout的时候，其中debao为SVN仓称，我用的是root超级用户，因为是服务器管理员。</p>
+
+<p>2.我同事svn up的时候会报下面的错误，提示没有权限打开该文件.svn/lock</p>
+
+<pre>
+[root@lamp hooks]# ssh -p 60022 www@192.168.1.170 /usr/local/bin/svn update /home/wwwroot/debao 
+www@192.168.1.170&#39;s password: 
+svn: Can&#39;t open file &#39;/home/wwwroot/debao/data/filecache/.svn/lock&#39;: Permission denied
+</pre>
+
+<p>&nbsp;3.用ll查看当前文件夹下的.svn文件时发现其所属组所有者为root</p>
+
+<pre>
+[root@as4-dev wwwroot]# ll debao/.svn
+total 28
+-r--r--r--  1 root root  143 Oct 28 12:27 all-wcprops
+-r--r--r--  1 root root 313 Oct 28 12:27 entries
+-r--r--r--  1 root root 2 Oct 28 12:25 format
+drwxr-xr-x  2 root root 4096 Oct 28 12:25 prop-base
+drwxr-xr-x  2 root root 4096 Oct 28 12:25 props
+drwxr-xr-x  2 root root 4096 Oct 28 12:27 text-base
+drwxr-xr-x  5 root root 4096 Oct 28 12:27 tmp
+
+知道了问题的真正原因，就可以通过下面的方法解决Can&#39;t open file &#39;.svn/lock&#39;: Permission denied的问题。
+&nbsp; &nbsp; 方法一：给目录加权限，www权限，这边www是组</pre>
+
+<pre>
+chmod  o+w  .svn -R
+su - www
+svn up
+</pre>
