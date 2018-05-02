@@ -1,0 +1,234 @@
+<h2>使用Angularjs和Vue.js对比</h2>
+
+<p>之前项目都是使用Angularjs，（注明此处主要讲Angularjs 1）在初步使用Vue.js后做一个简单的对比笔记。<br />
+首先从理论上简单说一下各自的特点，之后再用几个小的例子加以说明。</p>
+
+<h3>Angular</h3>
+
+<ul>
+	<li>1，MVVM（Model）(View)(View-model)</li>
+	<li>2，模块化（Module）控制器（Contoller）依赖注入：</li>
+	<li>3，双向数据绑定：界面的操作能实时反映到数据，数据的变更能实时展现到界面。</li>
+	<li>4，指令(ng-click ng-bind ng-model ng-href ng-src ng-if/ng-show...)</li>
+	<li>5，服务Service($compile $filter $interval $timeout $http...)</li>
+	<li>6，路由(ng-Route原生路由),ui-router(路由组件)</li>
+	<li>7，Ajax封装($http)</li>
+</ul>
+
+<p>其中双向数据绑定的实现使用了$scope变量的脏值检测，使用$scope.$watch（视图到模型），$scope.$apply(模型到视图)检测，内部调用的都是digest，当然也可以直接调用$scope.$digest进行脏检查。值得注意的是当数据变化十分频繁时，脏检测对浏览器性能的消耗将会很大，官方注明的最大检测脏值为2000个数据。</p>
+
+<h3>Vue</h3>
+
+<p>vue.js官网：是一套构建用户界面的&nbsp;<strong>渐进式框架</strong>。与其他重量级框架不同的是，Vue 采用自底向上增量开发的设计。Vue 的核心库只关注视<strong>图层</strong>，并且非常容易学习，非常容易与其它库或已有项目整合。另一方面，Vue 完全有能力驱动采用<strong>单文件组件</strong>和&nbsp;<strong>Vue 生态系统支持的库</strong>开发的复杂单页应用。</p>
+
+<p>Vue.js 的目标是通过尽可能简单的 API 实现<strong>响应的数据绑定</strong>和<strong>组合的视图组件</strong>。</p>
+
+<ul>
+	<li>（1）模块化，目前最热的方式是在项目中直接使用ES6的模块化，结合Webpack进行项目打包</li>
+	<li>（2）组件化，创造单个component后缀为.vue的文件，包含template(html代码)，script(es6代码),style(css样式)</li>
+	<li>（3）双向数据绑定：界面的操作能实时反映到数据，数据的变更能实时展现到界面。</li>
+	<li>（4）指令(v-html v-bind v-model v-if/v-show...)</li>
+	<li>（5）路由(vue-router)</li>
+	<li>（6）vuex 数据共享</li>
+	<li>（7）Ajax插件(vue-resource,axios)</li>
+</ul>
+
+<p>vue非常小巧，压缩后min源码为72.9kb，gzip压缩后只有25.11kb，想比Angular为144kb，可以自驾搭配使用需要的库插件，类似路由插件(Vue-router)，Ajax插件(vue-resource,axios)等</p>
+
+<h3>Vue与 Angular 双向数据绑定原理</h3>
+
+<p><strong>angular.js</strong>&nbsp;：<strong>脏值检查</strong></p>
+
+<p>angular.js 是通过脏值检测的方式比对数据是否有变更，来决定是否更新视图，最简单的方式就是通过 setInterval() 定时轮询检测数据变动，当然Google不会这么low，angular只有在指定的事件触发时进入脏值检测，大致如下：</p>
+
+<ul>
+	<li>DOM事件，譬如用户输入文本，点击按钮等。( ng-click )</li>
+	<li>XHR响应事件 ( $http )</li>
+	<li>浏览器Location变更事件 ( $location )</li>
+	<li>Timer事件( $timeout , $interval )</li>
+	<li>执行 $digest() 或 $apply()</li>
+</ul>
+
+<p><strong>vue</strong>&nbsp;：<strong>数据劫持</strong></p>
+
+<p>vue.js 则是采用数据劫持结合发布者-订阅者模式的方式，通过Object.defineProperty()来劫持各个属性的setter，getter，在数据变动时发布消息给订阅者，触发相应的监听回调。<a href="https://developer.mozilla.org/zh-CN/docs/Web/JavaScript/Reference/Global_Objects/Object/defineProperty" title="defineProperty">https://developer.mozilla.org/zh-CN/docs/Web/JavaScript/Reference/Global_Objects/Object/defineProperty</a>defineProperty</p>
+
+<p>下面直接上代码</p>
+
+<p>首先当然是Hello World了</p>
+
+<h3>vue</h3>
+
+<pre>
+<code>&lt;div id=&quot;app&quot;&gt;
+  {{ message }}
+&lt;/div&gt;
+
+new Vue({
+  el: &#39;#app&#39;,
+  data: {
+    message: &#39;Hello Vue.js!&#39;
+  }
+})</code></pre>
+
+<h3>Angular</h3>
+
+<pre>
+<code>&lt;div ng-app=&quot;myApp&quot; ng-controller=&quot;myCtrl&quot;&gt;
+ {{message}}
+&lt;/div&gt;
+
+var app = angular.module(&#39;myApp&#39;, []);
+app.controller(&#39;myCtrl&#39;, function($scope) {
+    $scope.message = &quot;Hello world&quot;;
+});</code></pre>
+
+<p>相比较来看，vue采用了json的数据格式进行dom和data的编写，编写风格更加靠进js的数据编码格式，通俗易懂。</p>
+
+<h3>vue的双向数据绑定</h3>
+
+<pre>
+<code>&lt;div id=&quot;app&quot;&gt;
+  &lt;p&gt;{{ message }}&lt;/p&gt;
+  &lt;input v-model=&quot;message&quot;&gt;
+&lt;/div&gt;
+
+new Vue({
+  el: &#39;#app&#39;,
+  data: {
+    message: &#39;Hello Vue.js!&#39;
+  }
+})</code></pre>
+
+<h3>Angular的双向数据绑定</h3>
+
+<pre>
+<code>&lt;div ng-app=&quot;myApp&quot; ng-controller=&quot;myCtrl&quot;&gt;
+  &lt;p&gt;{{message}}&lt;/p&gt;
+  &lt;input ng-model=&quot;message&quot;&gt;
+&lt;/div&gt;
+
+var app = angular.module(&#39;myApp&#39;, []);
+app.controller(&#39;myCtrl&#39;, function($scope) {
+    $scope.message = &quot;Hello world!&quot;;
+});</code></pre>
+
+<p>vue虽然是一个轻量级的框架，提供的API确非常多，包括一些便捷的指令和属性操作，一般vue是指令使用(v-)操作符，相比angularjs指令使用（ng-）。其中vue.js还支持指令的简写方式：</p>
+
+<ul>
+	<li>(1)事件click</li>
+</ul>
+
+<p><code>&lt;a v-on: click=&quot;fn&quot;&gt;&lt;/a&gt;</code></p>
+
+<pre>
+<code>简写方式：
+`&lt;a @click=&quot;fn&quot;&gt;&lt;/a&gt;`</code></pre>
+
+<ul>
+	<li>
+	<p>(2)属性</p>
+
+	<p><code>&lt;a v-bind: href=&quot;url&quot;&gt;&lt;/a&gt;</code></p>
+
+	<p>简写方式：<br />
+	<code>&lt;a :href=&quot;url&quot;&gt;&lt;/a&gt;</code></p>
+	</li>
+</ul>
+
+<h3>vue.渲染列表</h3>
+
+<pre>
+<code>&lt;div id=&quot;app&quot;&gt;
+  &lt;ul&gt;
+    &lt;li v-for=&quot;name in names&quot;&gt;
+      {{ name.first }}
+    &lt;/li&gt;
+  &lt;/ul&gt;
+&lt;/div&gt;
+
+new Vue({
+  el: &#39;#app&#39;,
+  data: {
+    names: [
+      { first: &#39;summer&#39;, last: &#39;7310&#39; },
+      { first: &#39;David&#39;, last:&#39;666&#39; },
+      { first: &#39;Json&#39;, last:&#39;888&#39; }
+    ]
+  }
+})</code></pre>
+
+<h3>Angularjs渲染列表</h3>
+
+<pre>
+<code>&lt;div ng-app=&quot;myApp&quot; ng-controller=&quot;myCtrl&quot;&gt;
+  &lt;li ng-repeat=&quot;name in names&quot;&gt;{{name.first}}&lt;/li&gt;
+&lt;/div&gt;
+
+var app = angular.module(&#39;myApp&#39;, []);
+app.controller(&#39;myCtrl&#39;, function($scope) {
+    $scope.names = [
+      { first: &#39;summer&#39;, last: &#39;7310&#39; },
+      { first: &#39;David&#39;, last:&#39;666&#39; },
+      { first: &#39;Json&#39;, last:&#39;888&#39; }
+    ]
+});</code></pre>
+
+<h3>vue的循环</h3>
+
+<pre>
+<code>&lt;ul&gt;
+    &lt;li v-for=&quot;item in list&quot;&gt;
+        &lt;a :href=&quot;item.url&quot;&gt;{{item.title}}&lt;/a&gt;
+    &lt;/li&gt;
+&lt;/ul&gt;</code></pre>
+
+<h3>angular和vue的渲染差不多</h3>
+
+<pre>
+<code>&lt;div class=&quot;item&quot; ng-repeat=&quot;news in  newsList&quot;&gt;
+    &lt;a ng-href=&quot;#/content/{{news.id}}&quot;&gt;
+        &lt;img ng-src=&quot;{{news.img}}&quot; /&gt;
+        &lt;div class=&quot;item-info&quot;&gt;
+            &lt;h3 class=&quot;item-title&quot;&gt;{{news.title}}&lt;/h3&gt;
+            &lt;p class=&quot;item-time&quot;&gt;{{news.createTime}}&lt;/p&gt;
+        &lt;/div&gt;
+    &lt;/a&gt;
+&lt;/div&gt;</code></pre>
+
+<h3>vue和Angular处理用户输入</h3>
+
+<pre>
+<code>&lt;div id=&quot;app&quot;&gt;
+  &lt;p&gt;{{ message }}&lt;/p&gt;
+  &lt;button v-on:click=&quot;reverseMessage&quot;&gt;Reverse Message&lt;/button&gt;
+&lt;/div&gt;
+
+new Vue({
+  el: &#39;#app&#39;,
+  data: {
+    message: &#39;Hello Vue.js!&#39;
+  },
+  methods: {
+    reverseMessage: function () {
+      this.message = this.message.split(&#39;&#39;).reverse().join(&#39;&#39;)
+    }
+  }
+})</code></pre>
+
+<hr />
+<pre>
+<code>&lt;div ng-app=&quot;myApp&quot; ng-controller=&quot;myCtrl&quot;&gt;
+ &lt;p&gt;{{ message }}&lt;/p&gt;
+ &lt;button ng-click=&quot;reverseMessage()&quot;&gt;Reverse Message&lt;/button&gt;
+&lt;/div&gt;
+
+var app = angular.module(&#39;myApp&#39;, []);
+app.controller(&#39;myCtrl&#39;, function($scope) {
+    $scope.message = &quot;Hello world!&quot;;
+    $scope.reverseMessage = function() {
+        this.message = this.message.split(&#39;&#39;).reverse().join(&#39;&#39;)
+    }
+});</code></pre>
+
+<p>posted @&nbsp;2017-02-13 16:33&nbsp;<a href="http://www.cnblogs.com/summer7310/">sumer7310</a>&nbsp;阅读(...) 评论(...)&nbsp;<a href="https://i.cnblogs.com/EditPosts.aspx?postid=6394379" rel="nofollow">编辑</a>&nbsp;<a href="https://www.cnblogs.com/summer7310/p/6394379.html#" onclick="AddToWz(6394379);return false;">收藏</a></p>

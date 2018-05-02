@@ -1,0 +1,140 @@
+<h1>Java多线程实现的三种方式</h1>
+
+<p><strong>1、继承Thread类实现多线程</strong></p>
+
+<p>继承Thread类的方法尽管被我列为一种多线程实现方式，但Thread本质上也是实现了Runnable接口的一个实例，它代表一个线程的实例，并且，启动线程的唯一方法就是通过Thread类的start()实例方法。start()方法是一个native方法，它将启动一个新线程，并执行run()方法。这种方式实现多线程很简单，通过自己的类直接extend Thread，并复写run()方法，就可以启动新线程并执行自己定义的run()方法。例如：</p>
+
+<pre>
+<code>public&nbsp;class&nbsp;MyThread&nbsp;extends&nbsp;Thread&nbsp;{&nbsp;
+　　public&nbsp;void&nbsp;run()&nbsp;{&nbsp;
+　　 System.out.println(&quot;MyThread.run()&quot;);&nbsp;
+　　}&nbsp;
+}</code></pre>
+
+<p>&nbsp;</p>
+
+<p>在合适的地方启动线程如下：</p>
+
+<p>&nbsp;</p>
+
+<pre>
+<code>MyThread myThread1 =&nbsp;new&nbsp;MyThread();&nbsp;
+MyThread myThread2 =&nbsp;new&nbsp;MyThread();&nbsp;
+myThread1.start();&nbsp;
+myThread2.start();</code></pre>
+
+<p><strong>2、实现Runnable接口方式实现多线程</strong></p>
+
+<p>如果自己的类已经extends另一个类，就无法直接extends Thread，此时，必须实现一个Runnable接口，如下：</p>
+
+<pre>
+<code>public&nbsp;class&nbsp;MyThread&nbsp;extends&nbsp;OtherClass&nbsp;implements&nbsp;Runnable&nbsp;{&nbsp;
+　　public&nbsp;void&nbsp;run()&nbsp;{&nbsp;
+　　 System.out.println(&quot;MyThread.run()&quot;);&nbsp;
+　　}&nbsp;
+}</code></pre>
+
+<p>&nbsp;</p>
+
+<p>为了启动MyThread，需要首先实例化一个Thread，并传入自己的MyThread实例：</p>
+
+<p>&nbsp;</p>
+
+<pre>
+<code>MyThread myThread =&nbsp;new&nbsp;MyThread();&nbsp;
+Thread thread =&nbsp;new&nbsp;Thread(myThread);&nbsp;
+thread.start();</code></pre>
+
+<p>&nbsp;</p>
+
+<p>事实上，当传入一个Runnable target参数给Thread后，Thread的run()方法就会调用target.run()，参考JDK源代码：</p>
+
+<p>&nbsp;</p>
+
+<pre>
+<code>public&nbsp;void&nbsp;run()&nbsp;{&nbsp;
+　　if&nbsp;(target !=&nbsp;null) {&nbsp;
+　　 target.run();&nbsp;
+　　}&nbsp;
+}</code></pre>
+
+<p><strong>3、使用ExecutorService、Callable、Future实现有返回结果的多线程</strong></p>
+
+<p>ExecutorService、Callable、Future这个对象实际上都是属于Executor框架中的功能类。想要详细了解Executor框架的可以访问http://www.javaeye.com/topic/366591 ，这里面对该框架做了很详细的解释。返回结果的线程是在JDK1.5中引入的新特征，确实很实用，有了这种特征我就不需要再为了得到返回值而大费周折了，而且即便实现了也可能漏洞百出。</p>
+
+<p>可返回值的任务必须实现Callable接口，类似的，无返回值的任务必须Runnable接口。执行Callable任务后，可以获取一个Future的对象，在该对象上调用get就可以获取到Callable任务返回的Object了，再结合线程池接口ExecutorService就可以实现传说中有返回结果的多线程了。下面提供了一个完整的有返回结果的多线程测试例子，在JDK1.5下验证过没问题可以直接使用。代码如下：</p>
+
+<pre>
+<code>import&nbsp;java.util.concurrent.*;&nbsp;
+import&nbsp;java.util.Date;&nbsp;
+import&nbsp;java.util.List;&nbsp;
+import&nbsp;java.util.ArrayList;&nbsp;
+&nbsp;&nbsp;
+/**
+* 有返回值的线程
+*/&nbsp;
+@SuppressWarnings(&quot;unchecked&quot;)&nbsp;
+public&nbsp;class&nbsp;Test {&nbsp;
+public&nbsp;static&nbsp;void&nbsp;main(String[] args) throws ExecutionException,&nbsp;
+&nbsp; &nbsp;InterruptedException {&nbsp;
+&nbsp; System.out.println(&quot;----程序开始运行----&quot;);&nbsp;
+&nbsp;&nbsp;Date&nbsp;date1 =&nbsp;new&nbsp;Date();&nbsp;
+&nbsp;&nbsp;
+&nbsp; int taskSize =&nbsp;5;&nbsp;
+&nbsp;&nbsp;// 创建一个线程池&nbsp;
+&nbsp; ExecutorService pool = Executors.newFixedThreadPool(taskSize);&nbsp;
+&nbsp;&nbsp;// 创建多个有返回值的任务&nbsp;
+&nbsp; List&lt;Future&gt; list =&nbsp;new&nbsp;ArrayList&lt;Future&gt;();&nbsp;
+&nbsp;&nbsp;for&nbsp;(int i =&nbsp;0; i &lt; taskSize; i++) {&nbsp;
+&nbsp; &nbsp;Callable c =&nbsp;new&nbsp;MyCallable(i +&nbsp;&quot; &quot;);&nbsp;
+&nbsp; &nbsp;// 执行任务并获取Future对象&nbsp;
+&nbsp; &nbsp;Future f = pool.submit(c);&nbsp;
+&nbsp; &nbsp;// System.out.println(&quot;&gt;&gt;&gt;&quot; + f.get().toString());&nbsp;
+&nbsp; &nbsp;list.add(f);&nbsp;
+&nbsp; }&nbsp;
+&nbsp;&nbsp;// 关闭线程池&nbsp;
+&nbsp; pool.shutdown();&nbsp;
+&nbsp;&nbsp;
+&nbsp;&nbsp;// 获取所有并发任务的运行结果&nbsp;
+&nbsp;&nbsp;for&nbsp;(Future f : list) {&nbsp;
+&nbsp; &nbsp;// 从Future对象上获取任务的返回值，并输出到控制台&nbsp;
+&nbsp; &nbsp;System.out.println(&quot;&gt;&gt;&gt;&quot;&nbsp;+ f.get().toString());&nbsp;
+&nbsp; }&nbsp;
+&nbsp;&nbsp;
+&nbsp;&nbsp;Date&nbsp;date2 =&nbsp;new&nbsp;Date();&nbsp;
+&nbsp; System.out.println(&quot;----程序结束运行----，程序运行时间【&quot;&nbsp;
+&nbsp; &nbsp; + (date2.getTime() - date1.getTime()) +&nbsp;&quot;毫秒】&quot;);&nbsp;
+}&nbsp;
+}&nbsp;
+&nbsp;&nbsp;
+class&nbsp;MyCallable&nbsp;implements&nbsp;Callable&lt;Object&gt; {&nbsp;
+private&nbsp;String&nbsp;taskNum;&nbsp;
+&nbsp;&nbsp;
+MyCallable(String&nbsp;taskNum) {&nbsp;
+&nbsp;&nbsp;this.taskNum = taskNum;&nbsp;
+}&nbsp;
+&nbsp;&nbsp;
+public&nbsp;Object&nbsp;call() throws Exception {&nbsp;
+&nbsp; System.out.println(&quot;&gt;&gt;&gt;&quot;&nbsp;+ taskNum +&nbsp;&quot;任务启动&quot;);&nbsp;
+&nbsp;&nbsp;Date&nbsp;dateTmp1 =&nbsp;new&nbsp;Date();&nbsp;
+&nbsp; Thread.sleep(1000);&nbsp;
+&nbsp;&nbsp;Date&nbsp;dateTmp2 =&nbsp;new&nbsp;Date();&nbsp;
+&nbsp; long time = dateTmp2.getTime() - dateTmp1.getTime();&nbsp;
+&nbsp; System.out.println(&quot;&gt;&gt;&gt;&quot;&nbsp;+ taskNum +&nbsp;&quot;任务终止&quot;);&nbsp;
+&nbsp;&nbsp;return&nbsp;taskNum +&nbsp;&quot;任务返回运行结果,当前任务时间【&quot;&nbsp;+ time +&nbsp;&quot;毫秒】&quot;;&nbsp;
+}&nbsp;
+}</code></pre>
+
+<p><strong>代码说明：</strong></p>
+
+<p>上述代码中Executors类，提供了一系列工厂方法用于创先线程池，返回的线程池都实现了ExecutorService接口。</p>
+
+<p>public static ExecutorService newFixedThreadPool(int nThreads) 创建固定数目线程的线程池。</p>
+
+<p>public static ExecutorService newCachedThreadPool() 创建一个可缓存的线程池，调用execute 将重用以前构造的线程（如果线程可用）。如果现有线程没有可用的，则创建一个新线程并添加到池中。终止并从缓存中移除那些已有 60 秒钟未被使用的线程。</p>
+
+<p>public static ExecutorService newSingleThreadExecutor() 创建一个单线程化的Executor。</p>
+
+<p>public static ScheduledExecutorService newScheduledThreadPool(int corePoolSize) 创建一个支持定时及周期性的任务执行的线程池，多数情况下可用来替代Timer类。</p>
+
+<p>ExecutoreService提供了submit()方法，传递一个Callable，或Runnable，返回Future。如果Executor后台线程池还没有完成Callable的计算，这调用返回Future对象的get()方法，会阻塞直到计算完成。</p>

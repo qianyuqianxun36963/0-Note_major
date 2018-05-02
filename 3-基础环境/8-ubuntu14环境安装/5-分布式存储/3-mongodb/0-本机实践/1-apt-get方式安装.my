@@ -1,0 +1,221 @@
+<h1>MongoDB 生产环境的安装与配置 (Ubuntu)</h1>
+
+<p>刚弄了个博客，顺便做个广告：&nbsp;<a href="http://hisea.me/" rel="nofollow" target="_blank">http://hisea.me</a></p>
+
+<p>前提条件</p>
+
+<p>Ubuntu</p>
+
+<p>安装10Gen的GPG key</p>
+
+<pre>
+<code>$ sudo apt-key adv --keyserver keyserver.ubuntu.com --recv 7F0CEB10
+</code></pre>
+
+<p>编辑source.list文件添加10gen源</p>
+
+<pre>
+<code>$ sudo vi /etc/apt/sources.list
+</code></pre>
+
+<p>添加：</p>
+
+<pre>
+<code>deb http://downloads-distro.mongodb.org/repo/ubuntu-upstart dist 10gen
+</code></pre>
+
+<p>安装MongoDB</p>
+
+<pre>
+<code>sudo apt-get update
+sudo apt-get install mongodb-10gen
+</code></pre>
+
+<p>为MongoDB的运行目录添加权限</p>
+
+<pre>
+<code>$ sudo chown mongodb /var/lib/mongodb
+</code></pre>
+
+<p>这样MongoDB就安装好了。</p>
+
+<p>启动和关掉mongodb可以运行。</p>
+
+<pre>
+<code>$ sudo service mongodb stop
+$ sudo service mongodb start
+</code></pre>
+
+<p>配置信息保存在 /etc/mongodb.conf</p>
+
+<p>如果想改变端口可以修改</p>
+
+<pre>
+<code>port=27017
+</code></pre>
+
+<p>默认情况下，mongodb可以接受任何连接，不需要用户名密码。</p>
+
+<p>生产环境我们有两种选择</p>
+
+<p>1.建立用户名密码</p>
+
+<pre>
+<code>$ mongo
+&gt; use admin
+switched to db admin
+&gt; db.addUser(&quot;username&quot;,&quot;password&quot;)
+</code></pre>
+
+<p>建立好用户名以后，需要开启连接时用用户名登陆</p>
+
+<p>在/etc/mongodb.conf中添加</p>
+
+<pre>
+<code>auth=true
+</code></pre>
+
+<p>2.只接受本地连接</p>
+
+<p>在/etc/mongodb.conf中添加:</p>
+
+<pre>
+<code>bind_ip=127.0.0.1
+</code></pre>
+
+<p>这样只有来自本地的连接才能连到MongoDB</p>
+
+<p>&nbsp;</p>
+
+<h2>在Ubuntu中安装MongoDB</h2>
+
+<p><strong>前言</strong></p>
+
+<p>MongoDB作为一种文档型的NoSQL数据库，使用起来非常灵活，回避了关系型数据库前期的复杂数据库设计。MongoDB存储基于JSON格式，同时用Javascript做为数据库操作语言，给了使用者无限想象的空间，可以通过编程在MongoDB服务器中解决非常复杂的条件查询的问题。</p>
+
+<p><strong>目录</strong></p>
+
+<ol>
+	<li>MongoDB在Windows中安装</li>
+	<li>MongoDB在Linux Ubuntu中安装</li>
+	<li>通过命令行客户端访问MongoDB</li>
+</ol>
+
+<h2>1 MongoDB在Windows中安装</h2>
+
+<p>在Windows系统上安装MongoDB数据库是件非常简单的事情，下载可执行安装文件(exe)，双击安装即可。下载地址：<a href="http://www.mongodb.org/downloads" target="_blank">http://www.mongodb.org/downloads</a></p>
+
+<ul>
+	<li>MongoDB服务器运行命令：MongoDB安装目录/bin/mongod.exe</li>
+	<li>MongoDB客户端运行命令：MongoDB安装目录/bin/mongo.exe</li>
+</ul>
+
+<h2>2 MongoDB在Linux Ubuntu中安装</h2>
+
+<p>本文使用的Linux是Ubuntu 12.04.2 LTS 64bit的系统，安装MongoDB数据库软件包可以通过apt-get实现。但我们修要安装官方提供MongoDB软件源。</p>
+
+<p>修改apt的source.list文件，增加10gen的设置。</p>
+
+<pre>
+<code>
+# 下载密钥文件
+~  sudo apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv 7F0CEB10
+Executing: gpg --ignore-time-conflict --no-options --no-default-keyring --secret-keyring /tmp/tmp.kVFab9XYw0 --trustdb-name /etc/apt/trustdb.gpg --keyring /etc/apt/trusted.gpg --primary-keyring /etc/apt/trusted.gpg --keyserver hkp://keyserver.ubuntu.com:80 --recv 7F0CEB10
+gpg: 下载密钥&lsquo;7F0CEB10&rsquo;，从 hkp 服务器 keyserver.ubuntu.com
+gpg: 密钥 7F0CEB10：公钥&ldquo;Richard Kreuter &rdquo;已导入
+gpg: 没有找到任何绝对信任的密钥
+gpg: 合计被处理的数量：1
+gpg:               已导入：1  (RSA: 1)
+
+# 在source.list中增加MongoDB源的配置
+~ echo &#39;deb http://downloads-distro.mongodb.org/repo/ubuntu-upstart dist 10gen&#39; | sudo tee /etc/apt/sources.list.d/mongodb.list
+deb http://downloads-distro.mongodb.org/repo/ubuntu-upstart dist 10gen
+
+# 更新软件源
+~ sudo apt-get update
+</code></pre>
+
+<p>在Linux Ubuntu中安装MongoDB数据库</p>
+
+<pre>
+<code>
+#安装MongoDB服务器端
+~ sudo apt-get install mongodb-10gen
+</code></pre>
+
+<p>安装完成后，MongoDB服务器会自动启动，我们检查MongoDB服务器程序</p>
+
+<pre>
+<code>
+# 检查MongoDB服务器系统进程
+~  ps -aux|grep mongo
+mongodb   6870  3.7  0.4 349208 39740 ?        Ssl  10:27   2:23 /usr/bin/mongod --config /etc/mongodb.conf
+
+# 通过启动命令检查MongoDB服务器状态
+~  netstat -nlt|grep 27017
+tcp        0      0 0.0.0.0:27017           0.0.0.0:*               LISTEN
+
+# 通过启动命令检查MongoDB服务器状态
+~ sudo /etc/init.d/mongodb status
+Rather than invoking init scripts through /etc/init.d, use the service(8)
+utility, e.g. service mongodb status
+
+Since the script you are attempting to invoke has been converted to an
+Upstart job, you may also use the status(8) utility, e.g. status mongodb
+mongodb start/running, process 6870
+
+# 通过系统服务检查MongoDB服务器状态
+~ sudo service mongodb status
+mongodb start/running, process 6870
+</code></pre>
+
+<p>通过web的控制台，查看MongoDB服务器的状态。在浏览器输入 http://ip:28017 ，就可以打开通过web的控制台了。</p>
+
+<p><a href="http://blog.fens.me/wp-content/uploads/2014/03/mongodb-web.png"><img alt="mongodb-web" src="http://blog.fens.me/wp-content/uploads/2014/03/mongodb-web.png" style="height:816px; width:1228px" /></a></p>
+
+<h2>3. 通过命令行客户端访问MongoDB</h2>
+
+<p>安装MongoDB服务器，会自动地一起安装MongoDB命令行客户端程序。</p>
+
+<p>在本机输入mongo命令就可以启动，客户端程序访问MongoDB服务器。</p>
+
+<pre>
+<code>
+~ mongo
+MongoDB shell version: 2.4.9
+connecting to: test
+Welcome to the MongoDB shell.
+For interactive help, type &quot;help&quot;.
+For more comprehensive documentation, see
+        http://docs.mongodb.org/
+Questions? Try the support group
+        http://groups.google.com/group/mongodb-user
+
+# 查看命令行帮助
+&gt; help
+        db.help()                    help on db methods
+        db.mycoll.help()             help on collection methods
+        sh.help()                    sharding helpers
+        rs.help()                    replica set helpers
+        help admin                   administrative help
+        help connect                 connecting to a db help
+        help keys                    key shortcuts
+        help misc                    misc things to know
+        help mr                      mapreduce
+
+        show dbs                     show database names
+        show collections             show collections in current database
+        show users                   show users in current database
+        show profile                 show most recent system.profile entries with time &gt;= 1ms
+        show logs                    show the accessible logger names
+        show log [name]              prints out the last segment of log in memory, &#39;global&#39; is default
+        use                 set current database
+        db.foo.find()                list objects in collection foo
+        db.foo.find( { a : 1 } )     list objects in foo where a == 1
+        it                           result of the last line evaluated; use to further iterate
+        DBQuery.shellBatchSize = x   set default number of items to display on shell
+        exit                         quit the mongo shell
+
+</code></pre>
+
+<p>MongoDB服务器，默认情况下是允许外部访问的。这样单节的MongoDB，我们已经成功地安装在Linux Ubuntu系统中。</p>

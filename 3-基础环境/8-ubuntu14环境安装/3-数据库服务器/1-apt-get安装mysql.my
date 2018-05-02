@@ -1,0 +1,87 @@
+<h1>ubuntu MySQL采用apt-get install安装目录</h1>
+
+<h2><strong>一).</strong>&nbsp;ubuntu下mysql安装布局:</h2>
+
+<p>/usr/bin&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 客户端程序和mysql_install_db<br />
+/var/lib/mysql&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 数据库和日志文件<br />
+/var/run/mysqld&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 服务器<br />
+/etc/mysql&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 配置文件my.cnf<br />
+/usr/share/mysql&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 字符集，基准程序和错误消息<br />
+/etc/init.d/mysql&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 启动mysql服务器</p>
+
+<h2><strong>二).</strong>&nbsp;设置mysql服务器随开关机自动启动和关闭：</h2>
+
+<p>系统 －&gt; 系统管理 －&gt; 服务<br />
+进行到&ldquo;服务设置&rdquo;窗口后，激活mysql数据库服务即可</p>
+
+<h2><strong>三).</strong>&nbsp;修改mysql数据库文件的存储目录：</h2>
+
+<p>MySQL默认的数据文件存储目录为/var/lib/mysql。假如要把目录移到/home/data下需要进行下面几步：</p>
+
+<p>1、home目录下建立data目录</p>
+
+<pre>
+cd /home
+mkdir data
+</pre>
+
+<pre>
+2、把MySQL服务进程停掉：</pre>
+
+<pre>
+mysqladmin -u root -p shutdown</pre>
+
+<pre>
+3、把/var/lib/mysql整个目录移到/home/data</pre>
+
+<pre>
+mv /var/lib/mysql　/home/data/
+</pre>
+
+<p>这样就把MySQL的数据文件移动到了/home/data/mysql下</p>
+
+<p>4、找到my.cnf配置文件</p>
+
+<p>如果/etc/目录下没有my.cnf配置文件，请到/usr/share/mysql/下找到*.cnf文件，拷贝其中一个到/etc/并改名为my.cnf)中。命令如下：</p>
+
+<pre>
+[root@test1 mysql]# cp /usr/share/mysql/my-medium.cnf　/etc/my.cnf
+</pre>
+
+<pre>
+5、编辑MySQL的配置文件/etc/my.cnf</pre>
+
+<p>为保证MySQL能够正常工作，需要指明mysql.sock文件的产生位置。修改socket=/var/lib/mysql/mysql.sock一行中等号右边的值为：/home/mysql/mysql.sock 。操作如下：</p>
+
+<pre>
+vi　 my.cnf　 (用vi工具编辑my.cnf文件，找到下列数据修改之)
+# The MySQL server
+[mysqld]　 port　= 3306
+#socket　 = /var/lib/mysql/mysql.sock（原内容，为了更稳妥用&ldquo;#&rdquo;注释此行）
+socket　 = /home/data/mysql/mysql.sock　（加上此行）
+</pre>
+
+<pre>
+6、修改MySQL启动脚本/etc/init.d/mysql</pre>
+
+<p>最后，需要修改MySQL启动脚本/etc/init.d/mysql，把其中datadir=/var/lib/mysql一行中，等号右边的路径改成你现在的实际存放路径：home/data/mysql。</p>
+
+<pre>
+[root@test1 etc]# vi　/etc/init.d/mysql
+#datadir=/var/lib/mysql（注释此行）
+datadir=/home/data/mysql （加上此行）
+
+7、重新启动MySQL服务
+/etc/init.d/mysql　start</pre>
+
+<p>或用reboot命令重启Linux</p>
+
+<p>如果工作正常移动就成功了，否则对照前面的7步再检查一下。还要注意目录的属主和权限。</p>
+
+<h2><strong>四).</strong>&nbsp;配置mysql数据库的INNODB存储引擎：</h2>
+
+<p>1 . 查看mysql存储引擎情况： 登录mysql数据库，在mysql&gt;提示符下搞入show engines;命令。发现： InnoDB | YES，说明此mysql数据库服务器支持InnoDB引擎。<br />
+2. 设置InnoDB为默认引擎：在配置文件my.cnf中的 [mysqld] 下面加入default-storage-engine=INNODB 一句，保存。<br />
+3. 重启mysql服务器：mysqladmin -u root -p shutdown(回车)，sudo /etc/init.d/mysql start(回车)。<br />
+4. 登录mysql数据库，在mysql&gt;提示符下搞入show engines;命令。如果出现 InnoDB |DEFAULT，则表示我们 设置InnoDB为默认引擎成功。<br />
+<strong>ps:</strong>&nbsp;这里我用重启命令sudo /etc/init.d/mysql restart，出现错误信息, 所以用了上面（步骤3）那种关闭服务又启动的笨方法。</p>
