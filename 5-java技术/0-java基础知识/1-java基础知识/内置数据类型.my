@@ -1,0 +1,258 @@
+<h1>内置数据类型</h1>
+
+<p>&nbsp;</p>
+
+<h2>高精度数字（high-precision number）</h2>
+
+<p>Java提供了两个用于高精度计算的类：BigInteger 和BigDecimal。虽然它们大体上属于&ldquo;包装器类&rdquo;的范畴，但二者都没有对应的基本类型。<br />
+不过，这两个类包含的方法，与基本类型所能执行的操作相似。也就是说，能作用于int 或float的操作, 也同样能作用于BigInteger或BigDecimal。只不过必须以方法调用方式取代运算符方式来实现。由于这么做复杂了许多，所以运算速度会比较慢。在这里，我们以速度换取了精度。</p>
+
+<p>BigInteger支持任意精度的整数（integer）。也就是说，在运算中，你可以准确表示任何大小的整数值，而不会丢失任何信息。</p>
+
+<p>BigDecimal支持任何精度的定点数（fixed-point number），例如，你可以用它进行精确的货币计算。</p>
+
+<p>&nbsp;</p>
+
+<h2>常见问题</h2>
+
+<h3>问题一，float 型数据相加失精度</h3>
+
+<h4>现象：</h4>
+
+<p><a href="http://www.iteye.com/problems/38302">请问2个float相加会是这样？</a></p>
+
+<p>float f0 = 0.021f;&nbsp;<br />
+float f1 = 0.022f;&nbsp;<br />
+out.println(f0);&nbsp;<br />
+out.println(f1);&nbsp;<br />
+out.println(f0 + f1);&nbsp;<br />
+<br />
+结果：&nbsp;<br />
+0.021&nbsp;<br />
+0.022&nbsp;<br />
+0.042999998&nbsp;</p>
+
+<h4>原因：</h4>
+
+<h4>1.&nbsp;&nbsp;浮点数IEEE 754表示方法</h4>
+
+<p>要搞清楚float累加为什么会产生误差，必须先大致理解float在机器里怎么存储的，具体的表示参考[1] 和 [2]， 这里只介绍一下组成</p>
+
+<p><img alt="" src="https://img-blog.csdn.net/20140815191211006" /></p>
+
+<p>由上图可知(摘在[2])， 浮点数由： 符号位 + 指数位 + 尾数部分， 三部分组成。由于机器中都是由二进制存储的，那么一个10进制的小数如何表示成二进制。例如: 8.25转成二进制为1000.01, 这是因为 1000.01 = 1*2^3 + 0*2^2 + 0*2^1 + 0*2^0 + 0*2^-1 + 2*2^-2 = 1000.01.</p>
+
+<p>（2）float的<strong>有效位数是6-7位</strong>，这是为什么呢？因为位数部分只有23位，所以最小的精度为1*2^-23 在10^-6和10^-7之间，接近10^-7,&nbsp;<a href="http://stackoverflow.com/questions/4610999/how-to-calculate-double-float-precision" target="_blank">[3]</a>中也有解释&nbsp;</p>
+
+<p>那么为什么float累加会产生误差呢，主要原因在于两个浮点数累加的过程。</p>
+
+<h4>2. 两个浮点数相加的过程</h4>
+
+<p>两浮点数X，Y进行加减运算时，必须按以下几步执行（可参考&nbsp;<a href="http://202.197.191.206:8080/23/text/ch02/se05/part1/r2_5_1_1.htm" target="_blank">[4]</a>&nbsp;中插图）：<br />
+（1）对阶，使两数的小数点位置对齐，小的阶码向大的阶码看齐。<br />
+（2）尾数求和，将对阶后的两尾数按定点加减运算规则求和(差)。<br />
+（3）规格化，为增加有效数字的位数，提高运算精度，必须将求和(差)后的尾数规格化。<br />
+（4）舍入，为提高精度，要考虑尾数右移时丢失的数值位。<br />
+（5）判断结果，即判断结果是否溢出。</p>
+
+<p>关键就在与<strong>对阶</strong>这一步骤，由于float的有效位数只有7位有效数字，如果一个大数和一个小数相加时，会产生很大的误差，因为尾数得截掉好多位。例如：</p>
+
+<p>123 + 0.00023456 = 1.23*10^2 + 0.000002 * 10^2 = 123.0002</p>
+
+<p>那么此时就会产生0.00003456的误差，如果累加多次，则误差就会进一步加大。</p>
+
+<p>那么怎么解决这种误差呢？</p>
+
+<h3>解决方法</h3>
+
+<p>（1）<strong>Kahan summation算法</strong>，具体解释和实现参考&nbsp;<a href="http://en.wikipedia.org/wiki/Kahan_summation_algorithm" target="_blank">[5]</a>&nbsp;和&nbsp;<a href="http://liu-mengmeng.diandian.com/post/2012-12-16/40046111427" target="_blank">[6]</a></p>
+
+<p>（2）<strong>使用double类型进行计算</strong>，由于double类型的有效数字有15~16位，一般情况下产生误差可以接受。</p>
+
+<p>（3）在取这个字段的时候<strong>转换成BigDecimal</strong>就可以了</p>
+
+<h3>解决示例</h3>
+
+<p>java float 加减精度问题</p>
+
+<p>在取这个字段的时候转换成BigDecimal就可以了</p>
+
+<p>同时,BigDecimal是可以设置精度的。</p>
+
+<p>float m = 12.22F;</p>
+
+<p>float c = 1.22F;</p>
+
+<p>BigDecimal b1 = new BigDecimal(Float.toString(m));</p>
+
+<p>BigDecimal b2 = new BigDecimal(Float.toString(c));</p>
+
+<p>System.out.println(m);</p>
+
+<p>System.out.println(c);</p>
+
+<p>Float add = b1.add(b2).floatValue();</p>
+
+<p>System.out.println(&quot;add=========&quot; + add);</p>
+
+<p>Float less = b1.subtract(b2).floatValue();</p>
+
+<p>System.out.println(&quot;less=========&quot; + less);</p>
+
+<p>Float multiply = b1.multiply(b2).floatValue();</p>
+
+<p>System.out.println(&quot;multiply=========&quot; + multiply);</p>
+
+<p>//给divide设置精确的小数点,解决不整除报异常</p>
+
+<p>Float divide = b1.divide(b2,4, BigDecimal.ROUND_HALF_EVEN).floatValue();</p>
+
+<p>System.out.println(&quot;divide=========&quot; + divide);</p>
+
+<p>===========================================</p>
+
+<p>BigDecimal不整除的一个异常java.lang.ArithmeticException: Non-terminating decimal expansion</p>
+
+<p>金额的数据类型是BigDecimal&nbsp;</p>
+
+<p>通过BigDecimal的divide方法进行除法时当不整除，出现无限循环小数时，就会抛异常的，异常如下：java.lang.ArithmeticException:</p>
+
+<p>&nbsp;Non-terminating decimal expansion; no exact representable decimal result. at java.math.BigDecimal.divide(Unknown Source)</p>
+
+<p>应用场景：一批中供客户的单价是1000元/年，如果按月计算的话1000/12=83.3333333333....&nbsp;</p>
+
+<p>解决之道：就是给divide设置精确的小数点divide(xxxxx,2, BigDecimal.ROUND_HALF_EVEN)&nbsp;</p>
+
+<p>在 java中， 四舍五入通过 BigDecimal 来实现。一定要注意：BigDecimal is Immutable。</p>
+
+<p>也就是跟String一样，对前一个的修改，比如setScale(), add（）等都会返回一个新的ＢigDecimal.</p>
+
+<p>四舍五入舍入模式是　BigDecimal.ROUND_HALF_UP　</p>
+
+<p>BigDecimal定义了一下舍入模式，只有在作除法运算或四舍五入时才用到舍入模式，</p>
+
+<p>下面简单介绍，详细请查阅J2se API文档</p>
+
+<p>static int</p>
+
+<p>ROUND_CEILING</p>
+
+<p>Rounding mode to round towards positive infinity.</p>
+
+<p>向正无穷方向舍入</p>
+
+<p>static int</p>
+
+<p>ROUND_DOWN</p>
+
+<p>Rounding mode to round towards zero.</p>
+
+<p>向零方向舍入</p>
+
+<p>static int</p>
+
+<p>ROUND_FLOOR</p>
+
+<p>Rounding mode to round towards negative infinity.</p>
+
+<p>向负无穷方向舍入</p>
+
+<p>static int</p>
+
+<p>ROUND_HALF_DOWN</p>
+
+<p>Rounding mode to round towards &quot;nearest neighbor&quot; unless both neighbors are equidistant,</p>
+
+<p>in which case round down.</p>
+
+<p>向（距离）最近的一边舍入，除非两边（的距离）是相等,如果是这样，向下舍入,例如1.55保留一位</p>
+
+<p>小数结果为1.5</p>
+
+<p>static int</p>
+
+<p>ROUND_HALF_EVEN</p>
+
+<p>Rounding mode to round towards the &quot;nearest neighbor&quot; unless both neighbors are equidistant,</p>
+
+<p>in which case, round towards the even neighbor.</p>
+
+<p>向（距离）最近的一边舍入，除非两边（的距离）是相等,如果是这样，如果保留位数是奇数，</p>
+
+<p>使用ROUND_HALF_UP，如果是偶数，使用ROUND_HALF_DOWN</p>
+
+<p>static int</p>
+
+<p>ROUND_HALF_UP</p>
+
+<p>Rounding mode to round towards &quot;nearest neighbor&quot; unless both neighbors are equidistant,</p>
+
+<p>in which case round up.</p>
+
+<p>向（距离）最近的一边舍入，除非两边（的距离）是相等,如果是这样，向上舍入, 1.55保留一位</p>
+
+<p>小数结果为1.6</p>
+
+<p>static int</p>
+
+<p>ROUND_UNNECESSARY</p>
+
+<p>Rounding mode to assert that the requested operation has an exact result, hence no</p>
+
+<p>rounding is necessary.</p>
+
+<p>计算结果是精确的，不需要舍入模式</p>
+
+<p>static int</p>
+
+<p>ROUND_UP</p>
+
+<p>Rounding mode to round away from zero.</p>
+
+<p>向远离0的方向舍入</p>
+
+<p>===========================================</p>
+
+<p>如何应用Java的BigDecimal类</p>
+
+<p>双精度浮点型变量double可以处理16位有效数。在实际应用中，需要对更大或者更小的数进行运算和处理。</p>
+
+<p>Java在java.math包中提供的API类BigDecimal，用来对超过16位有效位的数进行精确的运算。表5.7中列出了BigDecimal类的主要构造器和方法。</p>
+
+<p>表5.7 BigDecimal类的主要构造器和方法</p>
+
+<p>构造器 &nbsp;描 述</p>
+
+<p>BigDecimal(int)创建一个具有参数所指定整数值的对象。</p>
+
+<p>BigDecimal(double)创建一个具有参数所指定双精度值的对象。</p>
+
+<p>BigDecimal(long)创建一个具有参数所指定长整数值的对象。</p>
+
+<p>BigDecimal(String)创建一个具有参数所指定以字符串表示的数值的对象。</p>
+
+<p>续表</p>
+
+<p>方 法描 述</p>
+
+<p>add(BigDecimal)BigDecimal对象中的值相加，然后返回这个对象。</p>
+
+<p>subtract(BigDecimal)BigDecimal对象中的值相减，然后返回这个对象。</p>
+
+<p>multiply(BigDecimal)BigDecimal对象中的值相乘，然后返回这个对象。</p>
+
+<p>divide(BigDecimal)BigDecimal对象中的值相除，然后返回这个对象。</p>
+
+<p>toString()将BigDecimal对象的数值转换成字符串。</p>
+
+<p>doubleValue()将BigDecimal对象中的值以双精度数返回。</p>
+
+<p>floatValue()将BigDecimal对象中的值以单精度数返回。</p>
+
+<p>longValue()将BigDecimal对象中的值以长整数返回。</p>
+
+<p>intValue()将BigDecimal对象中的值以整数返回。</p>
+
+<p>注意，由于一般数值类型，例如double，不能准确地代表16位有效数以上的数字，在使用BigDecimal时，应用BigDecimal(String)构造器创建对象才有意义。另外，BigDecimal所创建的是对象，我们不能使用传统的+、-、*、/等算术运算符直接对其对象进行数学运算，而必须调用其相对应的方法。方法中的参数也必须是BigDecimal的对象。</p>
+
+<p>构造器是类的特殊方法，专门用来创建对象，特别是带有参数的对象。关于构造器概念和编写技术，将在本书第6章详细介绍。</p>
