@@ -1,0 +1,297 @@
+<h1><a href="http://www.cnblogs.com/humin/p/4556820.html" id="cb_post_title_url">JS实现继承的几种方式</a></h1>
+
+<p>JS作为面向对象的弱类型语言，继承也是其非常强大的特性之一。那么如何在JS中实现继承呢？让我们拭目以待。</p>
+
+<h2>JS继承的实现方式</h2>
+
+<p>既然要实现继承，那么首先我们得有一个父类，代码如下：</p>
+
+<pre>
+<code>// 定义一个动物类
+function Animal (name) {
+  // 属性
+  this.name = name || &#39;Animal&#39;;
+  // 实例方法
+  this.sleep = function(){
+    console.log(this.name + &#39;正在睡觉！&#39;);
+  }
+}
+// 原型方法
+Animal.prototype.eat = function(food) {
+  console.log(this.name + &#39;正在吃：&#39; + food);
+};
+</code></pre>
+
+<h3>1、原型链继承</h3>
+
+<p><strong>核心：</strong>&nbsp;将父类的实例作为子类的原型</p>
+
+<pre>
+<code>function Cat(){ 
+}
+Cat.prototype = new Animal();
+Cat.prototype.name = &#39;cat&#39;;
+
+//　Test Code
+var cat = new Cat();
+console.log(cat.name);
+console.log(cat.eat(&#39;fish&#39;));
+console.log(cat.sleep());
+console.log(cat instanceof Animal); //true 
+console.log(cat instanceof Cat); //true
+</code></pre>
+
+<p>特点：</p>
+
+<ol>
+	<li>非常纯粹的继承关系，实例是子类的实例，也是父类的实例</li>
+	<li>父类新增原型方法/原型属性，子类都能访问到</li>
+	<li>简单，易于实现</li>
+</ol>
+
+<p>缺点：</p>
+
+<ol>
+	<li>要想为子类新增属性和方法，必须要在<code>new Animal()</code>这样的语句之后执行，不能放到构造器中</li>
+	<li>无法实现多继承</li>
+	<li>来自原型对象的引用属性是所有实例共享的（详细请看附录代码：&nbsp;<a href="javascript:void(0);">示例1</a>）</li>
+	<li>创建子类实例时，无法向父类构造函数传参</li>
+</ol>
+
+<p>推荐指数：★★（3、4两大致命缺陷）</p>
+
+<p><strong>2017-8-17 10:21:43补充：感谢&nbsp;<a href="http://home.cnblogs.com/u/1066372/" target="_blank">MMHS</a>&nbsp;指出。缺点1中描述有误：可以在Cat构造函数中，为Cat实例增加实例属性。如果要新增原型属性和方法，则必须放在<code>new Animal()</code>这样的语句之后执行。</strong></p>
+
+<h3>2、构造继承</h3>
+
+<p><strong>核心：</strong>使用父类的构造函数来增强子类实例，等于是复制父类的实例属性给子类（没用到原型）</p>
+
+<pre>
+<code>function Cat(name){
+  Animal.call(this);
+  this.name = name || &#39;Tom&#39;;
+}
+
+// Test Code
+var cat = new Cat();
+console.log(cat.name);
+console.log(cat.sleep());
+console.log(cat instanceof Animal); // false
+console.log(cat instanceof Cat); // true
+</code></pre>
+
+<p>特点：</p>
+
+<ol>
+	<li>解决了1中，子类实例共享父类引用属性的问题</li>
+	<li>创建子类实例时，可以向父类传递参数</li>
+	<li>可以实现多继承（call多个父类对象）</li>
+</ol>
+
+<p>缺点：</p>
+
+<ol>
+	<li>实例并不是父类的实例，只是子类的实例</li>
+	<li>只能继承父类的实例属性和方法，不能继承原型属性/方法</li>
+	<li>无法实现函数复用，每个子类都有父类实例函数的副本，影响性能</li>
+</ol>
+
+<p>推荐指数：★★（缺点3）</p>
+
+<h3>3、实例继承</h3>
+
+<p><strong>核心：</strong>为父类实例添加新特性，作为子类实例返回</p>
+
+<pre>
+<code>function Cat(name){
+  var instance = new Animal();
+  instance.name = name || &#39;Tom&#39;;
+  return instance;
+}
+
+// Test Code
+var cat = new Cat();
+console.log(cat.name);
+console.log(cat.sleep());
+console.log(cat instanceof Animal); // true
+console.log(cat instanceof Cat); // false
+</code></pre>
+
+<p>特点：</p>
+
+<ol>
+	<li>不限制调用方式，不管是<code>new 子类()</code>还是<code>子类()</code>,返回的对象具有相同的效果</li>
+</ol>
+
+<p>缺点：</p>
+
+<ol>
+	<li>实例是父类的实例，不是子类的实例</li>
+	<li>不支持多继承</li>
+</ol>
+
+<p>推荐指数：★★</p>
+
+<h3>4、拷贝继承</h3>
+
+<pre>
+<code>function Cat(name){
+  var animal = new Animal();
+  for(var p in animal){
+    Cat.prototype[p] = animal[p];
+  }
+  Cat.prototype.name = name || &#39;Tom&#39;;
+}
+
+// Test Code
+var cat = new Cat();
+console.log(cat.name);
+console.log(cat.sleep());
+console.log(cat instanceof Animal); // false
+console.log(cat instanceof Cat); // true
+</code></pre>
+
+<p>特点：</p>
+
+<ol>
+	<li>支持多继承</li>
+</ol>
+
+<p>缺点：</p>
+
+<ol>
+	<li>效率较低，内存占用高（因为要拷贝父类的属性）</li>
+	<li>无法获取父类不可枚举的方法（不可枚举方法，不能使用for in 访问到）</li>
+</ol>
+
+<p>推荐指数：★（缺点1）</p>
+
+<h3>5、组合继承</h3>
+
+<p><strong>核心：</strong>通过调用父类构造，继承父类的属性并保留传参的优点，然后通过将父类实例作为子类原型，实现函数复用</p>
+
+<pre>
+<code>function Cat(name){
+  Animal.call(this);
+  this.name = name || &#39;Tom&#39;;
+}
+Cat.prototype = new Animal();
+
+<strong>// 感谢 @<a href="http://www.cnblogs.com/long-long/" id="a_comment_author_3861208" target="_blank">学无止境c</a>&nbsp;的提醒，组合继承也是需要修复构造函数指向的。</strong>
+
+<strong>Cat.prototype.constructor = Cat;</strong>
+
+// Test Code
+var cat = new Cat();
+console.log(cat.name);
+console.log(cat.sleep());
+console.log(cat instanceof Animal); // true
+console.log(cat instanceof Cat); // true
+</code></pre>
+
+<p>特点：</p>
+
+<ol>
+	<li>弥补了方式2的缺陷，可以继承实例属性/方法，也可以继承原型属性/方法</li>
+	<li>既是子类的实例，也是父类的实例</li>
+	<li>不存在引用属性共享问题</li>
+	<li>可传参</li>
+	<li>函数可复用</li>
+</ol>
+
+<p>缺点：</p>
+
+<ol>
+	<li>调用了两次父类构造函数，生成了两份实例（子类实例将子类原型上的那份屏蔽了）</li>
+</ol>
+
+<p>推荐指数：★★★★（仅仅多消耗了一点内存）</p>
+
+<h3>6、寄生组合继承</h3>
+
+<p><strong>核心：</strong>通过寄生方式，砍掉父类的实例属性，这样，在调用两次父类的构造的时候，就不会初始化两次实例方法/属性，避免的组合继承的缺点</p>
+
+<pre>
+<code>function Cat(name){
+  Animal.call(this);
+  this.name = name || &#39;Tom&#39;;
+}
+(function(){
+  // 创建一个没有实例方法的类
+  var Super = function(){};
+  Super.prototype = Animal.prototype;
+  //将实例作为子类的原型
+  Cat.prototype = new Super();
+})();
+
+// Test Code
+var cat = new Cat();
+console.log(cat.name);
+console.log(cat.sleep());
+console.log(cat instanceof Animal); // true
+console.log(cat instanceof Cat); //true
+
+<strong>感谢 @<a href="http://home.cnblogs.com/u/1291442/" id="a_comment_author_3855903" target="_blank">bluedrink</a> 提醒，该实现没有修复constructor。
+
+</strong>Cat.prototype.constructor = Cat; // 需要修复下构造函数</code></pre>
+
+<p>特点：</p>
+
+<ol>
+	<li>堪称完美</li>
+</ol>
+
+<p>缺点：</p>
+
+<ol>
+	<li>实现较为复杂</li>
+</ol>
+
+<p>推荐指数：★★★★（实现复杂，扣掉一颗星）</p>
+
+<h2>附录代码：</h2>
+
+<p>示例一：</p>
+
+<pre>
+<code>function Animal (name) {
+  // 属性
+  this.name = name || &#39;Animal&#39;;
+  // 实例方法
+  this.sleep = function(){
+    console.log(this.name + &#39;正在睡觉！&#39;);
+  }
+  //实例引用属性
+  this.features = [];
+}
+function Cat(name){
+}
+Cat.prototype = new Animal();
+
+var tom = new Cat(&#39;Tom&#39;);
+var kissy = new Cat(&#39;Kissy&#39;);
+
+console.log(tom.name); // &quot;Animal&quot;
+console.log(kissy.name); // &quot;Animal&quot;
+console.log(tom.features); // []
+console.log(kissy.features); // []
+
+tom.name = &#39;Tom-New Name&#39;;
+tom.features.push(&#39;eat&#39;);
+
+//针对父类实例值类型成员的更改，不影响
+console.log(tom.name); // &quot;Tom-New Name&quot;
+console.log(kissy.name); // &quot;Animal&quot;
+//针对父类实例引用类型成员的更改，会通过影响其他子类实例
+console.log(tom.features); // [&#39;eat&#39;]
+console.log(kissy.features); // [&#39;eat&#39;]
+
+原因分析：
+
+关键点：属性查找过程
+
+执行tom.features.push，首先找tom对象的实例属性（找不到），
+那么去原型对象中找，也就是Animal的实例。发现有，那么就直接在这个对象的
+features属性中插入值。
+在console.log(kissy.features); 的时候。同上，kissy实例上没有，那么去原型上找。
+刚好原型上有，就直接返回，但是注意，这个原型对象中features属性值已经变化了。</code></pre>

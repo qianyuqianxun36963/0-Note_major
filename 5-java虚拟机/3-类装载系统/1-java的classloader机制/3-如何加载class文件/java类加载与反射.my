@@ -1,0 +1,130 @@
+<h1>类加载机制和反射</h1>
+
+<p>调用java命令运行java程序时，该命令将启动一个java虚拟机进程<br />
+JVM进程被终止的情况：程序正常结束，程序运行到System.exit(),Runtime.getRuntime().exit(),程序中遇到未捕获的异常或错误而结束，平台强制结束JVM进程<br />
+18.1.2 类的加载<br />
+程序使用某个类时，会通过加载、连接、初始化进行类加载或类初始化，类的加载是指将类的class文件读入内存(将其放在运行时数据区的方法区内，然后在堆区创建一个这个类的Java.lang.Class对象(类也是一种对象))。<br />
+类的加载由类加载器完成，类加载器通常由JVM提供，称为系统类加载器，除此之外可以通过继承ClassLoader基类来自定义类加载器。<br />
+不同的类加载器加载类的来源：本地文件、jar包、网络加载、java源文件动态编译。<br />
+18.3 类的加载器<br />
+类加载器负责加载所有的类，同一个类(一个类用其全限定类名(包名加类名)标志)只会被加载一次。<br />
+JVM启动时，会形成3个类加载器组成的初始类加载器层次结构：<br />
+Bootstrap ClassLoader:根类加载器，负责加载java的核心类，它不是java.lang.ClassLoader的子类，而是由JVM自身实现<br />
+Extension ClassLoader:扩展类加载器，扩展类加载器的加载路径是JDK目录下jre/lib/ext,扩展类的getParent()方法返回null,实际上扩展类加载器的父类加载器是根加载器，只是根加载器并不是Java实现的</p>
+
+<p>System ClassLoader:系统(应用)类加载器，它负责在JVM启动时加载来自java命令的-classpath选项、java.class.path系统属性或CLASSPATH环境变量所指定的jar包和类路径。程序可以通过getSystemClassLoader()来获取系统类加载器。系统加载器的加载路径是程序运行的当前路径</p>
+
+<p><br />
+<br />
+18.1.3 类的连接<br />
+连接阶段负责把类的二进制数据合并到JRE中，类连接分为三个阶段：验证，检验被加载的类是否有正确的内部结构，并和其他类协调一致；准备，为类的静态Field分配内存，并设置默认初始值；解析，将类的二进制数据中的符号替换成直接引用。<br />
+18.1.4 类的初始化<br />
+类的初始化阶段，虚拟机负责对类进行初始化，主要就是对静态Field进行初始化。声明静态Field时指定初始值，使用静态初始化块为静态Field指定初始值。<br />
+JVM初始化一个类包含以下几个步骤：<br />
+(1)、假如这个类还没有被加载和连接，则程序先加载并连接该类<br />
+(2)、假如该类的直接父类还没有被初始化，则先初始化其父类(父类依次遵循1-3，JVM最先初始化的是java.lang.Object类)<br />
+(3)、假如类中有初始化语句，则系统依次执行这些初始化语句<br />
+18.1.5 类初始化的时机<br />
+当java程序首次通过下面6中方式来使用某个类或接口时，系统就会初始化该类或接口。<br />
+创建类的实例(new,反射,反序列化)<br />
+调用某个类的静态方法<br />
+调用某个类或接口的静态Field，或为该静态Field赋值<br />
+使用反射方式来强制创建某个类或接口对应的java.lang.Class对象(Class.forName(&quot;name&quot;))<br />
+初始化某个类的子类(该类的所有父类都会被初始化)<br />
+直接用java.exe来运行某个主类<br />
+对于final型的静态Field，如果该Field值在编译阶段就确定下来，使用该静态Field不会导致类的初始化<br />
+如果final型的静态Field的值不能在编译时确定下来，则必须等到运行时才可以确定<br />
+当使用ClassLoad类的loadClass()方法加载某个类时，该方法只是加载该类，并不会执行该类的初始化。使用Class的forName()<br />
+静态方法才会导致强制初始化该类。<br />
+<br />
+<br />
+18.2.2 类加载机制<br />
+JVM的类加载机制主要有如下3种<br />
+全盘负责。当一个类加载器负责加载某个Class时，该Class所依赖的和引用的其他Class也将由该类加载器负责载入，除非显式使用另一个类加载器来载入。<br />
+父类委托。先让parent(父)类加载器试图加载该Class，只有在父类加载器无法加载该类时才尝试从自己的类路径中加载该类。<br />
+缓存机制。缓存机制会保证所有加载过的Class都将缓存，当程序中需要使用某个Class时，类加载器先从缓存中搜寻该Class，只有当缓存区中不存在该Class对象时，系统才读取该类对应的二进制数据，将其转换成Class对象，存入缓存，所以修改Class<br />
+后必须重新启动JVM，程序中所做的修改才会生效的原因。<br />
+类加载器加载Class大致要经过如下8个步骤：<br />
+(1) 检测此Class是否载入过(缓存中是否有此Class)，有则进入第8步，否则执行第2步<br />
+(2) 如果父类加载器不存在(要么parent一定是根类加载器，要么本身就是根类加载器)，执行第4步，如果父类加载器存在则执行第3步<br />
+(3) 请求使用父类加载器去载入目标类，如果成功载入则调到第8步，否则执行第5步<br />
+(4) 请求使用根加载器来载入目标类，如果成功载入则调到第8步，否则调到第7步<br />
+(5) 当前类加载器尝试寻找Class文件，如果找到则执行第6步，如果找不到则调到第7步<br />
+(6) 从文件中载入Class，成功载入后调到第8步<br />
+(7) 抛出ClassNotFoundException异常<br />
+(8) 返回对应的java.lang.Class对象<br />
+第5,6步允许重写ClassLoader的findClass()方法实现自己的载入策略，甚至重写loadClass()方法来实现自己的载入过程<br />
+18.2.3 创建使用自定义的类加载器<br />
+JVM中除根类加载器外，所有类加载器都是ClassLoader子类的实例，开发者可以通过扩展ClassLoad的子类，并重写该ClassLoad所包含的方法来实现自定义的类加载器。<br />
+ClassLoader类有如下两个关键方法：<br />
+loadClass(String name,boolean resolve) 根据指定的二进制名称加载类<br />
+findClass(String name) 根据二进制名称来查找类<br />
+如果需要实现自定义的ClassLoader，则可以通过重写以上两个方法来实现<br />
+loadClass()方法的执行步骤如下：<br />
+(1) 用findLoadedClass(String s)检查是否已经加载类，如果已经加载则直接返回<br />
+(2) 在父类加载器上调用loadClass()方法，如果父类加载器为null，则使用根类加载器来加载<br />
+(3) 使用findClass(String)方法查找类<br />
+推荐重写findClass方法，避免覆盖默认类加载器的父类委托、缓冲机制两种策略。<br />
+ClassLoader 里有个核心方法：Class defineClass 该方法负责将制定类的字节码文件读入字节数组，并转换为Class对象<br />
+其他方法：findSystemClass(String name) 从本地文件系统装入文件<br />
+static getSystemClassLoader() 返回系统类加载器<br />
+getParent() 获取该类的父类加载器<br />
+resolveClass(Class&lt;?&gt; c) 连接制定的类，类加载器可使用该方法链接 c<br />
+findLoadedClass(String name) 从缓存中返回类对象<br />
+18.2.4 URLClassLoader类<br />
+java为ClassLoader提供了URLClassLoader实现类<br />
+URLClassLoader类提供了如下两个构造器：<br />
+URLClassLoader(URL[] urls) 使用默认的父类加载器创建一个ClassLoader对象<br />
+URLClassLoader(URL[] urls,ClassLoader parent) 使用指定的父类加载器创建一个ClassLoader对象<br />
+得到ClassLoader对象后就可以调用对象的loadClass()方法来加载指定类<br />
+<br />
+<br />
+18.3 反射<br />
+18.3.1 获得Class对象<br />
+使用Class类的forName(String clazzName)静态方法<br />
+调用某个类的class属性<br />
+调用某个对象的getClass()方法<br />
+18.3.2 从Class中获取信息<br />
+Class类提供了大量的实例方法来获取该Class对象所对应类的详细信息它可以获取该类里包含的构造器、方法、内部类、注释等信息，也可以获取该类所包含的属性(Field)信息<br />
+18.4 通过反射生成并操作对象<br />
+18.4.1 创建对象<br />
+通过反射来生成对象有如下两种方式：<br />
+使用Class对象的newInstance()方法来创建该Class对象对应的类的实例，这种方式利用该Class对象的默认构造器创建实例<br />
+先使用Class对象获取指定的Constructor对象，在调用Constructor对象的newInstance()方法来创建该Class对象的实例，可以选择使用指定的构造器来创建实例<br />
+(1) 获取该类的Class对象<br />
+(2) 利用Class对象的getConstructor()方法来获取指定的构造器<br />
+(3) 利用Constructor的newInstance()方法来创建Java对象<br />
+18.4.2 调用方法<br />
+当获得某个类对应的Class对象后，可以通过该Class对象的getMethod()或getMethods()方法获得Method对象或Method数组<br />
+通过Method的invoke()方法来调用对应的方法，java会要求程序必须有调用该方法的权限，如果程序确实需要调用某个对象的private方法，则可以先调用Method对象的setAccessible(boolean flag)方法，true指示取消Java语言的访问权限检查，可以通过调用该方法取消访问权限检查，通过反射即可访问private成员，private方法<br />
+18.4.3 访问属性值<br />
+通过Class对象的getFields()或getField()方法可以获取该类所包含的全部Field或指定Field，Field提供如下两个方法来读取或设置Field值<br />
+getXxx(Object obj) 获取obj对象该Field的属性值。此处Xxx对应8个基本类型，如属性的类型是引用类型，则取消get后的Xxx<br />
+setXxx(Object obj) 设置obj对象该Field的属性值。此处Xxx对应8个基本类型，如属性的类型是引用类型，则取消set后的Xxx<br />
+使用这两个方法可以随意的访问制定对象的所有属性，包括private访问控制的属性<br />
+18.4.4 操作数组<br />
+java.lang.reflect包下还提供了一个Array类，程序可以通过使用Array来动态创建数组，操作数组元素等<br />
+Array提供以下方法：<br />
+static Object newInstance(Class&lt;?&gt; componentType,int... length) 创建制定数据类型，制定维度的数组<br />
+static getXxx getXxx(Object array,int index) 返回array数组中第index个元素，其中Xxx是各种基本数据类型，如果数组元素是引用类型，则该方法变为get(Object array,int index)<br />
+static setXxx setXxx(Object array,int index) 返回array数组中第index个元素，其中Xxx是各种基本数据类型，如果数组元素是引用类型，则该方法变为get(Object array,int index,xxx val) 将array数组中第index个元素的值设为val。<br />
+18.5 使用反射生成动态代理<br />
+18.5.1 使用Proxy和InvocationHandler创建动态代理<br />
+在java的java.lang.reflect包下提供了一个Proxy类和一个InvocationHandle接口，会用使用这个类和接口可以生成JDK动态代理类和动态代理对象。<br />
+Proxy提供了如下两个方法来创建动态代理类和动态代理实例。<br />
+static Class&lt;?&gt; getProxyClass(ClassLoader loader,Class&lt;?&gt;... interfaces):创建一个动态代理类所对应的Class对象，该代理将实现interfaces所指定的多个接口。<br />
+static Object newProxyInstance(ClassLoader loader,Class&lt;?&gt;[] interfaces,InvocationHandler h);直接创建一个动态代理对象该代理对象的实现类实现了interface制定的的系列接口，执行代理对象的每个方法时都会被替换执行InvocationHandler对象的invoke方法<br />
+18.5.2 动态代理和AOP<br />
+AOP面向切面编程<br />
+18.6 反射和泛型<br />
+通过在反射中使用泛型，可以避免使用反射生成的对象需要强制类型转换<br />
+18.6.1 泛型和Class类<br />
+使用Class&lt;T&gt;泛型可避免强制类型转换<br />
+18.6.2 使用反射来获取泛型信息<br />
+通过制定类对应的Class对象，可以获取该类里包含的Field，获得Field对象后，就可以很容易的获得该Field的数据类型<br />
+Class&lt;?&gt; a = f.getType();<br />
+如果该Field的类型是具有泛型类型的类型，应用如下方法来获取指定Field的泛型类型<br />
+Type gType = f.getGenericType();<br />
+然后将Type对象强制类型转换为ParameterizedType对象，ParameterizedType代表被参数化的类型，也就是增加了泛型限制的类型。ParameterizedType类提供如下两个方法。<br />
+getRawType():返回没有泛型信息的原始类型<br />
+getActualTypeArguments():返回泛型参数的类型</p>

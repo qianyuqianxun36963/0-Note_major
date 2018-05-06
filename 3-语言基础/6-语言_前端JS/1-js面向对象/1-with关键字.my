@@ -1,0 +1,292 @@
+<h1>理解javascript中的with关键字</h1>
+
+<p>这篇文章主要帮助大家理解javascript中的with关键字，学习with关键字的作用，感兴趣的小伙伴们可以参考一下</p>
+
+<p>说起js中的with关键字，很多小伙伴们的第一印象可能就是with关键字的作用在于改变作用域，然后最关键的一点是不推荐使用with关键字。听到不推荐with关键字后，我们很多人都会忽略掉with关键字，认为不要去管它用它就可以了。但是有时候，我们在看一些代码或者面试题的时候，其中会有with关键字的相关问题，很多坑是你没接触过的，所以还是有必要说说with这一个关键字。</p>
+
+<h2><strong>一、基本说明</strong></h2>
+
+<p>在js高级程序设计中是这样描述with关键字的：with语句的作用是将代码的作用域设置到一个特定的作用域中，基本语法如下：</p>
+
+<p><code>with</code> <code>(expression) statement;</code></p>
+
+<p>使用with关键字的目的是为了简化多次编写访问同一对象的工作，比如下面的例子：</p>
+
+<p><code>var</code> <code>qs = location.search.substring(1);</code></p>
+
+<p><code>var</code> <code>hostName = location.hostname;</code></p>
+
+<p><code>var</code> <code>url = location.href;</code></p>
+
+<p><br />
+这几行代码都是访问location对象中的属性，如果使用with关键字的话，可以简化代码如下：</p>
+
+<p><code>with</code> <code>(location){</code></p>
+
+<p><code>&nbsp;&nbsp;</code><code>var</code> <code>qs = search.substring(1);</code></p>
+
+<p><code>&nbsp;&nbsp;</code><code>var</code> <code>hostName = hostname;</code></p>
+
+<p><code>&nbsp;&nbsp;</code><code>var</code> <code>url = href;</code></p>
+
+<p><code>}</code></p>
+
+<p>在这段代码中，使用了with语句关联了location对象，这就以为着在with代码块内部，每个变量首先被认为是一个局部变量，如果局部变量与location对象的某个属性同名，则这个局部变量会指向location对象属性。<br />
+注意：在严格模式下不能使用with语句。</p>
+
+<h2><strong>二、with关键字的弊端</strong></h2>
+
+<p>前面的基本说明中，我们可以看到with的作用之一是简化代码。但是为什么不推荐使用呢？下面我们来说说with的缺点：</p>
+
+<p>1、性能问题<br />
+2、语义不明，调试困难</p>
+
+<h2><strong>三、性能问题</strong></h2>
+
+<p>首先说说性能问题，关于使用with关键字的性能问题，首先我们来看看两段代码：</p>
+
+<p>第一段代码是没有使用with关键字：</p>
+
+<p><code>function</code> <code>func() {</code></p>
+
+<p><code>&nbsp;&nbsp;</code><code>console.time(</code><code>&quot;func&quot;</code><code>);</code></p>
+
+<p><code>&nbsp;&nbsp;</code><code>var</code> <code>obj = {</code></p>
+
+<p><code>&nbsp;&nbsp;&nbsp;&nbsp;</code><code>a: [1, 2, 3]</code></p>
+
+<p><code>&nbsp;&nbsp;</code><code>};</code></p>
+
+<p><code>&nbsp;&nbsp;</code><code>for</code> <code>(</code><code>var</code> <code>i = 0; i &lt; 100000; i++) {</code></p>
+
+<p><code>&nbsp;&nbsp;&nbsp;&nbsp;</code><code>var</code> <code>v = obj.a[0];</code></p>
+
+<p><code>&nbsp;&nbsp;</code><code>}</code></p>
+
+<p><code>&nbsp;&nbsp;</code><code>console.timeEnd(</code><code>&quot;func&quot;</code><code>);</code><code>//0.847ms</code></p>
+
+<p><code>}</code></p>
+
+<p><code>func();</code></p>
+
+<p>第二段代码使用了with关键字：</p>
+
+<p><code>function</code> <code>funcWith() {</code></p>
+
+<p><code>&nbsp;&nbsp;</code><code>console.time(</code><code>&quot;funcWith&quot;</code><code>);</code></p>
+
+<p><code>&nbsp;&nbsp;</code><code>var</code> <code>obj = {</code></p>
+
+<p><code>&nbsp;&nbsp;&nbsp;&nbsp;</code><code>a: [1, 2, 3]</code></p>
+
+<p><code>&nbsp;&nbsp;</code><code>};</code></p>
+
+<p><code>&nbsp;&nbsp;</code><code>var</code> <code>obj2 = { x: 2 };</code></p>
+
+<p><code>&nbsp;&nbsp;</code><code>with</code> <code>(obj2) {</code></p>
+
+<p><code>&nbsp;&nbsp;&nbsp;&nbsp;</code><code>console.log(x);</code></p>
+
+<p><code>&nbsp;&nbsp;&nbsp;&nbsp;</code><code>for</code> <code>(</code><code>var</code> <code>i = 0; i &lt; 100000; i++) {</code></p>
+
+<p><code>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</code><code>var</code> <code>v = obj.a[0];</code></p>
+
+<p><code>&nbsp;&nbsp;&nbsp;&nbsp;</code><code>}</code></p>
+
+<p><code>&nbsp;&nbsp;</code><code>}</code></p>
+
+<p><code>&nbsp;&nbsp;</code><code>console.timeEnd(</code><code>&quot;funcWith&quot;</code><code>);</code><code>//84.808ms</code></p>
+
+<p><code>}</code></p>
+
+<p><code>funcWith();</code></p>
+
+<p><code>function</code> <code>funcWith() {</code>在使用了with关键字后了，代码的性能大幅度降低。第二段代码的with语句作用到了obj2这个对象上，然后with块里面访问的却是obj对象。有一种观点是：使用了with关键字后，在with块内访问变量时，首先会在obj2上查找是否有名为obj的属性，如果没有，再进行下一步查找，这个过程导致了性能的降低。但是程序性能真正降低的原因真的是这样吗？<br />
+我们修改一下第二段代码，修改如下：</p>
+
+<p><code>&nbsp;&nbsp;</code><code>console.time(</code><code>&quot;funcWith&quot;</code><code>);</code></p>
+
+<p><code>&nbsp;&nbsp;</code><code>var</code> <code>obj = {</code></p>
+
+<p><code>&nbsp;&nbsp;&nbsp;&nbsp;</code><code>a: [1, 2, 3]</code></p>
+
+<p><code>&nbsp;&nbsp;</code><code>};</code></p>
+
+<p><code>&nbsp;&nbsp;</code><code>with</code> <code>(obj) {</code></p>
+
+<p><code>&nbsp;&nbsp;&nbsp;&nbsp;</code><code>for</code> <code>(</code><code>var</code> <code>i = 0; i &lt; 100000; i++) {</code></p>
+
+<p><code>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</code><code>var</code> <code>v = a[0];</code></p>
+
+<p><code>&nbsp;&nbsp;&nbsp;&nbsp;</code><code>}</code></p>
+
+<p><code>&nbsp;&nbsp;</code><code>}</code></p>
+
+<p><code>&nbsp;&nbsp;</code><code>console.timeEnd(</code><code>&quot;funcWith&quot;</code><code>);</code><code>//88.260ms</code></p>
+
+<p><code>}</code></p>
+
+<p><code>funcWith();</code></p>
+
+<p>这段代码将with语句作用到了obj对象上，然后直接使用a访问obj的a属性，按照前面说到的观点，访问a属性时，是一次性就可以在obj上找到该属性的，但是为什么代码性能依旧降低了呢。<br />
+真正的原因是：使用了with关键字后，JS引擎无法对这段代码进行优化。<br />
+JS引擎在代码执行之前有一个编译阶段，在不使用with关键字的时候，js引擎知道a是obj上的一个属性，它就可以静态分析代码来增强标识符的解析，从而优化了代码，因此代码执行的效率就提高了。使用了with关键字后，js引擎无法分辨出a变量是局部变量还是obj的一个属性，因此，js引擎在遇到with关键字后，它就会对这段代码放弃优化，所以执行效率就降低了。<br />
+使用with关键字对性能的影响还有一点就是js压缩工具，它无法对这段代码进行压缩，这也是影响性能的一个因素。</p>
+
+<p>&nbsp;</p>
+
+<h2><strong>四、语义不明，难以调试</strong></h2>
+
+<p>前面说到除了性能的问题，with还存在的一个缺点语义不明，难以调试，就是造成代码的不易阅读，而且可能造成潜在的bug。</p>
+
+<p><code>function</code> <code>foo(obj) {</code></p>
+
+<p><code>&nbsp;&nbsp;</code><code>with</code> <code>(obj) {</code></p>
+
+<p><code>&nbsp;&nbsp;&nbsp;&nbsp;</code><code>a = 2;</code></p>
+
+<p><code>&nbsp;&nbsp;</code><code>}</code></p>
+
+<p><code>}</code></p>
+
+<p>&nbsp;</p>
+
+<p><code>var</code> <code>o1 = {</code></p>
+
+<p><code>&nbsp;&nbsp;</code><code>a: 3</code></p>
+
+<p><code>};</code></p>
+
+<p><code>var</code> <code>o2 = {</code></p>
+
+<p><code>&nbsp;&nbsp;</code><code>b: 3</code></p>
+
+<p><code>};</code></p>
+
+<p>&nbsp;</p>
+
+<p><code>foo(o1);</code></p>
+
+<p><code>console.log(o1.a); </code><code>// 2</code></p>
+
+<p>&nbsp;</p>
+
+<p><code>foo(o2);</code></p>
+
+<p><code>console.log( o2.a ); </code><code>// undefined</code></p>
+
+<p><code>console.log( a ); </code><code>// 2</code></p>
+
+<p><br />
+这段代码很容易理解了，在foo函数内，使用了with关键字来访问传进来的obj对象，然后修改a属性。当传入o1对象时，因为o1对象存在着a属性，所以这样没有问题。传入o2对象时，在修改a属性时，由于o2对象没有a这个属性，所以被修改的a属性则变成了全局变量。这就造成了潜在的bug。</p>
+
+<p><strong>五、延伸分析</strong></p>
+
+<p>前面说了那么多，相信大家已经理解了为什么不推荐使用with关键字以及可能存在的问题。下面我们来看看一些更复杂的情况，看下面的代码：</p>
+
+<p><code>var</code> <code>obj = {</code></p>
+
+<p><code>&nbsp;&nbsp;</code><code>x: 10,</code></p>
+
+<p><code>&nbsp;&nbsp;</code><code>foo: </code><code>function</code> <code>() {</code></p>
+
+<p><code>&nbsp;&nbsp;&nbsp;&nbsp;</code><code>with</code> <code>(</code><code>this</code><code>) {</code></p>
+
+<p><code>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</code><code>var</code> <code>x = 20;</code></p>
+
+<p><code>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</code><code>var</code> <code>y = 30;</code></p>
+
+<p><code>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</code><code>console.log(y);</code><code>//30</code></p>
+
+<p><code>&nbsp;&nbsp;&nbsp;&nbsp;</code><code>}</code></p>
+
+<p><code>&nbsp;&nbsp;</code><code>}</code></p>
+
+<p><code>};</code></p>
+
+<p><code>obj.foo();</code></p>
+
+<p><code>console.log(obj.x);</code><code>//20</code></p>
+
+<p><code>console.log(obj.y);</code><code>//undefined</code></p>
+
+<p>在这段代码中，分别输出30，20，undefined的。涉及的知识点也比较多：with关键字，this关键字，变量提升等等，我们来一一解释一下。<br />
+<strong>1、this关键字</strong><br />
+关于this关键字的文章google上面相当多，这里不再赘述，我们只需记住一点：this关键字始终指向调用函数的对象。在这里，foo函数中，this指向的就是obj对象。因此在with(this)语句块里面，可以直接通过x变量来访问obj的x属性。<br />
+<strong>2、变量提升</strong><br />
+js中的变量提升也是一个经常遇到的问题，我们可以简单理解成在js中，变量声明会被提升到函数的顶部，尽管有的时候，它是在后面声明的。</p>
+
+<p>所以上面的代码可以解析为：</p>
+
+<p><code>var</code> <code>obj = {</code></p>
+
+<p><code>&nbsp;&nbsp;</code><code>x: 10,</code></p>
+
+<p><code>&nbsp;&nbsp;</code><code>foo: </code><code>function</code> <code>() {</code></p>
+
+<p><code>&nbsp;&nbsp;&nbsp;&nbsp;</code><code>var</code> <code>x;</code><code>//声明局部变量x</code></p>
+
+<p><code>&nbsp;&nbsp;&nbsp;&nbsp;</code><code>var</code> <code>y;</code><code>//声明局部变量y</code></p>
+
+<p><code>&nbsp;&nbsp;&nbsp;&nbsp;</code><code>with</code> <code>(obj) {</code></p>
+
+<p><code>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</code><code>x = 20;</code><code>//访问变量x，在obj上找到x，则修改为20</code></p>
+
+<p><code>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</code><code>y = 30;</code><code>//访问变量y，在bojg上找不到y，则进一步查找，找到局部变量y，修改为30</code></p>
+
+<p><code>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</code><code>console.log(y);</code><code>//30//直接输出局部变量y，</code></p>
+
+<p><code>&nbsp;&nbsp;&nbsp;&nbsp;</code><code>}</code></p>
+
+<p><code>&nbsp;&nbsp;</code><code>}</code></p>
+
+<p><code>};</code></p>
+
+<p><code>obj.foo();</code></p>
+
+<p><code>console.log(obj.x);</code><code>//20，obj.x已被修改为20</code></p>
+
+<p><code>console.log(obj.y);</code><code>//undefined，obj不存在y属性，则为undefined</code></p>
+
+<p>&nbsp;
+<p>上面的注释中，解释了代码的执行过程，相信大家已经理解了为什么会出处30,20，undefined的原因。</p>
+</p>
+
+<p>有兴趣的同学可以看看下面这段代码：</p>
+
+<p><code>({</code></p>
+
+<p><code>x: 10,</code></p>
+
+<p><code>foo: </code><code>function</code> <code>() {</code></p>
+
+<p><code>&nbsp;&nbsp;</code><code>function</code> <code>bar() {</code></p>
+
+<p><code>&nbsp;&nbsp;&nbsp;&nbsp;</code><code>console.log(x);</code></p>
+
+<p><code>&nbsp;&nbsp;&nbsp;&nbsp;</code><code>console.log(y);</code></p>
+
+<p><code>&nbsp;&nbsp;&nbsp;&nbsp;</code><code>console.log(</code><code>this</code><code>.x);</code></p>
+
+<p><code>&nbsp;&nbsp;</code><code>}</code></p>
+
+<p><code>&nbsp;&nbsp;</code><code>with</code> <code>(</code><code>this</code><code>) {</code></p>
+
+<p><code>&nbsp;&nbsp;&nbsp;&nbsp;</code><code>var</code> <code>x = 20;</code></p>
+
+<p><code>&nbsp;&nbsp;&nbsp;&nbsp;</code><code>var</code> <code>y = 30;</code></p>
+
+<p><code>&nbsp;&nbsp;&nbsp;&nbsp;</code><code>bar.call(</code><code>this</code><code>);</code></p>
+
+<p><code>&nbsp;&nbsp;</code><code>}</code></p>
+
+<p><code>}</code></p>
+
+<p><code>}).foo();</code></p>
+
+<p><br />
+这段代码会输出什么？为什么呢？</p>
+
+<p>总结</p>
+
+<p>本文总结了with语句的特点和弊端，总的来说，强烈不推荐使用with关键字。其实在日常编码中，我们只需要知道不去使用with就可以了，但是有的时候我们可能会遇到一些关于with的奇奇怪怪的问题，想要找出真正的原因，就要深入理解with关键字，这有助于我们去深入学习JS这门语言，同时也是学习JS的一个乐趣。</p>

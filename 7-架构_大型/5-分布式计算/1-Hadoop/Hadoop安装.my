@@ -1,0 +1,2325 @@
+<h1>史上最详细的Hadoop环境搭建</h1>
+
+<p>&nbsp;</p>
+
+<blockquote>
+<p>GitChat 作者：鸣宇淳&nbsp;<br />
+原文：<a href="http://gitbook.cn/books/5954c9600326c7705af8a92a/index.html" target="_blank">&nbsp;史上最详细的Hadoop环境搭建</a>&nbsp;</p>
+</blockquote>
+
+<h2>前言</h2>
+
+<p>Hadoop在大数据技术体系中的地位至关重要，Hadoop是大数据技术的基础，对Hadoop基础知识的掌握的扎实程度，会决定在大数据技术道路上走多远。</p>
+
+<p>这是一篇入门文章，Hadoop的学习方法很多，网上也有很多学习路线图。本文的思路是：以安装部署Apache Hadoop2.x版本为主线，来介绍Hadoop2.x的架构组成、各模块协同工作原理、技术细节。安装不是目的，通过安装认识Hadoop才是目的。</p>
+
+<p>本文分为五个部分、十三节、四十九步。</p>
+
+<h4>第一部分：Linux环境安装</h4>
+
+<p>Hadoop是运行在Linux，虽然借助工具也可以运行在Windows上，但是建议还是运行在Linux系统上，第一部分介绍Linux环境的安装、配置、Java JDK安装等。</p>
+
+<h4>第二部分：Hadoop本地模式安装</h4>
+
+<p>Hadoop本地模式只是用于本地开发调试，或者快速安装体验Hadoop，这部分做简单的介绍。</p>
+
+<h4>第三部分：Hadoop伪分布式模式安装</h4>
+
+<p>学习Hadoop一般是在伪分布式模式下进行。这种模式是在一台机器上各个进程上运行Hadoop的各个模块，伪分布式的意思是虽然各个模块是在各个进程上分开运行的，但是只是运行在一个操作系统上的，并不是真正的分布式。</p>
+
+<h4>第四部分：完全分布式安装</h4>
+
+<p>完全分布式模式才是生产环境采用的模式，Hadoop运行在服务器集群上，生产环境一般都会做HA，以实现高可用。</p>
+
+<h4>第五部分：Hadoop HA安装</h4>
+
+<p>HA是指高可用，为了解决Hadoop单点故障问题，生产环境一般都做HA部署。这部分介绍了如何配置Hadoop2.x的高可用，并简单介绍了HA的工作原理。&nbsp;<br />
+安装过程中，会穿插简单介绍涉及到的知识。希望能对大家有所帮助。&nbsp;<br />
+&emsp;</p>
+
+<h2>第一部分：Linux环境安装</h2>
+
+<h4>第一步、配置Vmware NAT网络</h4>
+
+<p>一、Vmware网络模式介绍</p>
+
+<p>参考：<a href="http://blog.csdn.net/collection4u/article/details/14127671" target="_blank">http://blog.csdn.net/collection4u/article/details/14127671</a></p>
+
+<p>二、NAT模式配置</p>
+
+<p>NAT是网络地址转换，是在宿主机和虚拟机之间增加一个地址转换服务，负责外部和虚拟机之间的通讯转接和IP转换。</p>
+
+<p>我们部署Hadoop集群，这里选择NAT模式，各个虚拟机通过NAT使用宿主机的IP来访问外网。</p>
+
+<p>我们的要求是集群中的各个虚拟机有固定的IP、可以访问外网，所以进行如下设置：</p>
+
+<p>1、 Vmware安装后，默认的NAT设置如下：</p>
+
+<p><img alt="enter image description here" src="http://images.gitbook.cn/04721520-5cb9-11e7-8185-21ba04c77532" title="" /></p>
+
+<p>2、 默认的设置是启动DHCP服务的，NAT会自动给虚拟机分配IP，但是我们需要将各个机器的IP固定下来，所以要取消这个默认设置。</p>
+
+<p>3、 为机器设置一个子网网段，默认是192.168.136网段，我们这里设置为100网段，将来各个虚拟机Ip就为 192.168.100.*。</p>
+
+<p>4、 点击NAT设置按钮，打开对话框，可以修改网关地址和DNS地址。这里我们为NAT指定DNS地址。</p>
+
+<p><img alt="enter image description here" src="http://images.gitbook.cn/1d50cff0-5cb9-11e7-86d9-f17e4b747fa0" title="" /></p>
+
+<p>5、 网关地址为当前网段里的.2地址，好像是固定的，我们不做修改，先记住网关地址就好了，后面会用到。</p>
+
+<h4>第二步、安装Linux操作系统</h4>
+
+<p>三、Vmware上安装Linux系统</p>
+
+<p>1、 文件菜单选择新建虚拟机</p>
+
+<p>2、 选择经典类型安装，下一步。</p>
+
+<p>3、 选择稍后安装操作系统，下一步。</p>
+
+<p>4、 选择Linux系统，版本选择CentOS 64位。</p>
+
+<p><img alt="enter image description here" src="http://images.gitbook.cn/2f159c20-5cb9-11e7-86d9-f17e4b747fa0" title="" /></p>
+
+<p>5、 命名虚拟机，给虚拟机起个名字，将来显示在Vmware左侧。并选择Linux系统保存在宿主机的哪个目录下，应该一个虚拟机保存在一个目录下，不能多个虚拟机使用一个目录。</p>
+
+<p><img alt="enter image description here" src="http://images.gitbook.cn/40636390-5cb9-11e7-8ca5-edc6aa6f5290" title="" /></p>
+
+<p>6、 指定磁盘容量，是指定分给Linux虚拟机多大的硬盘，默认20G就可以，下一步。</p>
+
+<p>7、 点击自定义硬件，可以查看、修改虚拟机的硬件配置，这里我们不做修改。</p>
+
+<p>8、 点击完成后，就创建了一个虚拟机，但是此时的虚拟机还是一个空壳，没有操作系统，接下来安装操作系统。</p>
+
+<p>9、 点击编辑虚拟机设置，找到DVD，指定操作系统ISO文件所在位置。</p>
+
+<p><img alt="enter image description here" src="http://images.gitbook.cn/52119a80-5cb9-11e7-8185-21ba04c77532" title="" /></p>
+
+<p>10、 点击开启此虚拟机，选择第一个回车开始安装操作系统。</p>
+
+<p><img alt="enter image description here" src="http://images.gitbook.cn/5ee9df60-5cb9-11e7-8ca5-edc6aa6f5290" title="" /></p>
+
+<p>11、 设置root密码。</p>
+
+<p><img alt="enter image description here" src="http://images.gitbook.cn/6ee78020-5cb9-11e7-86d9-f17e4b747fa0" title="" /></p>
+
+<p>12、 选择Desktop，这样就会装一个Xwindow。</p>
+
+<p><img alt="enter image description here" src="http://images.gitbook.cn/7cf9a490-5cb9-11e7-8ca5-edc6aa6f5290" style="height:591px; width:800px" title="" /></p>
+
+<p>13、 先不添加普通用户，其他用默认的，就把Linux安装完毕了。</p>
+
+<p>四、设置网络</p>
+
+<p>因为Vmware的NAT设置中关闭了DHCP自动分配IP功能，所以Linux还没有IP，需要我们设置网络各个参数。</p>
+
+<p>1、 用root进入Xwindow，右击右上角的网络连接图标，选择修改连接。</p>
+
+<p><img alt="enter image description here" src="http://images.gitbook.cn/8c898f60-5cb9-11e7-8185-21ba04c77532" style="height:488px; width:800px" title="" /></p>
+
+<p>2、 网络连接里列出了当前Linux里所有的网卡，这里只有一个网卡System eth0，点击编辑。</p>
+
+<p><img alt="enter image description here" src="http://images.gitbook.cn/97608600-5cb9-11e7-8185-21ba04c77532" title="" /></p>
+
+<p>3、 配置IP、子网掩码、网关（和NAT设置的一样）、DNS等参数，因为NAT里设置网段为100.*，所以这台机器可以设置为192.168.100.10网关和NAT一致，为192.168.100.2</p>
+
+<p><img alt="enter image description here" src="http://images.gitbook.cn/a1f96230-5cb9-11e7-b8ee-cfb7eda16afc" title="" /></p>
+
+<p>4、 用ping来检查是否可以连接外网，如下图，已经连接成功。</p>
+
+<p><img alt="enter image description here" src="http://images.gitbook.cn/af56dca0-5cb9-11e7-86d9-f17e4b747fa0" title="" /></p>
+
+<p>五、修改Hostname</p>
+
+<p>1、 临时修改hostname</p>
+
+<pre>
+<code>[root@localhost Desktop]# hostname bigdata-senior01.chybinmy.com</code></pre>
+
+<p>这种修改方式，系统重启后就会失效。</p>
+
+<p>2、 永久修改hostname</p>
+
+<p>想永久修改，应该修改配置文件 /etc/sysconfig/network。</p>
+
+<pre>
+<code>命令：[root@bigdata-senior01 ~] vim /etc/sysconfig/network</code></pre>
+
+<p>打开文件后，</p>
+
+<pre>
+<code>NETWORKING=yes  #使用网络
+HOSTNAME=bigdata-senior01.chybinmy.com  #设置主机名</code></pre>
+
+<p>六、配置Host</p>
+
+<pre>
+<code>命令：[root@bigdata-senior01 ~] vim /etc/hosts
+添加hosts: 192.168.100.10 bigdata-senior01.chybinmy.com</code></pre>
+
+<p>七、关闭防火墙</p>
+
+<p>学习环境可以直接把防火墙关闭掉。</p>
+
+<p>(1) 用root用户登录后，执行查看防火墙状态。</p>
+
+<pre>
+<code>[root@bigdata-senior01 hadoop]# service iptables status</code></pre>
+
+<p>(2) 用[root@bigdata-senior01 hadoop]# service iptables stop关闭防火墙，这个是临时关闭防火墙。</p>
+
+<pre>
+<code>[root@bigdata-senior01 hadoop-2.5.0]# service iptables stop
+iptables: Setting chains to policy ACCEPT: filter          [  OK  ]
+iptables: Flushing firewall rules:                         [  OK  ]
+iptables: Unloading modules:                               [  OK  ]</code></pre>
+
+<p>(3) 如果要永久关闭防火墙用。</p>
+
+<pre>
+<code>[root@bigdata-senior01 hadoop]# chkconfig iptables off</code></pre>
+
+<p>关闭，这种需要重启才能生效。</p>
+
+<p>八、关闭selinux</p>
+
+<p>selinux是Linux一个子安全机制，学习环境可以将它禁用。</p>
+
+<pre>
+<code>[hadoop@bigdata-senior01 hadoop-2.5.0]$ vim /etc/sysconfig/selinux</code></pre>
+
+<pre>
+<code># This file controls the state of SELinux on the system.
+# SELINUX= can take one of these three values:
+#     enforcing - SELinux security policy is enforced.
+#     permissive - SELinux prints warnings instead of enforcing.
+#     disabled - No SELinux policy is loaded.
+SELINUX=disabled
+# SELINUXTYPE= can take one of these two values:
+#     targeted - Targeted processes are protected,
+#     mls - Multi Level Security protection.
+SELINUXTYPE=targeted</code></pre>
+
+<p><img alt="enter image description here" src="http://images.gitbook.cn/5bdf1af0-5cba-11e7-b8ee-cfb7eda16afc" title="" /></p>
+
+<h4>第三步、安装JDK</h4>
+
+<p>九、安装Java JDK</p>
+
+<p>1、 查看是否已经安装了java JDK。</p>
+
+<pre>
+<code>[root@bigdata-senior01 Desktop]# java &ndash;version</code></pre>
+
+<p>注意：Hadoop机器上的JDK，最好是Oracle的Java JDK，不然会有一些问题，比如可能没有JPS命令。&nbsp;<br />
+如果安装了其他版本的JDK，卸载掉。</p>
+
+<p>2、 安装java JDK</p>
+
+<p>(1) 去下载Oracle版本Java JDK：jdk-7u67-linux-x64.tar.gz</p>
+
+<p>(2) 将jdk-7u67-linux-x64.tar.gz解压到/opt/modules目录下</p>
+
+<pre>
+<code>[root@bigdata-senior01 /]# tar -zxvf jdk-7u67-linux-x64.tar.gz -C /opt/modules</code></pre>
+
+<p>(3) 添加环境变量</p>
+
+<p>设置JDK的环境变量 JAVA_HOME。需要修改配置文件/etc/profile，追加</p>
+
+<pre>
+<code>export JAVA_HOME=&quot;/opt/modules/jdk1.7.0_67&quot;
+export PATH=$JAVA_HOME/bin:$PATH</code></pre>
+
+<p>修改完毕后，执行 source /etc/profile</p>
+
+<p>(4)安装后再次执行 java &ndash;version,可以看见已经安装完成。</p>
+
+<pre>
+<code>[root@bigdata-senior01 /]# java -version
+java version &quot;1.7.0_67&quot;
+Java(TM) SE Runtime Environment (build 1.7.0_67-b01)
+Java HotSpot(TM) 64-Bit Server VM (build 24.65-b04, mixed mode)</code></pre>
+
+<h2>第二部分：Hadoop本地模式安装</h2>
+
+<h3>第四步、Hadoop部署模式</h3>
+
+<p>Hadoop部署模式有：本地模式、伪分布模式、完全分布式模式、HA完全分布式模式。</p>
+
+<p>区分的依据是NameNode、DataNode、ResourceManager、NodeManager等模块运行在几个JVM进程、几个机器。</p>
+
+<table>
+	<thead>
+		<tr>
+			<th>模式名称</th>
+			<th>各个模块占用的JVM进程数</th>
+			<th>各个模块运行在几个机器数上</th>
+		</tr>
+	</thead>
+	<tbody>
+		<tr>
+			<td>本地模式</td>
+			<td>1个</td>
+			<td>1个</td>
+		</tr>
+		<tr>
+			<td>伪分布式模式</td>
+			<td>N个</td>
+			<td>1个</td>
+		</tr>
+		<tr>
+			<td>完全分布式模式</td>
+			<td>N个</td>
+			<td>N个</td>
+		</tr>
+		<tr>
+			<td>HA完全分布式</td>
+			<td>N个</td>
+			<td>N个</td>
+		</tr>
+	</tbody>
+</table>
+
+<h3>第五步、本地模式部署</h3>
+
+<p>十、本地模式介绍</p>
+
+<p>本地模式是最简单的模式，所有模块都运行与一个JVM进程中，使用的本地文件系统，而不是HDFS，本地模式主要是用于本地开发过程中的运行调试用。下载hadoop安装包后不用任何设置，默认的就是本地模式。</p>
+
+<p>十一、解压hadoop后就是直接可以使用</p>
+
+<p>1、 创建一个存放本地模式hadoop的目录</p>
+
+<pre>
+<code>[hadoop@bigdata-senior01 modules]$ mkdir /opt/modules/hadoopstandalone</code></pre>
+
+<p>2、 解压hadoop文件</p>
+
+<pre>
+<code>[hadoop@bigdata-senior01 modules]$ tar -zxf /opt/sofeware/hadoop-2.5.0.tar.gz  -C /opt/modules/hadoopstandalone/</code></pre>
+
+<p>3、 确保JAVA_HOME环境变量已经配置好</p>
+
+<pre>
+<code>[hadoop@bigdata-senior01 modules]$ echo ${JAVA_HOME}
+/opt/modules/jdk1.7.0_67</code></pre>
+
+<p>十二、运行MapReduce程序，验证</p>
+
+<p>我们这里用hadoop自带的wordcount例子来在本地模式下测试跑mapreduce。</p>
+
+<p>1、 准备mapreduce输入文件wc.input</p>
+
+<pre>
+<code>[hadoop@bigdata-senior01 modules]$ cat /opt/data/wc.input
+hadoop mapreduce hive
+hbase spark storm
+sqoop hadoop hive
+spark hadoop</code></pre>
+
+<p>2、 运行hadoop自带的mapreduce Demo</p>
+
+<pre>
+<code>[hadoop@bigdata-senior01 hadoopstandalone]$ bin/hadoop jar share/hadoop/mapreduce/hadoop-mapreduce-examples-2.5.0.jar wordcount /opt/data/wc.input output2</code></pre>
+
+<p><img alt="enter image description here" src="http://images.gitbook.cn/7492ce20-5cba-11e7-86d9-f17e4b747fa0" style="height:334px; width:800px" title="" /></p>
+
+<p>这里可以看到job ID中有local字样，说明是运行在本地模式下的。</p>
+
+<p>3、 查看输出文件</p>
+
+<p>本地模式下，mapreduce的输出是输出到本地。</p>
+
+<pre>
+<code>[hadoop@bigdata-senior01 hadoopstandalone]$ ll output2
+total 4
+-rw-r--r-- 1 hadoop hadoop 60 Jul  7 12:50 part-r-00000
+-rw-r--r-- 1 hadoop hadoop  0 Jul  7 12:50 _SUCCESS</code></pre>
+
+<p>输出目录中有_SUCCESS文件说明JOB运行成功，part-r-00000是输出结果文件。&nbsp;<br />
+&emsp;</p>
+
+<h2>第三部分：Hadoop伪分布式模式安装</h2>
+
+<h4>第六步、伪分布式Hadoop部署过程</h4>
+
+<p>十三、Hadoop所用的用户设置</p>
+
+<p>1、 创建一个名字为hadoop的普通用户</p>
+
+<pre>
+<code>[root@bigdata-senior01 ~]# useradd hadoop
+[root@bigdata-senior01 ~]# passwd hadoop</code></pre>
+
+<p>2、 给hadoop用户sudo权限</p>
+
+<pre>
+<code>[root@bigdata-senior01 ~]# vim /etc/sudoers</code></pre>
+
+<p>设置权限，学习环境可以将hadoop用户的权限设置的大一些，但是生产环境一定要注意普通用户的权限限制。</p>
+
+<pre>
+<code>root    ALL=(ALL)       ALL
+hadoop ALL=(root) NOPASSWD:ALL</code></pre>
+
+<p>注意：如果root用户无权修改sudoers文件，先手动为root用户添加写权限。</p>
+
+<pre>
+<code>[root@bigdata-senior01 ~]# chmod u+w /etc/sudoers</code></pre>
+
+<p>3、 切换到hadoop用户</p>
+
+<pre>
+<code>[root@bigdata-senior01 ~]# su - hadoop
+[hadoop@bigdata-senior01 ~]$</code></pre>
+
+<p>4、 创建存放hadoop文件的目录</p>
+
+<pre>
+<code>[hadoop@bigdata-senior01 ~]$ sudo mkdir /opt/modules</code></pre>
+
+<p>5、 将hadoop文件夹的所有者指定为hadoop用户</p>
+
+<p>如果存放hadoop的目录的所有者不是hadoop，之后hadoop运行中可能会有权限问题，那么就讲所有者改为hadoop。</p>
+
+<pre>
+<code>[hadoop@bigdata-senior01 ~]# sudo chown -R hadoop:hadoop /opt/modules</code></pre>
+
+<p>十四、解压Hadoop目录文件</p>
+
+<p>1、 复制hadoop-2.5.0.tar.gz到/opt/modules目录下。</p>
+
+<p>2、 解压hadoop-2.5.0.tar.gz</p>
+
+<pre>
+<code>[hadoop@bigdata-senior01 ~]# cd /opt/modules
+[hadoop@bigdata-senior01 hadoop]# tar -zxvf hadoop-2.5.0.tar.gz</code></pre>
+
+<p>十五、配置Hadoop</p>
+
+<p>1、 配置Hadoop环境变量</p>
+
+<pre>
+<code>[hadoop@bigdata-senior01 hadoop]# vim /etc/profile</code></pre>
+
+<p>追加配置：</p>
+
+<pre>
+<code>export HADOOP_HOME=&quot;/opt/modules/hadoop-2.5.0&quot;
+export PATH=$HADOOP_HOME/bin:$HADOOP_HOME/sbin:$PATH</code></pre>
+
+<p>执行：source /etc/profile 使得配置生效</p>
+
+<p>验证HADOOP_HOME参数：</p>
+
+<pre>
+<code>[hadoop@bigdata-senior01 /]$ echo $HADOOP_HOME
+/opt/modules/hadoop-2.5.0</code></pre>
+
+<p>2、 配置 hadoop-env.sh、mapred-env.sh、yarn-env.sh文件的JAVA_HOME参数</p>
+
+<pre>
+<code>[hadoop@bigdata-senior01 ~]$ sudo vim  ${HADOOP_HOME}/etc/hadoop/hadoop-env.sh</code></pre>
+
+<pre>
+<code>修改JAVA_HOME参数为：
+export JAVA_HOME=&quot;/opt/modules/jdk1.7.0_67&quot;</code></pre>
+
+<p>3、 配置core-site.xml</p>
+
+<p><img alt="enter image description here" src="http://images.gitbook.cn/85acb450-5cba-11e7-8ca5-edc6aa6f5290" title="" /></p>
+
+<p>[hadoop@bigdata-senior01 ~]{HADOOP_HOME}/etc/hadoop/core-site.xml</p>
+
+<p>（1） fs.defaultFS参数配置的是HDFS的地址。</p>
+
+<pre>
+<code>&lt;property&gt;
+&lt;name&gt;fs.defaultFS&lt;/name&gt;
+&lt;value&gt;hdfs://bigdata-senior01.chybinmy.com:8020&lt;/value&gt;
+&lt;/property&gt;</code></pre>
+
+<p>（2）&nbsp;<code>hadoop.tmp.dir</code>配置的是Hadoop临时目录，比如HDFS的NameNode数据默认都存放这个目录下，查看<code>*-default.xml</code>等默认配置文件，就可以看到很多依赖<code>${hadoop.tmp.dir}</code>的配置。</p>
+
+<p>默认的<code>hadoop.tmp.dir</code>是<code>/tmp/hadoop-${user.name}</code>,此时有个问题就是NameNode会将HDFS的元数据存储在这个/tmp目录下，如果操作系统重启了，系统会清空/tmp目录下的东西，导致NameNode元数据丢失，是个非常严重的问题，所有我们应该修改这个路径。</p>
+
+<ul>
+	<li>创建临时目录：</li>
+</ul>
+
+<pre>
+<code>    [hadoop@bigdata-senior01 hadoop-2.5.0]$ sudo mkdir -p /opt/data/tmp</code></pre>
+
+<ul>
+	<li>将临时目录的所有者修改为hadoop</li>
+</ul>
+
+<pre>
+<code>[hadoop@bigdata-senior01 hadoop-2.5.0]$ sudo chown &ndash;R hadoop:hadoop /opt/data/tmp</code></pre>
+
+<ul>
+	<li>修改hadoop.tmp.dir</li>
+</ul>
+
+<pre>
+<code> &lt;property&gt;
+   &lt;name&gt;hadoop.tmp.dir&lt;/name&gt;
+    &lt;value&gt;/opt/data/tmp&lt;/value&gt;
+  &lt;/property&gt;</code></pre>
+
+<p>十六、配置、格式化、启动HDFS</p>
+
+<p>1、 配置hdfs-site.xml</p>
+
+<p><img alt="enter image description here" src="http://images.gitbook.cn/90cfa810-5cba-11e7-86d9-f17e4b747fa0" title="" /></p>
+
+<pre>
+<code>[hadoop@bigdata-senior01 hadoop-2.5.0]$ vim ${HADOOP_HOME}/etc/hadoop/hdfs-site.xml</code></pre>
+
+<pre>
+<code>    &lt;property&gt;
+       &lt;name&gt;dfs.replication&lt;/name&gt;
+       &lt;value&gt;1&lt;/value&gt;
+    &lt;/property&gt;</code></pre>
+
+<p>dfs.replication配置的是HDFS存储时的备份数量，因为这里是伪分布式环境只有一个节点，所以这里设置为1。</p>
+
+<p>2、 格式化HDFS</p>
+
+<p><img alt="enter image description here" src="http://images.gitbook.cn/a037bf90-5cba-11e7-8ca5-edc6aa6f5290" title="" /></p>
+
+<pre>
+<code>[hadoop@bigdata-senior01 ~]$ hdfs namenode &ndash;format</code></pre>
+
+<p>格式化是对HDFS这个分布式文件系统中的DataNode进行分块，统计所有分块后的初始元数据的存储在NameNode中。</p>
+
+<p>格式化后，查看core-site.xml里hadoop.tmp.dir（本例是/opt/data目录）指定的目录下是否有了dfs目录，如果有，说明格式化成功。</p>
+
+<p>注意：</p>
+
+<ol>
+	<li>
+	<p>格式化时，这里注意hadoop.tmp.dir目录的权限问题，应该hadoop普通用户有读写权限才行，可以将/opt/data的所有者改为hadoop。&nbsp;<br />
+	[hadoop@bigdata-senior01 hadoop-2.5.0]$ sudo chown -R hadoop:hadoop /opt/data</p>
+	</li>
+	<li>
+	<p>查看NameNode格式化后的目录。</p>
+	</li>
+</ol>
+
+<pre>
+<code>   [hadoop@bigdata-senior01 ~]$ ll /opt/data/tmp/dfs/name/current</code></pre>
+
+<p><img alt="enter image description here" src="http://images.gitbook.cn/aebcca10-5cba-11e7-86d9-f17e4b747fa0" title="" /></p>
+
+<p>fsimage是NameNode元数据在内存满了后，持久化保存到的文件。</p>
+
+<p><code>fsimage*.md5</code>&nbsp;是校验文件，用于校验fsimage的完整性。</p>
+
+<p><code>seen_txid</code>&nbsp;是hadoop的版本</p>
+
+<p>vession文件里保存：</p>
+
+<ul>
+	<li>
+	<p>namespaceID：NameNode的唯一ID。</p>
+	</li>
+	<li>
+	<p>clusterID:集群ID，NameNode和DataNode的集群ID应该一致，表明是一个集群。</p>
+	</li>
+</ul>
+
+<pre>
+<code>#Mon Jul 04 17:25:50 CST 2016
+namespaceID=2101579007
+clusterID=CID-205277e6-493b-4601-8e33-c09d1d23ece4
+cTime=0
+storageType=NAME_NODE
+blockpoolID=BP-1641019026-127.0.0.1-1467624350057
+layoutVersion=-57</code></pre>
+
+<p>3、 启动NameNode</p>
+
+<pre>
+<code>[hadoop@bigdata-senior01 hadoop-2.5.0]$ ${HADOOP_HOME}/sbin/hadoop-daemon.sh start namenode
+starting namenode, logging to /opt/modules/hadoop-2.5.0/logs/hadoop-hadoop-namenode-bigdata-senior01.chybinmy.com.out</code></pre>
+
+<p><img alt="enter image description here" src="http://images.gitbook.cn/d2162ab0-5cba-11e7-8185-21ba04c77532" style="height:28px; width:800px" title="" /></p>
+
+<p>4、 启动DataNode</p>
+
+<pre>
+<code>[hadoop@bigdata-senior01 hadoop-2.5.0]$ ${HADOOP_HOME}/sbin/hadoop-daemon.sh start datanode
+starting datanode, logging to /opt/modules/hadoop-2.5.0/logs/hadoop-hadoop-datanode-bigdata-senior01.chybinmy.com.out</code></pre>
+
+<p><img alt="enter image description here" src="http://images.gitbook.cn/dc911ea0-5cba-11e7-b8ee-cfb7eda16afc" style="height:30px; width:800px" title="" /></p>
+
+<p>5、 启动SecondaryNameNode</p>
+
+<pre>
+<code>[hadoop@bigdata-senior01 hadoop-2.5.0]$ ${HADOOP_HOME}/sbin/hadoop-daemon.sh start secondarynamenode
+starting secondarynamenode, logging to /opt/modules/hadoop-2.5.0/logs/hadoop-hadoop-secondarynamenode-bigdata-senior01.chybinmy.com.out</code></pre>
+
+<p><img alt="enter image description here" src="http://images.gitbook.cn/e8e45500-5cba-11e7-8185-21ba04c77532" style="height:25px; width:800px" title="" /></p>
+
+<p>6、 JPS命令查看是否已经启动成功，有结果就是启动成功了。</p>
+
+<pre>
+<code>[hadoop@bigdata-senior01 hadoop-2.5.0]$ jps
+3034 NameNode
+3233 Jps
+3193 SecondaryNameNode
+3110 DataNode</code></pre>
+
+<p><img alt="enter image description here" src="http://images.gitbook.cn/f36a1e60-5cba-11e7-8ca5-edc6aa6f5290" title="" /></p>
+
+<p>7、 HDFS上测试创建目录、上传、下载文件</p>
+
+<p>HDFS上创建目录</p>
+
+<pre>
+<code>[hadoop@bigdata-senior01 hadoop-2.5.0]$ ${HADOOP_HOME}/bin/hdfs dfs -mkdir /demo1</code></pre>
+
+<p>上传本地文件到HDFS上</p>
+
+<pre>
+<code>[hadoop@bigdata-senior01 hadoop-2.5.0]$ ${HADOOP_HOME}/bin/hdfs dfs -put 
+${HADOOP_HOME}/etc/hadoop/core-site.xml /demo1</code></pre>
+
+<p>读取HDFS上的文件内容</p>
+
+<pre>
+<code>[hadoop@bigdata-senior01 hadoop-2.5.0]$ ${HADOOP_HOME}/bin/hdfs dfs -cat /demo1/core-site.xml</code></pre>
+
+<p><img alt="enter image description here" src="http://images.gitbook.cn/fe96fd30-5cba-11e7-8185-21ba04c77532" style="height:523px; width:800px" title="" /></p>
+
+<p>从HDFS上下载文件到本地</p>
+
+<pre>
+<code>[hadoop@bigdata-senior01 hadoop-2.5.0]$ bin/hdfs dfs -get /demo1/core-site.xml</code></pre>
+
+<p><img alt="enter image description here" src="http://images.gitbook.cn/08da3f50-5cbb-11e7-8ca5-edc6aa6f5290" title="" /></p>
+
+<p>十七、配置、启动YARN</p>
+
+<p>1、 配置mapred-site.xml</p>
+
+<p>默认没有mapred-site.xml文件，但是有个mapred-site.xml.template配置模板文件。复制模板生成mapred-site.xml。</p>
+
+<pre>
+<code>[hadoop@bigdata-senior01 hadoop-2.5.0]# cp etc/hadoop/mapred-site.xml.template etc/hadoop/mapred-site.xml</code></pre>
+
+<p>添加配置如下：</p>
+
+<pre>
+<code>&lt;property&gt;
+&lt;name&gt;mapreduce.framework.name&lt;/name&gt;
+&lt;value&gt;yarn&lt;/value&gt;
+&lt;/property&gt;</code></pre>
+
+<p>指定mapreduce运行在yarn框架上。</p>
+
+<p><img alt="enter image description here" src="http://images.gitbook.cn/2de68010-5cbb-11e7-8ca5-edc6aa6f5290" title="" /></p>
+
+<p>2、 配置yarn-site.xml</p>
+
+<p>添加配置如下：</p>
+
+<pre>
+<code>&lt;property&gt;
+  &lt;name&gt;yarn.nodemanager.aux-services&lt;/name&gt;
+  &lt;value&gt;mapreduce_shuffle&lt;/value&gt;
+&lt;/property&gt;
+&lt;property&gt;
+    &lt;name&gt;yarn.resourcemanager.hostname&lt;/name&gt;
+    &lt;value&gt;bigdata-senior01.chybinmy.com&lt;/value&gt;
+ &lt;/property&gt;</code></pre>
+
+<ul>
+	<li>
+	<p>yarn.nodemanager.aux-services配置了yarn的默认混洗方式，选择为mapreduce的默认混洗算法。</p>
+	</li>
+	<li>
+	<p>yarn.resourcemanager.hostname指定了Resourcemanager运行在哪个节点上。</p>
+
+	<p><img alt="enter image description here" src="http://images.gitbook.cn/dff66250-5cbd-11e7-b8ee-cfb7eda16afc" title="" /></p>
+	</li>
+</ul>
+
+<p>3、 启动Resourcemanager</p>
+
+<pre>
+<code>[hadoop@bigdata-senior01 hadoop-2.5.0]$ ${HADOOP_HOME}/sbin/yarn-daemon.sh start resourcemanager</code></pre>
+
+<p><img alt="enter image description here" src="http://images.gitbook.cn/e9a9e790-5cbd-11e7-8ca5-edc6aa6f5290" style="height:24px; width:800px" title="" /></p>
+
+<p>4、 启动nodemanager</p>
+
+<pre>
+<code>[hadoop@bigdata-senior01 hadoop-2.5.0]$ ${HADOOP_HOME}/sbin/yarn-daemon.sh start nodemanager</code></pre>
+
+<p><img alt="enter image description here" src="http://images.gitbook.cn/f03f8b00-5cbd-11e7-b8ee-cfb7eda16afc" style="height:29px; width:800px" title="" /></p>
+
+<p>5、 查看是否启动成功</p>
+
+<pre>
+<code>[hadoop@bigdata-senior01 hadoop-2.5.0]$ jps
+3034 NameNode
+4439 NodeManager
+4197 ResourceManager
+4543 Jps
+3193 SecondaryNameNode
+3110 DataNode</code></pre>
+
+<p>可以看到ResourceManager、NodeManager已经启动成功了。</p>
+
+<p><img alt="enter image description here" src="http://images.gitbook.cn/f88e7730-5cbd-11e7-8ca5-edc6aa6f5290" title="" /></p>
+
+<p>6、 YARN的Web页面</p>
+
+<p>YARN的Web客户端端口号是8088，通过<a href="http://192.168.100.10:8088/" target="_blank">http://192.168.100.10:8088/</a>可以查看。</p>
+
+<p><img alt="enter image description here" src="http://images.gitbook.cn/056adac0-5cbe-11e7-86d9-f17e4b747fa0" style="height:725px; width:800px" title="" /></p>
+
+<p>十八、运行MapReduce Job</p>
+
+<p>在Hadoop的share目录里，自带了一些jar包，里面带有一些mapreduce实例小例子，位置在share/hadoop/mapreduce/hadoop-mapreduce-examples-2.5.0.jar，可以运行这些例子体验刚搭建好的Hadoop平台，我们这里来运行最经典的WordCount实例。</p>
+
+<p>1、 创建测试用的Input文件</p>
+
+<p>创建输入目录:</p>
+
+<pre>
+<code>[hadoop@bigdata-senior01 hadoop-2.5.0]$ bin/hdfs dfs -mkdir -p /wordcountdemo/input</code></pre>
+
+<p>创建原始文件:</p>
+
+<p>在本地/opt/data目录创建一个文件wc.input,内容如下。</p>
+
+<p><img alt="enter image description here" src="http://images.gitbook.cn/178763e0-5cbe-11e7-86d9-f17e4b747fa0" title="" /></p>
+
+<p>将wc.input文件上传到HDFS的/wordcountdemo/input目录中:</p>
+
+<pre>
+<code>[hadoop@bigdata-senior01 hadoop-2.5.0]$ bin/hdfs dfs -put /opt/data/wc.input /wordcountdemo/input</code></pre>
+
+<p><img alt="enter image description here" src="http://images.gitbook.cn/1ea91ab0-5cbe-11e7-86d9-f17e4b747fa0" style="height:121px; width:800px" title="" /></p>
+
+<p>2、 运行WordCount MapReduce Job</p>
+
+<pre>
+<code>[hadoop@bigdata-senior01 hadoop-2.5.0]$ bin/yarn jar share/hadoop/mapreduce/hadoop-mapreduce-examples-
+2.5.0.jar wordcount /wordcountdemo/input /wordcountdemo/output</code></pre>
+
+<p><img alt="enter image description here" src="http://images.gitbook.cn/268f32f0-5cbe-11e7-8185-21ba04c77532" style="height:163px; width:800px" title="" /></p>
+
+<p>3、 查看输出结果目录</p>
+
+<pre>
+<code>[hadoop@bigdata-senior01 hadoop-2.5.0]$ bin/hdfs dfs -ls /wordcountdemo/output
+-rw-r--r--   1 hadoop supergroup          0 2016-07-05 05:12 /wordcountdemo/output/_SUCCESS
+-rw-r--r--   1 hadoop supergroup         60 2016-07-05 05:12 /wordcountdemo/output/part-r-00000</code></pre>
+
+<p><img alt="enter image description here" src="http://images.gitbook.cn/2f4b86f0-5cbe-11e7-8ca5-edc6aa6f5290" style="height:98px; width:800px" title="" /></p>
+
+<ul>
+	<li>
+	<p>output目录中有两个文件，_SUCCESS文件是空文件，有这个文件说明Job执行成功。</p>
+	</li>
+	<li>
+	<p>part-r-00000文件是结果文件，其中-r-说明这个文件是Reduce阶段产生的结果，mapreduce程序执行时，可以没有reduce阶段，但是肯定会有map阶段，如果没有reduce阶段这个地方有是-m-。</p>
+	</li>
+	<li>
+	<p>一个reduce会产生一个part-r-开头的文件。</p>
+	</li>
+	<li>
+	<p>查看输出文件内容。</p>
+	</li>
+</ul>
+
+<pre>
+<code>[hadoop@bigdata-senior01 hadoop-2.5.0]$ bin/hdfs dfs -cat /wordcountdemo/output/part-r-00000
+hadoop  3
+hbase   1
+hive    2
+mapreduce       1
+spark   2
+sqoop   1
+storm   1</code></pre>
+
+<p>结果是按照键值排好序的。</p>
+
+<p>十九、停止Hadoop</p>
+
+<pre>
+<code> [hadoop@bigdata-senior01 hadoop-2.5.0]$ sbin/hadoop-daemon.sh stop namenode
+stopping namenode
+[hadoop@bigdata-senior01 hadoop-2.5.0]$ sbin/hadoop-daemon.sh stop datanode
+stopping datanode
+[hadoop@bigdata-senior01 hadoop-2.5.0]$ sbin/yarn-daemon.sh stop resourcemanager
+stopping resourcemanager
+[hadoop@bigdata-senior01 hadoop-2.5.0]$ sbin/yarn-daemon.sh stop nodemanager
+stopping nodemanager</code></pre>
+
+<p><img alt="enter image description here" src="http://images.gitbook.cn/3c58e590-5cbe-11e7-86d9-f17e4b747fa0" style="height:153px; width:800px" title="" /></p>
+
+<p>二十、 Hadoop各个功能模块的理解</p>
+
+<p>1、 HDFS模块</p>
+
+<p>HDFS负责大数据的存储，通过将大文件分块后进行分布式存储方式，突破了服务器硬盘大小的限制，解决了单台机器无法存储大文件的问题，HDFS是个相对独立的模块，可以为YARN提供服务，也可以为HBase等其他模块提供服务。</p>
+
+<p>2、 YARN模块</p>
+
+<p>YARN是一个通用的资源协同和任务调度框架，是为了解决Hadoop1.x中MapReduce里NameNode负载太大和其他问题而创建的一个框架。</p>
+
+<p>YARN是个通用框架，不止可以运行MapReduce，还可以运行Spark、Storm等其他计算框架。</p>
+
+<p>3、 MapReduce模块</p>
+
+<p>MapReduce是一个计算框架，它给出了一种数据处理的方式，即通过Map阶段、Reduce阶段来分布式地流式处理数据。它只适用于大数据的离线处理，对实时性要求很高的应用不适用。</p>
+
+<h4>第七步、开启历史服务</h4>
+
+<p>二十一、历史服务介绍</p>
+
+<p>Hadoop开启历史服务可以在web页面上查看Yarn上执行job情况的详细信息。可以通过历史服务器查看已经运行完的Mapreduce作业记录，比如用了多少个Map、用了多少个Reduce、作业提交时间、作业启动时间、作业完成时间等信息。</p>
+
+<p>二十二、开启历史服务</p>
+
+<pre>
+<code>[hadoop@bigdata-senior01 hadoop-2.5.0]$ sbin/mr-jobhistory-daemon.sh start historyserver、</code></pre>
+
+<p>开启后，可以通过Web页面查看历史服务器：</p>
+
+<p><a href="http://bigdata-senior01.chybinmy.com:19888/" target="_blank">http://bigdata-senior01.chybinmy.com:19888/</a></p>
+
+<p>二十三、Web查看job执行历史</p>
+
+<p>1、 运行一个mapreduce任务</p>
+
+<pre>
+<code>[hadoop@bigdata-senior01 hadoop-2.5.0]$ bin/yarn jar share/hadoop/mapreduce/hadoop-mapreduce-examples-
+2.5.0.jar wordcount /wordcountdemo/input /wordcountdemo/output1</code></pre>
+
+<p>2、 job执行中</p>
+
+<p><img alt="enter image description here" src="http://images.gitbook.cn/477f82d0-5cbe-11e7-8185-21ba04c77532" style="height:305px; width:800px" title="" /></p>
+
+<p>3、 查看job历史</p>
+
+<p><img alt="enter image description here" src="http://images.gitbook.cn/50e9ca10-5cbe-11e7-86d9-f17e4b747fa0" style="height:255px; width:800px" title="" /></p>
+
+<p><img alt="enter image description here" src="http://images.gitbook.cn/57a39750-5cbe-11e7-b8ee-cfb7eda16afc" style="height:736px; width:800px" title="" /></p>
+
+<p>历史服务器的Web端口默认是19888，可以查看Web界面。</p>
+
+<p>但是在上面所显示的某一个Job任务页面的最下面，Map和Reduce个数的链接上，点击进入Map的详细信息页面，再查看某一个Map或者Reduce的详细日志是看不到的，是因为没有开启日志聚集服务。</p>
+
+<p>二十四、开启日志聚集</p>
+
+<p>4、 日志聚集介绍</p>
+
+<p>MapReduce是在各个机器上运行的，在运行过程中产生的日志存在于各个机器上，为了能够统一查看各个机器的运行日志，将日志集中存放在HDFS上，这个过程就是日志聚集。</p>
+
+<p>5、 开启日志聚集</p>
+
+<p>配置日志聚集功能：</p>
+
+<p>Hadoop默认是不启用日志聚集的。在yarn-site.xml文件里配置启用日志聚集。</p>
+
+<pre>
+<code>&lt;property&gt;
+    &lt;name&gt;yarn.log-aggregation-enable&lt;/name&gt;
+    &lt;value&gt;true&lt;/value&gt;
+ &lt;/property&gt;
+&lt;property&gt;
+    &lt;name&gt;yarn.log-aggregation.retain-seconds&lt;/name&gt;
+    &lt;value&gt;106800&lt;/value&gt;
+ &lt;/property&gt;</code></pre>
+
+<p>yarn.log-aggregation-enable:是否启用日志聚集功能。</p>
+
+<p>yarn.log-aggregation.retain-seconds：设置日志保留时间，单位是秒。</p>
+
+<p>将配置文件分发到其他节点：</p>
+
+<pre>
+<code>[hadoop@bigdata-senior01 hadoop]$ scp /opt/modules/hadoop-2.5.0/etc/hadoop/yarn-site.xml bigdata-senior02.chybinmy.com:/opt/modules/hadoop-2.5.0/etc/hadoop/
+[hadoop@bigdata-senior01 hadoop]$ scp /opt/modules/hadoop-2.5.0/etc/hadoop/yarn-site.xml bigdata-senior03.chybinmy.com:/opt/modules/hadoop-2.5.0/etc/hadoop/</code></pre>
+
+<p>重启Yarn进程：</p>
+
+<pre>
+<code>[hadoop@bigdata-senior01 hadoop-2.5.0]$ sbin/stop-yarn.sh
+[hadoop@bigdata-senior01 hadoop-2.5.0]$ sbin/start-yarn.sh</code></pre>
+
+<p>重启HistoryServer进程：</p>
+
+<pre>
+<code>[hadoop@bigdata-senior01 hadoop-2.5.0]$ sbin/mr-jobhistory-daemon.sh stop historyserver
+[hadoop@bigdata-senior01 hadoop-2.5.0]$ sbin/mr-jobhistory-daemon.sh start historyserver</code></pre>
+
+<p>6、 测试日志聚集</p>
+
+<p>运行一个demo MapReduce，使之产生日志：</p>
+
+<pre>
+<code>bin/yarn jar share/hadoop/mapreduce/hadoop-mapreduce-examples-2.5.0.jar wordcount /input /output1</code></pre>
+
+<p>查看日志：</p>
+
+<p>运行Job后，就可以在历史服务器Web页面查看各个Map和Reduce的日志了。&nbsp;<br />
+&emsp;</p>
+
+<h2>第四部分：完全分布式安装</h2>
+
+<h4>第八步、完全布式环境部署Hadoop</h4>
+
+<p>完全分部式是真正利用多台Linux主机来进行部署Hadoop，对Linux机器集群进行规划，使得Hadoop各个模块分别部署在不同的多台机器上。</p>
+
+<p>二十五、环境准备</p>
+
+<p>1、 克隆虚拟机</p>
+
+<ul>
+	<li>
+	<p>Vmware左侧选中要克隆的机器，这里对原有的BigData01机器进行克隆，虚拟机菜单中，选中管理菜单下的克隆命令。</p>
+	</li>
+	<li>
+	<p>选择&ldquo;创建完整克隆&rdquo;，虚拟机名称为BigData02，选择虚拟机文件保存路径，进行克隆。</p>
+	</li>
+	<li>
+	<p>再次克隆一个名为BigData03的虚拟机。</p>
+	</li>
+</ul>
+
+<p>2、 配置网络</p>
+
+<p>修改网卡名称：</p>
+
+<p>在BigData02和BigData03机器上编辑网卡信息。执行sudo vim /etc/udev/rules.d/70-persistent-net.rules命令。因为是从BigData01机器克隆来的，所以会保留BigData01的网卡eth0，并且再添加一个网卡eth1。并且eth0的Mac地址和BigData01的地址是一样的，Mac地址不允许相同，所以要删除eth0，只保留eth1网卡，并且要将eth1改名为eth0。将修改后的eth0的mac地址复制下来，修改network-scripts文件中的HWADDR属性。</p>
+
+<pre>
+<code>sudo vim /etc/sysconfig/network-scripts/ifcfg-eth0</code></pre>
+
+<p><img alt="enter image description here" src="http://images.gitbook.cn/692fc750-5cbe-11e7-8ca5-edc6aa6f5290" title="" /></p>
+
+<p>修改网络参数：</p>
+
+<p>BigData02机器IP改为192.168.100.12</p>
+
+<p>BigData03机器IP改为192.168.100.13</p>
+
+<p>3、 配置Hostname</p>
+
+<p>BigData02配置hostname为 bigdata-senior02.chybinmy.com</p>
+
+<p>BigData03配置hostname为 bigdata-senior03.chybinmy.com</p>
+
+<p>4、 配置hosts</p>
+
+<p>BigData01、BigData02、BigData03三台机器hosts都配置为：</p>
+
+<pre>
+<code>[hadoop@bigdata-senior01 hadoop-2.5.0]$ sudo vim /etc/hosts
+192.168.100.10 bigdata-senior01.chybinmy.com
+192.168.100.12 bigdata-senior02.chybinmy.com
+192.168.100.13 bigdata-senior03.chybinmy.com</code></pre>
+
+<p>5、 配置Windows上的SSH客户端</p>
+
+<p>在本地Windows中的SSH客户端上添加对BigData02、BigData03机器的SSH链接。</p>
+
+<p>二十六、服务器功能规划</p>
+
+<table>
+	<thead>
+		<tr>
+			<th>bigdata-senior01.chybinmy.com</th>
+			<th>bigdata-senior02.chybinmy.com</th>
+			<th>bigdata-senior03.chybinmy.com</th>
+		</tr>
+	</thead>
+	<tbody>
+		<tr>
+			<td>NameNode</td>
+			<td>ResourceManage</td>
+			<td>&nbsp;</td>
+		</tr>
+		<tr>
+			<td>DataNode</td>
+			<td>DataNode</td>
+			<td>DataNode</td>
+		</tr>
+		<tr>
+			<td>NodeManager</td>
+			<td>NodeManager</td>
+			<td>NodeManager</td>
+		</tr>
+		<tr>
+			<td>HistoryServer</td>
+			<td>&nbsp;</td>
+			<td>SecondaryNameNode</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>二十七、在第一台机器上安装新的Hadoop</p>
+
+<p>为了和之前BigData01机器上安装伪分布式Hadoop区分开来，我们将BigData01上的Hadoop服务都停止掉，然后在一个新的目录/opt/modules/app下安装另外一个Hadoop。&nbsp;<br />
+我们采用先在第一台机器上解压、配置Hadoop，然后再分发到其他两台机器上的方式来安装集群。</p>
+
+<p>6、 解压Hadoop目录：</p>
+
+<pre>
+<code>[hadoop@bigdata-senior01 modules]$ tar -zxf /opt/sofeware/hadoop-2.5.0.tar.gz -C /opt/modules/app/</code></pre>
+
+<p>7、 配置Hadoop JDK路径修改hadoop-env.sh、mapred-env.sh、yarn-env.sh文件中的JDK路径：</p>
+
+<pre>
+<code>export JAVA_HOME=&quot;/opt/modules/jdk1.7.0_67&quot;</code></pre>
+
+<p>8、 配置core-site.xml</p>
+
+<pre>
+<code>[hadoop@bigdata-senior01 hadoop-2.5.0]$ vim etc/hadoop/core-site.xml</code></pre>
+
+<pre>
+<code>&lt;configuration&gt;
+ &lt;property&gt;
+   &lt;name&gt;fs.defaultFS&lt;/name&gt;
+   &lt;value&gt;hdfs://bigdata-senior01.chybinmy.com:8020&lt;/value&gt;
+ &lt;/property&gt;
+ &lt;property&gt;
+   &lt;name&gt;hadoop.tmp.dir&lt;/name&gt;
+   &lt;value&gt;/opt/modules/app/hadoop-2.5.0/data/tmp&lt;/value&gt;
+ &lt;/property&gt;
+&lt;/configuration&gt;</code></pre>
+
+<p>fs.defaultFS为NameNode的地址。</p>
+
+<p>hadoop.tmp.dir为hadoop临时目录的地址，默认情况下，NameNode和DataNode的数据文件都会存在这个目录下的对应子目录下。应该保证此目录是存在的，如果不存在，先创建。</p>
+
+<p>9、 配置hdfs-site.xml</p>
+
+<pre>
+<code>[hadoop@bigdata-senior01 hadoop-2.5.0]$ vim etc/hadoop/hdfs-site.xml</code></pre>
+
+<pre>
+<code>&lt;configuration&gt;
+ &lt;property&gt;
+   &lt;name&gt;dfs.namenode.secondary.http-address&lt;/name&gt;
+   &lt;value&gt;bigdata-senior03.chybinmy.com:50090&lt;/value&gt;
+ &lt;/property&gt;
+&lt;/configuration&gt;</code></pre>
+
+<p>dfs.namenode.secondary.http-address是指定secondaryNameNode的http访问地址和端口号，因为在规划中，我们将BigData03规划为SecondaryNameNode服务器。</p>
+
+<p>所以这里设置为：bigdata-senior03.chybinmy.com:50090</p>
+
+<p>10、 配置slaves</p>
+
+<pre>
+<code>[hadoop@bigdata-senior01 hadoop-2.5.0]$ vim etc/hadoop/slaves
+bigdata-senior01.chybinmy.com
+bigdata-senior02.chybinmy.com
+bigdata-senior03.chybinmy.com</code></pre>
+
+<p>slaves文件是指定HDFS上有哪些DataNode节点。</p>
+
+<p>11、 配置yarn-site.xml</p>
+
+<pre>
+<code>[hadoop@bigdata-senior01 hadoop-2.5.0]$ vim etc/hadoop/yarn-site.xml</code></pre>
+
+<pre>
+<code>    &lt;property&gt;
+        &lt;name&gt;yarn.nodemanager.aux-services&lt;/name&gt;
+        &lt;value&gt;mapreduce_shuffle&lt;/value&gt;
+    &lt;/property&gt;
+    &lt;property&gt;
+        &lt;name&gt;yarn.resourcemanager.hostname&lt;/name&gt;
+        &lt;value&gt;bigdata-senior02.chybinmy.com&lt;/value&gt;
+    &lt;/property&gt;
+    &lt;property&gt;
+        &lt;name&gt;yarn.log-aggregation-enable&lt;/name&gt;
+        &lt;value&gt;true&lt;/value&gt;
+    &lt;/property&gt;
+    &lt;property&gt;
+        &lt;name&gt;yarn.log-aggregation.retain-seconds&lt;/name&gt;
+        &lt;value&gt;106800&lt;/value&gt;
+    &lt;/property&gt;</code></pre>
+
+<p>根据规划<code>yarn.resourcemanager.hostname</code>这个指定resourcemanager服务器指向<code>bigdata-senior02.chybinmy.com</code>。</p>
+
+<p><code>yarn.log-aggregation-enable</code>是配置是否启用日志聚集功能。</p>
+
+<p><code>yarn.log-aggregation.retain-seconds</code>是配置聚集的日志在HDFS上最多保存多长时间。</p>
+
+<p>12、 配置mapred-site.xml</p>
+
+<p>从mapred-site.xml.template复制一个mapred-site.xml文件。</p>
+
+<pre>
+<code>[hadoop@bigdata-senior01 hadoop-2.5.0]$ cp etc/hadoop/mapred-site.xml.template etc/hadoop/mapred-site.xml</code></pre>
+
+<pre>
+<code>&lt;configuration&gt;
+    &lt;property&gt;
+        &lt;name&gt;mapreduce.framework.name&lt;/name&gt;
+        &lt;value&gt;yarn&lt;/value&gt;
+    &lt;/property&gt;
+    &lt;property&gt;
+        &lt;name&gt;mapreduce.jobhistory.address&lt;/name&gt;
+        &lt;value&gt;bigdata-senior01.chybinmy.com:10020&lt;/value&gt;
+    &lt;/property&gt;
+    &lt;property&gt;
+        &lt;name&gt;mapreduce.jobhistory.webapp.address&lt;/name&gt;
+        &lt;value&gt;bigdata-senior01.chybinmy.com:19888&lt;/value&gt;
+    &lt;/property&gt;
+&lt;/configuration&gt;</code></pre>
+
+<p>mapreduce.framework.name设置mapreduce任务运行在yarn上。</p>
+
+<p>mapreduce.jobhistory.address是设置mapreduce的历史服务器安装在BigData01机器上。</p>
+
+<p>mapreduce.jobhistory.webapp.address是设置历史服务器的web页面地址和端口号。</p>
+
+<p>二十八、设置SSH无密码登录</p>
+
+<p>Hadoop集群中的各个机器间会相互地通过SSH访问，每次访问都输入密码是不现实的，所以要配置各个机器间的</p>
+
+<p>SSH是无密码登录的。</p>
+
+<p>1、 在BigData01上生成公钥</p>
+
+<pre>
+<code>[hadoop@bigdata-senior01 hadoop-2.5.0]$ ssh-keygen -t rsa</code></pre>
+
+<p>一路回车，都设置为默认值，然后再当前用户的Home目录下的<code>.ssh</code>目录中会生成公钥文件<code>（id_rsa.pub）</code>和私钥文件<code>（id_rsa）</code>。</p>
+
+<p>2、 分发公钥</p>
+
+<pre>
+<code>[hadoop@bigdata-senior01 hadoop-2.5.0]$ ssh-copy-id bigdata-senior01.chybinmy.com
+[hadoop@bigdata-senior01 hadoop-2.5.0]$ ssh-copy-id bigdata-senior02.chybinmy.com
+[hadoop@bigdata-senior01 hadoop-2.5.0]$ ssh-copy-id bigdata-senior03.chybinmy.com</code></pre>
+
+<p>3、 设置BigData02、BigData03到其他机器的无密钥登录</p>
+
+<p>同样的在BigData02、BigData03上生成公钥和私钥后，将公钥分发到三台机器上。</p>
+
+<p>二十九、分发Hadoop文件</p>
+
+<p>1、 首先在其他两台机器上创建存放Hadoop的目录</p>
+
+<pre>
+<code>[hadoop@bigdata-senior02 ~]$ mkdir /opt/modules/app
+[hadoop@bigdata-senior03 ~]$ mkdir /opt/modules/app</code></pre>
+
+<p>2、 通过Scp分发</p>
+
+<p>Hadoop根目录下的share/doc目录是存放的hadoop的文档，文件相当大，建议在分发之前将这个目录删除掉，可以节省硬盘空间并能提高分发的速度。</p>
+
+<p>doc目录大小有1.6G。</p>
+
+<pre>
+<code>[hadoop@bigdata-senior01 hadoop-2.5.0]$ du -sh /opt/modules/app/hadoop-2.5.0/share/doc
+1.6G    /opt/modules/app/hadoop-2.5.0/share/doc
+[hadoop@bigdata-senior01 hadoop-2.5.0]$ scp -r /opt/modules/app/hadoop-2.5.0/ bigdata-senior02.chybinmy.com:/opt/modules/app
+[hadoop@bigdata-senior01 hadoop-2.5.0]$ scp -r /opt/modules/app/hadoop-2.5.0/ bigdata-senior03.chybinmy.com:/opt/modules/app</code></pre>
+
+<p>三十、格式NameNode</p>
+
+<p>在NameNode机器上执行格式化：</p>
+
+<pre>
+<code>[hadoop@bigdata-senior01 hadoop-2.5.0]$ /opt/modules/app/hadoop-2.5.0/bin/hdfs namenode &ndash;format</code></pre>
+
+<p>注意：</p>
+
+<p>如果需要重新格式化NameNode,需要先将原来NameNode和DataNode下的文件全部删除，不然会报错，NameNode和DataNode所在目录是在<code>core-site.xml</code>中<code>hadoop.tmp.dir</code>、<code>dfs.namenode.name.dir</code>、<code>dfs.datanode.data.dir</code>属性配置的。</p>
+
+<pre>
+<code>&lt;property&gt;
+     &lt;name&gt;hadoop.tmp.dir&lt;/name&gt;
+     &lt;value&gt;/opt/data/tmp&lt;/value&gt;
+  &lt;/property&gt;
+&lt;property&gt;
+     &lt;name&gt;dfs.namenode.name.dir&lt;/name&gt;
+     &lt;value&gt;file://${hadoop.tmp.dir}/dfs/name&lt;/value&gt;
+  &lt;/property&gt;
+&lt;property&gt;
+     &lt;name&gt;dfs.datanode.data.dir&lt;/name&gt;
+     &lt;value&gt;file://${hadoop.tmp.dir}/dfs/data&lt;/value&gt;
+  &lt;/property&gt;</code></pre>
+
+<p>因为每次格式化，默认是创建一个集群ID，并写入NameNode和DataNode的VERSION文件中（VERSION文件所在目录为dfs/name/current 和 dfs/data/current），重新格式化时，默认会生成一个新的集群ID,如果不删除原来的目录，会导致namenode中的VERSION文件中是新的集群ID,而DataNode中是旧的集群ID，不一致时会报错。</p>
+
+<p>另一种方法是格式化时指定集群ID参数，指定为旧的集群ID。</p>
+
+<p>三十一、启动集群</p>
+
+<p>1、 启动HDFS</p>
+
+<pre>
+<code>[hadoop@bigdata-senior01 hadoop-2.5.0]$ /opt/modules/app/hadoop-2.5.0/sbin/start-dfs.sh</code></pre>
+
+<p><img alt="enter image description here" src="http://images.gitbook.cn/7c4619c0-5cbe-11e7-8ca5-edc6aa6f5290" style="height:270px; width:800px" title="" /></p>
+
+<p>2、 启动YARN</p>
+
+<pre>
+<code>[hadoop@bigdata-senior01 hadoop-2.5.0]$ /opt/modules/app/hadoop-2.5.0/sbin/start-yarn.sh</code></pre>
+
+<p>在BigData02上启动ResourceManager:</p>
+
+<pre>
+<code>[hadoop@bigdata-senior02 hadoop-2.5.0]$ sbin/yarn-daemon.sh start resourcemanager</code></pre>
+
+<p><img alt="enter image description here" src="http://images.gitbook.cn/98a56fd0-5cbe-11e7-8ca5-edc6aa6f5290" style="height:163px; width:800px" title="" /></p>
+
+<p>3、 启动日志服务器</p>
+
+<p>因为我们规划的是在BigData03服务器上运行MapReduce日志服务，所以要在BigData03上启动。</p>
+
+<pre>
+<code>[hadoop@bigdata-senior03 ~]$ /opt/modules/app/hadoop-2.5.0/sbin/mr-jobhistory-daemon.sh start historyserver
+starting historyserver, logging to /opt/modules/app/hadoop-2.5.0/logs/mapred-hadoop-historyserver-bigda       ta-senior03.chybinmy.com.out</code></pre>
+
+<pre>
+<code>[hadoop@bigdata-senior03 ~]$ jps
+3570 Jps
+3537 JobHistoryServer
+3310 SecondaryNameNode
+3213 DataNode
+3392 NodeManager</code></pre>
+
+<p>4、 查看HDFS Web页面</p>
+
+<p><a href="http://bigdata-senior01.chybinmy.com:50070/" target="_blank">http://bigdata-senior01.chybinmy.com:50070/</a></p>
+
+<p>5、 查看YARN Web 页面</p>
+
+<p><a href="http://bigdata-senior02.chybinmy.com:8088/cluster" target="_blank">http://bigdata-senior02.chybinmy.com:8088/cluster</a></p>
+
+<p>三十二、测试Job</p>
+
+<p>我们这里用hadoop自带的wordcount例子来在本地模式下测试跑mapreduce。</p>
+
+<p>1、 准备mapreduce输入文件wc.input</p>
+
+<pre>
+<code>[hadoop@bigdata-senior01 modules]$ cat /opt/data/wc.input
+hadoop mapreduce hive
+hbase spark storm
+sqoop hadoop hive
+spark hadoop</code></pre>
+
+<p>2、 在HDFS创建输入目录input</p>
+
+<pre>
+<code>[hadoop@bigdata-senior01 hadoop-2.5.0]$ bin/hdfs dfs -mkdir /input</code></pre>
+
+<p>3、 将wc.input上传到HDFS</p>
+
+<pre>
+<code>[hadoop@bigdata-senior01 hadoop-2.5.0]$ bin/hdfs dfs -put /opt/data/wc.input /input/wc.input</code></pre>
+
+<p>4、 运行hadoop自带的mapreduce Demo</p>
+
+<pre>
+<code>[hadoop@bigdata-senior01 hadoop-2.5.0]$ bin/yarn jar share/hadoop/mapreduce/hadoop-mapreduce-examples-2.5.0.jar wordcount /input/wc.input /output</code></pre>
+
+<p><img alt="enter image description here" src="http://images.gitbook.cn/a5cbfbc0-5cbe-11e7-8185-21ba04c77532" style="height:298px; width:800px" title="" /></p>
+
+<p>5、 查看输出文件</p>
+
+<pre>
+<code>[hadoop@bigdata-senior01 hadoop-2.5.0]$ bin/hdfs dfs -ls /output
+Found 2 items
+-rw-r--r--   3 hadoop supergroup          0 2016-07-14 16:36 /output/_SUCCESS
+-rw-r--r--   3 hadoop supergroup         60 2016-07-14 16:36 /output/part-r-00000</code></pre>
+
+<p>&nbsp;</p>
+
+<h2>第五部分：Hadoop HA安装</h2>
+
+<p>HA的意思是High Availability高可用，指当当前工作中的机器宕机后，会自动处理这个异常，并将工作无缝地转移到其他备用机器上去，以来保证服务的高可用。</p>
+
+<p>HA方式安装部署才是最常见的生产环境上的安装部署方式。Hadoop HA是Hadoop 2.x中新添加的特性，包括NameNode HA 和 ResourceManager HA。因为DataNode和NodeManager本身就是被设计为高可用的，所以不用对他们进行特殊的高可用处理。</p>
+
+<h3>第九步、时间服务器搭建</h3>
+
+<p>Hadoop对集群中各个机器的时间同步要求比较高，要求各个机器的系统时间不能相差太多，不然会造成很多问题。可以配置集群中各个机器和互联网的时间服务器进行时间同步，但是在实际生产环境中，集群中大部分服务器是不能连接外网的，这时候可以在内网搭建一个自己的时间服务器（NTP服务器），集群的各个机器与这个时间服务器进行时间同步。</p>
+
+<p>三十三、配置NTP服务器</p>
+
+<p>我们选择第三台机器（bigdata-senior03.chybinmy.com）为NTF服务器，其他机器和这台机器进行同步。</p>
+
+<p>1、 检查ntp服务是否已经安装</p>
+
+<pre>
+<code>[hadoop@bigdata-senior03 data]$ sudo rpm -qa | grep ntp
+ntpdate-4.2.6p5-1.el6.centos.x86_64
+ntp-4.2.6p5-1.el6.centos.x86_64</code></pre>
+
+<p>显示已经安装过了ntp程序，其中<code>ntpdate-4.2.6p5-1.el6.centos.x86_64</code>&nbsp;是用来和某台服务器进行同步的，<code>ntp-4.2.6p5-1.el6.centos.x86_64</code>是用来提供时间同步服务的。</p>
+
+<p>2、 修改配置文件ntp.conf</p>
+
+<pre>
+<code>[hadoop@bigdata-senior03 data]$ vim /etc/ntp.conf</code></pre>
+
+<p>启用restrice,修改网段</p>
+
+<p>restrict 192.168.100.0 mask 255.255.255.0 nomodify notrap&nbsp;<br />
+将这行的注释去掉，并且将网段改为集群的网段，我们这里是100网段。</p>
+
+<p>注释掉server域名配置</p>
+
+<pre>
+<code>#server 0.centos.pool.ntp.org iburst
+#server 1.centos.pool.ntp.org iburst
+#server 2.centos.pool.ntp.org iburst
+#server 3.centos.pool.ntp.org iburst</code></pre>
+
+<p>是时间服务器的域名，这里不需要连接互联网，所以将他们注释掉。</p>
+
+<p>修改</p>
+
+<p>server 127.127.1.0</p>
+
+<p>fudge 127.127.1.0 stratum 10</p>
+
+<p>3、 修改配置文件ntpd</p>
+
+<pre>
+<code>[hadoop@bigdata-senior03 ~]$ sudo vim /etc/sysconfig/ntpd</code></pre>
+
+<p>添加一行配置：SYNC_CLOCK=yes</p>
+
+<p><img alt="enter image description here" src="http://images.gitbook.cn/c8db0cf0-5cbe-11e7-b8ee-cfb7eda16afc" title="" /></p>
+
+<p>4、 启动ntp服务</p>
+
+<pre>
+<code>[hadoop@bigdata-senior03 ~]$ sudo chkconfig ntpd on</code></pre>
+
+<p>这样每次机器启动时，ntp服务都会自动启动。</p>
+
+<p>三十四、配置其他机器的同步</p>
+
+<p>切换到root用户进行配置通过contab进行定时同步：</p>
+
+<pre>
+<code>[root@bigdata-senior02 hadoop]# crontab -e 
+*/10 * * * * /usr/sbin/ntpdate bigdata-senior03.chybinmy.com
+[root@bigdata-senior02 hadoop]# crontab -e 
+*/10 * * * * /usr/sbin/ntpdate bigdata-senior03.chybinmy.com</code></pre>
+
+<p>三十五、 测试同步是否有效</p>
+
+<p>1、 查看目前三台机器的时间</p>
+
+<pre>
+<code>[hadoop@bigdata-senior03 ~]$ date &quot;+%Y-%m-%d %H:%M:%S&quot;
+2016-09-23 16:43:56
+[hadoop@bigdata-senior02 ~]$ date &quot;+%Y-%m-%d %H:%M:%S&quot;
+2016-09-23 16:44:08
+[hadoop@bigdata-senior01 data]$ date &quot;+%Y-%m-%d %H:%M:%S&quot;
+2016-09-23 16:44:18</code></pre>
+
+<p>2、 修改bigdata-senior01上的时间</p>
+
+<p>将时间改为一个以前的时间：</p>
+
+<pre>
+<code>[hadoop@bigdata-senior01 data]$ sudo date -s &#39;2016-01-01 00:00:00&#39;
+Fri Jan  1 00:00:00 CST 2016
+[hadoop@bigdata-senior01 data]$ date &quot;+%Y-%m-%d %H:%M:%S&quot;
+2016-01-01 00:00:05</code></pre>
+
+<p>等10分钟，看是否可以实现自动同步，将bigdata-senior01上的时间修改为和bigdata-senior03上的一致。</p>
+
+<p>3、 查看是否自动同步时间</p>
+
+<pre>
+<code>[hadoop@bigdata-senior01 data]$ date &quot;+%Y-%m-%d %H:%M:%S&quot;
+2016-09-23 16:54:36</code></pre>
+
+<p>可以看到bigdata-senior01上的时间已经实现自动同步了。</p>
+
+<h3>第十步、Zookeeper分布式机器部署</h3>
+
+<p>三十六、zookeeper说明</p>
+
+<p>Zookeeper在Hadoop集群中的作用。</p>
+
+<p>Zookeeper是分布式管理协作框架，Zookeeper集群用来保证Hadoop集群的高可用，（高可用的含义是：集群中就算有一部分服务器宕机，也能保证正常地对外提供服务。）</p>
+
+<p>Zookeeper保证高可用的原理。</p>
+
+<p>Zookeeper集群能够保证NamaNode服务高可用的原理是：Hadoop集群中有两个NameNode服务，两个NaameNode都定时地给Zookeeper发送心跳，告诉Zookeeper我还活着，可以提供服务，单某一个时间只有一个是Action状态，另外一个是Standby状态，一旦Zookeeper检测不到Action NameNode发送来的心跳后，就切换到Standby状态的NameNode上，将它设置为Action状态，所以集群中总有一个可用的NameNode，达到了NameNode的高可用目的。</p>
+
+<p>Zookeeper的选举机制。</p>
+
+<p>Zookeeper集群也能保证自身的高可用，保证自身高可用的原理是，Zookeeper集群中的各个机器分为Leader和Follower两个角色，写入数据时，要先写入Leader，Leader同意写入后，再通知Follower写入。客户端读取数时，因为数据都是一样的，可以从任意一台机器上读取数据。</p>
+
+<p>这里Leader角色就存在单点故障的隐患，高可用就是解决单点故障隐患的。Zookeeper从机制上解决了Leader的单点故障问题，Leader是哪一台机器是不固定的，Leader是选举出来的。选举流程是，集群中任何一台机器发现集群中没有Leader时，就推荐自己为Leader，其他机器来同意，当超过一半数的机器同意它为Leader时，选举结束，所以Zookeeper集群中的机器数据必须是奇数。这样就算当Leader机器宕机后，会很快选举出新的Leader，保证了Zookeeper集群本身的高可用。</p>
+
+<p>写入高可用。</p>
+
+<p>集群中的写入操作都是先通知Leader，Leader再通知Follower写入，实际上当超过一半的机器写入成功后，就认为写入成功了，所以就算有些机器宕机，写入也是成功的。</p>
+
+<p>读取高可用。</p>
+
+<p>zookeeperk客户端读取数据时，可以读取集群中的任何一个机器。所以部分机器的宕机并不影响读取。</p>
+
+<p>zookeeper服务器必须是奇数台，因为zookeeper有选举制度，角色有：领导者、跟随者、观察者，选举的目的是保证集群中数据的一致性。</p>
+
+<p>三十七、安装zookeeper</p>
+
+<p>我们这里在BigData01、BigData02、BigData03三台机器上安装zookeeper集群。</p>
+
+<p>1、 解压安装包</p>
+
+<p>在BigData01上安装解压zookeeper安装包。</p>
+
+<pre>
+<code>[hadoop@bigdata-senior01 hadoop-2.5.0]$ tar -zxf /opt/sofeware/zookeeper-3.4.8.tar.gz -C /opt/modules/</code></pre>
+
+<p>2、 修改配置</p>
+
+<p>拷贝conf下的zoo_sample.cfg副本，改名为zoo.cfg。zoo.cfg是zookeeper的配置文件：</p>
+
+<pre>
+<code>[hadoop@bigdata-senior01 zookeeper-3.4.8]$ cp conf/zoo_sample.cfg conf/zoo.cfg</code></pre>
+
+<p>dataDir属性设置zookeeper的数据文件存放的目录：</p>
+
+<p>dataDir=/opt/modules/zookeeper-3.4.8/data/zData</p>
+
+<p>指定zookeeper集群中各个机器的信息：</p>
+
+<pre>
+<code>server.1=bigdata-senior01.chybinmy.com:2888:3888
+server.2=bigdata-senior02.chybinmy.com:2888:3888
+server.3=bigdata-senior03.chybinmy.com:2888:3888</code></pre>
+
+<p>server后面的数字范围是1到255，所以一个zookeeper集群最多可以有255个机器。</p>
+
+<p><img alt="enter image description here" src="http://images.gitbook.cn/d3a902e0-5cbe-11e7-86d9-f17e4b747fa0" title="" /></p>
+
+<p>3、 创建myid文件</p>
+
+<p>在dataDir所指定的目录下创一个名为myid的文件，文件内容为server点后面的数字。</p>
+
+<p><img alt="enter image description here" src="http://images.gitbook.cn/db815f80-5cbe-11e7-b8ee-cfb7eda16afc" title="" /></p>
+
+<p>4、 分发到其他机器</p>
+
+<pre>
+<code>[hadoop@bigdata-senior01 zookeeper-3.4.8]$ scp -r /opt/modules/zookeeper-3.4.8 bigdata-senior02.chybinmy.com:/opt/modules
+[hadoop@bigdata-senior01 zookeeper-3.4.8]$ scp -r /opt/modules/zookeeper-3.4.8 bigdata-senior03.chybinmy.com:/opt/modules</code></pre>
+
+<p>5、 修改其他机器上的myid文件</p>
+
+<pre>
+<code>[hadoop@bigdata-senior02 zookeeper-3.4.8]$ echo 2 &gt; /opt/modules/zookeeper-3.4.8/data/zData/myid
+[hadoop@bigdata-senior02 zookeeper-3.4.8]$ cat /opt/modules/zookeeper-3.4.8/data/zData/myid 
+</code></pre>
+
+<pre>
+<code>[hadoop@bigdata-senior03 ~]$ echo 3 &gt; /opt/modules/zookeeper-3.4.8/data/zData/myid
+[hadoop@bigdata-senior03 ~]$ cat /opt/modules/zookeeper-3.4.8/data/zData/myid
+</code></pre>
+
+<p>6、 启动zookeeper</p>
+
+<p>需要在各个机器上分别启动zookeeper。</p>
+
+<pre>
+<code>[hadoop@bigdata-senior01 zookeeper-3.4.8]$ bin/zkServer.sh start
+[hadoop@bigdata-senior02 zookeeper-3.4.8]$ bin/zkServer.sh start
+[hadoop@bigdata-senior03 zookeeper-3.4.8]$ bin/zkServer.sh start</code></pre>
+
+<p><img alt="enter image description here" src="http://images.gitbook.cn/e6e83a10-5cbe-11e7-86d9-f17e4b747fa0" title="" /></p>
+
+<p>三十八、zookeeper命令</p>
+
+<p>进入zookeeper Shell</p>
+
+<p>在zookeeper根目录下执行 bin/zkCli.sh进入zk shell模式。</p>
+
+<p>zookeeper很像一个小型的文件系统，/是根目录，下面的所有节点都叫zNode。</p>
+
+<p>进入zk shell 后输入任意字符，可以列出所有的zookeeper命令</p>
+
+<p><img alt="enter image description here" src="http://images.gitbook.cn/f0fc55e0-5cbe-11e7-b8ee-cfb7eda16afc" title="" /></p>
+
+<p>查询zNode上的数据：get /zookeeper</p>
+
+<p>创建一个zNode : create /znode1 &ldquo;demodata &ldquo;</p>
+
+<p>列出所有子zNode：ls /</p>
+
+<p><img alt="enter image description here" src="http://images.gitbook.cn/f9ff01b0-5cbe-11e7-8185-21ba04c77532" title="" /></p>
+
+<p>删除znode : rmr /znode1</p>
+
+<p>退出shell模式：quit</p>
+
+<h4>第十一步、Hadoop 2.x HDFS HA 部署</h4>
+
+<p>三十九、HDFS HA原理</p>
+
+<p>单NameNode的缺陷存在单点故障的问题，如果NameNode不可用，则会导致整个HDFS文件系统不可用。所以需要设计高可用的HDFS（Hadoop HA）来解决NameNode单点故障的问题。解决的方法是在HDFS集群中设置多个NameNode节点。但是一旦引入多个NameNode，就有一些问题需要解决。</p>
+
+<ul>
+	<li>
+	<p>HDFS HA需要保证的四个问题：</p>
+
+	<ul>
+		<li>
+		<p>保证NameNode内存中元数据数据一致，并保证编辑日志文件的安全性。</p>
+		</li>
+		<li>
+		<p>多个NameNode如何协作</p>
+		</li>
+		<li>
+		<p>客户端如何能正确地访问到可用的那个NameNode。</p>
+		</li>
+		<li>
+		<p>怎么保证任意时刻只能有一个NameNode处于对外服务状态。</p>
+		</li>
+	</ul>
+	</li>
+	<li>
+	<p>解决方法</p>
+
+	<ul>
+		<li>
+		<p>对于保证NameNode元数据的一致性和编辑日志的安全性，采用Zookeeper来存储编辑日志文件。</p>
+		</li>
+		<li>
+		<p>两个NameNode一个是Active状态的，一个是Standby状态的，一个时间点只能有一个Active状态的&nbsp;<br />
+		NameNode提供服务,两个NameNode上存储的元数据是实时同步的，当Active的NameNode出现问题时，通过Zookeeper实时切换到Standby的NameNode上，并将Standby改为Active状态。</p>
+		</li>
+		<li>
+		<p>客户端通过连接一个Zookeeper的代理来确定当时哪个NameNode处于服务状态。</p>
+		</li>
+	</ul>
+	</li>
+</ul>
+
+<p>四十、HDFS HA架构图</p>
+
+<p><img alt="enter image description here" src="http://images.gitbook.cn/0446fec0-5cbf-11e7-86d9-f17e4b747fa0" title="" /></p>
+
+<ul>
+	<li>
+	<p>HDFS HA架构中有两台NameNode节点，一台是处于活动状态（Active）为客户端提供服务，另外一台处于热备份状态（Standby）。</p>
+	</li>
+	<li>
+	<p>元数据文件有两个文件：fsimage和edits，备份元数据就是备份这两个文件。JournalNode用来实时从Active NameNode上拷贝edits文件，JournalNode有三台也是为了实现高可用。</p>
+	</li>
+	<li>
+	<p>Standby NameNode不对外提供元数据的访问，它从Active NameNode上拷贝fsimage文件，从JournalNode上拷贝edits文件，然后负责合并fsimage和edits文件，相当于SecondaryNameNode的作用。最终目的是保证Standby NameNode上的元数据信息和Active NameNode上的元数据信息一致，以实现热备份。</p>
+	</li>
+	<li>
+	<p>Zookeeper来保证在Active NameNode失效时及时将Standby NameNode修改为Active状态。</p>
+	</li>
+	<li>
+	<p>ZKFC（失效检测控制）是Hadoop里的一个Zookeeper客户端，在每一个NameNode节点上都启动一个ZKFC进程，来监控NameNode的状态，并把NameNode的状态信息汇报给Zookeeper集群，其实就是在Zookeeper上创建了一个Znode节点，节点里保存了NameNode状态信息。当NameNode失效后，ZKFC检测到报告给Zookeeper，Zookeeper把对应的Znode删除掉，Standby ZKFC发现没有Active状态的NameNode时，就会用shell命令将自己监控的NameNode改为Active状态，并修改Znode上的数据。&nbsp;<br />
+	Znode是个临时的节点，临时节点特征是客户端的连接断了后就会把znode删除，所以当ZKFC失效时，也会导致切换NameNode。</p>
+	</li>
+	<li>
+	<p>DataNode会将心跳信息和Block汇报信息同时发给两台NameNode，DataNode只接受Active NameNode发来的文件读写操作指令。</p>
+	</li>
+</ul>
+
+<p>四十一、搭建HDFS HA 环境</p>
+
+<p>1、 服务器角色规划</p>
+
+<table>
+	<thead>
+		<tr>
+			<th>bigdata-senior01.chybinmy.com</th>
+			<th>bigdata-senior01.chybinmy.com</th>
+			<th>bigdata-senior01.chybinmy.com</th>
+		</tr>
+	</thead>
+	<tbody>
+		<tr>
+			<td>NameNode</td>
+			<td>NameNode</td>
+			<td>&nbsp;</td>
+		</tr>
+		<tr>
+			<td>Zookeeper</td>
+			<td>Zookeeper</td>
+			<td>Zookeeper</td>
+		</tr>
+		<tr>
+			<td>DataNode</td>
+			<td>DataNode</td>
+			<td>DataNode</td>
+		</tr>
+		<tr>
+			<td>&nbsp;</td>
+			<td>ResourceManage</td>
+			<td>ResourceManage</td>
+		</tr>
+		<tr>
+			<td>NodeManager</td>
+			<td>NodeManager</td>
+			<td>NodeManager</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>2、 创建HDFS HA 版本Hadoop程序目录</p>
+
+<p>在bigdata01、bigdata02、bigdata03三台机器上分别创建目录/opt/modules/hadoopha/用来存放Hadoop HA环境。</p>
+
+<pre>
+<code>[hadoop@bigdata-senior01 modules]$ mkdir /opt/modules/hadoopha</code>
+</pre>
+
+<p>3、 新解压Hadoop 2.5.0</p>
+
+<pre>
+<code>[hadoop@bigdata-senior01 ~]$ tar -zxf /opt/sofeware/hadoop-2.5.0.tar.gz -C /opt/modules/hadoopha/</code>
+</pre>
+
+<p>4、 配置Hadoop JDK路径</p>
+
+<pre>
+<code>修改hadoop-env.sh、mapred-env.sh、yarn-env.sh文件中的JDK路径
+export JAVA_HOME=&quot;/opt/modules/jdk1.7.0_67&quot;</code></pre>
+
+<p>5、 配置hdfs-site.xml</p>
+
+<pre>
+<code>&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot;?&gt;
+&lt;configuration&gt;
+  &lt;property&gt;
+    &lt;!-- 为namenode集群定义一个services name --&gt;
+    &lt;name&gt;dfs.nameservices&lt;/name&gt;
+    &lt;value&gt;ns1&lt;/value&gt;
+  &lt;/property&gt;
+  &lt;property&gt;
+    &lt;!-- nameservice 包含哪些namenode，为各个namenode起名 --&gt;
+    &lt;name&gt;dfs.ha.namenodes.ns1&lt;/name&gt;
+    &lt;value&gt;nn1,nn2&lt;/value&gt;
+  &lt;/property&gt;
+  &lt;property&gt;
+    &lt;!--  名为nn1的namenode 的rpc地址和端口号，rpc用来和datanode通讯 --&gt;
+    &lt;name&gt;dfs.namenode.rpc-address.ns1.nn1&lt;/name&gt;
+    &lt;value&gt;bigdata-senior01.chybinmy.com:8020&lt;/value&gt;
+  &lt;/property&gt;
+  &lt;property&gt;
+    &lt;!-- 名为nn2的namenode 的rpc地址和端口号，rpc用来和datanode通讯  --&gt;
+    &lt;name&gt;dfs.namenode.rpc-address.ns1.nn2&lt;/name&gt;
+    &lt;value&gt;bigdata-senior02.chybinmy.com:8020&lt;/value&gt;
+  &lt;/property&gt;
+  &lt;property&gt;
+    &lt;!--名为nn1的namenode 的http地址和端口号，web客户端 --&gt;
+    &lt;name&gt;dfs.namenode.http-address.ns1.nn1&lt;/name&gt;
+    &lt;value&gt;bigdata-senior01.chybinmy.com:50070&lt;/value&gt;
+  &lt;/property&gt;
+  &lt;property&gt;
+    &lt;!--名为nn2的namenode 的http地址和端口号，web客户端 --&gt;
+    &lt;name&gt;dfs.namenode.http-address.ns1.nn2&lt;/name&gt;
+    &lt;value&gt;bigdata-senior02.chybinmy.com:50070&lt;/value&gt;
+  &lt;/property&gt;
+  &lt;property&gt;
+    &lt;!--  namenode间用于共享编辑日志的journal节点列表 --&gt;
+    &lt;name&gt;dfs.namenode.shared.edits.dir&lt;/name&gt;
+    &lt;value&gt;qjournal://bigdata-senior01.chybinmy.com:8485;bigdata-senior02.chybinmy.com:8485;bigdata-senior03.chybinmy.com:8485/ns1&lt;/value&gt;
+  &lt;/property&gt;
+  &lt;property&gt;
+    &lt;!--  journalnode 上用于存放edits日志的目录 --&gt;
+    &lt;name&gt;dfs.journalnode.edits.dir&lt;/name&gt;
+    &lt;value&gt;/opt/modules/hadoopha/hadoop-2.5.0/tmp/data/dfs/jn&lt;/value&gt;
+  &lt;/property&gt;
+  &lt;property&gt;
+    &lt;!--  客户端连接可用状态的NameNode所用的代理类 --&gt;
+    &lt;name&gt;dfs.client.failover.proxy.provider.ns1&lt;/name&gt;
+    &lt;value&gt;org.apache.hadoop.hdfs.server.namenode.ha.ConfiguredFailoverProxyProvider&lt;/value&gt;
+  &lt;/property&gt;
+  &lt;property&gt;
+    &lt;!--   --&gt;
+    &lt;name&gt;dfs.ha.fencing.methods&lt;/name&gt;
+    &lt;value&gt;sshfence&lt;/value&gt;
+  &lt;/property&gt;
+  &lt;property&gt;
+    &lt;name&gt;dfs.ha.fencing.ssh.private-key-files&lt;/name&gt;
+    &lt;value&gt;/home/hadoop/.ssh/id_rsa&lt;/value&gt;
+  &lt;/property&gt;
+&lt;/configuration&gt;
+</code></pre>
+
+<p>6、 配置core-site.xml</p>
+
+<pre>
+<code>&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot;?&gt;
+&lt;configuration&gt;
+  &lt;property&gt;
+    &lt;!--  hdfs 地址，ha中是连接到nameservice --&gt;
+    &lt;name&gt;fs.defaultFS&lt;/name&gt;
+    &lt;value&gt;hdfs://ns1&lt;/value&gt;
+  &lt;/property&gt;
+  &lt;property&gt;
+    &lt;!--  --&gt;
+    &lt;name&gt;hadoop.tmp.dir&lt;/name&gt;
+    &lt;value&gt;/opt/modules/hadoopha/hadoop-2.5.0/data/tmp&lt;/value&gt;
+  &lt;/property&gt;
+&lt;/configuration&gt;
+</code></pre>
+
+<p><code>hadoop.tmp.dir</code>设置hadoop临时目录地址，默认时，NameNode和DataNode的数据存在这个路径下。</p>
+
+<p>7、 配置slaves文件</p>
+
+<pre>
+<code>bigdata-senior01.chybinmy.com
+bigdata-senior02.chybinmy.com
+bigdata-senior03.chybinmy.com</code></pre>
+
+<p>8、 分发到其他节点</p>
+
+<p>分发之前先将share/doc目录删除，这个目录中是帮助文件，并且很大，可以删除。</p>
+
+<pre>
+<code>[hadoop@bigdata-senior01 hadoop-2.5.0]$ scp -r /opt/modules/hadoopha bigdata-senior02.chybinmy.com:/opt/modules
+[hadoop@bigdata-senior01 hadoop-2.5.0]$ scp -r /opt/modules/hadoopha bigdata-senior03.chybinmy.com:/opt/modules</code></pre>
+
+<p>9、 启动HDFS HA集群</p>
+
+<p>三台机器分别启动Journalnode。</p>
+
+<pre>
+<code>[hadoop@bigdata-senior01 hadoop-2.5.0]$ sbin/hadoop-daemon.sh start journalnode
+[hadoop@bigdata-senior02 hadoop-2.5.0]$ sbin/hadoop-daemon.sh start journalnode
+[hadoop@bigdata-senior03 hadoop-2.5.0]$ sbin/hadoop-daemon.sh start journalnode</code></pre>
+
+<p>jps命令查看是否启动。</p>
+
+<p>10、 启动Zookeeper</p>
+
+<p>在三台节点上启动Zookeeper：</p>
+
+<pre>
+<code>[hadoop@bigdata-senior01 zookeeper-3.4.8]$ bin/zkServer.sh start
+[hadoop@bigdata-senior02 zookeeper-3.4.8]$ bin/zkServer.sh start
+[hadoop@bigdata-senior03 zookeeper-3.4.8]$ bin/zkServer.sh start</code></pre>
+
+<p>11、 格式化NameNode</p>
+
+<p>在第一台上进行NameNode格式化：</p>
+
+<pre>
+<code>[hadoop@bigdata-senior01 hadoop-2.5.0]$ bin/hdfs namenode -format</code></pre>
+
+<p>在第二台NameNode上：</p>
+
+<pre>
+<code>[hadoop@bigdata-senior02 hadoop-2.5.0]$ bin/hdfs namenode -bootstrapStandby</code></pre>
+
+<p>12、 启动NameNode</p>
+
+<p>在第一台、第二台上启动NameNode：</p>
+
+<pre>
+<code>[hadoop@bigdata-senior01 hadoop-2.5.0]$ sbin/hadoop-daemon.sh start namenode
+[hadoop@bigdata-senior02 hadoop-2.5.0]$ sbin/hadoop-daemon.sh start namenode</code></pre>
+
+<p>查看HDFS Web页面，此时两个NameNode都是standby状态。</p>
+
+<p>切换第一台为active状态：</p>
+
+<pre>
+<code>[hadoop@bigdata-senior01 hadoop-2.5.0]$ bin/hdfs haadmin -transitionToActive nn1</code></pre>
+
+<p>可以添加上forcemanual参数，强制将一个NameNode转换为Active状态。</p>
+
+<pre>
+<code>[hadoop@bigdata-senior01 hadoop-2.5.0]$ bin/hdfs haadmin &ndash;transitionToActive -forcemanual nn1</code></pre>
+
+<p>此时从web 页面就看到第一台已经是active状态了。</p>
+
+<p><img alt="enter image description here" src="http://images.gitbook.cn/14fd6830-5cbf-11e7-b8ee-cfb7eda16afc" title="" /></p>
+
+<p>13、 配置故障自动转移</p>
+
+<p>利用zookeeper集群实现故障自动转移，在配置故障自动转移之前，要先关闭集群，不能在HDFS运行期间进行配置。</p>
+
+<p>关闭NameNode、DataNode、JournalNode、zookeeper</p>
+
+<pre>
+<code>[hadoop@bigdata-senior01 hadoop-2.5.0]$ sbin/hadoop-daemon.sh stop namenode
+[hadoop@bigdata-senior01 hadoop-2.5.0]$ sbin/hadoop-daemon.sh stop datanode
+[hadoop@bigdata-senior01 hadoop-2.5.0]$ sbin/hadoop-daemon.sh stop journalnode
+[hadoop@bigdata-senior01 hadoop-2.5.0]$ cd ../../zookeeper-3.4.8/
+[hadoop@bigdata-senior01 zookeeper-3.4.8]$ bin/zkServer.sh stop
+[hadoop@bigdata-senior02 hadoop-2.5.0]$ sbin/hadoop-daemon.sh stop namenode
+[hadoop@bigdata-senior02 hadoop-2.5.0]$ sbin/hadoop-daemon.sh stop datanode
+[hadoop@bigdata- senior02 hadoop-2.5.0]$ sbin/hadoop-daemon.sh stop journalnode
+[hadoop@bigdata- senior02 hadoop-2.5.0]$ cd ../../zookeeper-3.4.8/
+[hadoop@bigdata- senior02 zookeeper-3.4.8]$ bin/zkServer.sh stop
+[hadoop@bigdata- senior03 hadoop-2.5.0]$ sbin/hadoop-daemon.sh stop datanode
+[hadoop@bigdata- senior03 hadoop-2.5.0]$ sbin/hadoop-daemon.sh stop journalnode
+[hadoop@bigdata- senior03 hadoop-2.5.0]$ cd ../../zookeeper-3.4.8/
+[hadoop@bigdata- senior03 zookeeper-3.4.8]$ bin/zkServer.sh stop</code></pre>
+
+<p>修改hdfs-site.xml</p>
+
+<pre>
+<code>&lt;property&gt;
+    &lt;name&gt;dfs.ha.automatic-failover.enabled&lt;/name&gt;
+    &lt;value&gt;true&lt;/value&gt;
+&lt;/property&gt;</code></pre>
+
+<p>修改core-site.xml</p>
+
+<pre>
+<code>&lt;property&gt;
+   &lt;name&gt;ha.zookeeper.quorum&lt;/name&gt;
+   &lt;value&gt;bigdata-senior01.chybinmy.com:2181,bigdata-senior02.chybinmy.com:2181,bigdata-senior03.chybinmy.com:2181&lt;/value&gt;
+&lt;/property&gt;</code></pre>
+
+<p>将hdfs-site.xml和core-site.xml分发到其他机器</p>
+
+<pre>
+<code>[hadoop@bigdata-senior01 hadoop-2.5.0]$ scp /opt/modules/hadoopha/hadoop-2.5.0/etc/hadoop/hdfs-site.xml bigdata-senior02.chybinmy.com:/opt/modules/hadoopha/hadoop-2.5.0/etc/hadoop/
+[hadoop@bigdata-senior01 hadoop-2.5.0]$ scp /opt/modules/hadoopha/hadoop-2.5.0/etc/hadoop/hdfs-site.xml bigdata-senior03.chybinmy.com:/opt/modules/hadoopha/hadoop-2.5.0/etc/hadoop/
+[hadoop@bigdata-senior01 hadoop-2.5.0]$ scp /opt/modules/hadoopha/hadoop-2.5.0/etc/hadoop/core-site.xml bigdata-senior02.chybinmy.com:/opt/modules/hadoopha/hadoop-2.5.0/etc/hadoop/
+[hadoop@bigdata-senior01 hadoop-2.5.0]$ scp /opt/modules/hadoopha/hadoop-2.5.0/etc/hadoop/core-site.xml bigdata-senior03.chybinmy.com:/opt/modules/hadoopha/hadoop-2.5.0/etc/hadoop/</code></pre>
+
+<p>启动zookeeper</p>
+
+<p>三台机器启动zookeeper</p>
+
+<pre>
+<code>[hadoop@bigdata-senior01 hadoop-2.5.0]$ /opt/modules/zookeeper-3.4.8/bin/zkServer.sh start</code></pre>
+
+<p>创建一个zNode</p>
+
+<pre>
+<code>[hadoop@bigdata-senior01 hadoop-2.5.0]$ cd /opt/modules/hadoopha/hadoop-2.5.0/
+[hadoop@bigdata-senior01 hadoop-2.5.0]$ bin/hdfs zkfc -formatZK</code></pre>
+
+<p><img alt="enter image description here" src="http://images.gitbook.cn/26b6e9c0-5cbf-11e7-86d9-f17e4b747fa0" title="" /></p>
+
+<p>在Zookeeper上创建一个存储namenode相关的节点。</p>
+
+<p>14、 启动HDFS、JournalNode、zkfc</p>
+
+<p>启动NameNode、DataNode、JournalNode、zkfc</p>
+
+<pre>
+<code>[hadoop@bigdata-senior01 hadoop-2.5.0]$ sbin/start-dfs.sh</code></pre>
+
+<p>zkfc只针对NameNode监听。</p>
+
+<p>四十二、测试HDFS HA</p>
+
+<p>1、 测试故障自动转移和数据是否共享</p>
+
+<p>在nn1上上传文件</p>
+
+<p>目前bigdata-senior01节点上的NameNode是Active状态的。</p>
+
+<p><img alt="enter image description here" src="http://images.gitbook.cn/31cc7000-5cbf-11e7-8ca5-edc6aa6f5290" title="" /></p>
+
+<pre>
+<code>[hadoop@bigdata-senior01 hadoop-2.5.0]$ bin/hdfs dfs -put /opt/data/wc.input /</code></pre>
+
+<p><img alt="enter image description here" src="http://images.gitbook.cn/3f42f0b0-5cbf-11e7-b8ee-cfb7eda16afc" title="" /></p>
+
+<p>将nn1上的NodeNode进程杀掉</p>
+
+<pre>
+<code>[hadoop@bigdata-senior01 hadoop-2.5.0]$ kill -9 3364</code></pre>
+
+<p>nn1上的namenode已经无法访问了。</p>
+
+<p>查看nn2是否是Active状态</p>
+
+<p><img alt="enter image description here" src="http://images.gitbook.cn/485a8410-5cbf-11e7-86d9-f17e4b747fa0" title="" /></p>
+
+<p>在nn2上查看是否看见文件</p>
+
+<p><img alt="enter image description here" src="http://images.gitbook.cn/50a355c0-5cbf-11e7-8185-21ba04c77532" title="" /></p>
+
+<p>经以上验证，已经实现了nn1和nn2之间的文件同步和故障自动转移。</p>
+
+<h3>第十二步、Hadoop 2.x YARN HA 部署</h3>
+
+<p>四十三、YARN HA原理</p>
+
+<p>Hadoop2.4版本之前，ResourceManager也存在单点故障的问题，也需要实现HA来保证ResourceManger的高可也用性。</p>
+
+<p>ResouceManager从记录着当前集群的资源分配情况和JOB的运行状态，YRAN HA 利用Zookeeper等共享存储介质来存储这些信息来达到高可用。另外利用Zookeeper来实现ResourceManager自动故障转移。</p>
+
+<p><img alt="enter image description here" src="http://images.gitbook.cn/6676a550-5cbf-11e7-8185-21ba04c77532" title="" /></p>
+
+<ul>
+	<li>
+	<p>MasterHADaemon：控制RM的 Master的启动和停止，和RM运行在一个进程中，可以接收外部RPC命令。</p>
+	</li>
+	<li>
+	<p>共享存储：Active Master将信息写入共享存储，Standby Master读取共享存储信息以保持和Active Master同步。</p>
+	</li>
+	<li>
+	<p>ZKFailoverController：基于Zookeeper实现的切换控制器，由ActiveStandbyElector和HealthMonitor组成，ActiveStandbyElector负责与Zookeeper交互，判断所管理的Master是进入Active还是Standby；HealthMonitor负责监控Master的活动健康情况，是个监视器。</p>
+	</li>
+	<li>
+	<p>Zookeeper：核心功能是维护一把全局锁控制整个集群上只有一个Active的ResourceManager。</p>
+	</li>
+</ul>
+
+<p>四十四、搭建YARN HA环境</p>
+
+<p>1、 服务器角色规划</p>
+
+<table>
+	<thead>
+		<tr>
+			<th>bigdata-senior01.chybinmy.com</th>
+			<th>bigdata-senior01.chybinmy.com</th>
+			<th>bigdata-senior01.chybinmy.com</th>
+		</tr>
+	</thead>
+	<tbody>
+		<tr>
+			<td>NameNode</td>
+			<td>NameNode</td>
+			<td>&nbsp;</td>
+		</tr>
+		<tr>
+			<td>Zookeeper</td>
+			<td>Zookeeper</td>
+			<td>Zookeeper</td>
+		</tr>
+		<tr>
+			<td>DataNode</td>
+			<td>DataNode</td>
+			<td>DataNode</td>
+		</tr>
+		<tr>
+			<td>&nbsp;</td>
+			<td>ResourceManage</td>
+			<td>ResourceManage</td>
+		</tr>
+		<tr>
+			<td>NodeManager</td>
+			<td>NodeManager</td>
+			<td>NodeManager</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>2、 修改配置文件yarn-site.xml</p>
+
+<pre>
+<code>&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot;?&gt;
+&lt;configuration&gt;
+  &lt;property&gt;
+    &lt;name&gt;yarn.nodemanager.aux-services&lt;/name&gt;
+    &lt;value&gt;mapreduce_shuffle&lt;/value&gt;
+  &lt;/property&gt;
+  &lt;property&gt;
+    &lt;name&gt;yarn.log-aggregation-enable&lt;/name&gt;
+    &lt;value&gt;true&lt;/value&gt;
+  &lt;/property&gt;
+  &lt;property&gt;
+    &lt;name&gt;yarn.log-aggregation.retain-seconds&lt;/name&gt;
+    &lt;value&gt;106800&lt;/value&gt;
+  &lt;/property&gt;
+  &lt;property&gt;
+    &lt;!--  启用resourcemanager的ha功能 --&gt;
+    &lt;name&gt;yarn.resourcemanager.ha.enabled&lt;/name&gt;
+    &lt;value&gt;true&lt;/value&gt;
+  &lt;/property&gt;
+  &lt;property&gt;
+    &lt;!--  为resourcemanage ha 集群起个id --&gt;
+    &lt;name&gt;yarn.resourcemanager.cluster-id&lt;/name&gt;
+    &lt;value&gt;yarn-cluster&lt;/value&gt;
+  &lt;/property&gt;
+  &lt;property&gt;
+    &lt;!--  指定resourcemanger ha 有哪些节点名 --&gt;
+    &lt;name&gt;yarn.resourcemanager.ha.rm-ids&lt;/name&gt;
+    &lt;value&gt;rm12,rm13&lt;/value&gt;
+  &lt;/property&gt;
+  &lt;property&gt;
+    &lt;!--  指定第一个节点的所在机器 --&gt;
+    &lt;name&gt;yarn.resourcemanager.hostname.rm12&lt;/name&gt;
+    &lt;value&gt;bigdata-senior02.chybinmy.com&lt;/value&gt;
+  &lt;/property&gt;
+  &lt;property&gt;
+    &lt;!--  指定第二个节点所在机器 --&gt;
+    &lt;name&gt;yarn.resourcemanager.hostname.rm13&lt;/name&gt;
+    &lt;value&gt;bigdata-senior03.chybinmy.com&lt;/value&gt;
+  &lt;/property&gt;
+  &lt;property&gt;
+    &lt;!--  指定resourcemanger ha 所用的zookeeper 节点 --&gt;
+    &lt;name&gt;yarn.resourcemanager.zk-address&lt;/name&gt;
+    &lt;value&gt;bigdata-senior01.chybinmy.com:2181,bigdata-senior02.chybinmy.com:2181,bigdata-senior03.chybinmy.com:2181&lt;/value&gt;
+  &lt;/property&gt;
+  &lt;property&gt;
+    &lt;!--  --&gt;
+    &lt;name&gt;yarn.resourcemanager.recovery.enabled&lt;/name&gt;
+    &lt;value&gt;true&lt;/value&gt;
+  &lt;/property&gt;
+  &lt;property&gt;
+    &lt;!--  --&gt;
+    &lt;name&gt;yarn.resourcemanager.store.class&lt;/name&gt;
+    &lt;value&gt;org.apache.hadoop.yarn.server.resourcemanager.recovery.ZKRMStateStore&lt;/value&gt;
+  &lt;/property&gt;
+&lt;/configuration&gt;
+</code></pre>
+
+<p>3、 分发到其他机器</p>
+
+<pre>
+<code>[hadoop@bigdata-senior01 hadoop-2.5.0]$ scp /opt/modules/hadoopha/hadoop-2.5.0/etc/hadoop/yarn-site.xml bigdata-senior02.chybinmy.com:/opt/modules/hadoopha/hadoop-2.5.0/etc/hadoop/
+[hadoop@bigdata-senior01 hadoop-2.5.0]$ scp /opt/modules/hadoopha/hadoop-2.5.0/etc/hadoop/yarn-site.xml bigdata-senior03.chybinmy.com:/opt/modules/hadoopha/hadoop-2.5.0/etc/hadoop/\</code></pre>
+
+<p>4、 启动</p>
+
+<p>在bigdata-senior01上启动yarn：</p>
+
+<pre>
+<code>[hadoop@bigdata-senior01 hadoop-2.5.0]$ sbin/start-yarn.sh</code></pre>
+
+<p>在bigdata-senior02、bigdata-senior03上启动resourcemanager：</p>
+
+<pre>
+<code>[hadoop@bigdata-senior02 hadoop-2.5.0]$ sbin/yarn-daemon.sh start resourcemanager
+[hadoop@bigdata-senior03 hadoop-2.5.0]$ sbin/yarn-daemon.sh start resourcemanager</code></pre>
+
+<p>启动后各个节点的进程。</p>
+
+<p><img alt="enter image description here" src="http://images.gitbook.cn/a5661890-5cbf-11e7-8185-21ba04c77532" title="" /></p>
+
+<p><img alt="enter image description here" src="http://images.gitbook.cn/a9db9b20-5cbf-11e7-8ca5-edc6aa6f5290" title="" /></p>
+
+<p><img alt="enter image description here" src="http://images.gitbook.cn/ae2049b0-5cbf-11e7-86d9-f17e4b747fa0" title="" /></p>
+
+<p>Web客户端访问bigdata02机器上的resourcemanager正常，它是active状态的。</p>
+
+<p><a href="http://bigdata-senior02.chybinmy.com:8088/cluster" target="_blank">http://bigdata-senior02.chybinmy.com:8088/cluster</a></p>
+
+<p>访问另外一个resourcemanager，因为他是standby,会自动跳转到active的resourcemanager。</p>
+
+<p><a href="http://bigdata-senior03.chybinmy.com:8088/cluster" target="_blank">http://bigdata-senior03.chybinmy.com:8088/cluster</a></p>
+
+<p>四十五、测试YARN HA</p>
+
+<p>5、 运行一个mapreduce job</p>
+
+<pre>
+<code>[hadoop@bigdata-senior01 hadoop-2.5.0]$ bin/yarn jar share/hadoop/mapreduce/hadoop-mapreduce-examples-2.5.0.jar wordcount /wc.input /input</code></pre>
+
+<p>6、 在job运行过程中，将Active状态的resourcemanager进程杀掉。</p>
+
+<pre>
+<code>[hadoop@bigdata-senior02 hadoop-2.5.0]$ kill -9 4475</code></pre>
+
+<p>7、 观察另外一个resourcemanager是否可以自动接替。</p>
+
+<p>bigdata02的resourcemanage Web客户端已经不能访问，bigdata03的resourcemanage已经自动变为active状态。</p>
+
+<p>8、 观察job是否可以顺利完成。</p>
+
+<p>而mapreduce job 也能顺利完成，没有因为resourcemanager的意外故障而影响运行。</p>
+
+<p>经过以上测试，已经验证YARN HA 已经搭建成功。</p>
+
+<h3>第十三步、HDFS Federation 架构部署</h3>
+
+<p>四十六、HDFS Federation 的使用原因</p>
+
+<p>1、 单个NameNode节点的局限性</p>
+
+<p>命名空间的限制。</p>
+
+<p>NameNode上存储着整个HDFS上的文件的元数据，NameNode是部署在一台机器上的，因为单个机器硬件的限制，必然会限制NameNode所能管理的文件个数，制约了数据量的增长。</p>
+
+<p>数据隔离问题。</p>
+
+<p>整个HDFS上的文件都由一个NameNode管理，所以一个程序很有可能会影响到整个HDFS上的程序，并且权限控制比较复杂。</p>
+
+<p>性能瓶颈。</p>
+
+<p>单个NameNode时HDFS文件系统的吞吐量受限于单个NameNode的吞吐量。因为NameNode是个JVM进程，JVM进程所占用的内存很大时，性能会下降很多。</p>
+
+<p>2、 HDFS Federation介绍</p>
+
+<p>HDFS Federation是可以在Hadoop集群中设置多个NameNode，不同于HA中多个NameNode是完全一样的，是多个备份，Federation中的多个NameNode是不同的，可以理解为将一个NameNode切分为了多个NameNode，每一个NameNode只负责管理一部分数据。&nbsp;<br />
+HDFS Federation中的多个NameNode共用DataNode。</p>
+
+<p>四十七、HDFS Federation的架构图</p>
+
+<p><img alt="enter image description here" src="http://images.gitbook.cn/cbde6c70-5cbf-11e7-8185-21ba04c77532" title="" /></p>
+
+<p>四十八、HDFS Federation搭建</p>
+
+<p>1、 服务器角色规划</p>
+
+<table>
+	<thead>
+		<tr>
+			<th>bigdata-senior01.chybinmy.com</th>
+			<th>bigdata-senior01.chybinmy.com</th>
+			<th>bigdata-senior01.chybinmy.com</th>
+		</tr>
+	</thead>
+	<tbody>
+		<tr>
+			<td>NameNode1</td>
+			<td>NameNode2</td>
+			<td>NameNode3</td>
+		</tr>
+		<tr>
+			<td>&nbsp;</td>
+			<td>ResourceManage</td>
+			<td>&nbsp;</td>
+		</tr>
+		<tr>
+			<td>DataNode</td>
+			<td>DataNode</td>
+			<td>DataNode</td>
+		</tr>
+		<tr>
+			<td>NodeManager</td>
+			<td>NodeManager</td>
+			<td>NodeManager</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>2、 创建HDFS Federation 版本Hadoop程序目录</p>
+
+<p>在bigdata01上创建目录/opt/modules/hadoopfederation /用来存放Hadoop Federation环境。</p>
+
+<pre>
+<code>[hadoop@bigdata-senior01 modules]$ mkdir /opt/modules/hadoopfederation</code></pre>
+
+<p>3、 新解压Hadoop 2.5.0</p>
+
+<pre>
+<code>[hadoop@bigdata-senior01 ~]$ tar -zxf /opt/sofeware/hadoop-2.5.0.tar.gz -C /opt/modules/hadoopfederation/</code></pre>
+
+<p>4、 配置Hadoop JDK路径</p>
+
+<p>修改hadoop-env.sh、mapred-env.sh、yarn-env.sh文件中的JDK路径。</p>
+
+<p>export JAVA_HOME=&rdquo;/opt/modules/jdk1.7.0_67&rdquo;</p>
+
+<p>5、 配置hdfs-site.xml</p>
+
+<pre>
+<code>&lt;configuration&gt;
+&lt;property&gt;
+&lt;!&mdash;配置三台NameNode --&gt;
+    &lt;name&gt;dfs.nameservices&lt;/name&gt;
+    &lt;value&gt;ns1,ns2,ns3&lt;/value&gt;
+  &lt;/property&gt;
+  &lt;property&gt;
+&lt;!&mdash;第一台NameNode的机器名和rpc端口，指定了NameNode和DataNode通讯用的端口号 --&gt;
+    &lt;name&gt;dfs.namenode.rpc-address.ns1&lt;/name&gt;
+    &lt;value&gt;bigdata-senior01.chybinmy.com:8020&lt;/value&gt;
+  &lt;/property&gt;
+   &lt;property&gt;
+&lt;!&mdash;第一台NameNode的机器名和rpc端口，备用端口号 --&gt;
+    &lt;name&gt;dfs.namenode.serviceerpc-address.ns1&lt;/name&gt;
+    &lt;value&gt;bigdata-senior01.chybinmy.com:8022&lt;/value&gt;
+  &lt;/property&gt;
+  &lt;property&gt;
+&lt;!&mdash;第一台NameNode的http页面地址和端口号 --&gt;
+    &lt;name&gt;dfs.namenode.http-address.ns1&lt;/name&gt;
+    &lt;value&gt;bigdata-senior01.chybinmy.com:50070&lt;/value&gt;
+  &lt;/property&gt;
+&lt;property&gt;
+&lt;!&mdash;第一台NameNode的https页面地址和端口号 --&gt;
+    &lt;name&gt;dfs.namenode.https-address.ns1&lt;/name&gt;
+    &lt;value&gt;bigdata-senior01.chybinmy.com:50470&lt;/value&gt;
+  &lt;/property&gt;
+
+  &lt;property&gt;
+    &lt;name&gt;dfs.namenode.rpc-address.ns2&lt;/name&gt;
+    &lt;value&gt;bigdata-senior02.chybinmy.com:8020&lt;/value&gt;
+  &lt;/property&gt;
+   &lt;property&gt;
+    &lt;name&gt;dfs.namenode.serviceerpc-address.ns2&lt;/name&gt;
+    &lt;value&gt;bigdata-senior02.chybinmy.com:8022&lt;/value&gt;
+  &lt;/property&gt;
+  &lt;property&gt;
+    &lt;name&gt;dfs.namenode.http-address.ns2&lt;/name&gt;
+    &lt;value&gt;bigdata-senior02.chybinmy.com:50070&lt;/value&gt;
+  &lt;/property&gt;
+    &lt;property&gt;
+    &lt;name&gt;dfs.namenode.https-address.ns2&lt;/name&gt;
+    &lt;value&gt;bigdata-senior02.chybinmy.com:50470&lt;/value&gt;
+  &lt;/property&gt;
+
+
+  &lt;property&gt;
+    &lt;name&gt;dfs.namenode.rpc-address.ns3&lt;/name&gt;
+    &lt;value&gt;bigdata-senior03.chybinmy.com:8020&lt;/value&gt;
+  &lt;/property&gt;
+   &lt;property&gt;
+    &lt;name&gt;dfs.namenode.serviceerpc-address.ns3&lt;/name&gt;
+    &lt;value&gt;bigdata-senior03.chybinmy.com:8022&lt;/value&gt;
+  &lt;/property&gt;
+  &lt;property&gt;
+    &lt;name&gt;dfs.namenode.http-address.ns3&lt;/name&gt;
+    &lt;value&gt;bigdata-senior03.chybinmy.com:50070&lt;/value&gt;
+  &lt;/property&gt;
+    &lt;property&gt;
+    &lt;name&gt;dfs.namenode.https-address.ns3&lt;/name&gt;
+    &lt;value&gt;bigdata-senior03.chybinmy.com:50470&lt;/value&gt;
+  &lt;/property&gt;
+
+&lt;/configuration&gt;</code></pre>
+
+<p>6、 配置core-site.xml</p>
+
+<pre>
+<code>&lt;configuration&gt;
+&lt;property&gt;
+    &lt;name&gt;hadoop.tmp.dir&lt;/name&gt;
+    &lt;value&gt;/opt/modules/hadoopha/hadoop-2.5.0/data/tmp&lt;/value&gt;
+&lt;/property&gt;
+&lt;/configuration&gt;</code></pre>
+
+<p>hadoop.tmp.dir设置hadoop临时目录地址，默认时，NameNode和DataNode的数据存在这个路径下。</p>
+
+<p>7、 配置slaves文件</p>
+
+<pre>
+<code>bigdata-senior01.chybinmy.com
+bigdata-senior02.chybinmy.com
+bigdata-senior03.chybinmy.com</code></pre>
+
+<p>8、 配置yarn-site.xml</p>
+
+<pre>
+<code>&lt;configuration&gt;
+&lt;property&gt;
+    &lt;name&gt;yarn.nodemanager.aux-services&lt;/name&gt;
+    &lt;value&gt;mapreduce_shuffle&lt;/value&gt;
+ &lt;/property&gt;     
+ &lt;property&gt;
+    &lt;name&gt;yarn.resourcemanager.hostname&lt;/name&gt;
+    &lt;value&gt;bigdata-senior02.chybinmy.com&lt;/value&gt;
+ &lt;/property&gt;     
+ &lt;property&gt;
+    &lt;name&gt;yarn.log-aggregation-enable&lt;/name&gt;
+    &lt;value&gt;true&lt;/value&gt;
+ &lt;/property&gt;     
+ &lt;property&gt;
+    &lt;name&gt;yarn.log-aggregation.retain-seconds&lt;/name&gt;
+    &lt;value&gt;106800&lt;/value&gt;
+ &lt;/property&gt;     
+&lt;/configuration&gt;</code></pre>
+
+<p>9、 分发到其他节点</p>
+
+<p>分发之前先将share/doc目录删除，这个目录中是帮助文件，并且很大，可以删除。</p>
+
+<pre>
+<code>[hadoop@bigdata-senior01 hadoop-2.5.0]$ scp -r /opt/modules/ /opt/modules/hadoopfederation bigdata-senior02.chybinmy.com:/opt/modules
+[hadoop@bigdata-senior01 hadoop-2.5.0]$ scp -r /opt/modules/hadoopfederation bigdata-senior03.chybinmy.com:/opt/modules</code></pre>
+
+<p>10、 格式化NameNode</p>
+
+<p>在第一台上进行NameNode格式化。</p>
+
+<pre>
+<code>[hadoop@bigdata-senior01 hadoop-2.5.0]$ bin/hdfs namenode -format -clusterId hadoop-federation-clusterId</code></pre>
+
+<p>这里一定要指定一个集群ID，使得多个NameNode的集群ID是一样的，因为这三个NameNode在同一个集群中，这里集群ID为hadoop-federation-clusterId。</p>
+
+<p>在第二台NameNode上。</p>
+
+<pre>
+<code>[hadoop@bigdata-senior02 hadoop-2.5.0]$ bin/hdfs namenode -format -clusterId hadoop-federation-clusterId</code></pre>
+
+<p>在第二台NameNode上。</p>
+
+<pre>
+<code>[hadoop@bigdata-senior03 hadoop-2.5.0]$ bin/hdfs namenode -format -clusterId hadoop-federation-clusterId</code></pre>
+
+<p>11、 启动NameNode</p>
+
+<p>在第一台、第二台、第三台机器上启动NameNode：</p>
+
+<pre>
+<code>[hadoop@bigdata-senior01 hadoop-2.5.0]$ sbin/hadoop-daemon.sh start namenode
+[hadoop@bigdata-senior02 hadoop-2.5.0]$ sbin/hadoop-daemon.sh start namenode
+[hadoop@bigdata-senior03 hadoop-2.5.0]$ sbin/hadoop-daemon.sh start namenode</code></pre>
+
+<p>启动后，用jps命令查看是否已经启动成功。</p>
+
+<p>查看HDFS Web页面，此时三个NameNode都是standby状态。</p>
+
+<p><img alt="enter image description here" src="http://images.gitbook.cn/dd3582b0-5cbf-11e7-8185-21ba04c77532" title="" /></p>
+
+<p><img alt="enter image description here" src="http://images.gitbook.cn/e55b6310-5cbf-11e7-86d9-f17e4b747fa0" title="" /></p>
+
+<p><img alt="enter image description here" src="http://images.gitbook.cn/ed9121f0-5cbf-11e7-8185-21ba04c77532" title="" /></p>
+
+<p>12、 启动DataNode</p>
+
+<pre>
+<code>[hadoop@bigdata-senior01 hadoop-2.5.0]$ sbin/hadoop-daemon.sh start datanode
+[hadoop@bigdata-senior02 hadoop-2.5.0]$ sbin/hadoop-daemon.sh start datanode
+[hadoop@bigdata-senior03 hadoop-2.5.0]$ sbin/hadoop-daemon.sh start datanode</code></pre>
+
+<p>启动后，用jps命令确认DataNode进程已经启动成功。</p>
+
+<p>四十九、测试HDFS Federation</p>
+
+<p>1、 修改core-site.xml</p>
+
+<p>在bigdata-senior01机器上,修改core-site.xml文件，指定连接的NameNode是第一台NameNode。</p>
+
+<p>[hadoop@bigdata-senior01 hadoop-2.5.0]$ vim etc/hadoop/core-site.xml</p>
+
+<pre>
+<code>&lt;configuration&gt;
+  &lt;property&gt;
+     &lt;name&gt;fs.defaultFS&lt;/name&gt;
+     &lt;value&gt;hdfs://bigdata-senior01.chybinmy.com:8020&lt;/value&gt;
+  &lt;/property&gt;
+&lt;property&gt;
+    &lt;name&gt;hadoop.tmp.dir&lt;/name&gt;
+    &lt;value&gt;/opt/modules/hadoopfederation/hadoop-2.5.0/data/tmp&lt;/value&gt;
+&lt;/property&gt;
+&lt;/configuration&gt;</code></pre>
+
+<p>2、 在bigdate-senior01上传一个文件到HDFS</p>
+
+<pre>
+<code>[hadoop@bigdata-senior01 hadoop-2.5.0]$ bin/hdfs dfs -mkdir /tmp
+[hadoop@bigdata-senior01 hadoop-2.5.0]$ bin/hdfs dfs -put ~/shuffle_daily.sh /tmp/shuffle_daily.sh</code></pre>
+
+<p>3、 查看HDFS文件</p>
+
+<p><img alt="enter image description here" src="http://images.gitbook.cn/153b6620-5cc0-11e7-86d9-f17e4b747fa0" style="height:228px; width:800px" title="" /></p>
+
+<p>可以看到，刚才的文件只上传到了bigdate-senior01机器上的NameNode上了，并没有上传到其他的NameNode上去。</p>
+
+<p>这样，在HDFS的客户端，可以指定要上传到哪个NameNode上，从而来达到了划分NameNode的目的。</p>
+
+<h2>后记</h2>
+
+<p>这篇文章的操作步骤并不是工作中标准的操作流程，如果在成百上千的机器全部这样安装会被累死，希望读者可以通过文章中一步步地安装，从而初步了解到Hadoop的组成部分，协助过程等，这对于Hadoop的深入使用有很大的帮助。</p>

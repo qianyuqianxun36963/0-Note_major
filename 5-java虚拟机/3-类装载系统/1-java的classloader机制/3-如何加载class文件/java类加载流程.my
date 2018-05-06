@@ -1,5 +1,13 @@
 <h1>JAVA类加载流程</h1>
 
+<h2>一、ClassLoader概念</h2>
+
+<p>　　ClassLoader是用来动态的加载class文件到虚拟机中，并转换成java.lang.class类的一个实例，每个这样的实例用来表示一个java类，我们可以根据Class的实例得到该类的信息，并通过实例的newInstance()方法创建出该类的一个对象，除此之外，ClassLoader还负责加载Java应用所需的资源，如图像文件和配置文件等。</p>
+
+<p>　　ClassLoader类是一个抽象类。如果给定类的二进制名称，那么类加载器会试图查找或生成构成类定义的数据。一般策略是将名称转换为某个文件名，然后从文件系统读取该名称的&ldquo;类文件&rdquo;。ClassLoader类使用委托模型来搜索类和资源。每个 ClassLoader实例都有一个相关的父类加载器。需要查找类或资源时，ClassLoader实例会在试图亲自查找类或资源之前，将搜索类或资源的任务委托给其父类加载器。 &nbsp;</p>
+
+<p>　　注意：程序在启动的时候，并不会一次性加载程序所要用的所有class文件，而是根据程序的需要，通过Java的类加载机制来动态加载某个class文件到内存中。</p>
+
 <h2>二、JVM平台提供三层classLoader</h2>
 
 <ol>
@@ -33,9 +41,144 @@
 	<li>类中静态属性和初始化赋值以及静态代码块的执行</li>
 </ol>
 
+<h2>五、自定义类加载器</h2>
+
+<h4>　　1、为何要自定义类加载器？</h4>
+
+<p>　　JVM提供的类加载器，只能加载指定目录的jar和class，如果我们想加载其他位置的类或jar时，例如加载网络上的一个class文件，默认的ClassLoader就不能满足我们的需求了，所以需要定义自己的类加载器。</p>
+
+<h4>　　2、如何实现自定义的类加载器？</h4>
+
+<p>　　我们实现一个ClassLoader，并指定这个ClassLoader的加载路径。有两种方式：</p>
+
+<p>　　<strong>方式一</strong>：继承ClassLoader，重写父类的findClass()方法，代码如下：</p>
+
+<pre>
+ 1 import java.io.ByteArrayOutputStream;
+ 2 import java.io.File;
+ 3 import java.io.FileInputStream;
+ 4 import java.io.IOException;
+ 5 public class PathClassLoader extends ClassLoader
+ 6 {
+ 7     public static final String drive = &quot;d:/&quot;;
+ 8     public static final String fileType = &quot;.class&quot;;
+ 9 
+10     public static void main(String[] args) throws Exception
+11     {
+12         PathClassLoader loader = new PathClassLoader();
+13         Class&lt;?&gt; objClass = loader.loadClass(&quot;HelloWorld&quot;, true);
+14         Object obj = objClass.newInstance();
+15         System.out.println(objClass.getName());
+16         System.out.println(objClass.getClassLoader());
+17         System.out.println(obj.getClass().toString());
+18     }
+19 
+20     public Class&lt;?&gt; findClass(String name)
+21     {
+22         byte[] data = loadClassData(name);
+23         return defineClass(name, data, 0, data.length);// 将一个 byte 数组转换为 Class// 类的实例
+24     }
+25     public byte[] loadClassData(String name)
+26     {
+27         FileInputStream fis = null;
+28         byte[] data = null;
+29         try
+30         {
+31             fis = new FileInputStream(new File(drive + name + fileType));
+32             ByteArrayOutputStream baos = new ByteArrayOutputStream();
+33             int ch = 0;
+34             while ((ch = fis.read()) != -1)
+35             {
+36                 baos.write(ch);
+37             }
+38             data = baos.toByteArray();
+39         } catch (IOException e)
+40         {
+41             e.printStackTrace();
+42         }
+43         return data;
+44     }
+45 }
+</pre>
+
+<p>　　在第13行，我们调用了父类的loadClass()方法，该方法使用指定的二进制名称来加载类，下面是loadClass方法的源代码：</p>
+
+<pre>
+protected Class&lt;?&gt; loadClass(String name, boolean resolve) throws ClassNotFoundException
+    {
+        synchronized (getClassLoadingLock(name))
+        {
+            // 第一步先检查这个类是否已经被加载
+            Class&lt;?&gt; c = findLoadedClass(name);
+            if (c == null)
+            {
+                long t0 = System.nanoTime();
+                try
+                {
+                    //parent为父加载器
+                    if (parent != null)
+                    {
+                        //将搜索类或资源的任务委托给其父类加载器
+                        c = parent.loadClass(name, false);
+                    } else
+                    {
+                        //检查该class是否被BootstrapClassLoader加载
+                        c = findBootstrapClassOrNull(name);
+                    }
+                } 
+                catch (ClassNotFoundException e)
+                {
+                    // ClassNotFoundException thrown if class not found
+                    // from the non-null parent class loader
+                }
+                if (c == null)
+                {
+                    //如果上述两步均没有找到加载的class，则调用findClass()方法
+                    long t1 = System.nanoTime();
+                    c = findClass(name);
+                    // this is the defining class loader; record the stats
+                    sun.misc.PerfCounter.getParentDelegationTime().addTime(t1 - t0);
+                    sun.misc.PerfCounter.getFindClassTime().addElapsedTimeFrom(t1);
+                    sun.misc.PerfCounter.getFindClasses().increment();
+                }
+            }
+            if (resolve)
+            {
+                resolveClass(c);
+            }
+            return c;
+        }
+    }</pre>
+
+<p>　　这个方法首先检查指定class是否已经被加载，如果已被加载过，则调用resolveClass()方法链接指定的类,如果还未加载，则先将搜索类或资源的任务委托给其父类加载器，检查该class是否被BootstrapClassLoader加载，如果上述两步均没有找到加载的class，则调用findClass()方法，在我们自定义的加载器中，我们重写了findClass方法，去我们指定的路径下加载class文件。</p>
+
+<p>　　另外，我们自定义的类加载器没有指定父加载器，在JVM规范中不指定父类加载器的情况下，默认采用系统类加载器即AppClassLoader作为其父加载器，所以在使用该自定义类加载器时，需要加载的类不能在类路径中，否则的话根据双亲委派模型的原则，待加载的类会由系统类加载器加载。如果一定想要把自定义加载器需要加载的类放在类路径中, 就要把自定义类加载器的父加载器设置为null。&nbsp;</p>
+
+<p>　　<strong>方式二</strong>：继承URLClassLoader类，然后设置自定义路径的URL来加载URL下的类。</p>
+
+<p>　　我们将指定的目录转换为URL路径，然后重写findClass方法。</p>
+
+<h2>六、实现类的热部署</h2>
+
+<h4>　　1、什么是类的热部署？</h4>
+
+<p>　　所谓热部署，就是在应用正在运行的时候升级软件，不需要重新启用应用。</p>
+
+<p>　　对于Java应用程序来说，热部署就是运行时更新Java类文件。在基于Java的应用服务器实现热部署的过程中，类装入器扮演着重要的角色。大多数基于Java的应用服务器，包括EJB服务器和Servlet容器，都支持热部署。</p>
+
+<p>　　类装入器不能重新装入一个已经装入的类，但只要使用一个新的类装入器实例，就可以将类再次装入一个正在运行的应用程序。</p>
+
+<h4>　　2、如何实现Java类的热部署</h4>
+
+<p>　　前面的分析，我们已经知道，JVM在加载类之前会检查请求的类是否已经被加载过来，也就是要调用findLoadedClass方法查看是否能够返回类实例。如果类已经加载过来，再调用loadClass会导致类冲突。</p>
+
+<p>　　但是，JVM判断一个类是否是同一个类有两个条件：一是看这个类的完整类名是否一样(包括包名)，二是看加载这个类的ClassLoader加载器是否是同一个(既是是同一个ClassLoader类的两个实例，加载同一个类也会不一样)。</p>
+
+<p>　　所以，要实现类的热部署可以创建不同的ClassLoader的实例对象，然后通过这个不同的实例对象来加载同名的类。</p>
+
 <p>&nbsp;</p>
 
-<h2>五、源码分析</h2>
+<h2>七、源码分析</h2>
 
 <p>我们看到了系统的3个类加载器，但我们可能不知道具体哪个先行呢？&nbsp;<br />
 我可以先告诉你答案&nbsp;<br />
@@ -534,9 +677,8 @@ static class ExtClassLoader extends URLClassLoader {
 
 extcl = ExtClassLoader.getExtClassLoader();
 
-loader = AppClassLoader.getAppClassLoader(extcl);</code></pre>
-
-<p>&nbsp;</p>
+loader = AppClassLoader.getAppClassLoader(extcl);</code>
+</pre>
 
 <p>代码已经说明了问题AppClassLoader的parent是一个ExtClassLoader实例。</p>
 
@@ -544,10 +686,9 @@ loader = AppClassLoader.getAppClassLoader(extcl);</code></pre>
 
 <pre>
 <code>public ExtClassLoader(File[] dirs) throws IOException {
-            super(getExtURLs(dirs), null, factory);   
-}</code></pre>
-
-<p>&nbsp;</p>
+      super(getExtURLs(dirs), null, factory);   
+}</code>
+</pre>
 
 <p>对应的代码</p>
 
