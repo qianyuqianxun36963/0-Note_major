@@ -1,0 +1,96 @@
+<h1><a href="http://www.cnblogs.com/duanxz/p/6084494.html" id="cb_post_title_url">Maven依赖排除 禁止依赖传递 取消依赖的方法</a></h1>
+
+<p>大家都知道Maven的优点是依赖管理，特别是前期使用ANT的开发者都有很多感触。最近要开发一个java工程，定的要使用maven，会使用hadoop和hbase的客户端，而引入一个hadoop-client的jar或者hbase的jar包，会依赖十几个其他的jar包，而这些jar包的功能我又用不上，所以这种依赖反倒成了工程瘦身的负担。关键我还有强迫症，见到这些对工程无用的包，我就抓狂。所以在网上百找千寻，找到了几个方法：</p>
+
+<p>1. 项目间传递</p>
+
+<p>&nbsp;&nbsp;&nbsp; 如果我的当前项目是project1，project1要依赖project2，project1依赖project2的配置中加上&nbsp;&lt;optional&gt;true&lt;/optional&gt;，表示依赖可选，</p>
+
+<pre>
+&lt;dependency&gt;
+	&lt;groupId&gt;com.projecct&lt;/groupId&gt;
+	&lt;artifactId&gt;project2&lt;/artifactId&gt;
+	&lt;version&gt;1.0&lt;/version&gt;
+	&lt;scope&gt;compile&lt;/scope&gt;
+	&lt;optional&gt;true&lt;/optional&gt;
+&lt;/dependency&gt;</pre>
+
+<p>&nbsp;那么以后所有声明依赖project1的项目如果也依赖project2，就必须写手动声明。比如project3依赖project1和project2，如果project3只声明了对project1的依赖，那么project2不会自动加入依赖，需要重新声明对project2的依赖。</p>
+
+<p>这种方式排除不了我项目中对第三方jar包所依赖的其他依赖，因为我不可能去修改第三方jar包的pom文件，所以只适合在项目组内部使用。</p>
+
+<p>2. 依赖过滤</p>
+
+<p>（1）单依赖过滤</p>
+
+<p>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 同依赖过滤直接处理：可以过滤一个或者多个，如果过滤多个要写多个&lt;exclusion&gt;。这个也解决不了我的问题，或者说解决太麻烦，我那里知道hbase要依赖那些包，记不住。</p>
+
+<pre>
+&lt;dependency&gt;    
+	&lt;groupId&gt;org.apache.hbase&lt;/groupId&gt;
+	&lt;artifactId&gt;hbase&lt;/artifactId&gt;
+	&lt;version&gt;0.94.17&lt;/version&gt; 
+	&lt;exclusions&gt;  
+		 &lt;exclusion&gt;	 
+			 &lt;groupId&gt;commons-logging&lt;/groupId&gt;		
+			 &lt;artifactId&gt;commons-logging&lt;/artifactId&gt;  
+		 &lt;/exclusion&gt;  
+	&lt;/exclusions&gt;  
+&lt;/dependency&gt;</pre>
+
+<p>（2）多依赖过滤</p>
+
+<p>&nbsp;&nbsp;&nbsp;&nbsp; 把所以依赖都过滤了。手起刀落~啊，世界都安静了。</p>
+
+<pre>
+&lt;dependency&gt;
+	&lt;groupId&gt;org.apache.hbase&lt;/groupId&gt;
+	&lt;artifactId&gt;hbase&lt;/artifactId&gt;
+	&lt;version&gt;0.94.17&lt;/version&gt;
+	&lt;exclusions&gt;
+		&lt;exclusion&gt;
+			&lt;groupId&gt;*&lt;/groupId&gt;
+			&lt;artifactId&gt;*&lt;/artifactId&gt;
+		&lt;/exclusion&gt;
+	&lt;/exclusions&gt;
+&lt;/dependency&gt;
+
+
+</pre>
+
+<h2>使用Eclipse-maven去除依赖问题的技巧</h2>
+
+<p>强大的maven管理工具，去除重复依赖问题非常简单。</p>
+
+<h3>POM文件中去除依赖</h3>
+
+<pre>
+&lt;dependencies&gt;
+  &lt;dependency&gt;
+    &lt;groupId&gt; org.apache.cassandra&lt;/groupId&gt;
+    &lt;artifactId&gt;cassandra-all&lt;/artifactId&gt;
+    &lt;version&gt;0.8.1&lt;/version&gt;
+    &lt;exclusions&gt;
+      &lt;exclusion&gt;
+        &lt;groupId&gt;org.slf4j&lt;/groupId&gt;
+        &lt;artifactId&gt;slf4j-log4j12&lt;/artifactId&gt;
+      &lt;/exclusion&gt;
+      &lt;exclusion&gt;
+        &lt;groupId&gt;log4j&lt;/groupId&gt;
+        &lt;artifactId&gt;log4j&lt;/artifactId&gt;
+      &lt;/exclusion&gt;
+    &lt;/exclusions&gt;
+  &lt;/dependency&gt;
+&lt;/dependencies&gt;</pre>
+
+<p>使用 exclusion去除依赖。</p>
+
+<h3>Eclipse图形界面去除依赖</h3>
+
+<p><img alt="" src="https://images2015.cnblogs.com/blog/285763/201611/285763-20161121101816300-1898831904.png" /></p>
+
+<p>&nbsp;</p>
+
+<p><img alt="" src="http://img2.tuicool.com/AbEzEn.png!web" /></p>
+
+<p>直接删除就OK了。</p>

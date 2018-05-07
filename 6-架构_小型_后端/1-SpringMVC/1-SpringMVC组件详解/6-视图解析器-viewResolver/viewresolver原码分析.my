@@ -1,0 +1,378 @@
+<h1>SpringMVC之ViewResolver和View解析</h1>
+
+<p>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; 过完年了，本来是想在年前将SpringMVC系列写完的，只是在接近年末的时候没有了一种学习心态，这两天看了一下ViewResolver源码，就想尽快将这篇博客写出，也好完结SpringMVC的系列博客并开始下面的学习。</p>
+
+<p>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; 自己写的配置文件springController.xml中和ViewResolve有关的部分</p>
+
+<ol start="1">
+	<li>&lt;!--视图解析器--&gt;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&lt;bean&nbsp;class=&quot;org.springframework.web.servlet.view.InternalResourceViewResolver&quot;&gt;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;!--&nbsp;webroot到一指定文件夹文件路径&nbsp;--&gt;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;property&nbsp;name=&quot;prefix&quot;&nbsp;value=&quot;/&quot;/&gt;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;!--&nbsp;视图名称后缀&nbsp;&nbsp;--&gt;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;property&nbsp;name=&quot;suffix&quot;&nbsp;value=&quot;.jsp&quot;/&gt;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&lt;/bean&gt;&nbsp;&nbsp;</li>
+</ol>
+
+<p>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp;自己写的处理器处理用户的请求，在处理完请求后返回一个ModelAndView对象</p>
+
+<ol start="1">
+	<li>package&nbsp;com.wangbiao.springMVC;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>import&nbsp;javax.servlet.ServletContext;&nbsp;&nbsp;</li>
+	<li>import&nbsp;javax.servlet.http.HttpServletRequest;&nbsp;&nbsp;</li>
+	<li>import&nbsp;javax.servlet.http.HttpServletResponse;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>import&nbsp;org.springframework.web.servlet.ModelAndView;&nbsp;&nbsp;</li>
+	<li>import&nbsp;org.springframework.web.servlet.mvc.multiaction.MultiActionController;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>public&nbsp;class&nbsp;HelloWorld&nbsp;extends&nbsp;&nbsp;MultiActionController{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;ModelAndView&nbsp;sayHelloWorld(HttpServletRequest&nbsp;request,&nbsp;HttpServletResponse&nbsp;response)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;String&nbsp;param&nbsp;=&nbsp;request.getParameter(&quot;param&quot;);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;System.out.println(&quot;springMVC测试：helloWorld;&quot;+param);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ModelAndView&nbsp;mv&nbsp;=&nbsp;new&nbsp;ModelAndView();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;mv.addObject(&quot;content&quot;,&nbsp;&quot;springMVC&nbsp;HelloWorld:&quot;+param);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;mv.setViewName(&quot;springMVC/helloWorld&quot;);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ServletContext&nbsp;ctx&nbsp;=&nbsp;this.getServletContext();&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return&nbsp;mv;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>}&nbsp;&nbsp;</li>
+</ol>
+
+<p>可以看出处理器返回MdoelAndView对象并向此对象中设一个viewName，ViewName是逻辑视图名，还向MdoelAndView中传入了数值，其实就是向MdoelAndView传入了一个Map对象，这个Map对象就是我们常说的数据模型Modle。</p>
+
+<h2>一.ViewResolve和View的作用</h2>
+
+<p>&nbsp; &nbsp; &nbsp;1.&nbsp;ViewResolve的作用就是通过解析MdoelAndView，将MdoelAndView中的逻辑视图名变为一个真正的View对象，并将MdoelAndView中的Model取出。</p>
+
+<p>&nbsp; &nbsp; &nbsp; 2.View的作用就是在获取到ViewResolve传来的View和Model，对Model进行渲染，通过View对象找到要展示给用户的物理视图，将渲染后的视图展示给用户。用很直白的话将就是将数据通过request存储起来，找到要展示给用户的页面，将这些数据放在页面中，并将页面呈现给用户。</p>
+
+<h2>二.ViewResolve源码介绍</h2>
+
+<p>&nbsp; &nbsp; &nbsp;ViewResolve和前面的HandlerMapping,HandlerAdapter一样，首先是在启动服务的时候，IOC容器会根据配置文件里面的ViewResolve相关信息对ViewResolve进行实例化，并存储到DispatcherServlet的&nbsp;List&lt;ViewResolver&gt; viewResolvers属性中。当要解析MdoelAndView对象的时候，会遍历viewResolvers，从中取出一个viewResolver对进行解析，要是解析出View对象，就不再进行遍历，要是解析出的View对象是空的，接着从viewResolvers中取出viewResolver对MdoelAndView对象进行解析。</p>
+
+<p>下面是DispatcherServlet类里面取出IOC容器里面的viewResolver相关对象，可以看成是DispatcherServlet对viewResolver的注册。</p>
+
+<ol start="1">
+	<li>private&nbsp;void&nbsp;initViewResolvers(ApplicationContext&nbsp;context)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;this.viewResolvers&nbsp;=&nbsp;null;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if&nbsp;(this.detectAllViewResolvers)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//&nbsp;Find&nbsp;all&nbsp;ViewResolvers&nbsp;in&nbsp;the&nbsp;ApplicationContext,&nbsp;including&nbsp;ancestor&nbsp;contexts.&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Map&lt;String,&nbsp;ViewResolver&gt;&nbsp;matchingBeans&nbsp;=&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;BeanFactoryUtils.beansOfTypeIncludingAncestors(context,&nbsp;ViewResolver.class,&nbsp;true,&nbsp;false);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if&nbsp;(!matchingBeans.isEmpty())&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;this.viewResolvers&nbsp;=&nbsp;new&nbsp;ArrayList&lt;ViewResolver&gt;(matchingBeans.values());&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//&nbsp;We&nbsp;keep&nbsp;ViewResolvers&nbsp;in&nbsp;sorted&nbsp;order.&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;OrderComparator.sort(this.viewResolvers);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;else&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;try&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ViewResolver&nbsp;vr&nbsp;=&nbsp;context.getBean(VIEW_RESOLVER_BEAN_NAME,&nbsp;ViewResolver.class);//从IOC容器里面的viewResolver相关对象并存储&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;this.viewResolvers&nbsp;=&nbsp;Collections.singletonList(vr);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;catch&nbsp;(NoSuchBeanDefinitionException&nbsp;ex)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//&nbsp;Ignore,&nbsp;we&#39;ll&nbsp;add&nbsp;a&nbsp;default&nbsp;ViewResolver&nbsp;later.&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//&nbsp;Ensure&nbsp;we&nbsp;have&nbsp;at&nbsp;least&nbsp;one&nbsp;ViewResolver,&nbsp;by&nbsp;registering&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//&nbsp;a&nbsp;default&nbsp;ViewResolver&nbsp;if&nbsp;no&nbsp;other&nbsp;resolvers&nbsp;are&nbsp;found.&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if&nbsp;(this.viewResolvers&nbsp;==&nbsp;null)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;this.viewResolvers&nbsp;=&nbsp;getDefaultStrategies(context,&nbsp;ViewResolver.class);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if&nbsp;(logger.isDebugEnabled())&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;logger.debug(&quot;No&nbsp;ViewResolvers&nbsp;found&nbsp;in&nbsp;servlet&nbsp;&#39;&quot;&nbsp;+&nbsp;getServletName()&nbsp;+&nbsp;&quot;&#39;:&nbsp;using&nbsp;default&quot;);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+</ol>
+
+<p>再看看viewResolver拿到了ModelAndView对象后是怎么处理的</p>
+
+<p>DispatcherServlet的doDispatch方法中有一个render(mv, processedRequest, response);render就是对ModelAndView对象进行解析</p>
+
+<p>DispatcherServlet的render方法</p>
+
+<ol start="1">
+	<li>protected&nbsp;void&nbsp;render(ModelAndView&nbsp;mv,&nbsp;HttpServletRequest&nbsp;request,&nbsp;HttpServletResponse&nbsp;response)&nbsp;throws&nbsp;Exception&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//&nbsp;Determine&nbsp;locale&nbsp;for&nbsp;request&nbsp;and&nbsp;apply&nbsp;it&nbsp;to&nbsp;the&nbsp;response.&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Locale&nbsp;locale&nbsp;=&nbsp;this.localeResolver.resolveLocale(request);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;response.setLocale(locale);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;View&nbsp;view;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if&nbsp;(mv.isReference())&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//&nbsp;获取&lt;span&nbsp;style=&quot;font-size:&nbsp;13.3333339691162px;&quot;&gt;ModelAndView对象中的视图名和数据模型，通过逻辑视图名获取到真正的view对象。&lt;/span&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;view&nbsp;=&nbsp;resolveViewName(mv.getViewName(),&nbsp;mv.getModelInternal(),&nbsp;locale,&nbsp;request);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if&nbsp;(view&nbsp;==&nbsp;null)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;throw&nbsp;new&nbsp;ServletException(&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&quot;Could&nbsp;not&nbsp;resolve&nbsp;view&nbsp;with&nbsp;name&nbsp;&#39;&quot;&nbsp;+&nbsp;mv.getViewName()&nbsp;+&nbsp;&quot;&#39;&nbsp;in&nbsp;servlet&nbsp;with&nbsp;name&nbsp;&#39;&quot;&nbsp;+&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;getServletName()&nbsp;+&nbsp;&quot;&#39;&quot;);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;else&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//&nbsp;No&nbsp;need&nbsp;to&nbsp;lookup:&nbsp;the&nbsp;ModelAndView&nbsp;object&nbsp;contains&nbsp;the&nbsp;actual&nbsp;View&nbsp;object.&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;view&nbsp;=&nbsp;mv.getView();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if&nbsp;(view&nbsp;==&nbsp;null)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;throw&nbsp;new&nbsp;ServletException(&quot;ModelAndView&nbsp;[&quot;&nbsp;+&nbsp;mv&nbsp;+&nbsp;&quot;]&nbsp;neither&nbsp;contains&nbsp;a&nbsp;view&nbsp;name&nbsp;nor&nbsp;a&nbsp;&quot;&nbsp;+&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&quot;View&nbsp;object&nbsp;in&nbsp;servlet&nbsp;with&nbsp;name&nbsp;&#39;&quot;&nbsp;+&nbsp;getServletName()&nbsp;+&nbsp;&quot;&#39;&quot;);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//&nbsp;Delegate&nbsp;to&nbsp;the&nbsp;View&nbsp;object&nbsp;for&nbsp;rendering.&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if&nbsp;(logger.isDebugEnabled())&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;logger.debug(&quot;Rendering&nbsp;view&nbsp;[&quot;&nbsp;+&nbsp;view&nbsp;+&nbsp;&quot;]&nbsp;in&nbsp;DispatcherServlet&nbsp;with&nbsp;name&nbsp;&#39;&quot;&nbsp;+&nbsp;getServletName()&nbsp;+&nbsp;&quot;&#39;&quot;);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;view.render(mv.getModelInternal(),&nbsp;request,&nbsp;response);//View对象对Model进行渲染后将视图展示给用户&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+</ol>
+
+<p>在render方法中主要看两段代码:</p>
+
+<ol start="1">
+	<li>view&nbsp;=&nbsp;resolveViewName(mv.getViewName(),&nbsp;mv.getModelInternal(),&nbsp;locale,&nbsp;request);&nbsp;&nbsp;</li>
+	<li>view.render(mv.getModelInternal(),&nbsp;request,&nbsp;response);&nbsp;&nbsp;</li>
+</ol>
+
+<p>先看resolveViewName方法</p>
+
+<ol start="1">
+	<li>protected&nbsp;View&nbsp;resolveViewName(String&nbsp;viewName,&nbsp;Map&lt;String,&nbsp;Object&gt;&nbsp;model,&nbsp;Locale&nbsp;locale,&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;HttpServletRequest&nbsp;request)&nbsp;throws&nbsp;Exception&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;for&nbsp;(ViewResolver&nbsp;viewResolver&nbsp;:&nbsp;this.viewResolvers)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;View&nbsp;view&nbsp;=&nbsp;viewResolver.resolveViewName(viewName,&nbsp;locale);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if&nbsp;(view&nbsp;!=&nbsp;null)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return&nbsp;view;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;return&nbsp;null;&nbsp;&nbsp;</li>
+	<li>}&nbsp;&nbsp;</li>
+</ol>
+
+<p>在resolveViewName方法中我们看到了通过遍历viewResolers，从中选出合适的ViewResolver对视图名进行解析，如果解析出的View不为空，就直接返回了，结合上面的配置文件，viewResolers中只有一个InternalResourceViewResolver对象。<br />
+我们再看ViewResoler的resolveViewName方法。InternalResourceViewResolver的祖先类AbstractCachingViewResolver中有resolveViewName方法。</p>
+
+<p>&nbsp;</p>
+
+<p>AbstractCachingViewResolver是实现了ViewResolver接口的抽象方法</p>
+
+<p>AbstractCachingViewResolver中的resolveViewName方法，该方法首先会判断有没有缓存，要是有缓存，它会先去缓存中通过viewName查找是否有View对象的存在，要是没有，它会通过viewName创建一个新的View对象，并将View对象存入缓存中，这样再次遇到同样的视图名的时候就可以直接在缓存中取出View对象了</p>
+
+<ol start="1">
+	<li>public&nbsp;View&nbsp;resolveViewName(String&nbsp;viewName,&nbsp;Locale&nbsp;locale)&nbsp;throws&nbsp;Exception&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if&nbsp;(!isCache())&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return&nbsp;createView(viewName,&nbsp;locale);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;else&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Object&nbsp;cacheKey&nbsp;=&nbsp;getCacheKey(viewName,&nbsp;locale);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;synchronized&nbsp;(this.viewCache)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;View&nbsp;view&nbsp;=&nbsp;this.viewCache.get(cacheKey);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if&nbsp;(view&nbsp;==&nbsp;null)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//&nbsp;Ask&nbsp;the&nbsp;subclass&nbsp;to&nbsp;create&nbsp;the&nbsp;View&nbsp;object.&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;view&nbsp;=&nbsp;createView(viewName,&nbsp;locale);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;this.viewCache.put(cacheKey,&nbsp;view);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if&nbsp;(logger.isTraceEnabled())&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;logger.trace(&quot;Cached&nbsp;view&nbsp;[&quot;&nbsp;+&nbsp;cacheKey&nbsp;+&nbsp;&quot;]&quot;);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return&nbsp;view;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+</ol>
+
+<p><br />
+AbstractCachingViewResolver中的createView方法</p>
+
+<p>&nbsp;</p>
+
+<p>&nbsp;</p>
+
+<p><strong>[java]</strong>&nbsp;<a href="https://blog.csdn.net/wangbiao007/article/details/50689021#" onclick="dp.sh.Toolbar.Command('ViewSource',this);return false;" title="view plain">view plain</a>&nbsp;<a href="https://blog.csdn.net/wangbiao007/article/details/50689021#" onclick="dp.sh.Toolbar.Command('CopyToClipboard',this);return false;" title="copy">copy</a></p>
+
+<ol start="1">
+	<li>protected&nbsp;View&nbsp;createView(String&nbsp;viewName,&nbsp;Locale&nbsp;locale)&nbsp;throws&nbsp;Exception&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;return&nbsp;loadView(viewName,&nbsp;locale);&nbsp;&nbsp;</li>
+	<li>}&nbsp;&nbsp;</li>
+</ol>
+
+<p>AbstractCachingViewResolver中的loadView方法是一个抽象方法,它通过AbstractCachingViewResolver的子类UrlBasedViewResolver方法实现</p>
+
+<p>UrlBasedViewResolver中的loadView方法</p>
+
+<ol start="1">
+	<li>protected&nbsp;View&nbsp;loadView(String&nbsp;viewName,&nbsp;Locale&nbsp;locale)&nbsp;throws&nbsp;Exception&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;AbstractUrlBasedView&nbsp;view&nbsp;=&nbsp;buildView(viewName);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;View&nbsp;result&nbsp;=&nbsp;(View)&nbsp;getApplicationContext().getAutowireCapableBeanFactory().initializeBean(view,&nbsp;viewName);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;return&nbsp;(view.checkResource(locale)&nbsp;?&nbsp;result&nbsp;:&nbsp;null);&nbsp;&nbsp;</li>
+	<li>}&nbsp;&nbsp;</li>
+</ol>
+
+<p>UrlBasedViewResolver中的buildView方法</p>
+
+<p>&nbsp;</p>
+
+<p>我觉得buildView方法是创建View对象最核心的方法，buildView方法会获取一个View对象，这个对象会将视图以什么格式呈现给用户，例如如果是jsp显示呈现给用户的话，那这个view对象就是JstlView，默认的是JstlView。在这个方法中我们看到了getPrefix() + viewName + getSuffix()这样一段代码，这就是对视图路径的一个拼接了，getPrefix()方法获取前缀，也就是我们在配置文件中配置的&nbsp;&lt;property name=&quot;prefix&quot; value=&quot;/&quot;/&gt; &nbsp;的value中的值了,getSuffix()方法就是获取后缀值了，也就是我们在配置文件中配置的&lt;property name=&quot;suffix&quot; value=&quot;.jsp&quot;/&gt; &nbsp;&nbsp;的value中的值。这样就将将视图的物理路径找到了，并赋值到View的URL属性中去。</p>
+
+<ol start="1">
+	<li>protected&nbsp;AbstractUrlBasedView&nbsp;buildView(String&nbsp;viewName)&nbsp;throws&nbsp;Exception&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;AbstractUrlBasedView&nbsp;view&nbsp;=&nbsp;(AbstractUrlBasedView)&nbsp;BeanUtils.instantiateClass(getViewClass());&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;view.setUrl(getPrefix()&nbsp;+&nbsp;viewName&nbsp;+&nbsp;getSuffix());&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;String&nbsp;contentType&nbsp;=&nbsp;getContentType();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if&nbsp;(contentType&nbsp;!=&nbsp;null)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;view.setContentType(contentType);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;view.setRequestContextAttribute(getRequestContextAttribute());&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;view.setAttributesMap(getAttributesMap());&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return&nbsp;view;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+</ol>
+
+<p>就这样我们得到了一个View对象，这个视图的name就是逻辑视图名，因为当将View对象放在缓存的时候，我们可以通过逻辑视图名在缓存中找出View对象。我们在获取到View对象的时候，我们还要将View进行渲染，并呈现给用户。我们再来看看View中的render方法。</p>
+
+<ol start="1">
+	<li>view.render(mv.getModelInternal(),&nbsp;request,&nbsp;response);&nbsp;&nbsp;</li>
+</ol>
+
+<p>View是个接口，View由AbstractView实现。AbstractView中的reder方法</p>
+
+<ol start="1">
+	<li>public&nbsp;void&nbsp;render(Map&lt;String,&nbsp;?&gt;&nbsp;model,&nbsp;HttpServletRequest&nbsp;request,&nbsp;HttpServletResponse&nbsp;response)&nbsp;throws&nbsp;Exception&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;if&nbsp;(logger.isTraceEnabled())&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;logger.trace(&quot;Rendering&nbsp;view&nbsp;with&nbsp;name&nbsp;&#39;&quot;&nbsp;+&nbsp;this.beanName&nbsp;+&nbsp;&quot;&#39;&nbsp;with&nbsp;model&nbsp;&quot;&nbsp;+&nbsp;model&nbsp;+&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&quot;&nbsp;and&nbsp;static&nbsp;attributes&nbsp;&quot;&nbsp;+&nbsp;this.staticAttributes);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;//&nbsp;Consolidate&nbsp;static&nbsp;and&nbsp;dynamic&nbsp;model&nbsp;attributes.&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;Map&lt;String,&nbsp;Object&gt;&nbsp;mergedModel&nbsp;=&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;new&nbsp;HashMap&lt;String,&nbsp;Object&gt;(this.staticAttributes.size()&nbsp;+&nbsp;(model&nbsp;!=&nbsp;null&nbsp;?&nbsp;model.size()&nbsp;:&nbsp;0));&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;mergedModel.putAll(this.staticAttributes);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;if&nbsp;(model&nbsp;!=&nbsp;null)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;mergedModel.putAll(model);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;//&nbsp;Expose&nbsp;RequestContext?&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;if&nbsp;(this.requestContextAttribute&nbsp;!=&nbsp;null)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;mergedModel.put(this.requestContextAttribute,&nbsp;createRequestContext(request,&nbsp;response,&nbsp;mergedModel));&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;prepareResponse(request,&nbsp;response);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;renderMergedOutputModel(mergedModel,&nbsp;request,&nbsp;response);&nbsp;&nbsp;</li>
+	<li>}&nbsp;&nbsp;</li>
+</ol>
+
+<p>renderMergedOutputModel方法由AbstractView的孙子类InternalResourceView实现</p>
+
+<p>InternalResourceView的renderMergedOutputModel方法</p>
+
+<p>在renderMergedOutputModel方法中我们看到了我们刚学servlet的一丝痕迹。我们获取到视图的物理路径，然后将这段路径传给RequestDispatcher对象，再调用RequestDispatcher的forward方法将页面呈现给用户，这样就走完了视图的解析了。至于RequestDispatcher的forward方法是如何根据视图路径将页面呈现给用户，这个我也不知道，只是知道这个方法是这么用的罢了。</p>
+
+<ol start="1">
+	<li>protected&nbsp;void&nbsp;renderMergedOutputModel(&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Map&lt;String,&nbsp;Object&gt;&nbsp;model,&nbsp;HttpServletRequest&nbsp;request,&nbsp;HttpServletResponse&nbsp;response)&nbsp;throws&nbsp;Exception&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;//&nbsp;Determine&nbsp;which&nbsp;request&nbsp;handle&nbsp;to&nbsp;expose&nbsp;to&nbsp;the&nbsp;RequestDispatcher.&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;HttpServletRequest&nbsp;requestToExpose&nbsp;=&nbsp;getRequestToExpose(request);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;//&nbsp;Expose&nbsp;the&nbsp;model&nbsp;object&nbsp;as&nbsp;request&nbsp;attributes.&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;exposeModelAsRequestAttributes(model,&nbsp;requestToExpose);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;//&nbsp;Expose&nbsp;helpers&nbsp;as&nbsp;request&nbsp;attributes,&nbsp;if&nbsp;any.&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;exposeHelpers(requestToExpose);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;//&nbsp;Determine&nbsp;the&nbsp;path&nbsp;for&nbsp;the&nbsp;request&nbsp;dispatcher.&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;String&nbsp;dispatcherPath&nbsp;=&nbsp;prepareForRendering(requestToExpose,&nbsp;response);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;//&nbsp;Obtain&nbsp;a&nbsp;RequestDispatcher&nbsp;for&nbsp;the&nbsp;target&nbsp;resource&nbsp;(typically&nbsp;a&nbsp;JSP).&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;RequestDispatcher&nbsp;rd&nbsp;=&nbsp;getRequestDispatcher(requestToExpose,&nbsp;dispatcherPath);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;if&nbsp;(rd&nbsp;==&nbsp;null)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;throw&nbsp;new&nbsp;ServletException(&quot;Could&nbsp;not&nbsp;get&nbsp;RequestDispatcher&nbsp;for&nbsp;[&quot;&nbsp;+&nbsp;getUrl()&nbsp;+&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&quot;]:&nbsp;Check&nbsp;that&nbsp;the&nbsp;corresponding&nbsp;file&nbsp;exists&nbsp;within&nbsp;your&nbsp;web&nbsp;application&nbsp;archive!&quot;);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;//&nbsp;If&nbsp;already&nbsp;included&nbsp;or&nbsp;response&nbsp;already&nbsp;committed,&nbsp;perform&nbsp;include,&nbsp;else&nbsp;forward.&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;if&nbsp;(useInclude(requestToExpose,&nbsp;response))&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;response.setContentType(getContentType());&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if&nbsp;(logger.isDebugEnabled())&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;logger.debug(&quot;Including&nbsp;resource&nbsp;[&quot;&nbsp;+&nbsp;getUrl()&nbsp;+&nbsp;&quot;]&nbsp;in&nbsp;InternalResourceView&nbsp;&#39;&quot;&nbsp;+&nbsp;getBeanName()&nbsp;+&nbsp;&quot;&#39;&quot;);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;rd.include(requestToExpose,&nbsp;response);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;else&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//&nbsp;Note:&nbsp;The&nbsp;forwarded&nbsp;resource&nbsp;is&nbsp;supposed&nbsp;to&nbsp;determine&nbsp;the&nbsp;content&nbsp;type&nbsp;itself.&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;exposeForwardRequestAttributes(requestToExpose);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if&nbsp;(logger.isDebugEnabled())&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;logger.debug(&quot;Forwarding&nbsp;to&nbsp;resource&nbsp;[&quot;&nbsp;+&nbsp;getUrl()&nbsp;+&nbsp;&quot;]&nbsp;in&nbsp;InternalResourceView&nbsp;&#39;&quot;&nbsp;+&nbsp;getBeanName()&nbsp;+&nbsp;&quot;&#39;&quot;);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;rd.forward(requestToExpose,&nbsp;response);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>}&nbsp;&nbsp;</li>
+</ol>
+
+<p>在renderMergedOutputModel方法中调用了InternalResourceView祖先类AbstractView的exposeModelAsRequestAttributes方法</p>
+
+<p>AbstractView的exposeModelAsRequestAttributes方法，在exposeModelAsRequestAttributes方法中是不是看到了我非常熟悉的一段代码</p>
+
+<ol start="1">
+	<li>request.setAttribute(modelName,&nbsp;modelValue);&nbsp;&nbsp;</li>
+</ol>
+
+<p>就是将ModelAndView中的Mdoel里面的值交给request存储，我们就可以在页面就可以通过el表达式来获取这些值了。</p>
+
+<ol start="1">
+	<li>protected&nbsp;void&nbsp;exposeModelAsRequestAttributes(Map&lt;String,&nbsp;Object&gt;&nbsp;model,&nbsp;HttpServletRequest&nbsp;request)&nbsp;throws&nbsp;Exception&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;for&nbsp;(Map.Entry&lt;String,&nbsp;Object&gt;&nbsp;entry&nbsp;:&nbsp;model.entrySet())&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;String&nbsp;modelName&nbsp;=&nbsp;entry.getKey();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Object&nbsp;modelValue&nbsp;=&nbsp;entry.getValue();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if&nbsp;(modelValue&nbsp;!=&nbsp;null)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;request.setAttribute(modelName,&nbsp;modelValue);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if&nbsp;(logger.isDebugEnabled())&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;logger.debug(&quot;Added&nbsp;model&nbsp;object&nbsp;&#39;&quot;&nbsp;+&nbsp;modelName&nbsp;+&nbsp;&quot;&#39;&nbsp;of&nbsp;type&nbsp;[&quot;&nbsp;+&nbsp;modelValue.getClass().getName()&nbsp;+&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&quot;]&nbsp;to&nbsp;request&nbsp;in&nbsp;view&nbsp;with&nbsp;name&nbsp;&#39;&quot;&nbsp;+&nbsp;getBeanName()&nbsp;+&nbsp;&quot;&#39;&quot;);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;else&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;request.removeAttribute(modelName);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if&nbsp;(logger.isDebugEnabled())&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;logger.debug(&quot;Removed&nbsp;model&nbsp;object&nbsp;&#39;&quot;&nbsp;+&nbsp;modelName&nbsp;+&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&quot;&#39;&nbsp;from&nbsp;request&nbsp;in&nbsp;view&nbsp;with&nbsp;name&nbsp;&#39;&quot;&nbsp;+&nbsp;getBeanName()&nbsp;+&nbsp;&quot;&#39;&quot;);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+</ol>
+
+<p><br />
+&nbsp; &nbsp; 已经快晚上十一点啦，我还在公司写博客，哈哈，是不是很认真，哎，一整天了还没将这片博客写完，惭愧啊。该回去啦，明天来进行一下总结。</p>
+
+<p>&nbsp;</p>
+
+<h2>三.ResolverView和View相关类的介绍</h2>
+
+<p>&nbsp; &nbsp; &nbsp; 1.类AbstractCachingViewResolver</p>
+
+<p>&nbsp; &nbsp; &nbsp; &nbsp;AbstractCachingViewResolver实现了ResolverView接口。AbstractCachingViewResolver类的主要作用就是在缓存中通过逻辑视图名查找视图，如果没有查找到，就去创建一个新的视图，并将该视图存入缓存中。</p>
+
+<p>&nbsp; &nbsp; &nbsp; 2.类UrlBasedViewResolver</p>
+
+<p>&nbsp; &nbsp; &nbsp; &nbsp;UrlBasedViewResolver继承了AbstractCachingViewResolver。UrlBasedViewResolver的主要作用是创建一个View的对象，这个View的对象可以在配置文件中配置，也可以取默认的，默认的就是JstlView，读取配置文件中对ResolverView的配置，根据逻辑视图名找到真正视图的路径，将路径存入View对象中。这样就得到了一个View对象。</p>
+
+<p>&nbsp; &nbsp; &nbsp; 3.类AbstractView</p>
+
+<p>&nbsp; &nbsp; &nbsp; &nbsp;AbstractView实现了View接口。AbstractView的主要作用是渲染视图和将model中的数据取出来并传给页面。AbstractView渲染视图只是实现了一个抽象方法，该功能主要靠AbstractView的孙子类InternalResourceView来实现</p>
+
+<p>&nbsp; &nbsp; &nbsp; 4.AbstractUrlBasedView类</p>
+
+<p>&nbsp; &nbsp; &nbsp; 主要是起到一个承上启下的作用，其他的作用这个我也不知道。</p>
+
+<p>&nbsp; &nbsp; &nbsp; 5.InternalResourceView类</p>
+
+<p>&nbsp; &nbsp; &nbsp; &nbsp;InternalResourceView继承了AbstractUrlBasedView，InternalResourceView的主要作用就是拿到视图的路径，创建一个RequestDispatcher对象。将视图路径给RequestDispatcher，RequestDispatcher条用forward方法，将视图展示给用户。</p>
+
+<p>&nbsp; &nbsp; &nbsp; 有很多细节的地方其实自己也不是特别懂，所以就没有写。总结的话等以后自己对ResolverView和View后再来写。</p>
+
+<p>&nbsp; &nbsp; &nbsp;&nbsp;</p>
