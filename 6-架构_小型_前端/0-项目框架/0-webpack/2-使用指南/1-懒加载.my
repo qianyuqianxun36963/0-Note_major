@@ -1,0 +1,110 @@
+<h1>懒加载</h1>
+
+<blockquote>
+<p>本指南的继承自<a href="https://www.webpackjs.com/guides/code-splitting">代码分离</a>。如果你尚未阅读该指南，请先行阅读。</p>
+</blockquote>
+
+<p>懒加载或者按需加载，是一种很好的优化网页或应用的方式。这种方式实际上是先把你的代码在一些逻辑断点处分离开，然后在一些代码块中完成某些操作后，立即引用或即将引用另外一些新的代码块。这样加快了应用的初始加载速度，减轻了它的总体体积，因为某些代码块可能永远不会被加载。</p>
+
+<h2>示例</h2>
+
+<p>我们在<a href="https://www.webpackjs.com/guides/code-splitting#dynamic-imports">代码分离</a>中的例子基础上，进一步做些调整来说明这个概念。那里的代码确实会在脚本运行的时候产生一个分离的代码块&nbsp;<code>lodash.bundle.js</code>&nbsp;，在技术概念上&ldquo;懒加载&rdquo;它。问题是加载这个包并不需要用户的交互 -- 意思是每次加载页面的时候都会请求它。这样做并没有对我们有很多帮助，还会对性能产生负面影响。</p>
+
+<p>我们试试不同的做法。我们增加一个交互，当用户点击按钮的时候用 console 打印一些文字。但是会等到第一次交互的时候再加载那个代码块（<code>print.js</code>）。为此，我们返回到代码分离的例子中，把&nbsp;<code>lodash</code>&nbsp;放到主代码块中，重新运行<em>代码分离</em>中的代码&nbsp;<a href="https://www.webpackjs.com/guides/code-splitting#dynamic-imports">final&nbsp;<em>Dynamic Imports</em>&nbsp;example</a>。</p>
+
+<p><strong>project</strong></p>
+
+<pre>
+<code>webpack-demo
+|- package.json
+|- webpack.config.js
+|- /dist
+|- /src
+  |- index.js
++ |- print.js
+|- /node_modules
+</code></pre>
+
+<p><strong>src/print.js</strong></p>
+
+<pre>
+<code>console.log(&#39;The print.js module has loaded! See the network tab in dev tools...&#39;);
+
+export default () =&gt; {
+  console.log(&#39;Button Clicked: Here\&#39;s &quot;some text&quot;!&#39;);
+}
+</code></pre>
+
+<p><strong>src/index.js</strong></p>
+
+<pre>
+<code>+ import _ from &#39;lodash&#39;;
++
+- async function getComponent() {
++ function component() {
+    var element = document.createElement(&#39;div&#39;);
+-   const _ = await import(/* webpackChunkName: &quot;lodash&quot; */ &#39;lodash&#39;);
++   var button = document.createElement(&#39;button&#39;);
++   var br = document.createElement(&#39;br&#39;);
+
++   button.innerHTML = &#39;Click me and look at the console!&#39;;
+    element.innerHTML = _.join([&#39;Hello&#39;, &#39;webpack&#39;], &#39; &#39;);
++   element.appendChild(br);
++   element.appendChild(button);
++
++   // Note that because a network request is involved, some indication
++   // of loading would need to be shown in a production-level site/app.
++   button.onclick = e =&gt; import(/* webpackChunkName: &quot;print&quot; */ &#39;./print&#39;).then(module =&gt; {
++     var print = module.default;
++
++     print();
++   });
+
+    return element;
+  }
+
+- getComponent().then(component =&gt; {
+-   document.body.appendChild(component);
+- });
++ document.body.appendChild(component());
+</code></pre>
+
+<blockquote>
+<p>注意当调用 ES6 模块的&nbsp;<code>import()</code>&nbsp;方法（引入模块）时，必须指向模块的&nbsp;<code>.default</code>&nbsp;值，因为它才是 promise 被处理后返回的实际的&nbsp;<code>module</code>&nbsp;对象。</p>
+</blockquote>
+
+<p>现在运行 webpack 来验证一下我们的懒加载功能：</p>
+
+<pre>
+<code>Hash: e0f95cc0bda81c2a1340
+Version: webpack 3.0.0
+Time: 1378ms
+          Asset       Size  Chunks                    Chunk Names
+print.bundle.js  417 bytes       0  [emitted]         print
+index.bundle.js     548 kB       1  [emitted]  [big]  index
+     index.html  189 bytes          [emitted]
+   [0] ./src/index.js 742 bytes {1} [built]
+   [2] (webpack)/buildin/global.js 509 bytes {1} [built]
+   [3] (webpack)/buildin/module.js 517 bytes {1} [built]
+   [4] ./src/print.js 165 bytes {0} [built]
+    + 1 hidden module
+Child html-webpack-plugin for &quot;index.html&quot;:
+       [2] (webpack)/buildin/global.js 509 bytes {0} [built]
+       [3] (webpack)/buildin/module.js 517 bytes {0} [built]
+        + 2 hidden modules
+</code></pre>
+
+<h2>框架</h2>
+
+<p>许多框架和类库对于如何用它们自己的方式来实现（懒加载）都有自己的建议。这里有一些例子：</p>
+
+<ul>
+	<li>React:&nbsp;<a href="https://reacttraining.com/react-router/web/guides/code-splitting">Code Splitting and Lazy Loading</a></li>
+	<li>Vue:&nbsp;<a href="https://alexjoverm.github.io/2017/07/16/Lazy-load-in-Vue-using-Webpack-s-code-splitting/">Lazy Load in Vue using Webpack&#39;s code splitting</a></li>
+	<li>AngularJS:&nbsp;<a href="https://medium.com/@var_bin/angularjs-webpack-lazyload-bb7977f390dd">AngularJS + Webpack = lazyLoad</a>&nbsp;by&nbsp;<a href="https://twitter.com/var_bincom">@var_bincom</a></li>
+</ul>
+
+<hr />
+<blockquote>
+<p>原文：<a href="https://webpack.js.org/guides/lazy-loading/">https://webpack.js.org/guides/lazy-loading/</a></p>
+</blockquote>

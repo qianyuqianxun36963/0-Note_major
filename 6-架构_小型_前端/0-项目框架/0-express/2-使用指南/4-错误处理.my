@@ -1,0 +1,113 @@
+<h1>错误处理</h1>
+
+<p>定义错误处理中间件和定义其他中间件一样，除了需要 4 个参数，而不是 3 个，其格式如下&nbsp;<code>(err, req, res, next)</code>。例如：</p>
+
+<pre>
+<code>app.use(function(err, req, res, next) {
+  console.error(err.stack);
+  res.status(500).send(&#39;Something broke!&#39;);
+});
+</code></pre>
+
+<p>在其他&nbsp;<code>app.use()</code>&nbsp;和路由调用后，最后定义错误处理中间件，比如：</p>
+
+<pre>
+<code>var bodyParser = require(&#39;body-parser&#39;);
+var methodOverride = require(&#39;method-override&#39;);
+
+app.use(bodyParser());
+app.use(methodOverride());
+app.use(function(err, req, res, next) {
+  // 业务逻辑
+});
+</code></pre>
+
+<p>中间件返回的响应是随意的，可以响应一个 HTML 错误页面、一句简单的话、一个 JSON 字符串，或者其他任何您想要的东西。</p>
+
+<p>为了便于组织（更高级的框架），您可能会像定义常规中间件一样，定义多个错误处理中间件。比如您想为使用 XHR 的请求定义一个，还想为没有使用的定义一个，那么：</p>
+
+<pre>
+<code>var bodyParser = require(&#39;body-parser&#39;);
+var methodOverride = require(&#39;method-override&#39;);
+
+app.use(bodyParser());
+app.use(methodOverride());
+app.use(logErrors);
+app.use(clientErrorHandler);
+app.use(errorHandler);
+</code></pre>
+
+<p><code>logErrors</code>&nbsp;将请求和错误信息写入标准错误输出、日志或类似服务：</p>
+
+<pre>
+<code>function logErrors(err, req, res, next) {
+  console.error(err.stack);
+  next(err);
+}
+</code></pre>
+
+<p><code>clientErrorHandler</code>&nbsp;的定义如下（注意这里将错误直接传给了&nbsp;<code>next</code>）：</p>
+
+<pre>
+<code>function clientErrorHandler(err, req, res, next) {
+  if (req.xhr) {
+    res.status(500).send({ error: &#39;Something blew up!&#39; });
+  } else {
+    next(err);
+  }
+}
+</code></pre>
+
+<p><code>errorHandler</code>&nbsp;能捕获所有错误，其定义如下：</p>
+
+<pre>
+<code>function errorHandler(err, req, res, next) {
+  res.status(500);
+  res.render(&#39;error&#39;, { error: err });
+}
+</code></pre>
+
+<p>如果向&nbsp;<code>next()</code>&nbsp;传入参数（除了 &lsquo;route&rsquo; 字符串），Express 会认为当前请求有错误的输出，因此跳过后续其他非错误处理和路由/中间件函数。如果需做特殊处理，需要创建新的错误处理路由，如下节所示。</p>
+
+<p>如果路由句柄有多个回调函数，可使用 &lsquo;route&rsquo; 参数跳到下一个路由句柄。比如：</p>
+
+<pre>
+<code>app.get(&#39;/a_route_behind_paywall&#39;, 
+  function checkIfPaidSubscriber(req, res, next) {
+    if(!req.user.hasPaid) { 
+    
+      // 继续处理该请求
+      next(&#39;route&#39;);
+    }
+  }, function getPaidContent(req, res, next) {
+    PaidContent.find(function(err, doc) {
+      if(err) return next(err);
+      res.json(doc);
+    });
+  });
+</code></pre>
+
+<p>在这个例子中，句柄&nbsp;<code>getPaidContent</code>&nbsp;会被跳过，但&nbsp;<code>app</code>&nbsp;中为&nbsp;<code>/a_route_behind_paywall</code>&nbsp;定义的其他句柄则会继续执行。</p>
+
+<p><code>next()</code>&nbsp;和&nbsp;<code>next(err)</code>&nbsp;类似于&nbsp;<code>Promise.resolve()</code>&nbsp;和&nbsp;<code>Promise.reject()</code>。它们让您可以向 Express 发信号，告诉它当前句柄执行结束并且处于什么状态。<code>next(err)</code>会跳过后续句柄，除了那些用来处理错误的句柄。</p>
+
+<h2>缺省错误处理句柄</h2>
+
+<p>Express 内置了一个错误处理句柄，它可以捕获应用中可能出现的任意错误。这个缺省的错误处理中间件将被添加到中间件堆栈的底部。</p>
+
+<p>如果你向&nbsp;<code>next()</code>&nbsp;传递了一个 error ，而你并没有在错误处理句柄中处理这个 error，Express 内置的缺省错误处理句柄就是最后兜底的。最后错误将被连同堆栈追踪信息一同反馈到客户端。堆栈追踪信息并不会在生产环境中反馈到客户端。</p>
+
+<p>设置环境变量&nbsp;<code>NODE_ENV</code>&nbsp;为 &ldquo;production&rdquo; 就可以让应用运行在生产环境模式下。</p>
+
+<p>如果你已经开始向 response 输出数据了，这时才调用&nbsp;<code>next()</code>&nbsp;并传递了一个 error，比如你在将向客户端输出数据流时遇到一个错误，Express 内置的缺省错误处理句柄将帮你关闭连接并告知 request 请求失败。</p>
+
+<p>因此，当你添加了一个自定义的错误处理句柄后，如果已经向客户端发送包头信息了，你还可以将错误处理交给 Express 内置的错误处理机制。</p>
+
+<pre>
+<code>function errorHandler(err, req, res, next) {
+  if (res.headersSent) {
+    return next(err);
+  }
+  res.status(500);
+  res.render(&#39;error&#39;, { error: err });
+}</code></pre>

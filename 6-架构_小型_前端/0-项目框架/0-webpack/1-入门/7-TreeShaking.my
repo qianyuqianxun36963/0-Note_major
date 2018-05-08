@@ -1,0 +1,197 @@
+<h1>Tree Shaking</h1>
+
+<p><em>tree shaking</em>&nbsp;是一个术语，通常用于描述移除 JavaScript 上下文中的未引用代码(dead-code)。它依赖于 ES2015 模块系统中的<a href="http://exploringjs.com/es6/ch_modules.html#static-module-structure">静态结构特性</a>，例如&nbsp;<a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Statements/import"><code>import</code></a>&nbsp;和&nbsp;<a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Statements/export"><code>export</code></a>。这个术语和概念实际上是兴起于 ES2015 模块打包工具&nbsp;<a href="https://github.com/rollup/rollup">rollup</a>。</p>
+
+<p>新的 webpack 4 正式版本，扩展了这个检测能力，通过&nbsp;<code>package.json</code>&nbsp;的&nbsp;<code>&quot;sideEffects&quot;</code>&nbsp;属性作为标记，向 compiler 提供提示，表明项目中的哪些文件是 &quot;pure(纯的 ES2015 模块)&quot;，由此可以安全地删除文件中未使用的部分。</p>
+
+<blockquote>
+<p>本指南的继承自<a href="https://www.webpackjs.com/guides/getting-started">起步指南</a>。如果你尚未阅读该指南，请先行阅读。</p>
+</blockquote>
+
+<h2>添加一个通用模块</h2>
+
+<p>在我们的项目中添加一个新的通用模块文件&nbsp;<code>src/math.js</code>，此文件导出两个函数：</p>
+
+<p><strong>project</strong></p>
+
+<pre>
+<code>webpack-demo
+|- package.json
+|- webpack.config.js
+|- /dist
+  |- bundle.js
+  |- index.html
+|- /src
+  |- index.js
++ |- math.js
+|- /node_modules
+</code></pre>
+
+<p><strong>src/math.js</strong></p>
+
+<pre>
+<code>export function square(x) {
+  return x * x;
+}
+
+export function cube(x) {
+  return x * x * x;
+}
+</code></pre>
+
+<p>接着，更新入口脚本，使用其中一个新方法，并且为了简单，将&nbsp;<code>lodash</code>&nbsp;删除：</p>
+
+<p><strong>src/index.js</strong></p>
+
+<pre>
+<code>- import _ from &#39;lodash&#39;;
++ import { cube } from &#39;./math.js&#39;;
+
+  function component() {
+-   var element = document.createElement(&#39;div&#39;);
++   var element = document.createElement(&#39;pre&#39;);
+
+-   // lodash 是由当前 script 脚本 import 导入进来的
+-   element.innerHTML = _.join([&#39;Hello&#39;, &#39;webpack&#39;], &#39; &#39;);
++   element.innerHTML = [
++     &#39;Hello webpack!&#39;,
++     &#39;5 cubed is equal to &#39; + cube(5)
++   ].join(&#39;\n\n&#39;);
+
+    return element;
+  }
+
+  document.body.appendChild(component());
+</code></pre>
+
+<p>注意，我们<strong>并未从&nbsp;<code>src/math.js</code>&nbsp;模块中&nbsp;<code>import</code>&nbsp;导入&nbsp;<code>square</code>&nbsp;方法</strong>。这个功能是所谓的&ldquo;未引用代码(dead code)&rdquo;，也就是说，应该删除掉未被引用的&nbsp;<code>export</code>。现在让我们运行我们的npm 脚本&nbsp;<code>npm run build</code>，并检查输出的 bundle：</p>
+
+<p><strong>dist/bundle.js (around lines 90 - 100)</strong></p>
+
+<pre>
+<code>/* 1 */
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+&quot;use strict&quot;;
+/* unused harmony export square */
+/* harmony export (immutable) */ __webpack_exports__[&quot;a&quot;] = cube;
+function square(x) {
+  return x * x;
+}
+
+function cube(x) {
+  return x * x * x;
+}
+</code></pre>
+
+<p>注意，上面的&nbsp;<code>unused harmony export square</code>&nbsp;注释。如果你看下面的代码，你会注意到&nbsp;<code>square</code>&nbsp;没有被导入，但是，它仍然被包含在 bundle 中。我们将在下一节中解决这个问题。</p>
+
+<h2>将文件标记为无副作用(side-effect-free)</h2>
+
+<p>在一个纯粹的 ESM 模块世界中，识别出哪些文件有副作用很简单。然而，我们的项目无法达到这种纯度，所以，此时有必要向 webpack 的 compiler 提供提示哪些代码是&ldquo;纯粹部分&rdquo;。</p>
+
+<p>这种方式是通过 package.json 的&nbsp;<code>&quot;sideEffects&quot;</code>&nbsp;属性来实现的。</p>
+
+<pre>
+<code>{
+  &quot;name&quot;: &quot;your-project&quot;,
+  &quot;sideEffects&quot;: false
+}
+</code></pre>
+
+<p>如同上面提到的，如果所有代码都不包含副作用，我们就可以简单地将该属性标记为&nbsp;<code>false</code>，来告知 webpack，它可以安全地删除未用到的 export 导出。</p>
+
+<blockquote>
+<p>「副作用」的定义是，在导入时会执行特殊行为的代码，而不是仅仅暴露一个 export 或多个 export。举例说明，例如 polyfill，它影响全局作用域，并且通常不提供 export。</p>
+</blockquote>
+
+<p>如果你的代码确实有一些副作用，那么可以改为提供一个数组：</p>
+
+<pre>
+<code>{
+  &quot;name&quot;: &quot;your-project&quot;,
+  &quot;sideEffects&quot;: [
+    &quot;./src/some-side-effectful-file.js&quot;
+  ]
+}
+</code></pre>
+
+<p>数组方式支持相关文件的相对路径、绝对路径和 glob 模式。它在内部使用&nbsp;<a href="https://github.com/micromatch/micromatch#matching-features">micromatch</a>。</p>
+
+<blockquote>
+<p>注意，任何导入的文件都会受到 tree shaking 的影响。这意味着，如果在项目中使用类似&nbsp;<code>css-loader</code>&nbsp;并导入 CSS 文件，则需要将其添加到 side effect 列表中，以免在生产模式中无意中将它删除：</p>
+</blockquote>
+
+<pre>
+<code>{
+  &quot;name&quot;: &quot;your-project&quot;,
+  &quot;sideEffects&quot;: [
+    &quot;./src/some-side-effectful-file.js&quot;,
+    &quot;*.css&quot;
+  ]
+}
+</code></pre>
+
+<p>最后，还可以在&nbsp;<a href="https://github.com/webpack/webpack/issues/6065#issuecomment-351060570"><code>module.rules</code>&nbsp;配置选项</a>&nbsp;中设置&nbsp;<code>&quot;sideEffects&quot;</code>。</p>
+
+<h2>压缩输出</h2>
+
+<p>通过如上方式，我们已经可以通过&nbsp;<code>import</code>&nbsp;和&nbsp;<code>export</code>&nbsp;语法，找出那些需要删除的&ldquo;未使用代码(dead code)&rdquo;，然而，我们不只是要找出，还需要在 bundle 中删除它们。为此，我们将使用&nbsp;<code>-p</code>(production) 这个 webpack 编译标记，来启用 uglifyjs 压缩插件。</p>
+
+<blockquote>
+<p>注意，<code>--optimize-minimize</code>&nbsp;标记也会在 webpack 内部调用&nbsp;<code>UglifyJsPlugin</code>。</p>
+</blockquote>
+
+<p>从 webpack 4 开始，也可以通过&nbsp;<code>&quot;mode&quot;</code>&nbsp;配置选项轻松切换到压缩输出，只需设置为&nbsp;<code>&quot;production&quot;</code>。</p>
+
+<p><strong>webpack.config.js</strong></p>
+
+<pre>
+<code>const path = require(&#39;path&#39;);
+
+module.exports = {
+  entry: &#39;./src/index.js&#39;,
+  output: {
+    filename: &#39;bundle.js&#39;,
+    path: path.resolve(__dirname, &#39;dist&#39;)
+- }
++ },
++ mode: &quot;production&quot;
+};
+</code></pre>
+
+<blockquote>
+<p>注意，也可以在命令行接口中使用&nbsp;<code>--optimize-minimize</code>&nbsp;标记，来使用&nbsp;<code>UglifyJSPlugin</code>。</p>
+</blockquote>
+
+<p>准备就绪后，然后运行另一个命令&nbsp;<code>npm run build</code>，看看输出结果有没有发生改变。</p>
+
+<p>你发现&nbsp;<code>dist/bundle.js</code>&nbsp;中的差异了吗？显然，现在整个 bundle 都已经被精简过，但是如果仔细观察，则不会看到&nbsp;<code>square</code>&nbsp;函数被引入，但会看到&nbsp;<code>cube</code>&nbsp;函数的修改版本（<code>function r(e){return e*e*e}n.a=r</code>）。现在，随着 tree shaking 和代码压缩，我们的 bundle 减小几个字节！虽然，在这个特定示例中，可能看起来没有减少很多，但是，在具有复杂的依赖树的大型应用程序上运行时，tree shaking 或许会对 bundle 产生显著的体积优化。</p>
+
+<h2>结论</h2>
+
+<p>为了学会使用&nbsp;<em>tree shaking</em>，你必须&hellip;&hellip;</p>
+
+<ul>
+	<li>使用 ES2015 模块语法（即&nbsp;<code>import</code>&nbsp;和&nbsp;<code>export</code>）。</li>
+	<li>在项目&nbsp;<code>package.json</code>&nbsp;文件中，添加一个 &quot;sideEffects&quot; 入口。</li>
+	<li>引入一个能够删除未引用代码(dead code)的压缩工具(minifier)（例如&nbsp;<code>UglifyJSPlugin</code>）。</li>
+</ul>
+
+<p>你可以将应用程序想象成一棵树。绿色表示实际用到的源码和 library，是树上活的树叶。灰色表示无用的代码，是秋天树上枯萎的树叶。为了除去死去的树叶，你必须摇动这棵树，使它们落下。</p>
+
+<p>如果你对优化输出很感兴趣的话，请进入到下一个指南，来了解<a href="https://www.webpackjs.com/guides/production">生产环境</a>中进行构建的详细细节。</p>
+
+<hr />
+<blockquote>
+<p>原文：<a href="https://webpack.js.org/guides/tree-shaking/">https://webpack.js.org/guides/tree-shaking/</a></p>
+</blockquote>
+
+<hr />
+<h3>进一步阅读</h3>
+
+<ul>
+	<li><a href="https://medium.com/webpack/webpack-4-beta-try-it-today-6b1d27d7d7e2#9a67">webpack 4 beta &mdash; try it today!</a></li>
+	<li><a href="https://webpack.js.org/plugins/module-concatenation-plugin/#debugging-optimization-bailouts">Debugging Optimization Bailouts</a></li>
+	<li><a href="https://github.com/webpack/webpack/issues/6074">Issue 6074 - Add support for more complex selectors for sideEffects</a></li>
+</ul>

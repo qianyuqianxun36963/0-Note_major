@@ -1,0 +1,119 @@
+<h1>管理依赖</h1>
+
+<blockquote>
+<p>es6 modules</p>
+</blockquote>
+
+<blockquote>
+<p>commonjs</p>
+</blockquote>
+
+<blockquote>
+<p>amd</p>
+</blockquote>
+
+<h2>带表达式的 require 语句</h2>
+
+<p>如果你的 request 含有表达式(expressions)，会创建一个上下文(context)，因为在编译时(compile time)并不清楚<strong>具体</strong>是哪一个模块被导入。</p>
+
+<p>示例：</p>
+
+<pre>
+<code>require(&quot;./template/&quot; + name + &quot;.ejs&quot;);
+</code></pre>
+
+<p>webpack 解析&nbsp;<code>require()</code>&nbsp;的调用，提取出来如下这些信息：</p>
+
+<pre>
+<code>Directory: ./template
+Regular expression: /^.*\.ejs$/
+</code></pre>
+
+<p><strong>具有上下文的模块</strong></p>
+
+<p>（译者注：这里的 request 应该是指在 require() 语句中的表达式，如 &quot;./template/&quot; + name + &quot;.ejs&quot;）生成一个具有上下文的模块。它包含<strong>目录下的所有模块</strong>的引用(reference)，这些模块能够「通过从 request 匹配出来的正则表达式」所 require 进来。上下文模块包含一个 map 对象，会把 request 中所有模块转译成对应的模块 id。</p>
+
+<p>示例：</p>
+
+<pre>
+<code>{
+    &quot;./table.ejs&quot;: 42,
+    &quot;./table-row.ejs&quot;: 43,
+    &quot;./directory/folder.ejs&quot;: 44
+}
+</code></pre>
+
+<p>上下文模块还包含一些运行时(runtime)逻辑来访问这个 map 对象。</p>
+
+<p>这意味着 webpack 能够支持动态 require，但会导致所有可能用到的模块都包含在 bundle 中。</p>
+
+<h2><code>require.context</code></h2>
+
+<p>你还可以使用&nbsp;<code>require.context()</code>&nbsp;方法来创建自己的（模块）上下文。</p>
+
+<p>你可以给这个方法传 3 个参数：要搜索的文件夹目录，是否还应该搜索它的子目录，以及一个匹配文件的正则表达式。</p>
+
+<p>webpack 会在构建的时候解析代码中的&nbsp;<code>require.context()</code>&nbsp;。</p>
+
+<p>语法如下：</p>
+
+<pre>
+<code>require.context(directory, useSubdirectories = false, regExp = /^\.\//)
+</code></pre>
+
+<p>示例：</p>
+
+<pre>
+<code>require.context(&quot;./test&quot;, false, /\.test\.js$/);
+// （创建了）一个包含了 test 文件夹（不包含子目录）下面的、所有文件名以 `.test.js` 结尾的、能被 require 请求到的文件的上下文。
+</code></pre>
+
+<pre>
+<code>require.context(&quot;../&quot;, true, /\.stories\.js$/);
+// （创建了）一个包含了父级文件夹（包含子目录）下面，所有文件名以 `.stories.js` 结尾的文件的上下文。
+</code></pre>
+
+<blockquote>
+<p>传递给&nbsp;<code>require.context</code>&nbsp;的参数必须是字面量(literal)！</p>
+</blockquote>
+
+<h3>上下文模块 API</h3>
+
+<p>一个上下文模块导出一个（require）函数，这个函数可以接收一个参数：request。</p>
+
+<p>导出的方法有 3 个属性：&nbsp;<code>resolve</code>,&nbsp;<code>keys</code>,&nbsp;<code>id</code>。</p>
+
+<ul>
+	<li><code>resolve</code>&nbsp;是一个函数，它返回请求被解析后得到的模块 id。</li>
+	<li><code>keys</code>&nbsp;也是一个函数，它返回一个数组，由所有可能被上下文模块处理的请求（译者注：参考下面第二段代码中的 key）组成。</li>
+</ul>
+
+<p>比如，如果想引入一个文件夹下面的所有文件，或者引入能匹配正则表达式的文件，你可以这样：</p>
+
+<pre>
+<code>function importAll (r) {
+  r.keys().forEach(r);
+}
+
+importAll(require.context(&#39;../components/&#39;, true, /\.js$/));
+</code></pre>
+
+<pre>
+<code>var cache = {};
+
+function importAll (r) {
+  r.keys().forEach(key =&gt; cache[key] = r(key));
+}
+
+importAll(require.context(&#39;../components/&#39;, true, /\.js$/));
+// 在构建时，所有被 require 的模块都会被存到（上面代码中的）cache 里面。
+</code></pre>
+
+<ul>
+	<li><code>id</code>&nbsp;是上下文模块里面所包含的模块 id. 它可能在你使用&nbsp;<code>module.hot.accept</code>&nbsp;的时候被用到。</li>
+</ul>
+
+<hr />
+<blockquote>
+<p>原文：<a href="https://webpack.js.org/guides/dependency-management/">https://webpack.js.org/guides/dependency-management/</a></p>
+</blockquote>
