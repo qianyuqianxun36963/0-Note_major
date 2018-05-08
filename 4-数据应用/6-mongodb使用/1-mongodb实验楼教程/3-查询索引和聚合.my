@@ -1,0 +1,361 @@
+<h1>查询、索引与聚合</h1>
+
+<h2>一、实验介绍</h2>
+
+<h3>1.1 实验内容</h3>
+
+<p>本次实验将介绍 MongoDB 查询、索引及聚合的相关知识。</p>
+
+<h3>1.2 实验知识点</h3>
+
+<ul>
+	<li>集合数据查询</li>
+	<li>索引</li>
+	<li>聚合</li>
+</ul>
+
+<h3>1.3 实验环境</h3>
+
+<p>课程使用的实验环境为 Ubuntu Linux 14.04 64 位版本。实验中会用到程序：</p>
+
+<ul>
+	<li>MongoDB 2.4.9</li>
+	<li>Xfce终端</li>
+</ul>
+
+<h2>二、开发准备</h2>
+
+<h3>2.1 初始化环境</h3>
+
+<p>启动 MongoDB 服务，因为 MongoDB 并不随系统一起启动，可能以下命令运行后会等一小段的时间才会启动完毕。</p>
+
+<pre>
+<code>$ sudo service mongodb start
+</code></pre>
+
+<p>进入 MongoDB 命令行操作界面，在命令行中敲<strong>exit</strong>可以退出。</p>
+
+<pre>
+<code>$ mongo
+</code></pre>
+
+<p>实验中的布尔类型的 ture 用1代替，false 用0代替。</p>
+
+<h3>2.2 初始化 MongoDB 数据库</h3>
+
+<pre>
+<code>&gt; use Chenshi
+switched to db Chenshi
+&gt; db.createCollection(&quot;shiyanlou&quot;)            #无参数
+{&quot;ok&quot;:1}
+&gt; show collections
+shiyanlou
+system.indexes
+&gt; userdoc1=({&quot;user_id&quot;:1,&quot;name&quot;:&quot;cloud&quot;,&quot;state&quot;:&quot;active&quot;,&quot;actor&quot;:&quot;user&quot;,&quot;e-mail&quot;:&quot;test@qq.com&quot;,&quot;VM_num&quot;:2,&quot;time&quot;:[{&quot;date&quot;:&quot;2014-08-12&quot;,&quot;hour&quot;:&quot;10:53 PM&quot;}] })        
+&gt; userdoc2=({&quot;user_id&quot;:2,&quot;name&quot;:&quot;testadmin&quot;,&quot;state&quot;:&quot;active&quot;,&quot;actor&quot;:&quot;admin&quot;,&quot;e-mail&quot;:&quot;test@qq.com&quot;,&quot;VM_num&quot;:2,&quot;time&quot;:[{&quot;date&quot;:&quot;2014-08-11&quot;,&quot;hour&quot;:&quot;06:34 AM&quot;}] })    
+&gt; doc=({&quot;name&quot;:&quot;peter&quot;,&quot;position&quot;:&quot;teacher&quot;})
+&gt; db.shiyanlou.insert(userdoc1)
+WriteResult({&quot;nInserted&quot;:1})
+&gt; db.shiyanlou.insert(userdoc2)
+WriteResult({&quot;nInserted&quot;:1})
+&gt; db.shiyanlou.insert(doc1)
+WriteResult({&quot;nInserted&quot;:1})
+</code></pre>
+
+<h2>三、实验步骤</h2>
+
+<h3>3.1 查询语句</h3>
+
+<p>db.COLLECTION_NAME.find(Parameter) 范例：</p>
+
+<pre>
+<code>&gt; db.shiyanlou.find()
+</code></pre>
+
+<p>文档信息，这条指令相当于 sqlite 中的 SELECT * FROM TABLE_NAME</p>
+
+<h4>3.1.1 条件操作符1</h4>
+
+<p>MongoDB 中的条件操作符有：</p>
+
+<ul>
+	<li>(&gt;) 大于 - $gt #greater than</li>
+	<li>(&lt;) 小于 - $lt #less than</li>
+	<li>(&gt;=) 大于等于 - $gte #equal</li>
+	<li>(&lt;= ) 小于等于 - $lte</li>
+</ul>
+
+<p>范例：</p>
+
+<pre>
+<code>&gt; db.shiyanlou.find({user_id:{$gt:1}})
+&gt; db.shiyanlou.find({user_id:{$lte:2,$gt:1}})
+</code></pre>
+
+<h4>3.1.2 条件操作符2</h4>
+
+<p>语法：</p>
+
+<pre>
+<code>$type
+</code></pre>
+
+<p>type的值：</p>
+
+<ul>
+	<li>双精度型-1</li>
+	<li>字符串-2</li>
+	<li>对象-3</li>
+	<li>数组-4</li>
+	<li>二进制数据-5</li>
+	<li>对象ID-7</li>
+	<li>布尔类型-8</li>
+	<li>数据-9</li>
+	<li>空-10</li>
+	<li>正则表达式-11</li>
+	<li>JS代码-13</li>
+	<li>符号-14</li>
+	<li>有作用域的JS代码-15</li>
+	<li>32位整型数-16</li>
+	<li>时间戳-17</li>
+	<li>64位整型数-18</li>
+	<li>Min key-255</li>
+	<li>Max key-127</li>
+</ul>
+
+<p>范例：</p>
+
+<pre>
+<code>&gt; db.shiyanlou.find({&quot;name&quot;:{$type:2}})
+</code></pre>
+
+<p>查找 name 是字符串的文档记录。</p>
+
+<h4>3.1.3 limit 与 skip</h4>
+
+<p>读取指定数量的数据记录&nbsp;<code>limit</code></p>
+
+<p>范例：</p>
+
+<pre>
+<code>&gt; db.shiyanlou.find().limit(1)
+</code></pre>
+
+<p>读取一条记录，默认是排在最前面的那一条被读取。</p>
+
+<p>读取时跳过指定数量的数据记录&nbsp;<code>skip</code></p>
+
+<p>范例：</p>
+
+<pre>
+<code>&gt; db.shiyanlou.find().limit(1).skip(1)
+</code></pre>
+
+<p>当然，还可以添加 find 的查找条件的参数，以便进行更精确的查找。</p>
+
+<h4>3.1.4 MongoDB 排序 sort()</h4>
+
+<p>与 sqlite 中的排序一样有升序和降序，其中升序用1表示，降序用-1表示 语法：</p>
+
+<pre>
+<code>db.COLLECTION_NAME.find().sort({KEY:1|-1})
+</code></pre>
+
+<p>范例：</p>
+
+<pre>
+<code>&gt; db.shiyanlou.find().sort({&quot;time&quot;:1})
+</code></pre>
+
+<h3>3.2 索引 ensureIndex()</h3>
+
+<p>索引通常能够极大的提高查询的效率，如果没有索引，MongoDB 在读取数据时必须扫描集合中的每个文件并选取那些符合查询条件的记录。这种扫描全集合的查询效率是非常低的，特别在处理大量的数据时，查询可以要花费几十秒甚至几分钟，无疑对网站的性能是非常致命的。</p>
+
+<p>索引是特殊的数据结构，索引存储在一个易于遍历读取的数据集合中，索引是对数据库集合中一个文档或多个文档的值进行排序的一种结构。</p>
+
+<p>语法：</p>
+
+<pre>
+<code>db.COLLECTION_NAME.ensureIndex({KEY:1|-1})
+</code></pre>
+
+<p>同样1代表升序，-1代表降序</p>
+
+<p>范例：</p>
+
+<pre>
+<code>&gt; db.shiyanlou.ensureIndex({&quot;name&quot;:1})
+</code></pre>
+
+<p>ensureIndex() 的可选参数：</p>
+
+<table>
+	<thead>
+		<tr>
+			<th>参数</th>
+			<th>类型</th>
+			<th>描述</th>
+		</tr>
+	</thead>
+	<tbody>
+		<tr>
+			<td>background</td>
+			<td>Boolean</td>
+			<td>建立索引要不要阻塞其他数据库操作，默认为false</td>
+		</tr>
+		<tr>
+			<td>unique</td>
+			<td>Boolean</td>
+			<td>建立的索引是否唯一，默认false</td>
+		</tr>
+		<tr>
+			<td>name</td>
+			<td>string</td>
+			<td>索引的名称，若未指定，系统自动生成</td>
+		</tr>
+		<tr>
+			<td>dropDups</td>
+			<td>Boolean</td>
+			<td>建立唯一索引时，是否删除重复记录，默认flase</td>
+		</tr>
+		<tr>
+			<td>sparse</td>
+			<td>Boolean</td>
+			<td>对文档不存在的字段数据不启用索引，默认false</td>
+		</tr>
+		<tr>
+			<td>expireAfterSeconds</td>
+			<td>integer</td>
+			<td>设置集合的生存时间，单位为秒</td>
+		</tr>
+		<tr>
+			<td>v</td>
+			<td>index version</td>
+			<td>索引的版本号</td>
+		</tr>
+		<tr>
+			<td>weights</td>
+			<td>document</td>
+			<td>索引权重值，范围为1到99999</td>
+		</tr>
+		<tr>
+			<td>default-language</td>
+			<td>string</td>
+			<td>默认为英语</td>
+		</tr>
+		<tr>
+			<td>language_override</td>
+			<td>string</td>
+			<td>默认值为 language</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>范例：</p>
+
+<pre>
+<code>&gt; db.shiyanlou.ensureIndex({&quot;user_id&quot;:1,&quot;name&quot;:1},{background:1})
+</code></pre>
+
+<h3>3.3 聚合 aggregate()</h3>
+
+<p>语法：</p>
+
+<pre>
+<code>db.COLLECTION_NAME.aggregate({
+$match:{x:1},
+{limit:NUM},
+$group:{_id:$age}
+})
+</code></pre>
+
+<p>这些参数都可选</p>
+
+<ul>
+	<li>$match:查询，跟 find 一样；</li>
+	<li>$limit：限制显示结果数量；</li>
+	<li>$skip：忽略结果数量；</li>
+	<li>$sort：排序；</li>
+	<li>$group：按照给定表达式组合结果。</li>
+</ul>
+
+<p>范例：</p>
+
+<pre>
+<code>&gt; db.shiyanlou.aggregate([{$group:{_id:&quot;$name&quot;, user:{$sum:&quot;$user_id&quot;}}}])
+</code></pre>
+
+<p>$name 意为取得 name 的值</p>
+
+<h4>3.3.1 聚合表达式</h4>
+
+<table>
+	<thead>
+		<tr>
+			<th>名称</th>
+			<th>描述</th>
+		</tr>
+	</thead>
+	<tbody>
+		<tr>
+			<td>$sum</td>
+			<td>计算总和</td>
+		</tr>
+		<tr>
+			<td>$avg</td>
+			<td>计算平均值</td>
+		</tr>
+		<tr>
+			<td>\$min和$max</td>
+			<td>计算最小和最大值</td>
+		</tr>
+		<tr>
+			<td>$push</td>
+			<td>在结果文档中插入值到一个数组</td>
+		</tr>
+		<tr>
+			<td>$addToSet</td>
+			<td>在结果文档中插入值到一个数组，但不创建副本</td>
+		</tr>
+		<tr>
+			<td>$first</td>
+			<td>根据资源文档的排序获取第一个文档数据</td>
+		</tr>
+		<tr>
+			<td>$last</td>
+			<td>根据资源文档的排序获取最后一个文档数据</td>
+		</tr>
+	</tbody>
+</table>
+
+<h4>3.3.2 管道</h4>
+
+<p>MongoDB 的聚合管道将 MongoDB 文档在一个管道处理完毕后将结果传递给下一个管道处理。管道操作是可以重复的。</p>
+
+<p>表达式：处理输入文档并输出。表达式是无状态的，只能用于计算当前聚合管道的文档，不能处理其它的文档。 聚合框架中常用的几个操作：</p>
+
+<ul>
+	<li>$project：修改输入文档的结构。可以用来重命名、增加或删除域，也可以用于创建计算结果以及嵌套文档。</li>
+	<li>\$match：用于过滤数据，只输出符合条件的文档。$match 使用 MongoDB 的标准查询操作。</li>
+	<li>$limit：用来限制 MongoDB 聚合管道返回的文档数。</li>
+	<li>$skip：在聚合管道中跳过指定数量的文档，并返回余下的文档。</li>
+	<li>$unwind：将文档中的某一个数组类型字段拆分成多条，每条包含数组中的一个值。</li>
+	<li>$group：将集合中的文档分组，可用于统计结果。</li>
+	<li>$sort：将输入文档排序后输出。</li>
+	<li>$geoNear：输出接近某一地理位置的有序文档。</li>
+</ul>
+
+<p>范例：</p>
+
+<pre>
+<code>&gt; db.shiyanlou.aggregate([{$match:{user_id:{$gt:0,$lte:2}}},{$group:{_id:&quot;user&quot;,count:{$sum:1}}}])
+{&quot;_id&quot;:&quot;user&quot;,&quot;count&quot;:2}
+</code></pre>
+
+<h2>四、实验总结</h2>
+
+<p>本节课程介绍了 MongoDB 的查询、索引和聚合，可以使用 find 进行查询，sort 用于排序，ensureIndex 用于建立索引，aggregate 用于聚合。</p>
+
+<h2>五、课后习题</h2>
+
+<p>请再新添加一个职工集合，每个职工包括年龄，工资，住址等信息，插入多个文档，最后结合上述所讲操作一遍。</p>

@@ -1,0 +1,278 @@
+<h1>数据库和集合基本操作</h1>
+
+<h2>一、实验介绍</h2>
+
+<h3>1.1 实验内容</h3>
+
+<p>本次实验将介绍 MongoDB 的基本概念，以及数据库和集合的基本操作。</p>
+
+<h3>1.2 实验知识点</h3>
+
+<ul>
+	<li>MongoDB 概念</li>
+	<li>数据库基本操作</li>
+	<li>集合基本操作</li>
+</ul>
+
+<h3>1.3 实验环境</h3>
+
+<p>课程使用的实验环境为 Ubuntu Linux 14.04 64 位版本。实验中会用到程序：</p>
+
+<ul>
+	<li>MongoDB 2.4.9</li>
+	<li>Xfce终端</li>
+</ul>
+
+<h2>二、实验步骤</h2>
+
+<p>本教程只介绍了 MongoDB 的基础知识，其相关的安装配置等并未涉及，如有需要可参考&nbsp;<a href="http://blog.csdn.net/u010858605/article/details/50957610" target="_blank">MongoDB环境配置教程</a>。</p>
+
+<h3>2.1 MongoDB 简介</h3>
+
+<h4>2.1.1 简介</h4>
+
+<p>MongoDB 是一个介于关系数据库和非关系数据库之间的产品，是非关系数据库当中功能最丰富，最像关系数据库的。它支持的数据结构非常松散，是类似 json 的 bson 格式，因此可以存储比较复杂的数据类型。</p>
+
+<h4>2.1.2 面向集合的存储</h4>
+
+<p>在 MongoDB 中，一个数据库包含多个集合，类似于 MySQL 中一个数据库包含多个表；一个集合包含多个文档，类似于 MySQL 中一个表包含多条数据。</p>
+
+<h4>2.1.3 虚拟机开机配置</h4>
+
+<p>启动 MongoDB 服务，因为 MongoDB 并不随系统一起启动，可能以下命令运行后会等一小段的时间才会启动完毕。</p>
+
+<pre>
+<code>$ sudo service mongodb start
+</code></pre>
+
+<p>进入 MongoDB 命令行操作界面(可能会出现 connect failed，多试几次就行)，在命令行中敲<strong>exit</strong>可以退出。</p>
+
+<pre>
+<code>$ mongo
+</code></pre>
+
+<p>实验中的布尔类型的 ture 用1代替，false 用0代替。</p>
+
+<h3>2.2 基本概念</h3>
+
+<h4>2.2.1 数据库</h4>
+
+<ul>
+	<li>一个 MongoDB 可以创建多个数据库</li>
+	<li>使用 show dbs 可以查看所有数据库的列表</li>
+	<li>执行 db 命令则可以查看当前数据库对象或者集合</li>
+	<li>运行 use 命令可以连接到指定的数据库</li>
+</ul>
+
+<pre>
+<code>$ mongo      #进入到mongo命令行
+&gt; use test            #连接到test数据库
+</code></pre>
+
+<p>注意：数据库名可以是任何字符，但是不能有空格、点号和$字符</p>
+
+<h4>2.2.2 文档</h4>
+
+<p>文档是 MongoDB 的核心，类似于 SQLite 数据库（关系数据库）中的每一行数据。多个键及其关联的值放在一起就是文档。在 Mongodb 中使用一种类 json 的 bson 存储数据，bson 数据可以理解为在 json 的基础上添加了一些 json 中没有的数据类型。</p>
+
+<p>例：</p>
+
+<pre>
+<code>{&quot;company&quot;:&quot;Chenshi keji&quot;}
+</code></pre>
+
+<h4>2.2.3 文档的逻辑联系</h4>
+
+<p>假设有两个文档：</p>
+
+<pre>
+<code>{
+   &quot;name&quot;: &quot;Tom Hanks&quot;,
+   &quot;contact&quot;: &quot;987654321&quot;,
+   &quot;dob&quot;: &quot;01-01-1991&quot;
+}#user文档
+
+{
+   &quot;building&quot;: &quot;22 A, Indiana Apt&quot;,
+   &quot;pincode&quot;: 123456,
+   &quot;city&quot;: &quot;chengdu&quot;,
+   &quot;state&quot;: &quot;sichuan&quot;
+}#address文档
+</code></pre>
+
+<p>关系1：嵌入式关系，把 address 文档嵌入到 user 文档中</p>
+
+<pre>
+<code>{
+   &quot;name&quot;: &quot;Tom Hanks&quot;,
+   &quot;contact&quot;: &quot;987654321&quot;,
+   &quot;dob&quot;: &quot;01-01-1991&quot;,
+   &quot;address&quot;:
+   [{
+   &quot;building&quot;: &quot;22 A, Indiana Apt&quot;,
+   &quot;pincode&quot;: 123456,
+   &quot;city&quot;: &quot;chengdu&quot;,
+   &quot;state&quot;: &quot;sichuan&quot;
+    },
+    {
+    &quot;building&quot;: &quot;170 A, Acropolis Apt&quot;,
+    &quot;pincode&quot;: 456789,
+    &quot;city&quot;: &quot;beijing&quot;,
+    &quot;state&quot;: &quot;beijing&quot;
+    }]
+}#这就是嵌入式的关系
+</code></pre>
+
+<p>关系2：引用式关系：将两个文档分开，通过引用文档的_id字段来建立关系</p>
+
+<pre>
+<code>{
+   &quot;contact&quot;: &quot;987654321&quot;,
+   &quot;dob&quot;: &quot;01-01-1991&quot;,
+   &quot;name&quot;: &quot;Tom Benzamin&quot;,
+   &quot;address_ids&quot;: [
+      ObjectId(&quot;52ffc4a5d85242602e000000&quot;)    #对应address文档的id字段
+   ]
+}#这就是引用式关系
+</code></pre>
+
+<h4>2.2.4 集合</h4>
+
+<p>集合就是一组文档的组合，就相当于是<strong>关系数据库中的表</strong>，在 MongoDB 中可以存储不同的文档结构的文档。 例:</p>
+
+<pre>
+<code>{&quot;company&quot;:&quot;Chenshi keji&quot;} {&quot;people&quot;:&quot;man&quot;,&quot;name&quot;:&quot;peter&quot;}
+</code></pre>
+
+<p>上面两个文档就可以存储在同一个集合中。</p>
+
+<h4>2.2.5 元数据</h4>
+
+<p>数据库的信息存储在集合中，他们统一使用系统的命名空间：DBNAME.system.* DBNAME 可用 db 或数据库名替代</p>
+
+<ul>
+	<li>DBNAME.system.namespaces ：列出所有名字空间</li>
+	<li>DBNAME.system.indexs ：列出所有索引</li>
+	<li>DBNAME.system.profile ：列出数据库概要信息</li>
+	<li>DBNAME.system.users ：列出访问数据库的用户</li>
+	<li>DBNAME.system.sources ：列出服务器信息</li>
+</ul>
+
+<h3>2.3 数据库的创建和销毁</h3>
+
+<h4>2.3.1 创建数据库</h4>
+
+<p>启动服务后，进入 MongoDB 命令行操作界面：</p>
+
+<pre>
+<code>$ mongo
+</code></pre>
+
+<p>使用 use 命令创建数据库：</p>
+
+<pre>
+<code>&gt; use mydb
+</code></pre>
+
+<p>查看当前连接的数据库：</p>
+
+<pre>
+<code>&gt; db
+</code></pre>
+
+<p>查看所有的数据库：</p>
+
+<pre>
+<code>&gt; show dbs
+</code></pre>
+
+<p>列出的所有数据库中看不到 mydb 或者显示 mydb(empty) ，因为 mydb 为空，里面没有任何东西，MongoDB 不显示或显示 mydb(empty)。</p>
+
+<h4>2.3.2 销毁数据库</h4>
+
+<p>使用 db.dropDatabase() 销毁数据库：</p>
+
+<pre>
+<code>&gt; use local
+ switched to db local
+&gt; db.dropDatabase()
+</code></pre>
+
+<p>查看所有的数据库：</p>
+
+<pre>
+<code>&gt; show dbs
+</code></pre>
+
+<h3>2.4 集合（collection）的创建和删除</h3>
+
+<h4>2.4.1 创建集合</h4>
+
+<p>在数据库 mydb 中创建一个集合</p>
+
+<pre>
+<code>&gt; use mydb
+switched to db mydb
+&gt; db.createCollection(&quot;users&quot;)
+</code></pre>
+
+<p>查看创建的集合：</p>
+
+<pre>
+<code>&gt; show collections
+</code></pre>
+
+<h4>2.4.2 删除集合</h4>
+
+<p>删除集合的方法如下：（删除 users 集合）</p>
+
+<pre>
+<code>&gt; show collections
+&gt; db.users.drop()
+</code></pre>
+
+<p>查看是否删除成功：</p>
+
+<pre>
+<code>&gt; show collections
+</code></pre>
+
+<h3>2.5 向集合中插入数据</h3>
+
+<h4>2.5.1 使用 insert()</h4>
+
+<p>插入数据时，如果 users 集合没有创建会自动创建。</p>
+
+<pre>
+<code>&gt; use mydb
+switched to db mydb
+&gt; db.users.insert([
+... { name : &quot;jam&quot;,
+... email : &quot;jam@qq.com&quot;
+... },
+... { name : &quot;tom&quot;,
+... email : &quot;tom@qq.com&quot;
+... }
+... ])
+</code></pre>
+
+<h4>2.5.2 使用 save()</h4>
+
+<p>插入数据时，如果 users 集合没有创建会自动创建。</p>
+
+<pre>
+<code>&gt; use mydb2
+switched to db mydb2
+&gt; db.users.save([
+... { name : &quot;jam&quot;,
+... email : &quot;jam@qq.com&quot;
+... },
+... { name : &quot;tom&quot;,
+... email : &quot;tom@qq.com&quot;
+... }
+... ])
+</code></pre>
+
+<h2>三、实验总结</h2>
+
+<p>本节实验介绍了 MongoDB 和集合的基本操作，在 MongoDB 中使用一种类 json 的 bson 存储数据，可以使用 use 创建和切换数据库，show dbs 可以查看有哪些数据库，dropDatabase 可以删除数据库，createCollection 可以创建集合，show collections 可以查看集合，insert() 和 save() 可以插入数据。</p>
