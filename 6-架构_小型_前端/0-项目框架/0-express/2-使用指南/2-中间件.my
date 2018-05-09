@@ -1,0 +1,296 @@
+<h1>使用中间件</h1>
+
+<p>Express 是一个自身功能极简，完全是由路由和中间件构成一个的 web 开发框架：从本质上来说，一个 Express 应用就是在调用各种中间件。</p>
+
+<p><em>中间件（Middleware）</em>&nbsp;是一个函数，它可以访问请求对象（<a href="http://www.expressjs.com.cn/4x/api.html#req">request object</a>&nbsp;(<code>req</code>)）, 响应对象（<a href="http://www.expressjs.com.cn/4x/api.html#res">response object</a>&nbsp;(<code>res</code>)）, 和 web 应用中处于请求-响应循环流程中的中间件，一般被命名为&nbsp;<code>next</code>&nbsp;的变量。</p>
+
+<p>中间件的功能包括：</p>
+
+<ul>
+	<li>执行任何代码。</li>
+	<li>修改请求和响应对象。</li>
+	<li>终结请求-响应循环。</li>
+	<li>调用堆栈中的下一个中间件。</li>
+</ul>
+
+<p>如果当前中间件没有终结请求-响应循环，则必须调用&nbsp;<code>next()</code>&nbsp;方法将控制权交给下一个中间件，否则请求就会挂起。</p>
+
+<p>Express 应用可使用如下几种中间件：</p>
+
+<ul>
+	<li><a href="http://www.expressjs.com.cn/guide/using-middleware.html#middleware.application">应用级中间件</a></li>
+	<li><a href="http://www.expressjs.com.cn/guide/using-middleware.html#middleware.router">路由级中间件</a></li>
+	<li><a href="http://www.expressjs.com.cn/guide/using-middleware.html#middleware.error-handling">错误处理中间件</a></li>
+	<li><a href="http://www.expressjs.com.cn/guide/using-middleware.html#middleware.built-in">内置中间件</a></li>
+	<li><a href="http://www.expressjs.com.cn/guide/using-middleware.html#middleware.third-party">第三方中间件</a></li>
+</ul>
+
+<p>使用可选则挂载路径，可在应用级别或路由级别装载中间件。另外，你还可以同时装在一系列中间件函数，从而在一个挂载点上创建一个子中间件栈。</p>
+
+<h2>应用级中间件</h2>
+
+<p>应用级中间件绑定到&nbsp;<a href="http://www.expressjs.com.cn/4x/api.html#app">app 对象</a>&nbsp;使用&nbsp;<code>app.use()</code>&nbsp;和&nbsp;<code>app.METHOD()</code>， 其中，&nbsp;<code>METHOD</code>&nbsp;是需要处理的 HTTP 请求的方法，例如 GET, PUT, POST 等等，全部小写。例如：</p>
+
+<pre>
+<code>var app = express();
+
+// 没有挂载路径的中间件，应用的每个请求都会执行该中间件
+app.use(function (req, res, next) {
+  console.log(&#39;Time:&#39;, Date.now());
+  next();
+});
+
+// 挂载至 /user/:id 的中间件，任何指向 /user/:id 的请求都会执行它
+app.use(&#39;/user/:id&#39;, function (req, res, next) {
+  console.log(&#39;Request Type:&#39;, req.method);
+  next();
+});
+
+// 路由和句柄函数(中间件系统)，处理指向 /user/:id 的 GET 请求
+app.get(&#39;/user/:id&#39;, function (req, res, next) {
+  res.send(&#39;USER&#39;);
+});
+</code></pre>
+
+<p>下面这个例子展示了在一个挂载点装载一组中间件。</p>
+
+<pre>
+<code>// 一个中间件栈，对任何指向 /user/:id 的 HTTP 请求打印出相关信息
+app.use(&#39;/user/:id&#39;, function(req, res, next) {
+  console.log(&#39;Request URL:&#39;, req.originalUrl);
+  next();
+}, function (req, res, next) {
+  console.log(&#39;Request Type:&#39;, req.method);
+  next();
+});
+</code></pre>
+
+<p>作为中间件系统的路由句柄，使得为路径定义多个路由成为可能。在下面的例子中，为指向&nbsp;<code>/user/:id</code>&nbsp;的 GET 请求定义了两个路由。第二个路由虽然不会带来任何问题，但却永远不会被调用，因为第一个路由已经终止了请求-响应循环。</p>
+
+<pre>
+<code>// 一个中间件栈，处理指向 /user/:id 的 GET 请求
+app.get(&#39;/user/:id&#39;, function (req, res, next) {
+  console.log(&#39;ID:&#39;, req.params.id);
+  next();
+}, function (req, res, next) {
+  res.send(&#39;User Info&#39;);
+});
+
+// 处理 /user/:id， 打印出用户 id
+app.get(&#39;/user/:id&#39;, function (req, res, next) {
+  res.end(req.params.id);
+});
+</code></pre>
+
+<p>如果需要在中间件栈中跳过剩余中间件，调用&nbsp;<code>next(&#39;route&#39;)</code>&nbsp;方法将控制权交给下一个路由。&nbsp;<strong>注意</strong>：&nbsp;<code>next(&#39;route&#39;)</code>&nbsp;只对使用&nbsp;<code>app.VERB()</code>&nbsp;或&nbsp;<code>router.VERB()</code>&nbsp;加载的中间件有效。</p>
+
+<pre>
+<code>// 一个中间件栈，处理指向 /user/:id 的 GET 请求
+app.get(&#39;/user/:id&#39;, function (req, res, next) {
+  // 如果 user id 为 0, 跳到下一个路由
+  if (req.params.id == 0) next(&#39;route&#39;);
+  // 否则将控制权交给栈中下一个中间件
+  else next(); //
+}, function (req, res, next) {
+  // 渲染常规页面
+  res.render(&#39;regular&#39;);
+});
+
+// 处理 /user/:id， 渲染一个特殊页面
+app.get(&#39;/user/:id&#39;, function (req, res, next) {
+  res.render(&#39;special&#39;);
+});
+</code></pre>
+
+<h2>路由级中间件</h2>
+
+<p>路由级中间件和应用级中间件一样，只是它绑定的对象为&nbsp;<code>express.Router()</code>。</p>
+
+<pre>
+<code>var router = express.Router();
+</code></pre>
+
+<p>路由级使用&nbsp;<code>router.use()</code>&nbsp;或&nbsp;<code>router.VERB()</code>&nbsp;加载。</p>
+
+<p>上述在应用级创建的中间件系统，可通过如下代码改写为路由级：</p>
+
+<pre>
+<code>var app = express();
+var router = express.Router();
+
+// 没有挂载路径的中间件，通过该路由的每个请求都会执行该中间件
+router.use(function (req, res, next) {
+  console.log(&#39;Time:&#39;, Date.now());
+  next();
+});
+
+// 一个中间件栈，显示任何指向 /user/:id 的 HTTP 请求的信息
+router.use(&#39;/user/:id&#39;, function(req, res, next) {
+  console.log(&#39;Request URL:&#39;, req.originalUrl);
+  next();
+}, function (req, res, next) {
+  console.log(&#39;Request Type:&#39;, req.method);
+  next();
+});
+
+// 一个中间件栈，处理指向 /user/:id 的 GET 请求
+router.get(&#39;/user/:id&#39;, function (req, res, next) {
+  // 如果 user id 为 0, 跳到下一个路由
+  if (req.params.id == 0) next(&#39;route&#39;);
+  // 负责将控制权交给栈中下一个中间件
+  else next(); //
+}, function (req, res, next) {
+  // 渲染常规页面
+  res.render(&#39;regular&#39;);
+});
+
+// 处理 /user/:id， 渲染一个特殊页面
+router.get(&#39;/user/:id&#39;, function (req, res, next) {
+  console.log(req.params.id);
+  res.render(&#39;special&#39;);
+});
+
+// 将路由挂载至应用
+app.use(&#39;/&#39;, router);
+</code></pre>
+
+<h2>错误处理中间件</h2>
+
+<p>错误处理中间件有&nbsp;<em>4</em>&nbsp;个参数，定义错误处理中间件时必须使用这 4 个参数。即使不需要&nbsp;<code>next</code>&nbsp;对象，也必须在签名中声明它，否则中间件会被识别为一个常规中间件，不能处理错误。</p>
+
+<p>错误处理中间件和其他中间件定义类似，只是要使用 4 个参数，而不是 3 个，其签名如下：&nbsp;<code>(err, req, res, next)</code>。</p>
+
+<pre>
+<code>app.use(function(err, req, res, next) {
+  console.error(err.stack);
+  res.status(500).send(&#39;Something broke!&#39;);
+});
+</code></pre>
+
+<p>请参考&nbsp;<a href="http://www.expressjs.com.cn/guide/error-handling.html">错误处理</a>&nbsp;一章了解更多关于错误处理中间件的内容。</p>
+
+<h2>内置中间件</h2>
+
+<p>从 4.x 版本开始，, Express 已经不再依赖&nbsp;<a href="https://github.com/senchalabs/connect">Connect</a>&nbsp;了。除了&nbsp;<code>express.static</code>, Express 以前内置的中间件现在已经全部单独作为模块安装使用了。请参考&nbsp;<a href="https://github.com/senchalabs/connect#middleware">中间件列表</a>。</p>
+
+<h4>express.static(root, [options])</h4>
+
+<p><code>express.static</code>&nbsp;是 Express 唯一内置的中间件。它基于&nbsp;<a href="https://github.com/expressjs/serve-static">serve-static</a>，负责在 Express 应用中提托管静态资源。</p>
+
+<p>参数&nbsp;<code>root</code>&nbsp;指提供静态资源的根目录。</p>
+
+<p>可选的&nbsp;<code>options</code>&nbsp;参数拥有如下属性。</p>
+
+<table>
+	<thead>
+		<tr>
+			<th>属性</th>
+			<th>描述</th>
+			<th>类型</th>
+			<th>缺省值</th>
+		</tr>
+	</thead>
+	<tbody>
+		<tr>
+			<td><code>dotfiles</code></td>
+			<td>是否对外输出文件名以点（<code>.</code>）开头的文件。可选值为 &ldquo;allow&rdquo;、&ldquo;deny&rdquo; 和 &ldquo;ignore&rdquo;</td>
+			<td>String</td>
+			<td>&ldquo;ignore&rdquo;</td>
+		</tr>
+		<tr>
+			<td><code>etag</code></td>
+			<td>是否启用 etag 生成</td>
+			<td>Boolean</td>
+			<td><code>true</code></td>
+		</tr>
+		<tr>
+			<td><code>extensions</code></td>
+			<td>设置文件扩展名备份选项</td>
+			<td>Array</td>
+			<td><code>[]</code></td>
+		</tr>
+		<tr>
+			<td><code>index</code></td>
+			<td>发送目录索引文件，设置为&nbsp;<code>false</code>&nbsp;禁用目录索引。</td>
+			<td>Mixed</td>
+			<td>&ldquo;index.html&rdquo;</td>
+		</tr>
+		<tr>
+			<td><code>lastModified</code></td>
+			<td>设置&nbsp;<code>Last-Modified</code>&nbsp;头为文件在操作系统上的最后修改日期。可能值为&nbsp;<code>true</code>&nbsp;或&nbsp;<code>false</code>。</td>
+			<td>Boolean</td>
+			<td><code>true</code></td>
+		</tr>
+		<tr>
+			<td><code>maxAge</code></td>
+			<td>以毫秒或者其<a href="https://www.npmjs.org/package/ms">字符串格式</a>设置 Cache-Control 头的 max-age 属性。</td>
+			<td>Number</td>
+			<td>0</td>
+		</tr>
+		<tr>
+			<td><code>redirect</code></td>
+			<td>当路径为目录时，重定向至 &ldquo;/&rdquo;。</td>
+			<td>Boolean</td>
+			<td><code>true</code></td>
+		</tr>
+		<tr>
+			<td><code>setHeaders</code></td>
+			<td>设置 HTTP 头以提供文件的函数。</td>
+			<td>Function</td>
+			<td>&nbsp;</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>下面的例子使用了&nbsp;<code>express.static</code>&nbsp;中间件，其中的&nbsp;<code>options</code>&nbsp;对象经过了精心的设计。</p>
+
+<pre>
+<code>var options = {
+  dotfiles: &#39;ignore&#39;,
+  etag: false,
+  extensions: [&#39;htm&#39;, &#39;html&#39;],
+  index: false,
+  maxAge: &#39;1d&#39;,
+  redirect: false,
+  setHeaders: function (res, path, stat) {
+    res.set(&#39;x-timestamp&#39;, Date.now());
+  }
+}
+
+app.use(express.static(&#39;public&#39;, options));
+</code></pre>
+
+<p>每个应用可有多个静态目录。</p>
+
+<pre>
+<code>app.use(express.static(&#39;public&#39;));
+app.use(express.static(&#39;uploads&#39;));
+app.use(express.static(&#39;files&#39;));
+</code></pre>
+
+<p>更多关于&nbsp;<code>serve-static</code>&nbsp;和其参数的信息，请参考&nbsp;<a href="https://github.com/expressjs/serve-static">serve-static</a>&nbsp;文档。</p>
+
+<h2>第三方中间件</h2>
+
+<p>通过使用第三方中间件从而为 Express 应用增加更多功能。</p>
+
+<p>安装所需功能的 node 模块，并在应用中加载，可以在应用级加载，也可以在路由级加载。</p>
+
+<p>下面的例子安装并加载了一个解析 cookie 的中间件：&nbsp;<code>cookie-parser</code></p>
+
+<pre>
+<code>$ npm install cookie-parser
+</code></pre>
+
+<pre>
+<code>var express = require(&#39;express&#39;);
+var app = express();
+var cookieParser = require(&#39;cookie-parser&#39;);
+
+// 加载用于解析 cookie 的中间件
+app.use(cookieParser());
+</code></pre>
+
+<p>请参考&nbsp;<a href="http://www.expressjs.com.cn/resources/middleware.html">第三方中间件</a>&nbsp;获取 Express 中经常用到的第三方中间件列表。</p>
+
+<p><a href="http://www.expressjs.com.cn/guide/using-middleware.html#" id="top"><img src="http://www.expressjs.com.cn/images/arrow.png" /></a></p>

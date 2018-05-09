@@ -1,0 +1,402 @@
+<h1>开发</h1>
+
+<blockquote>
+<p>本指南继续沿用<a href="https://www.webpackjs.com/guides/output-management">管理输出</a>指南中的代码示例。</p>
+</blockquote>
+
+<p>如果你一直跟随之前的指南，应该对一些 webpack 基础知识有着很扎实的理解。在我们继续之前，先来看看如何建立一个开发环境，使我们的开发变得更容易一些。</p>
+
+<blockquote>
+<p>本指南中的工具<strong>仅用于开发环境</strong>，请<strong>不要</strong>在生产环境中使用它们！</p>
+</blockquote>
+
+<h2>使用 source map</h2>
+
+<p>当 webpack 打包源代码时，可能会很难追踪到错误和警告在源代码中的原始位置。例如，如果将三个源文件（<code>a.js</code>,&nbsp;<code>b.js</code>&nbsp;和&nbsp;<code>c.js</code>）打包到一个 bundle（<code>bundle.js</code>）中，而其中一个源文件包含一个错误，那么堆栈跟踪就会简单地指向到&nbsp;<code>bundle.js</code>。这并通常没有太多帮助，因为你可能需要准确地知道错误来自于哪个源文件。</p>
+
+<p>为了更容易地追踪错误和警告，JavaScript 提供了&nbsp;<a href="http://blog.teamtreehouse.com/introduction-source-maps">source map</a>&nbsp;功能，将编译后的代码映射回原始源代码。如果一个错误来自于&nbsp;<code>b.js</code>，source map 就会明确的告诉你。</p>
+
+<p>source map 有很多<a href="https://www.webpackjs.com/configuration/devtool">不同的选项</a>可用，请务必仔细阅读它们，以便可以根据需要进行配置。</p>
+
+<p>对于本指南，我们使用&nbsp;<code>inline-source-map</code>&nbsp;选项，这有助于解释说明我们的目的（仅解释说明，不要用于生产环境）：</p>
+
+<p><strong>webpack.config.js</strong></p>
+
+<pre>
+<code>  const path = require(&#39;path&#39;);
+  const HtmlWebpackPlugin = require(&#39;html-webpack-plugin&#39;);
+  const CleanWebpackPlugin = require(&#39;clean-webpack-plugin&#39;);
+
+  module.exports = {
+    entry: {
+      app: &#39;./src/index.js&#39;,
+      print: &#39;./src/print.js&#39;
+    },
++   devtool: &#39;inline-source-map&#39;,
+    plugins: [
+      new CleanWebpackPlugin([&#39;dist&#39;]),
+      new HtmlWebpackPlugin({
+        title: &#39;Development&#39;
+      })
+    ],
+    output: {
+      filename: &#39;[name].bundle.js&#39;,
+      path: path.resolve(__dirname, &#39;dist&#39;)
+    }
+  };
+</code></pre>
+
+<p>现在，让我们来做一些调试，在&nbsp;<code>print.js</code>&nbsp;文件中生成一个错误：</p>
+
+<p><strong>src/print.js</strong></p>
+
+<pre>
+<code>  export default function printMe() {
+-   console.log(&#39;I get called from print.js!&#39;);
++   cosnole.error(&#39;I get called from print.js!&#39;);
+  }
+</code></pre>
+
+<p>运行&nbsp;<code>npm run build</code>，就会编译为如下：</p>
+
+<pre>
+<code>Hash: 7bf68ca15f1f2690e2d1
+Version: webpack 3.1.0
+Time: 1224ms
+          Asset       Size  Chunks                    Chunk Names
+  app.bundle.js    1.44 MB    0, 1  [emitted]  [big]  app
+print.bundle.js    6.43 kB       1  [emitted]         print
+     index.html  248 bytes          [emitted]
+   [0] ./src/print.js 84 bytes {0} {1} [built]
+   [1] ./src/index.js 403 bytes {0} [built]
+   [3] (webpack)/buildin/global.js 509 bytes {0} [built]
+   [4] (webpack)/buildin/module.js 517 bytes {0} [built]
+    + 1 hidden module
+Child html-webpack-plugin for &quot;index.html&quot;:
+       [2] (webpack)/buildin/global.js 509 bytes {0} [built]
+       [3] (webpack)/buildin/module.js 517 bytes {0} [built]
+        + 2 hidden modules
+</code></pre>
+
+<p>现在在浏览器打开最终生成的&nbsp;<code>index.html</code>&nbsp;文件，点击按钮，并且在控制台查看显示的错误。错误应该如下：</p>
+
+<pre>
+<code> Uncaught ReferenceError: cosnole is not defined
+    at HTMLButtonElement.printMe (print.js:2)
+</code></pre>
+
+<p>我们可以看到，此错误包含有发生错误的文件（<code>print.js</code>）和行号（2）的引用。这是非常有帮助的，因为现在我们知道了，所要解决的问题的确切位置。</p>
+
+<h2>选择一个开发工具</h2>
+
+<blockquote>
+<p>一些文本编辑器具有&ldquo;安全写入&rdquo;功能，可能会干扰以下某些工具。阅读<a href="https://www.webpackjs.com/guides/development/#adjusting-your-text-editor">调整文本编辑器</a>以解决这些问题。</p>
+</blockquote>
+
+<p>每次要编译代码时，手动运行&nbsp;<code>npm run build</code>&nbsp;就会变得很麻烦。</p>
+
+<p>webpack 中有几个不同的选项，可以帮助你在代码发生变化后自动编译代码：</p>
+
+<ol start="undefined">
+	<li>webpack&#39;s Watch Mode</li>
+	<li>webpack-dev-server</li>
+	<li>webpack-dev-middleware</li>
+</ol>
+
+<p>多数场景中，你可能需要使用&nbsp;<code>webpack-dev-server</code>，但是不妨探讨一下以上的所有选项。</p>
+
+<h3>使用观察模式</h3>
+
+<p>你可以指示 webpack &quot;watch&quot; 依赖图中的所有文件以进行更改。如果其中一个文件被更新，代码将被重新编译，所以你不必手动运行整个构建。</p>
+
+<p>我们添加一个用于启动 webpack 的观察模式的 npm script 脚本：</p>
+
+<p><strong>package.json</strong></p>
+
+<pre>
+<code>  {
+    &quot;name&quot;: &quot;development&quot;,
+    &quot;version&quot;: &quot;1.0.0&quot;,
+    &quot;description&quot;: &quot;&quot;,
+    &quot;main&quot;: &quot;webpack.config.js&quot;,
+    &quot;scripts&quot;: {
+      &quot;test&quot;: &quot;echo \&quot;Error: no test specified\&quot; &amp;&amp; exit 1&quot;,
++     &quot;watch&quot;: &quot;webpack --watch&quot;,
+      &quot;build&quot;: &quot;webpack&quot;
+    },
+    &quot;keywords&quot;: [],
+    &quot;author&quot;: &quot;&quot;,
+    &quot;license&quot;: &quot;ISC&quot;,
+    &quot;devDependencies&quot;: {
+      &quot;clean-webpack-plugin&quot;: &quot;^0.1.16&quot;,
+      &quot;css-loader&quot;: &quot;^0.28.4&quot;,
+      &quot;csv-loader&quot;: &quot;^2.1.1&quot;,
+      &quot;file-loader&quot;: &quot;^0.11.2&quot;,
+      &quot;html-webpack-plugin&quot;: &quot;^2.29.0&quot;,
+      &quot;style-loader&quot;: &quot;^0.18.2&quot;,
+      &quot;webpack&quot;: &quot;^3.0.0&quot;,
+      &quot;xml-loader&quot;: &quot;^1.2.1&quot;
+    }
+  }
+</code></pre>
+
+<p>现在，你可以在命令行中运行&nbsp;<code>npm run watch</code>，就会看到 webpack 编译代码，然而却不会退出命令行。这是因为 script 脚本还在观察文件。</p>
+
+<p>现在，webpack 观察文件的同时，我们先移除我们之前引入的错误：</p>
+
+<p><strong>src/print.js</strong></p>
+
+<pre>
+<code>  export default function printMe() {
+-   cosnole.log(&#39;I get called from print.js!&#39;);
++   console.log(&#39;I get called from print.js!&#39;);
+  }
+</code></pre>
+
+<p>现在,保存文件并检查终端窗口。应该可以看到 webpack 自动重新编译修改后的模块！</p>
+
+<p>唯一的缺点是，为了看到修改后的实际效果，你需要刷新浏览器。如果能够自动刷新浏览器就更好了，可以尝试使用&nbsp;<code>webpack-dev-server</code>，恰好可以实现我们想要的功能。</p>
+
+<h3>使用 webpack-dev-server</h3>
+
+<p><code>webpack-dev-server</code>&nbsp;为你提供了一个简单的 web 服务器，并且能够实时重新加载(live reloading)。让我们设置以下：</p>
+
+<pre>
+<code>npm install --save-dev webpack-dev-server
+</code></pre>
+
+<p>修改配置文件，告诉开发服务器(dev server)，在哪里查找文件：</p>
+
+<p><strong>webpack.config.js</strong></p>
+
+<pre>
+<code>  const path = require(&#39;path&#39;);
+  const HtmlWebpackPlugin = require(&#39;html-webpack-plugin&#39;);
+  const CleanWebpackPlugin = require(&#39;clean-webpack-plugin&#39;);
+
+  module.exports = {
+    entry: {
+      app: &#39;./src/index.js&#39;,
+      print: &#39;./src/print.js&#39;
+    },
+    devtool: &#39;inline-source-map&#39;,
++   devServer: {
++     contentBase: &#39;./dist&#39;
++   },
+    plugins: [
+      new CleanWebpackPlugin([&#39;dist&#39;]),
+      new HtmlWebpackPlugin({
+        title: &#39;Development&#39;
+      })
+    ],
+    output: {
+      filename: &#39;[name].bundle.js&#39;,
+      path: path.resolve(__dirname, &#39;dist&#39;)
+    }
+  };
+</code></pre>
+
+<p>以上配置告知&nbsp;<code>webpack-dev-server</code>，在&nbsp;<code>localhost:8080</code>&nbsp;下建立服务，将&nbsp;<code>dist</code>&nbsp;目录下的文件，作为可访问文件。</p>
+
+<p>让我们添加一个 script 脚本，可以直接运行开发服务器(dev server)：</p>
+
+<p><strong>package.json</strong></p>
+
+<pre>
+<code>  {
+    &quot;name&quot;: &quot;development&quot;,
+    &quot;version&quot;: &quot;1.0.0&quot;,
+    &quot;description&quot;: &quot;&quot;,
+    &quot;main&quot;: &quot;webpack.config.js&quot;,
+    &quot;scripts&quot;: {
+      &quot;test&quot;: &quot;echo \&quot;Error: no test specified\&quot; &amp;&amp; exit 1&quot;,
+      &quot;watch&quot;: &quot;webpack --watch&quot;,
++     &quot;start&quot;: &quot;webpack-dev-server --open&quot;,
+      &quot;build&quot;: &quot;webpack&quot;
+    },
+    &quot;keywords&quot;: [],
+    &quot;author&quot;: &quot;&quot;,
+    &quot;license&quot;: &quot;ISC&quot;,
+    &quot;devDependencies&quot;: {
+      &quot;clean-webpack-plugin&quot;: &quot;^0.1.16&quot;,
+      &quot;css-loader&quot;: &quot;^0.28.4&quot;,
+      &quot;csv-loader&quot;: &quot;^2.1.1&quot;,
+      &quot;file-loader&quot;: &quot;^0.11.2&quot;,
+      &quot;html-webpack-plugin&quot;: &quot;^2.29.0&quot;,
+      &quot;style-loader&quot;: &quot;^0.18.2&quot;,
+      &quot;webpack&quot;: &quot;^3.0.0&quot;,
+      &quot;xml-loader&quot;: &quot;^1.2.1&quot;
+    }
+  }
+</code></pre>
+
+<p>现在，我们可以在命令行中运行&nbsp;<code>npm start</code>，就会看到浏览器自动加载页面。如果现在修改和保存任意源文件，web 服务器就会自动重新加载编译后的代码。试一下！</p>
+
+<p><code>webpack-dev-server</code>&nbsp;带有许多可配置的选项。转到<a href="https://www.webpackjs.com/configuration/dev-server">相关文档</a>以了解更多。</p>
+
+<blockquote>
+<p>现在，服务器正在运行，你可能需要尝试<a href="https://www.webpackjs.com/guides/hot-module-replacement">模块热替换(Hot Module Replacement)</a>！</p>
+</blockquote>
+
+<h3>使用 webpack-dev-middleware</h3>
+
+<p><code>webpack-dev-middleware</code>&nbsp;是一个容器(wrapper)，它可以把 webpack 处理后的文件传递给一个服务器(server)。&nbsp;<code>webpack-dev-server</code>&nbsp;在内部使用了它，同时，它也可以作为一个单独的包来使用，以便进行更多自定义设置来实现更多的需求。接下来是一个 webpack-dev-middleware 配合 express server 的示例。</p>
+
+<p>首先，安装&nbsp;<code>express</code>&nbsp;和&nbsp;<code>webpack-dev-middleware</code>：</p>
+
+<pre>
+<code>npm install --save-dev express webpack-dev-middleware
+</code></pre>
+
+<p>接下来我们需要对 webpack 的配置文件做一些调整，以确保中间件(middleware)功能能够正确启用：</p>
+
+<p><strong>webpack.config.js</strong></p>
+
+<pre>
+<code>  const path = require(&#39;path&#39;);
+  const HtmlWebpackPlugin = require(&#39;html-webpack-plugin&#39;);
+  const CleanWebpackPlugin = require(&#39;clean-webpack-plugin&#39;);
+
+  module.exports = {
+    entry: {
+      app: &#39;./src/index.js&#39;,
+      print: &#39;./src/print.js&#39;
+    },
+    devtool: &#39;inline-source-map&#39;,
+    plugins: [
+      new CleanWebpackPlugin([&#39;dist&#39;]),
+      new HtmlWebpackPlugin({
+        title: &#39;Output Management&#39;
+      })
+    ],
+    output: {
+      filename: &#39;[name].bundle.js&#39;,
+      path: path.resolve(__dirname, &#39;dist&#39;),
++     publicPath: &#39;/&#39;
+    }
+  };
+</code></pre>
+
+<p><code>publicPath</code>&nbsp;也会在服务器脚本用到，以确保文件资源能够在&nbsp;<code>http://localhost:3000</code>&nbsp;下正确访问，我们稍后再设置端口号。下一步就是设置我们自定义的&nbsp;<code>express</code>&nbsp;服务：</p>
+
+<p><strong>project</strong></p>
+
+<pre>
+<code>  webpack-demo
+  |- package.json
+  |- webpack.config.js
++ |- server.js
+  |- /dist
+  |- /src
+    |- index.js
+    |- print.js
+  |- /node_modules
+</code></pre>
+
+<p><strong>server.js</strong></p>
+
+<pre>
+<code>const express = require(&#39;express&#39;);
+const webpack = require(&#39;webpack&#39;);
+const webpackDevMiddleware = require(&#39;webpack-dev-middleware&#39;);
+
+const app = express();
+const config = require(&#39;./webpack.config.js&#39;);
+const compiler = webpack(config);
+
+// Tell express to use the webpack-dev-middleware and use the webpack.config.js
+// configuration file as a base.
+app.use(webpackDevMiddleware(compiler, {
+  publicPath: config.output.publicPath
+}));
+
+// Serve the files on port 3000.
+app.listen(3000, function () {
+  console.log(&#39;Example app listening on port 3000!\n&#39;);
+});
+</code></pre>
+
+<p>现在，添加一个 npm script，以使我们更方便地运行服务：</p>
+
+<p><strong>package.json</strong></p>
+
+<pre>
+<code>  {
+    &quot;name&quot;: &quot;development&quot;,
+    &quot;version&quot;: &quot;1.0.0&quot;,
+    &quot;description&quot;: &quot;&quot;,
+    &quot;main&quot;: &quot;webpack.config.js&quot;,
+    &quot;scripts&quot;: {
+      &quot;test&quot;: &quot;echo \&quot;Error: no test specified\&quot; &amp;&amp; exit 1&quot;,
+      &quot;watch&quot;: &quot;webpack --watch&quot;,
+      &quot;start&quot;: &quot;webpack-dev-server --open&quot;,
++     &quot;server&quot;: &quot;node server.js&quot;,
+      &quot;build&quot;: &quot;webpack&quot;
+    },
+    &quot;keywords&quot;: [],
+    &quot;author&quot;: &quot;&quot;,
+    &quot;license&quot;: &quot;ISC&quot;,
+    &quot;devDependencies&quot;: {
+      &quot;clean-webpack-plugin&quot;: &quot;^0.1.16&quot;,
+      &quot;css-loader&quot;: &quot;^0.28.4&quot;,
+      &quot;csv-loader&quot;: &quot;^2.1.1&quot;,
+      &quot;express&quot;: &quot;^4.15.3&quot;,
+      &quot;file-loader&quot;: &quot;^0.11.2&quot;,
+      &quot;html-webpack-plugin&quot;: &quot;^2.29.0&quot;,
+      &quot;style-loader&quot;: &quot;^0.18.2&quot;,
+      &quot;webpack&quot;: &quot;^3.0.0&quot;,
+      &quot;webpack-dev-middleware&quot;: &quot;^1.12.0&quot;,
+      &quot;xml-loader&quot;: &quot;^1.2.1&quot;
+    }
+  }
+</code></pre>
+
+<p>现在，在你的终端执行&nbsp;<code>npm run server</code>，将会有类似如下信息输出：</p>
+
+<pre>
+<code>Example app listening on port 3000!
+webpack built 27b137af6d9d8668c373 in 1198ms
+Hash: 27b137af6d9d8668c373
+Version: webpack 3.0.0
+Time: 1198ms
+          Asset       Size  Chunks                    Chunk Names
+  app.bundle.js    1.44 MB    0, 1  [emitted]  [big]  app
+print.bundle.js    6.57 kB       1  [emitted]         print
+     index.html  306 bytes          [emitted]
+   [0] ./src/print.js 116 bytes {0} {1} [built]
+   [1] ./src/index.js 403 bytes {0} [built]
+   [2] ./node_modules/lodash/lodash.js 540 kB {0} [built]
+   [3] (webpack)/buildin/global.js 509 bytes {0} [built]
+   [4] (webpack)/buildin/module.js 517 bytes {0} [built]
+Child html-webpack-plugin for &quot;index.html&quot;:
+         Asset    Size  Chunks  Chunk Names
+    index.html  544 kB       0
+       [0] ./node_modules/html-webpack-plugin/lib/loader.js!./node_modules/html-webpack-plugin/default_index.ejs 538 bytes {0} [built]
+       [1] ./node_modules/lodash/lodash.js 540 kB {0} [built]
+       [2] (webpack)/buildin/global.js 509 bytes {0} [built]
+       [3] (webpack)/buildin/module.js 517 bytes {0} [built]
+webpack: Compiled successfully.
+</code></pre>
+
+<p>现在，打开浏览器，跳转到&nbsp;<code>http://localhost:3000</code>，你应该看到你的webpack 应用程序已经运行！</p>
+
+<blockquote>
+<p>如果想要了解更多关于模块热替换(Hot Module Replacement)的机制，我们推荐你查看<a href="https://www.webpackjs.com/guides/hot-module-replacement/">模块热替换(Hot Module Replacement)</a>指南。</p>
+</blockquote>
+
+<h2>调整文本编辑器</h2>
+
+<p>使用自动编译代码时，可能会在保存文件时遇到一些问题。某些编辑器具有&ldquo;安全写入&rdquo;功能，可能会影响重新编译。</p>
+
+<p>要在一些常见的编辑器中禁用此功能，请查看以下列表：</p>
+
+<ul>
+	<li><strong>Sublime Text 3</strong>&nbsp;- 在用户首选项(user preferences)中添加&nbsp;<code>atomic_save: &quot;false&quot;</code>。</li>
+	<li><strong>IntelliJ</strong>&nbsp;- 在首选项(preferences)中使用搜索，查找到 &quot;safe write&quot; 并且禁用它。</li>
+	<li><strong>Vim</strong>&nbsp;- 在设置(settings)中增加&nbsp;<code>:set backupcopy=yes</code>。</li>
+	<li><strong>WebStorm</strong>&nbsp;- 在&nbsp;<code>Preferences &gt; Appearance &amp; Behavior &gt; System Settings</code>&nbsp;中取消选中 Use&nbsp;<code>&quot;safe write&quot;</code>。</li>
+</ul>
+
+<h2>结论</h2>
+
+<p>现在，你已经学会了如何自动编译代码，并运行一个简单的开发服务器(development server)，你可以查看下一个指南，其中将介绍&nbsp;<a href="https://www.webpackjs.com/guides/hot-module-replacement">模块热替换(Hot Module Replacement)</a>。</p>

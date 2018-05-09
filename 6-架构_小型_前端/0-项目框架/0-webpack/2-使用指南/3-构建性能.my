@@ -1,0 +1,189 @@
+<h1>构建性能</h1>
+
+<p>本指南包含一些改进构建/编译性能的实用技巧。</p>
+
+<hr />
+<h2>常规</h2>
+
+<p>无论你正在&nbsp;<a href="https://www.webpackjs.com/guides/development">development</a>&nbsp;或构建&nbsp;<a href="https://www.webpackjs.com/guides/production">production</a>，以下做法应该帮助到你达到最佳。</p>
+
+<h3>保持版本最新</h3>
+
+<p>使用最新的 webpack 版本。我们会经常进行性能优化。 webpack 的最新稳定版本是：</p>
+
+<p><a href="https://github.com/webpack/webpack/releases"><img alt="latest webpack version" src="https://img.shields.io/npm/v/webpack.svg?label=webpack&amp;style=flat-square&amp;maxAge=3600" /></a></p>
+
+<p>保持最新的&nbsp;<strong>Node.js</strong>&nbsp;也能够保证性能。除此之外，保证你的包管理工具 (例如&nbsp;<code>npm</code>&nbsp;或者&nbsp;<code>yarn</code>&nbsp;) 为最新也能保证性能。较新的版本能够建立更高效的模块树以及提高解析速度。</p>
+
+<h3>Loaders</h3>
+
+<p>将 loaders 应用于最少数的必要模块中。而不是:</p>
+
+<pre>
+<code>{
+  test: /\.js$/,
+  loader: &quot;babel-loader&quot;
+}
+</code></pre>
+
+<p>使用&nbsp;<code>include</code>&nbsp;字段仅将 loader 模块应用在实际需要用其转换的位置中：</p>
+
+<pre>
+<code>{
+  test: /\.js$/,
+  include: path.resolve(__dirname, &quot;src&quot;),
+  loader: &quot;babel-loader&quot;
+}
+</code></pre>
+
+<h3>Bootstrap</h3>
+
+<p>每个额外的 loader/plugin 都有启动时间。尽量少使用不同的工具。</p>
+
+<h3>解析</h3>
+
+<p>以下几步可以提供解析速度:</p>
+
+<ul>
+	<li>尽量减少&nbsp;<code>resolve.modules</code>,&nbsp;<code>resolve.extensions</code>,&nbsp;<code>resolve.mainFiles</code>,&nbsp;<code>resolve.descriptionFiles</code>中类目的数量，因为他们会增加文件系统调用的次数。</li>
+	<li>如果你不使用 symlinks ，可以设置&nbsp;<code>resolve.symlinks: false</code>&nbsp;(例如&nbsp;<code>npm link</code>&nbsp;或者&nbsp;<code>yarn link</code>).</li>
+	<li>如果你使用自定义解析 plugins ，并且没有指定 context 信息，可以设置&nbsp;<code>resolve.cacheWithContext: false</code>&nbsp;。</li>
+</ul>
+
+<h3>Dlls</h3>
+
+<p>使用&nbsp;<code>DllPlugin</code>&nbsp;将更改不频繁的代码进行单独编译。这将改善引用程序的编译速度，即使它增加了构建过程的复杂性。</p>
+
+<h3>Smaller = Faster</h3>
+
+<p>减少编译的整体大小，以提高构建性能。尽量保持 chunks 小巧。</p>
+
+<ul>
+	<li>使用 更少/更小 的库。</li>
+	<li>在多页面应用程序中使用&nbsp;<code>CommonsChunksPlugin</code>。</li>
+	<li>在多页面应用程序中以&nbsp;<code>async</code>&nbsp;模式使用&nbsp;<code>CommonsChunksPlugin</code>&nbsp;。</li>
+	<li>移除不使用的代码。</li>
+	<li>只编译你当前正在开发部分的代码。</li>
+</ul>
+
+<h3>Worker Pool</h3>
+
+<p><code>thread-loader</code>&nbsp;可以将非常消耗资源的 loaders 转存到 worker pool 中。</p>
+
+<blockquote>
+<p>不要使用太多的 workers ，因为 Node.js 的 runtime 和 loader 有一定的启动开销。最小化 workers 和主进程间的模块传输。进程间通讯(IPC)是非常消耗资源的。</p>
+</blockquote>
+
+<h3>持久化缓存</h3>
+
+<p>使用&nbsp;<code>cache-loader</code>&nbsp;启用持久化缓存。使用&nbsp;<code>package.json</code>&nbsp;中的&nbsp;<code>&quot;postinstall&quot;</code>&nbsp;清除缓存目录。</p>
+
+<h3>自定义 plugins/loaders</h3>
+
+<p>这里不对它们配置的性能问题作过多赘述。</p>
+
+<hr />
+<h2>Development</h2>
+
+<p>下面步骤对于&nbsp;<em>development</em>&nbsp;特别有用。</p>
+
+<h3>增量编译</h3>
+
+<p>使用 webpack 的监听模式。不要使用其他工具来监听你的文件和调用 webpack 。在监听模式下构建会记录时间戳并将信息传递给编译让缓存失效。</p>
+
+<p>在某些设置中，监听会回退到轮询模式。有许多监听文件会导致 CPU 大量负载。在这些情况下，你可以使用&nbsp;<code>watchOptions.poll</code>&nbsp;来增加轮询的间隔。</p>
+
+<h3>在内存中编译</h3>
+
+<p>以下几个实用工具通过在内存中进行代码的编译和资源的提供，但并不写入磁盘来提高性能:</p>
+
+<ul>
+	<li><code>webpack-dev-server</code></li>
+	<li><code>webpack-hot-middleware</code></li>
+	<li><code>webpack-dev-middleware</code></li>
+</ul>
+
+<h3>Devtool</h3>
+
+<p>需要注意的是不同的&nbsp;<code>devtool</code>&nbsp;的设置，会导致不同的性能差异。</p>
+
+<ul>
+	<li><code>&quot;eval&quot;</code>&nbsp;具有最好的性能，但并不能帮助你转译代码。</li>
+	<li>如果你能接受稍差一些的 mapping 质量，可以使用&nbsp;<code>cheap-source-map</code>&nbsp;选项来提高性能</li>
+	<li>使用&nbsp;<code>eval-source-map</code>&nbsp;配置进行增量编译。</li>
+</ul>
+
+<p>=&gt; 在大多数情况下，<code>cheap-module-eval-source-map</code>&nbsp;是最好的选择。</p>
+
+<h3>避免在生产环境下才会用到的工具</h3>
+
+<p>某些实用工具， plugins 和 loaders 都只能在构建生产环境时才有用。例如，在开发时使用&nbsp;<code>UglifyJsPlugin</code>&nbsp;来压缩和修改代码是没有意义的。以下这些工具在开发中通常被排除在外:</p>
+
+<ul>
+	<li><code>UglifyJsPlugin</code></li>
+	<li><code>ExtractTextPlugin</code></li>
+	<li><code>[hash]</code>/<code>[chunkhash]</code></li>
+	<li><code>AggressiveSplittingPlugin</code></li>
+	<li><code>AggressiveMergingPlugin</code></li>
+	<li><code>ModuleConcatenationPlugin</code></li>
+</ul>
+
+<h3>最小化入口 chunk</h3>
+
+<p>webpack 只会在文件系统中生成已经更新的 chunk 。对于某些配置选项(HMR,&nbsp;<code>[name]</code>/<code>[chunkhash]</code>&nbsp;in&nbsp;<code>output.chunkFilename</code>,&nbsp;<code>[hash]</code>)来说，除了更新的 chunks 无效之外，入口 chunk 也不会生效。</p>
+
+<p>应当在生成入口 chunk 时，尽量减少入口 chunk 的体积，以提高性能。下述代码块将只提取包含 runtime 的 chunk ，<em>其他 chunk 都作为子模块</em>:</p>
+
+<pre>
+<code>new CommonsChunkPlugin({
+  name: &quot;manifest&quot;,
+  minChunks: Infinity
+})
+</code></pre>
+
+<hr />
+<h2>Production</h2>
+
+<p>以下步骤在&nbsp;<em>production</em>&nbsp;中非常有用。</p>
+
+<blockquote>
+<p><strong>不要为了非常小的性能增益，牺牲你应用程序的质量！</strong>&nbsp;请注意，优化代码质量在大多数情况下比构建性能更重要。</p>
+</blockquote>
+
+<h3>多个编译时</h3>
+
+<p>当进行多个编译时，以下工具可以帮助到你:</p>
+
+<ul>
+	<li><a href="https://github.com/trivago/parallel-webpack"><code>parallel-webpack</code></a>: 它允许编译工作在 worker 池中进行。</li>
+	<li><code>cache-loader</code>: 缓存可以在多个编译时之间共享。</li>
+</ul>
+
+<h3>Source Maps</h3>
+
+<p>Source maps 真的很消耗资源。你真的需要他们？</p>
+
+<hr />
+<h2>工具相关问题</h2>
+
+<p>下列工具存在某些可能会降低构建性能的问题。</p>
+
+<h3>Babel</h3>
+
+<ul>
+	<li>项目中的 preset/plugins 数量最小化。</li>
+</ul>
+
+<h3>TypeScript</h3>
+
+<ul>
+	<li>在单独的进程中使用&nbsp;<code>fork-ts-checker-webpack-plugin</code>&nbsp;进行类型检查。</li>
+	<li>配置 loaders 跳过类型检查。</li>
+	<li>使用&nbsp;<code>ts-loader</code>&nbsp;时，设置&nbsp;<code>happyPackMode: true</code>&nbsp;/&nbsp;<code>transpileOnly: true</code>。</li>
+</ul>
+
+<h3>Sass</h3>
+
+<ul>
+	<li><code>node-sass</code>&nbsp;中有个来自 Node.js 线程池的阻塞线程的 bug。 当使用&nbsp;<code>thread-loader</code>&nbsp;时，需要设置&nbsp;<code>workerParallelJobs: 2</code>。</li>
+</ul>

@@ -1,0 +1,320 @@
+<h1>创建 Library</h1>
+
+<p><a href="https://github.com/webpack-china/webpack.js.org/edit/cn/src/content/guides/author-libraries.md">编辑此页</a></p>
+
+<p>除了打包应用程序代码，webpack 还可以用于打包 JavaScript library。以下指南适用于希望流水线化(streamline)打包策略的 library 作者。</p>
+
+<h2>创建一个 library</h2>
+
+<p>假设你正在编写一个名为&nbsp;<code>webpack-numbers</code>&nbsp;的小的 library，可以将数字 1 到 5 转换为文本表示，反之亦然，例如将 2 转换为 &#39;two&#39;。</p>
+
+<p>基本的项目结构可能如下所示：</p>
+
+<p><strong>project</strong></p>
+
+<pre>
+<code>+  |- webpack.config.js
++  |- package.json
++  |- /src
++    |- index.js
++    |- ref.json
+</code></pre>
+
+<p>初始化 npm，安装 webpack 和 lodash：</p>
+
+<pre>
+<code>npm init -y
+npm install --save-dev webpack lodash
+</code></pre>
+
+<p><strong>src/ref.json</strong></p>
+
+<pre>
+<code>[{
+  &quot;num&quot;: 1,
+  &quot;word&quot;: &quot;One&quot;
+}, {
+  &quot;num&quot;: 2,
+  &quot;word&quot;: &quot;Two&quot;
+}, {
+  &quot;num&quot;: 3,
+  &quot;word&quot;: &quot;Three&quot;
+}, {
+  &quot;num&quot;: 4,
+  &quot;word&quot;: &quot;Four&quot;
+}, {
+  &quot;num&quot;: 5,
+  &quot;word&quot;: &quot;Five&quot;
+}, {
+  &quot;num&quot;: 0,
+  &quot;word&quot;: &quot;Zero&quot;
+}]
+</code></pre>
+
+<p><strong>src/index.js</strong></p>
+
+<pre>
+<code>import _ from &#39;lodash&#39;;
+import numRef from &#39;./ref.json&#39;;
+
+export function numToWord(num) {
+  return _.reduce(numRef, (accum, ref) =&gt; {
+    return ref.num === num ? ref.word : accum;
+  }, &#39;&#39;);
+};
+
+export function wordToNum(word) {
+  return _.reduce(numRef, (accum, ref) =&gt; {
+    return ref.word === word &amp;&amp; word.toLowerCase() ? ref.num : accum;
+  }, -1);
+};
+</code></pre>
+
+<p>该 library 的使用方式如下：</p>
+
+<pre>
+<code>// ES2015 模块引入
+import * as webpackNumbers from &#39;webpack-numbers&#39;;
+// CommonJS 模块引入
+var webpackNumbers = require(&#39;webpack-numbers&#39;);
+// ...
+// ES2015 和 CommonJS 模块调用
+webpackNumbers.wordToNum(&#39;Two&#39;);
+// ...
+// AMD 模块引入
+require([&#39;webpackNumbers&#39;], function ( webpackNumbers) {
+  // ...
+  // AMD 模块调用
+  webpackNumbers.wordToNum(&#39;Two&#39;);
+  // ...
+});
+</code></pre>
+
+<p>用户还可以通过 script 标签来加载和使用此 library：</p>
+
+<pre>
+<code>&lt;!doctype html&gt;
+&lt;html&gt;
+  ...
+  &lt;script src=&quot;https://unpkg.com/webpack-numbers&quot;&gt;&lt;/script&gt;
+  &lt;script&gt;
+    // ...
+    // 全局变量
+    webpackNumbers.wordToNum(&#39;Five&#39;)
+    // window 对象中的属性
+    window.webpackNumbers.wordToNum(&#39;Five&#39;)
+    // ...
+  &lt;/script&gt;
+&lt;/html&gt;
+</code></pre>
+
+<p>注意，我们还可以通过以下配置方式，将 library 暴露：</p>
+
+<ul>
+	<li>global 对象中的属性，用于 Node.js。</li>
+	<li><code>this</code>&nbsp;对象中的属性。</li>
+</ul>
+
+<p>完整的 library 配置和相关代码请参阅&nbsp;<a href="https://github.com/kalcifer/webpack-library-example">webpack library 示例</a>。</p>
+
+<h2>基本配置</h2>
+
+<p>现在，让我们以某种方式打包这个 library，能够实现以下几个目标：</p>
+
+<ul>
+	<li>不打包&nbsp;<code>lodash</code>，而是使用&nbsp;<code>externals</code>&nbsp;来 require 用户加载好的 lodash。</li>
+	<li>设置 library 的名称为&nbsp;<code>webpack-numbers</code>.</li>
+	<li>将 library 暴露为一个名为&nbsp;<code>webpackNumbers</code>的变量。</li>
+	<li>能够访问其他 Node.js 中的 library。</li>
+</ul>
+
+<p>此外，用户应该能够通过以下方式访问 library：</p>
+
+<ul>
+	<li>ES2015 模块。例如&nbsp;<code>import webpackNumbers from &#39;webpack-numbers&#39;</code>。</li>
+	<li>CommonJS 模块。例如&nbsp;<code>require(&#39;webpack-numbers&#39;)</code>.</li>
+	<li>全局变量，当通过&nbsp;<code>script</code>&nbsp;脚本引入时</li>
+</ul>
+
+<p>我们可以从这个基本的 webpack 配置开始：</p>
+
+<p><strong>webpack.config.js</strong></p>
+
+<pre>
+<code>var path = require(&#39;path&#39;);
+
+module.exports = {
+  entry: &#39;./src/index.js&#39;,
+  output: {
+    path: path.resolve(__dirname, &#39;dist&#39;),
+    filename: &#39;webpack-numbers.js&#39;
+  }
+};
+</code></pre>
+
+<h2>外部化 lodash</h2>
+
+<p>现在，如果执行&nbsp;<code>webpack</code>，你会发现创建了一个非常巨大的文件。如果你查看这个文件，会看到 lodash 也被打包到代码中。在这种场景中，我们更倾向于把&nbsp;<code>lodash</code>&nbsp;当作&nbsp;<code>peerDependency</code>。也就是说，用户应该已经将&nbsp;<code>lodash</code>&nbsp;安装好。因此，你可以放弃对外部 library 的控制，而是将控制权让给使用 library 的用户。</p>
+
+<p>这可以使用&nbsp;<code>externals</code>&nbsp;配置来完成：</p>
+
+<p><strong>webpack.config.js</strong></p>
+
+<pre>
+<code>  var path = require(&#39;path&#39;);
+
+  module.exports = {
+    entry: &#39;./src/index.js&#39;,
+    output: {
+      path: path.resolve(__dirname, &#39;dist&#39;),
+      filename: &#39;webpack-numbers.js&#39;
+-   }
++   },
++   externals: {
++     lodash: {
++       commonjs: &#39;lodash&#39;,
++       commonjs2: &#39;lodash&#39;,
++       amd: &#39;lodash&#39;,
++       root: &#39;_&#39;
++     }
++   }
+  };
+</code></pre>
+
+<p>这意味着你的 library 需要一个名为&nbsp;<code>lodash</code>&nbsp;的依赖，这个依赖在用户的环境中必须存在且可用。</p>
+
+<blockquote>
+<p>注意，如果你计划只是将 library 用作另一个 webpack bundle 中的依赖模块，则可以将&nbsp;<code>externals</code>&nbsp;指定为数组。</p>
+</blockquote>
+
+<h2>外部扩展的限制</h2>
+
+<p>对于从一个依赖目录中，调用多个文件的 library：</p>
+
+<pre>
+<code>import A from &#39;library/one&#39;;
+import B from &#39;library/two&#39;;
+
+// ...
+</code></pre>
+
+<p>无法通过在 externals 中指定&nbsp;<code>library</code>&nbsp;目录的方式，将它们从 bundle 中排除。你需要逐个排除它们，或者使用正则表达式排除。</p>
+
+<pre>
+<code>externals: [
+  &#39;library/one&#39;,
+  &#39;library/two&#39;,
+  // Everything that starts with &quot;library/&quot;
+  /^library\/.+$/
+]
+</code></pre>
+
+<h2>暴露 library</h2>
+
+<p>对于用途广泛的 library，我们希望它能够兼容不同的环境，例如 CommonJS，AMD，Node.js 或者作为一个全局变量。为了让你的 library 能够在各种用户环境(consumption)中可用，需要在&nbsp;<code>output</code>&nbsp;中添加&nbsp;<code>library</code>&nbsp;属性：</p>
+
+<p><strong>webpack.config.js</strong></p>
+
+<pre>
+<code>  var path = require(&#39;path&#39;);
+
+  module.exports = {
+    entry: &#39;./src/index.js&#39;,
+    output: {
+      path: path.resolve(__dirname, &#39;dist&#39;),
+-     filename: &#39;webpack-numbers.js&#39;
++     filename: &#39;webpack-numbers.js&#39;,
++     library: &#39;webpackNumbers&#39;
+    },
+    externals: {
+      lodash: {
+        commonjs: &#39;lodash&#39;,
+        commonjs2: &#39;lodash&#39;,
+        amd: &#39;lodash&#39;,
+        root: &#39;_&#39;
+      }
+    }
+  };
+</code></pre>
+
+<blockquote>
+<p>注意，<code>library</code>&nbsp;设置绑定到&nbsp;<code>entry</code>&nbsp;配置。对于大多数库，指定一个入口起点就足够了。虽然<a href="https://github.com/webpack/webpack/tree/master/examples/multi-part-library">构建多个库</a>也是也可以的，然而还可以直接通过将<a href="https://stackoverflow.com/questions/34072598/es6-exporting-importing-in-index-file">主入口脚本(index script)</a>暴露部分导出，来作为单个入口起点则相对简单。<strong>不推荐</strong>使用<code>数组</code>作为库的&nbsp;<code>entry</code>。</p>
+</blockquote>
+
+<p>当你在 import 引入模块时，这可以将你的 library bundle 暴露为名为&nbsp;<code>webpackNumbers</code>&nbsp;的全局变量。为了让 library 和其他环境兼容，还需要在配置文件中添加&nbsp;<code>libraryTarget</code>&nbsp;属性。这是可以控制 library 如何以不同方式暴露的选项。</p>
+
+<p><strong>webpack.config.js</strong></p>
+
+<pre>
+<code>  var path = require(&#39;path&#39;);
+
+  module.exports = {
+    entry: &#39;./src/index.js&#39;,
+    output: {
+      path: path.resolve(__dirname, &#39;dist&#39;),
+      filename: &#39;webpack-numbers.js&#39;,
+-     library: &#39;webpackNumbers&#39;
++     library: &#39;webpackNumbers&#39;,
++     libraryTarget: &#39;umd&#39;
+    },
+    externals: {
+      lodash: {
+        commonjs: &#39;lodash&#39;,
+        commonjs2: &#39;lodash&#39;,
+        amd: &#39;lodash&#39;,
+        root: &#39;_&#39;
+      }
+    }
+  };
+</code></pre>
+
+<p>可以通过以下方式暴露 library：</p>
+
+<ul>
+	<li>遍历：作为一个全局变量，通过&nbsp;<code>script</code>&nbsp;标签来访问（<code>libraryTarget:&#39;var&#39;</code>）。</li>
+	<li>this：通过&nbsp;<code>this</code>&nbsp;对象访问（<code>libraryTarget:&#39;this&#39;</code>）。</li>
+	<li>window：通过&nbsp;<code>window</code>&nbsp;对象访问，在浏览器中（<code>libraryTarget:&#39;window&#39;</code>）。</li>
+	<li>UMD：在 AMD 或 CommonJS 的&nbsp;<code>require</code>&nbsp;之后可访问（<code>libraryTarget:&#39;umd&#39;</code>）。</li>
+</ul>
+
+<p>如果设置了&nbsp;<code>library</code>&nbsp;但没设置&nbsp;<code>libraryTarget</code>，则&nbsp;<code>libraryTarget</code>&nbsp;默认为&nbsp;<code>var</code>，详细说明请查看&nbsp;<a href="https://www.webpackjs.com/configuration/output">output 配置文档</a>。查看&nbsp;<a href="https://www.webpackjs.com/configuration/output#output-librarytarget"><code>output.libraryTarget</code></a>，以获取所有可用选项的详细列表。</p>
+
+<blockquote>
+<p>在 webpack 3.5.5 中，使用&nbsp;<code>libraryTarget: { root:&#39;_&#39; }</code>&nbsp;将无法正常工作（参考&nbsp;<a href="https://github.com/webpack/webpack/issues/4824">issue 4824</a>) 所述）。然而，可以设置&nbsp;<code>libraryTarget: { var: &#39;_&#39; }</code>&nbsp;来将 library 作为全局变量。</p>
+</blockquote>
+
+<h3>最终步骤</h3>
+
+<p>遵循<a href="https://www.webpackjs.com/guides/production">生产环境指南</a>中的步骤，来优化生产环境下的输出。那么，我们还需要通过设置&nbsp;<code>package.json</code>&nbsp;中的&nbsp;<code>main</code>字段，添加生成 bundle 的文件路径。</p>
+
+<p><strong>package.json</strong></p>
+
+<pre>
+<code>{
+  ...
+  &quot;main&quot;: &quot;dist/webpack-numbers.js&quot;,
+  ...
+}
+</code></pre>
+
+<p>或者，按照这里的<a href="https://github.com/dherman/defense-of-dot-js/blob/master/proposal.md#typical-usage">指南</a>添加为标准模块：</p>
+
+<pre>
+<code>{
+  ...
+  &quot;module&quot;: &quot;src/index.js&quot;,
+  ...
+}
+</code></pre>
+
+<p>键(key)&nbsp;<code>main</code>&nbsp;是指&nbsp;<a href="https://docs.npmjs.com/files/package.json#main"><code>package.json</code>&nbsp;标准</a>，以及&nbsp;<code>module</code>&nbsp;是&nbsp;<a href="https://github.com/dherman/defense-of-dot-js/blob/master/proposal.md">一个</a><a href="https://github.com/rollup/rollup/wiki/pkg.module">提案</a>，此提案允许 JavaScript 生态系统升级使用 ES2015 模块，而不会破坏向后兼容性。</p>
+
+<blockquote>
+<p><code>module</code>&nbsp;属性应指向一个使用 ES2015 模块语法的脚本，但不包括浏览器或 Node.js 尚不支持的其他语法特性。这使得 webpack 本身就可以解析模块语法，如果用户只用到 library 的某些部分，则允许通过&nbsp;<a href="https://webpack.js.org/guides/tree-shaking/">tree shaking</a>&nbsp;打包更轻量的包。</p>
+</blockquote>
+
+<p>现在你可以<a href="https://docs.npmjs.com/getting-started/publishing-npm-packages">将其发布为一个 npm 包</a>，并且在&nbsp;<a href="https://unpkg.com/#/">unpkg.com</a>&nbsp;找到它并分发给你的用户。</p>
+
+<blockquote>
+<p>为了暴露和 library 关联着的样式表，你应该使用&nbsp;<a href="https://www.webpackjs.com/plugins/extract-text-webpack-plugin"><code>ExtractTextPlugin</code></a>。然后，用户可以像使用其他样式表一样使用和加载这些样式表。</p>
+</blockquote>

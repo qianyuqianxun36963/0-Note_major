@@ -1,0 +1,290 @@
+<h1>代码分离</h1>
+
+<blockquote>
+<p>本指南继续沿用<a href="https://www.webpackjs.com/guides/getting-started">起步</a>和<a href="https://www.webpackjs.com/guides/output-management">管理输出</a>中的代码示例。。请确保你至少已熟悉其中提供的示例。</p>
+</blockquote>
+
+<p>代码分离是 webpack 中最引人注目的特性之一。此特性能够把代码分离到不同的 bundle 中，然后可以按需加载或并行加载这些文件。代码分离可以用于获取更小的 bundle，以及控制资源加载优先级，如果使用合理，会极大影响加载时间。</p>
+
+<p>有三种常用的代码分离方法：</p>
+
+<ul>
+	<li>入口起点：使用&nbsp;<a href="https://www.webpackjs.com/configuration/entry-context"><code>entry</code></a>&nbsp;配置手动地分离代码。</li>
+	<li>防止重复：使用&nbsp;<a href="https://www.webpackjs.com/plugins/commons-chunk-plugin"><code>CommonsChunkPlugin</code></a>&nbsp;去重和分离 chunk。</li>
+	<li>动态导入：通过模块的内联函数调用来分离代码。</li>
+</ul>
+
+<h2>入口起点(entry points)</h2>
+
+<p>这是迄今为止最简单、最直观的分离代码的方式。不过，这种方式手动配置较多，并有一些陷阱，我们将会解决这些问题。先来看看如何从 main bundle 中分离另一个模块：</p>
+
+<p><strong>project</strong></p>
+
+<pre>
+<code>webpack-demo
+|- package.json
+|- webpack.config.js
+|- /dist
+|- /src
+  |- index.js
++ |- another-module.js
+|- /node_modules
+</code></pre>
+
+<p><strong>another-module.js</strong></p>
+
+<pre>
+<code>import _ from &#39;lodash&#39;;
+
+console.log(
+  _.join([&#39;Another&#39;, &#39;module&#39;, &#39;loaded!&#39;], &#39; &#39;)
+);
+</code></pre>
+
+<p><strong>webpack.config.js</strong></p>
+
+<pre>
+<code>const path = require(&#39;path&#39;);
+const HTMLWebpackPlugin = require(&#39;html-webpack-plugin&#39;);
+
+module.exports = {
+  entry: {
+    index: &#39;./src/index.js&#39;,
+    another: &#39;./src/another-module.js&#39;
+  },
+  plugins: [
+    new HTMLWebpackPlugin({
+      title: &#39;Code Splitting&#39;
+    })
+  ],
+  output: {
+    filename: &#39;[name].bundle.js&#39;,
+    path: path.resolve(__dirname, &#39;dist&#39;)
+  }
+};
+</code></pre>
+
+<p>这将生成如下构建结果：</p>
+
+<pre>
+<code>Hash: 309402710a14167f42a8
+Version: webpack 2.6.1
+Time: 570ms
+            Asset    Size  Chunks                    Chunk Names
+  index.bundle.js  544 kB       0  [emitted]  [big]  index
+another.bundle.js  544 kB       1  [emitted]  [big]  another
+   [0] ./~/lodash/lodash.js 540 kB {0} {1} [built]
+   [1] (webpack)/buildin/global.js 509 bytes {0} {1} [built]
+   [2] (webpack)/buildin/module.js 517 bytes {0} {1} [built]
+   [3] ./src/another-module.js 87 bytes {1} [built]
+   [4] ./src/index.js 216 bytes {0} [built]
+</code></pre>
+
+<p>正如前面提到的，这种方法存在一些问题:</p>
+
+<ul>
+	<li>如果入口 chunks 之间包含重复的模块，那些重复模块都会被引入到各个 bundle 中。</li>
+	<li>这种方法不够灵活，并且不能将核心应用程序逻辑进行动态拆分代码。</li>
+</ul>
+
+<p>以上两点中，第一点对我们的示例来说无疑是个问题，因为之前我们在&nbsp;<code>./src/index.js</code>&nbsp;中也引入过&nbsp;<code>lodash</code>，这样就在两个 bundle 中造成重复引用。接着，我们通过使用&nbsp;<code>CommonsChunkPlugin</code>&nbsp;来移除重复的模块。</p>
+
+<h2>防止重复(prevent duplication)</h2>
+
+<p><a href="https://www.webpackjs.com/plugins/commons-chunk-plugin"><code>CommonsChunkPlugin</code></a>&nbsp;插件可以将公共的依赖模块提取到已有的入口 chunk 中，或者提取到一个新生成的 chunk。让我们使用这个插件，将之前的示例中重复的&nbsp;<code>lodash</code>&nbsp;模块去除：</p>
+
+<p><strong>webpack.config.js</strong></p>
+
+<pre>
+<code>  const path = require(&#39;path&#39;);
++ const webpack = require(&#39;webpack&#39;);
+  const HTMLWebpackPlugin = require(&#39;html-webpack-plugin&#39;);
+
+  module.exports = {
+    entry: {
+      index: &#39;./src/index.js&#39;,
+      another: &#39;./src/another-module.js&#39;
+    },
+    plugins: [
+      new HTMLWebpackPlugin({
+        title: &#39;Code Splitting&#39;
+-     })
++     }),
++     new webpack.optimize.CommonsChunkPlugin({
++       name: &#39;common&#39; // 指定公共 bundle 的名称。
++     })
+    ],
+    output: {
+      filename: &#39;[name].bundle.js&#39;,
+      path: path.resolve(__dirname, &#39;dist&#39;)
+    }
+  };
+</code></pre>
+
+<p>这里我们使用&nbsp;<a href="https://www.webpackjs.com/plugins/commons-chunk-plugin"><code>CommonsChunkPlugin</code></a>&nbsp;之后，现在应该可以看出，<code>index.bundle.js</code>&nbsp;中已经移除了重复的依赖模块。需要注意的是，CommonsChunkPlugin 插件将&nbsp;<code>lodash</code>&nbsp;分离到单独的 chunk，并且将其从 main bundle 中移除，减轻了大小。执行&nbsp;<code>npm run build</code>&nbsp;查看效果：</p>
+
+<pre>
+<code>Hash: 70a59f8d46ff12575481
+Version: webpack 2.6.1
+Time: 510ms
+            Asset       Size  Chunks                    Chunk Names
+  index.bundle.js  665 bytes       0  [emitted]         index
+another.bundle.js  537 bytes       1  [emitted]         another
+ common.bundle.js     547 kB       2  [emitted]  [big]  common
+   [0] ./~/lodash/lodash.js 540 kB {2} [built]
+   [1] (webpack)/buildin/global.js 509 bytes {2} [built]
+   [2] (webpack)/buildin/module.js 517 bytes {2} [built]
+   [3] ./src/another-module.js 87 bytes {1} [built]
+   [4] ./src/index.js 216 bytes {0} [built]
+</code></pre>
+
+<p>以下是由社区提供的，一些对于代码分离很有帮助的插件和 loaders：</p>
+
+<ul>
+	<li><a href="https://www.webpackjs.com/plugins/extract-text-webpack-plugin"><code>ExtractTextPlugin</code></a>: 用于将 CSS 从主应用程序中分离。</li>
+	<li><a href="https://www.webpackjs.com/loaders/bundle-loader"><code>bundle-loader</code></a>: 用于分离代码和延迟加载生成的 bundle。</li>
+	<li><a href="https://github.com/gaearon/promise-loader"><code>promise-loader</code></a>: 类似于&nbsp;<code>bundle-loader</code>&nbsp;，但是使用的是 promises。</li>
+</ul>
+
+<p><a href="https://www.webpackjs.com/plugins/commons-chunk-plugin"><code>CommonsChunkPlugin</code></a>&nbsp;插件还可以通过使用<a href="https://www.webpackjs.com/plugins/commons-chunk-plugin/#explicit-vendor-chunk">显式的 vendor chunks</a>&nbsp;功能，从应用程序代码中分离 vendor 模块。</p>
+
+<h2>动态导入(dynamic imports)</h2>
+
+<p>当涉及到动态代码拆分时，webpack 提供了两个类似的技术。对于动态导入，第一种，也是优先选择的方式是，使用符合&nbsp;<a href="https://github.com/tc39/proposal-dynamic-import">ECMAScript 提案</a>&nbsp;的&nbsp;<a href="https://www.webpackjs.com/api/module-methods#import-"><code>import()</code>&nbsp;语法</a>。第二种，则是使用 webpack 特定的&nbsp;<a href="https://www.webpackjs.com/api/module-methods#require-ensure"><code>require.ensure</code></a>。让我们先尝试使用第一种&hellip;&hellip;</p>
+
+<blockquote>
+<p><code>import()</code>&nbsp;调用会在内部用到&nbsp;<a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise">promises</a>。如果在旧有版本浏览器中使用&nbsp;<code>import()</code>，记得使用 一个 polyfill 库（例如&nbsp;<a href="https://github.com/stefanpenner/es6-promise">es6-promise</a>&nbsp;或&nbsp;<a href="https://github.com/taylorhakes/promise-polyfill">promise-polyfill</a>），来 shim&nbsp;<code>Promise</code>。</p>
+</blockquote>
+
+<p>在我们开始本节之前，先从配置中移除掉多余的&nbsp;<a href="https://www.webpackjs.com/concepts/entry-points/"><code>entry</code></a>&nbsp;和&nbsp;<a href="https://www.webpackjs.com/plugins/commons-chunk-plugin"><code>CommonsChunkPlugin</code></a>，因为接下来的演示中并不需要它们：</p>
+
+<p><strong>webpack.config.js</strong></p>
+
+<pre>
+<code>  const path = require(&#39;path&#39;);
+- const webpack = require(&#39;webpack&#39;);
+  const HTMLWebpackPlugin = require(&#39;html-webpack-plugin&#39;);
+
+  module.exports = {
+    entry: {
++     index: &#39;./src/index.js&#39;
+-     index: &#39;./src/index.js&#39;,
+-     another: &#39;./src/another-module.js&#39;
+    },
+    plugins: [
+      new HTMLWebpackPlugin({
+        title: &#39;Code Splitting&#39;
+-     }),
++     })
+-     new webpack.optimize.CommonsChunkPlugin({
+-       name: &#39;common&#39; // 指定公共 bundle 的名称。
+-     })
+    ],
+    output: {
+      filename: &#39;[name].bundle.js&#39;,
++     chunkFilename: &#39;[name].bundle.js&#39;,
+      path: path.resolve(__dirname, &#39;dist&#39;)
+    }
+  };
+</code></pre>
+
+<p>注意，这里使用了&nbsp;<code>chunkFilename</code>，它决定非入口 chunk 的名称。想了解&nbsp;<code>chunkFilename</code>&nbsp;更多信息，请查看&nbsp;<a href="https://www.webpackjs.com/configuration/output/#output-chunkfilename">output 相关文档</a>。接着，更新我们的项目，移除掉那些现在不会用到的文件:</p>
+
+<p><strong>project</strong></p>
+
+<pre>
+<code>webpack-demo
+|- package.json
+|- webpack.config.js
+|- /dist
+|- /src
+  |- index.js
+- |- another-module.js
+|- /node_modules
+</code></pre>
+
+<p>现在，我们不再使用静态导入&nbsp;<code>lodash</code>，而是通过使用动态导入来分离一个 chunk：</p>
+
+<p><strong>src/index.js</strong></p>
+
+<pre>
+<code>- import _ from &#39;lodash&#39;;
+-
+- function component() {
++ function getComponent() {
+-   var element = document.createElement(&#39;div&#39;);
+-
+-   // Lodash, now imported by this script
+-   element.innerHTML = _.join([&#39;Hello&#39;, &#39;webpack&#39;], &#39; &#39;);
++   return import(/* webpackChunkName: &quot;lodash&quot; */ &#39;lodash&#39;).then(_ =&gt; {
++     var element = document.createElement(&#39;div&#39;);
++
++     element.innerHTML = _.join([&#39;Hello&#39;, &#39;webpack&#39;], &#39; &#39;);
++
++     return element;
++
++   }).catch(error =&gt; &#39;An error occurred while loading the component&#39;);
+  }
+
+- document.body.appendChild(component());
++ getComponent().then(component =&gt; {
++   document.body.appendChild(component);
++ })
+</code></pre>
+
+<p>注意，在注释中使用了&nbsp;<code>webpackChunkName</code>。这样做会导致我们的 bundle 被命名为&nbsp;<code>lodash.bundle.js</code>&nbsp;，而不是&nbsp;<code>[id].bundle.js</code>&nbsp;。想了解更多关于&nbsp;<code>webpackChunkName</code>&nbsp;和其他可用选项，请查看&nbsp;<a href="https://www.webpackjs.com/api/module-methods#import-"><code>import()</code>&nbsp;相关文档</a>。让我们执行 webpack，查看&nbsp;<code>lodash</code>&nbsp;是否会分离到一个单独的 bundle：</p>
+
+<pre>
+<code>Hash: a27e5bf1dd73c675d5c9
+Version: webpack 2.6.1
+Time: 544ms
+           Asset     Size  Chunks                    Chunk Names
+lodash.bundle.js   541 kB       0  [emitted]  [big]  lodash
+ index.bundle.js  6.35 kB       1  [emitted]         index
+   [0] ./~/lodash/lodash.js 540 kB {0} [built]
+   [1] ./src/index.js 377 bytes {1} [built]
+   [2] (webpack)/buildin/global.js 509 bytes {0} [built]
+   [3] (webpack)/buildin/module.js 517 bytes {0} [built]
+</code></pre>
+
+<p>由于&nbsp;<code>import()</code>&nbsp;会返回一个 promise，因此它可以和&nbsp;<a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Statements/async_function"><code>async</code>&nbsp;函数</a>一起使用。但是，需要使用像 Babel 这样的预处理器和<a href="https://babeljs.io/docs/plugins/syntax-dynamic-import/#installation">Syntax Dynamic Import Babel Plugin</a>。下面是如何通过&nbsp;<code>async</code>&nbsp;函数简化代码：</p>
+
+<p><strong>src/index.js</strong></p>
+
+<pre>
+<code>- function getComponent() {
++ async function getComponent() {
+-   return import(/* webpackChunkName: &quot;lodash&quot; */ &#39;lodash&#39;).then(_ =&gt; {
+-     var element = document.createElement(&#39;div&#39;);
+-
+-     element.innerHTML = _.join([&#39;Hello&#39;, &#39;webpack&#39;], &#39; &#39;);
+-
+-     return element;
+-
+-   }).catch(error =&gt; &#39;An error occurred while loading the component&#39;);
++   var element = document.createElement(&#39;div&#39;);
++   const _ = await import(/* webpackChunkName: &quot;lodash&quot; */ &#39;lodash&#39;);
++
++   element.innerHTML = _.join([&#39;Hello&#39;, &#39;webpack&#39;], &#39; &#39;);
++
++   return element;
+  }
+
+  getComponent().then(component =&gt; {
+    document.body.appendChild(component);
+  });
+</code></pre>
+
+<h2>bundle 分析(bundle analysis)</h2>
+
+<p>如果我们以分离代码作为开始，那么就以检查模块作为结束，分析输出结果是很有用处的。<a href="https://github.com/webpack/analyse">官方分析工具</a>&nbsp;是一个好的初始选择。下面是一些社区支持(community-supported)的可选工具：</p>
+
+<ul>
+	<li><a href="https://alexkuz.github.io/webpack-chart/">webpack-chart</a>: webpack 数据交互饼图。</li>
+	<li><a href="https://chrisbateman.github.io/webpack-visualizer/">webpack-visualizer</a>: 可视化并分析你的 bundle，检查哪些模块占用空间，哪些可能是重复使用的。</li>
+	<li><a href="https://github.com/webpack-contrib/webpack-bundle-analyzer">webpack-bundle-analyzer</a>: 一款分析 bundle 内容的插件及 CLI 工具，以便捷的、交互式、可缩放的树状图形式展现给用户。</li>
+</ul>
+
+<h2>下一步</h2>
+
+<p>关于「如何在真正的应用程序和<a href="https://www.webpackjs.com/guides/caching">缓存</a>中&nbsp;<code>import()</code>&nbsp;导入」以及学习「如何更加高效地分离代码」的具体示例，请查看<a href="https://www.webpackjs.com/guides/lazy-loading">懒加载</a>。</p>
