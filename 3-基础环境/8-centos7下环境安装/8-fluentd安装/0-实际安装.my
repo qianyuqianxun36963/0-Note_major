@@ -1,0 +1,172 @@
+<h1>Fluentd 安装实践</h1>
+
+<p><a href="https://docs.fluentd.org/v1.0/articles/before-install">官网指导</a></p>
+
+<h2>设置授时服务Chrony</h2>
+
+<p><a href="https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/set-time.html">亚马逊授时服务安装</a>&nbsp;官网给的是亚马逊云和ubuntu的安装方式。<a href="https://software.opensuse.org/package/chrony">chrony 官网安装包下载</a>&nbsp;虽然也没用到。最后还是在<a href="https://blog.csdn.net/hnhuangyiyang/article/details/52711631">网上找的</a>。</p>
+
+<h3>安装chrony</h3>
+
+<p>yum&nbsp;install&nbsp;chrony&nbsp;-y&nbsp;&nbsp;</p>
+
+<h3><code>修改配置文件</code></h3>
+
+<p>/etc/chrony.conf</p>
+
+<p>添加下面</p>
+
+<p>server 169.254.169.123 prefer iburst</p>
+
+<h3>启动chrony服务并设定开机自启</h3>
+
+<p>systemctl enable chronyd.service<br />
+systemctl start chronyd.service &nbsp;&nbsp;</p>
+
+<h2>放开linux最大文件打开数的限制</h2>
+
+<h3>查看当前限制数：&nbsp;</h3>
+
+<p>ulimit -n</p>
+
+<p>默认为 1024 太小了。</p>
+
+<h3>修改限制数：</h3>
+
+<p>修改下面配置文件</p>
+
+<p>/etc/security/limits.conf</p>
+
+<p>在里面添加</p>
+
+<blockquote>
+<pre>
+root soft nofile 65536
+root hard nofile 65536
+* soft nofile 65536
+* hard nofile 65536</pre>
+</blockquote>
+
+<h2>设置网络核心参数</h2>
+
+<p>修改下面配置文件</p>
+
+<p>/etc/sysctl.conf</p>
+
+<p>在里面添加</p>
+
+<blockquote>
+<pre>
+net.core.somaxconn = 1024
+net.core.netdev_max_backlog = 5000
+net.core.rmem_max = 16777216
+net.core.wmem_max = 16777216
+net.ipv4.tcp_wmem = 4096 12582912 16777216
+net.ipv4.tcp_rmem = 4096 12582912 16777216
+net.ipv4.tcp_max_syn_backlog = 8096
+net.ipv4.tcp_slow_start_after_idle = 0
+net.ipv4.tcp_tw_reuse = 1
+net.ipv4.ip_local_port_range = 10240 65535</pre>
+</blockquote>
+
+<p>修改之后 重启机器或执行：</p>
+
+<p>sysctl -p</p>
+
+<p>&nbsp;</p>
+
+<h2>准备工作做完以后</h2>
+
+<p>由于Fluentd的安装较为麻烦,所以业界流行的稳定安装版本其实是有Treasure Data公司提供的td-agent。本文将介绍的也是td-agent的安装和使用。</p>
+
+<h3>安装 td-agent</h3>
+
+<p>Ubuntu 14.04 下的安装:</p>
+
+<p>curl -L https://toolbelt.treasuredata.com/sh/install-ubuntu-trusty-td-agent2.sh | sh&nbsp;</p>
+
+<p>现在也支持Redhat / CentOS：</p>
+
+<p>curl -L https://toolbelt.treasuredata.com/sh/install-redhat-td-agent3.sh | sh&nbsp;</p>
+
+<p>官网说支持Redhat / CentOS 两个，但是只给了上面一条安装语句，无语。。centos下也执行的上面这句，提示安装成功。。无奈。</p>
+
+<h2>启动服务</h2>
+
+<p>官方提供了启动终止的脚本，我们可以使用。</p>
+
+<h3>systemctl</h3>
+
+<p>The&nbsp;<code>/usr/lib/systemd/system/td-agent</code>&nbsp;script is provided to start, stop, or restart the agent.</p>
+
+<p>sudo systemctl start td-agent.service<br />
+sudo systemctl status td-agent.service</p>
+
+<h3>systemd</h3>
+
+<p>If you want to customize systemd behaviour, put your&nbsp;<code>td-agent.service</code>&nbsp;into&nbsp;<code>/etc/systemd/system</code></p>
+
+<h3>init.d</h3>
+
+<p>The&nbsp;<code>/etc/init.d/td-agent</code>&nbsp;script is provided to start, stop, or restart the agent.</p>
+
+<pre>
+$ sudo /etc/init.d/td-agent start
+Starting td-agent: [  OK  ]
+$ sudo /etc/init.d/td-agent status
+td-agent (pid  21678) is running...
+</pre>
+
+<p>The following commands are supported:</p>
+
+<pre>
+$ sudo /etc/init.d/td-agent start
+$ sudo /etc/init.d/td-agent stop
+$ sudo /etc/init.d/td-agent restart
+$ sudo /etc/init.d/td-agent status
+</pre>
+
+<p>Please make sure&nbsp;<strong>your configuration file</strong>&nbsp;is located at&nbsp;<code>/etc/td-agent/td-agent.conf</code>.</p>
+
+<h2>后面的暂时没用到</h2>
+
+<h2>Step 3: Post Sample Logs via HTTP</h2>
+
+<p>By default,&nbsp;<code>/etc/td-agent/td-agent.conf</code>&nbsp;is configured to take logs from HTTP and route them to stdout (<code>/var/log/td-agent/td-agent.log</code>). You can post sample log records using the curl command.</p>
+
+<pre>
+$ curl -X POST -d &#39;json={&quot;json&quot;:&quot;message&quot;}&#39; http://localhost:8888/debug.test
+</pre>
+
+<h2>Next Steps</h2>
+
+<p>You&rsquo;re now ready to collect your real logs using Fluentd. Please see the following tutorials to learn how to collect your data from various data sources.</p>
+
+<ul>
+	<li>Basic Configuration
+	<ul>
+		<li><a href="https://docs.fluentd.org/v1.0/articles/config-file">Config File</a></li>
+	</ul>
+	</li>
+	<li>Application Logs
+	<ul>
+		<li><a href="https://docs.fluentd.org/v1.0/articles/ruby">Ruby</a>,&nbsp;<a href="https://docs.fluentd.org/v1.0/articles/java">Java</a>,&nbsp;<a href="https://docs.fluentd.org/v1.0/articles/python">Python</a>,&nbsp;<a href="https://docs.fluentd.org/v1.0/articles/php">PHP</a>,&nbsp;<a href="https://docs.fluentd.org/v1.0/articles/perl">Perl</a>,&nbsp;<a href="https://docs.fluentd.org/v1.0/articles/nodejs">Node.js</a>,&nbsp;<a href="https://docs.fluentd.org/v1.0/articles/scala">Scala</a></li>
+	</ul>
+	</li>
+	<li>Examples
+	<ul>
+		<li><a href="https://docs.fluentd.org/v1.0/articles/apache-to-s3">Store Apache Log into Amazon S3</a></li>
+		<li><a href="https://docs.fluentd.org/v1.0/articles/apache-to-mongodb">Store Apache Log into MongoDB</a></li>
+		<li><a href="https://docs.fluentd.org/v1.0/articles/http-to-hdfs">Data Collection into HDFS</a></li>
+	</ul>
+	</li>
+</ul>
+
+<p>Please refer to the resources below for further steps.</p>
+
+<ul>
+	<li><a href="http://docs.treasuredata.com/articles/td-agent-changelog">ChangeLog of td-agent</a></li>
+	<li><a href="https://github.com/treasure-data/chef-td-agent/">Chef Cookbook</a></li>
+</ul>
+
+<p>&nbsp;</p>

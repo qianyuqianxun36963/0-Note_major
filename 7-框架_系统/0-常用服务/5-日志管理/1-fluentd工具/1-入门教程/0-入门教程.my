@@ -1,0 +1,201 @@
+<h1>Fluentd入门教程</h1>
+
+<p>摘要：最近发生了一些不可描述的故事,艰难之中换到了现在的组,主要的工作内容是数据挖掘。也终于有机会学习新的知识:Ruby和Fluentd。本文将总结开源软件Fluentd的入门知识,包括如何安装,配置文件语法,插件简介等内容。Fluentd的官网内容非常详尽,内容的组织也尤其清晰,所以网络上关于Fluentd的文档很少。本文主要用于学习记录,也希望能帮助到英语不好的读者。OverviewFluentd是一个完全开源免费的log信息收集软件,支持超过125个系统的log信息收集。其架</p>
+
+<h2>Overview&nbsp;</h2>
+
+<p>Fluentd是一个完全开源免费的log信息收集软件,支持超过125个系统的log信息收集。其架构图如图1所示。</p>
+
+<p><img alt="Fluentd入门教程" src="http://aliyunzixunbucket.oss-cn-beijing.aliyuncs.com/jpg/08e0f9a4a582ccfb407548a98b55dca6.jpg?x-oss-process=image/resize,p_100/auto-orient,1/quality,q_90/format,jpg/watermark,image_eXVuY2VzaGk=,t_100,g_se,x_0,y_0" />&nbsp;</p>
+
+<p>图1. Fluentd架构图&nbsp;</p>
+
+<p>本质上,Fluentd可以分为客户端和服务端两种模块。客户端为安装在被采集系统中的程序,用于读取log文件等信息,并发送到Fluentd的服务端。服务端则是一个收集器。在Fluentd服务端,我们可以进行相应的配置,使其可以对收集到的数据进行过滤和处理,并最终路由到下一跳。下一跳可以是用于存储的数据库,如MongoDB, Amazon S3, 也可以是其他的数据处理平台,比如Hadoop。</p>
+
+<h2>Install&nbsp;</h2>
+
+<p>由于Fluentd的安装较为麻烦,所以业界流行的稳定安装版本其实是有Treasure Data公司提供的td-agent。本文将介绍的也是td-agent的安装和使用。</p>
+
+<p>官网 安装文档 介绍了针对不同系统的安装办法。本文介绍&ldquo;Ubuntu 14.04 LTS / Trusty 64bit/32bit&ldquo;系统的安装:</p>
+
+<p>curl -L https://toolbelt.treasuredata.com/sh/install-ubuntu-trusty-td-agent2.sh | sh&nbsp;</p>
+
+<p>安装完成之后,可运行以下的命令来启动Fluentd服务:</p>
+
+<p>$ /etc/init.d/td-agent restart&nbsp;<br />
+$ /etc/init.d/td-agent status&nbsp;<br />
+td-agent (pid21678) is running...&nbsp;</p>
+
+<p>通过start, stop, restart等命令可以启动、关闭和重启Fluentd服务。此时默认的Fluentd配置文件的目录是/etc/td-agent/td-agent.conf文件。</p>
+
+<p>Post Sample Logs via HTTP&nbsp;</p>
+
+<p>默认情况下,/etc/td-agent/td-agent.conf文件已经对td-agent进行了基本的配置。可以接收通过HTTP Post的数据,并将其路由、写入到/var/log/td-agent/td-agent.log中。</p>
+
+<p>可尝试通过以下curl命令来尝试post数据。</p>
+
+<p>$ curl -X POST -d &#39;json={&quot;json&quot;:&quot;message&quot;}&#39; http://localhost:8888/debug.test&nbsp;</p>
+
+<p>执行之后,可在输出log的最后一行找到我们输入的测试数据。</p>
+
+<p>Syntax of Config&nbsp;</p>
+
+<p>在Fluentd中,配置文件非常重要,它定义了Fluentd应该执行的操作。其语法很简单,详细内容可点击 配置语法 。</p>
+
+<p>打开/etc/td-agent/td-agent.conf文件,可以看到配置文件的具体内容。配置文件中基本会出现的配置分为以下几种:</p>
+
+<p>source: 定义输入&nbsp;<br />
+match:定义输出的目标,如写入文件,或者发送到指定地点。&nbsp;<br />
+filter:过滤,也即事件处理流水线,可在输入和输出之间运行。&nbsp;<br />
+system:系统级别的设置。&nbsp;<br />
+label:定义一组操作,从而实现复用和内部路由。&nbsp;<br />
+@include:引入其他文件,和Java、python的import类似。&nbsp;<br />
+source&nbsp;</p>
+
+<p>Fluentd支持多输入。每一个输入配置必须包含类型/type,比如tcp数据输入,或者http类型输入。type将指定使用的input plugin。以下的示例中就定义了两个输入源,一个是从24224端口进入的tcp数据流,另一个是从9880端口进入的http数据。</p>
+
+<p># Receive events from 24224/tcp&nbsp;<br />
+# This is used by log forwarding and the fluent-cat command&nbsp;<br />
+&lt;source&gt;&nbsp;<br />
+@type forward&nbsp;<br />
+port 24224&nbsp;<br />
+&lt;/source&gt;&nbsp;<br />
+# http://this.host:9880/myapp.access?json={&quot;event&quot;:&quot;data&quot;}&nbsp;<br />
+&lt;source&gt;&nbsp;<br />
+@type http&nbsp;<br />
+port 9880&nbsp;<br />
+&lt;/source&gt;&nbsp;</p>
+
+<p>Source指定的input插件将带有{tag, time,record} 三个属性的事件/event提交给Fluentd的引擎,完成数据的输入。</p>
+
+<h2>match&nbsp;</h2>
+
+<p>Match配置了数据流的匹配规则和匹配成功后所需执行的动作,和路由表项类似。比如以下的配置中就对匹配myapp.access标签成功的数据包执行file类型动作,将数据写入到路径为/var/log/fluent/access的文件中。</p>
+
+<p># Match events tagged with &quot;myapp.access&quot; and&nbsp;<br />
+# store them to /var/log/fluent/access.%Y-%m-%d&nbsp;<br />
+# Of course, you can control how you partition your data&nbsp;<br />
+# with the time_slice_format option.&nbsp;<br />
+&lt;match myapp.access&gt;&nbsp;<br />
+@type file&nbsp;<br />
+path /var/log/fluent/access&nbsp;<br />
+&lt;/match&gt;&nbsp;</p>
+
+<p>标准的动作有file和forward等。File表明写入文件,而forward表明转发到下一跳。</p>
+
+<p>Match Pattern的设计与正常的正则匹配没有区别,具体的分类如下:</p>
+
+<p>*: 匹配tag的某一部分,比如 a.* 可以匹配 a.b, 但a.b.c无法匹配成功。&nbsp;<br />
+**: 匹配0个或者多个tag部分。比如 a.** 可以匹配a.b,a.b.c&nbsp;<br />
+{X,Y,Z}:匹配X, Y, or Z,或关系。&nbsp;</p>
+
+<p>此外,他们还可以混用,比如a.{b,c,d}.*等等。当&nbsp;<br />
+<br />
+标签内,有多个匹配模式时,将支持或逻辑的匹配,即只要匹配成功人一个都执行对应的操作。比如:&nbsp;</p>
+
+<p>&lt;match a b&gt; 匹配a和b.&nbsp;<br />
+&lt;match a.** b.*&gt; 匹配a, a.b, a.b.c&nbsp;<br />
+Logging&nbsp;</p>
+
+<p>Fluentd支持两种类型的logging 配置,一种是全局的,另一种是针对插件的。</p>
+
+<p>global&nbsp;<br />
+Plugin&nbsp;</p>
+
+<p>支持的log的输出级别有如下几种:</p>
+
+<p>fatal&nbsp;<br />
+error&nbsp;<br />
+warn&nbsp;<br />
+info&nbsp;<br />
+debug&nbsp;<br />
+trace&nbsp;</p>
+
+<p>介绍完Config file的语法之后,我们还需要了解config file配置的对象Fluentd的Plugin/插件。</p>
+
+<h2>Plugin&nbsp;</h2>
+
+<p>Fluentd有5种类型的插件,分别是:</p>
+
+<p>Input:完成输入数据的读取,由source部分配置&nbsp;<br />
+Parser:解析插件&nbsp;<br />
+Output:完成输出数据的操作,由match部分配置&nbsp;<br />
+Formatter:消息格式化的插件,属于filter类型&nbsp;<br />
+Buffer:缓存插件,用于缓存数据&nbsp;</p>
+
+<p>每一个类型都包含着多种的插件,比如input类型就包含了以下几种插件:</p>
+
+<p>in_forward&nbsp;<br />
+in_http&nbsp;<br />
+in_tail&nbsp;<br />
+in_exec&nbsp;<br />
+in_syslog&nbsp;<br />
+in_scribe&nbsp;</p>
+
+<p>由于篇幅限制,本文将不会对插件进行展开介绍,读者可以自行阅读 官方文档 。</p>
+
+<h2>Route&nbsp;</h2>
+
+<p>Route指的是数据在Fluentd中的处理流水线,一般的流程为</p>
+
+<p>input -&gt; filter -&gt; output&nbsp;<br />
+input -&gt; filter -&gt; output with label&nbsp;</p>
+
+<p>即由输入插件获取数据,然后交给filter做处理,然后交给output插件去转发。同时,也支持数据包/事件的重新提交,比如修改tag之后重新路由等等。</p>
+
+<p>reroute event by tags&nbsp;<br />
+reroute event by record content&nbsp;<br />
+reroute event to other label&nbsp;</p>
+
+<h2>Use case&nbsp;</h2>
+
+<p>此处将选择一个最简单的使用案例来介绍Fluentd的使用。 Fluentd收集Docker的登陆信息 案例。</p>
+
+<p>首先创建一个config file, 用于配置Fluentd的行为,可命名为&rdquo;in_docker.conf&ldquo;。</p>
+
+<p>&lt;source&gt;&nbsp;<br />
+type forward&nbsp;<br />
+port 24224&nbsp;<br />
+bind 0.0.0.0&nbsp;<br />
+&lt;/source&gt;&nbsp;<br />
+&lt;match *.*&gt;&nbsp;<br />
+type stdout&nbsp;<br />
+&lt;/match&gt;&nbsp;</p>
+
+<p>然后保存文件。使用以下命令运行Fluentd。</p>
+
+<p>$ fluentd -c in_docker.conf&nbsp;</p>
+
+<p>若运行成功则可见输出信息如下所示:</p>
+
+<p>$ fluentd -c in_docker.conf&nbsp;<br />
+2015-09-01 15:07:12 -0600 [info]: reading config file path=&quot;in_docker.conf&quot;&nbsp;<br />
+2015-09-01 15:07:12 -0600 [info]: starting fluentd-0.12.15&nbsp;<br />
+2015-09-01 15:07:12 -0600 [info]: gem &#39;fluent-plugin-mongo&#39; version &#39;0.7.10&#39;&nbsp;<br />
+2015-09-01 15:07:12 -0600 [info]: gem &#39;fluentd&#39; version &#39;0.12.15&#39;&nbsp;<br />
+2015-09-01 15:07:12 -0600 [info]: adding match pattern=&quot;*.*&quot; type=&quot;stdout&quot;&nbsp;<br />
+2015-09-01 15:07:12 -0600 [info]: adding source type=&quot;forward&quot;&nbsp;<br />
+2015-09-01 15:07:12 -0600 [info]: using configuration file: &lt;ROOT&gt;&nbsp;<br />
+&lt;source&gt;&nbsp;<br />
+@type forward&nbsp;<br />
+port 24224&nbsp;<br />
+bind 0.0.0.0&nbsp;<br />
+&lt;/source&gt;&nbsp;<br />
+&lt;match docker.*&gt;&nbsp;<br />
+@type stdout&nbsp;<br />
+&lt;/match&gt;&nbsp;<br />
+&lt;/ROOT&gt;&nbsp;<br />
+2015-09-01 15:07:12 -0600 [info]: listening fluent socket on 0.0.0.0:24224&nbsp;</p>
+
+<p>然后启动docker containner。如果之前没有安装过docker engine,请读者自行安装。由于docker 本身支持Fluentd收集信息,所以可以通过启动命令来启动Fluentd的client/客户端。</p>
+
+<p>$ docker run --log-driver=fluentd ubuntu echo &quot;Hello Fluentd!&quot;&nbsp;<br />
+Hello Fluentd!&nbsp;</p>
+
+<p>以上命令中的ubuntu为一个镜像,如果本地没有,docker engine会自动下载,并在此镜像上创建容器。启动容器后,查看默认的输出信息文件:/var/log/td-agent/td-agent.log,可在最后一行查看到输出的信息。</p>
+
+<h2>总结&nbsp;</h2>
+
+<p>Fluentd是一个优秀的log信息收集的开源免费软件,目前以支持超过125种系统的log信息获取。Fluentd结合其他数据处理平台的使用,可以搭建大数据收集和处理平台,搭建商业化的解决方案。</p>
+
+<p>以上是<a href="https://www.aliyun.com/jiaocheng/139877.html">Fluentd入门教程</a>的内容，更多&nbsp;<a href="https://www.aliyun.com/jiaocheng/topic_3405.html">入门教程&nbsp;</a><a href="https://www.aliyun.com/jiaocheng/topic_26050.html">FluentD&nbsp;</a>的内容，请您使用右上方搜索功能获取相关信息。</p>

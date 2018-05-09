@@ -1,0 +1,73 @@
+<h1>windows7 下搭建本地svn服务</h1>
+
+<p>win7下安装svn服务器端及客户端详细步骤：</p>
+
+<h2>1.下载服务器端</h2>
+
+<p>&nbsp;&nbsp; &nbsp;http://subversion.tigris.org/servlets/ProjectDocumentList?folderID=91</p>
+
+<p>&nbsp;&nbsp; &nbsp;如：Setup-Subversion-1.8.13.msi<br />
+&nbsp;&nbsp; &nbsp;地址：http://sourceforge.net/projects/win32svn/files/1.6.16/Setup-Subversion-1.6.16.msi</p>
+
+<p>&nbsp;&nbsp; &nbsp;如：Setup-Subversion-1.5.3.msi<br />
+&nbsp;&nbsp; &nbsp;地址：http://subversion.tigris.org/files/documents/15/44049/Setup-Subversion-1.5.3.msi</p>
+
+<p>&nbsp;&nbsp; &nbsp;由于我是32位的系统所以选择Windows列表下的Win64Svn (64-bit client, server and bindings, MSI and ZIPs; maintained by David Darj)</p>
+
+<h2>2.安装服务器端</h2>
+
+<p>安装路径可以自己改，我的安装路径是D:/Program Files/Subversion<br />
+&nbsp;&nbsp; &nbsp;</p>
+
+<h2>3.下载客户端</h2>
+
+<p>&nbsp; &nbsp; http://tortoisesvn.net/downloads<br />
+&nbsp;&nbsp; &nbsp;<br />
+&nbsp;&nbsp; &nbsp;如：TortoiseSVN-1.8.7.25475-win64-svn-1.6.16.msi。<br />
+&nbsp;&nbsp; &nbsp;地址：http://sourceforge.net/projects/tortoisesvn/files/1.6.15/Application/TortoiseSVN-1.6.15.21042-win32-svn-1.6.16.msi</p>
+
+<p>&nbsp;&nbsp; &nbsp;如：TortoiseSVN-1.8.7.25475-win64-svn-1.6.16.msi。<br />
+&nbsp;&nbsp; &nbsp;地址：http://sourceforge.net/projects/tortoisesvn/files/1.6.15/Application/TortoiseSVN-1.6.15.21042-win32-svn-1.6.16.msi</p>
+
+<p>&nbsp;&nbsp; &nbsp;并下载对应版本的语言包<br />
+&nbsp;&nbsp; &nbsp;如：LanguagePack_1.8.7.25475-win64-zh_CN.msi<br />
+&nbsp;&nbsp; &nbsp;地址：略</p>
+
+<h2>4.安装客户端</h2>
+
+<p>&nbsp;&nbsp; &nbsp;安装路径也可以自己改，我的安装路径是D:/Program Files/TortoiseSVN</p>
+
+<h2>5.安装版本控制库</h2>
+
+<p>&nbsp; &nbsp; 路径自己定，我的做法是在D盘上新建一个svn文件夹，双击打开它，然后在里面点击右键，[TotoiseSVN]-&gt; [Create Repository here]进行创建，版本库模式指定为默认的即可。Repository创建完毕后会在目录下生成若干个文件和文件夹，conf目录是用来设置管理的目 录；db目录就是所有版本控制的数据文件；hooks目录放置hook脚本文件的目录；locks用来放置Subversion文件库锁定数据的目录， 用来追踪存取文件库的客户端；format文件是一个文本文件，里面只放了一个整数，表示当前文件库配置的版本号。（本步骤也可以用命令行来完成：svnadmin create D:/svn/repository）</p>
+
+<h2>6.设置版本控制库权限</h2>
+
+<p>&nbsp;&nbsp; &nbsp;打开/conf/目录，打开svnserve.conf找到一下两句：<br />
+&nbsp;&nbsp; &nbsp;# [general]<br />
+&nbsp;&nbsp; &nbsp;# password-db = passwd<br />
+&nbsp;&nbsp; &nbsp;去之每行开头的#，其中第二行是指定身份验证的文件名，即passwd文件<br />
+&nbsp;&nbsp; &nbsp;同样打开passwd文件，将<br />
+&nbsp;&nbsp; &nbsp;# [users]<br />
+&nbsp;&nbsp; &nbsp;# harry = harryssecret<br />
+&nbsp;&nbsp; &nbsp;# sally = sallyssecret<br />
+&nbsp;&nbsp; &nbsp;将# [users]开头#字符去掉，这是设置用户，一行一个，存储格式为&ldquo;用户名 = 密码&rdquo;，如可插入一行：wang=123，即为系统添加一个用户名为wang，密码为123的用户</p>
+
+<h2>7.启动服务器端并将svn设为系统服务</h2>
+
+<p>&nbsp;&nbsp; &nbsp;打开cmd输入: sc create svnser binPath= &quot;D:/Program Files/Subversion/bin/svnserve.exe --service --root D:/svn&quot;，回车；（注：&ldquo;=&rdquo;前不得有空格，后必须有空格。 svnser为自定义的服务名称），不提示错误即为成功。</p>
+
+<p>&nbsp;&nbsp; &nbsp;由于win7的安全权限问题，安装系统服务时会出现&ldquo;[sc] openSCManager 失败 5 拒绝 &rdquo;错误。<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;解决方案：<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp; &nbsp;在Subversion的bin目录下创建一个启动服务的批处理文件。例如在D:/Program Files/Subversion/bin/下创建文件: svnSetup.bat。编辑该文件，在文件内写入：<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;sc create svnserve binpath= &quot;D:/Program Files/Subversion/bin/svnserve.exe --service --root D:/svn&quot; --service --root F:\Repositories&quot; displayname= &quot;Subversion&quot; depend= tcpip start= auto<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;sc start svnserve<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;保存后退出，右键单击svnSetup.bat,选择以&ldquo;管理员方式运行&rdquo;即可。</p>
+
+<h2>8、这只svnser为自启动服务。</h2>
+
+<p>&nbsp;&nbsp; &nbsp;启动后在计算机-&gt;管理-&gt;服务和应用程序-&gt;服务-&gt;找到svnser,右键属性找到启动类型改为自动。这样每次开机它都会自动运行了,若是采用后一种批处理文件的方式则不需此操作。</p>
+
+<h2>9.访问svn,在桌面上点右键[TotoiseSVN]-&gt;[Repo-browser]</h2>
+
+<p>&nbsp; &nbsp; 在地址栏里输入svn://localhost/，这样就可以访问svn了，到这里也就完成了本地svn服务器端和客户端的安装。</p>

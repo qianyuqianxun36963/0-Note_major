@@ -8,18 +8,12 @@
 2)、Shared Database Master-Slave方式&nbsp;<br />
 3)、Replicated LevelDB Store方式&nbsp;</p>
 
-<p>&nbsp;</p>
-
 <p>第一种方案同样支持N个AMQ实例组网，但由于他是基于kahadb存储策略，亦可以部署在分布式文件系统上，应用灵活、高效且安全。&nbsp;<br />
-<br />
 第二种方案与shared filesystem方式类似，只是共享的存储介质由文件系统改成了数据库而已，支持N个AMQ实例组网，但他的性能会受限于数据库；&nbsp;&nbsp;<br />
-<br />
 第三种方案是ActiveMQ5.9以后才新增的特性，使用ZooKeeper协调选择一个node作为master。被选择的master broker node开启并接受客户端连接。&nbsp;<br />
 其他node转入slave模式，连接master并同步他们的存储状态。slave不接受客户端连接。所有的存储操作都将被复制到连接至Master的slaves。&nbsp;<br />
 如果master死了，得到了最新更新的slave被允许成为master。fialed node能够重新加入到网络中并连接master进入slave mode。所有需要同步的disk的消息操作都将等待存储状态被复制到其他法定节点的操作完成才能完成。所以，如果你配置了replicas=3，那么法定大小是(3/2)+1=2. Master将会存储并更新然后等待 (2-1)=1个slave存储和更新完成，才汇报success。至于为什么是2-1，熟悉Zookeeper的应该知道，有一个node要作为观擦者存在。&nbsp;<br />
 单一个新的master被选中，你需要至少保障一个法定node在线以能够找到拥有最新状态的node。这个node将会成为新的master。因此，推荐运行至少3个replica nodes，以防止一个node失败了，服务中断。&nbsp;</p>
-
-<p>&nbsp;</p>
 
 <p><strong>Shared Filesystem Master-Slave方式</strong>&nbsp;<br />
 shared filesystem Master-Slave部署方式主要是通过共享存储目录来实现master和slave的热备，所有的ActiveMQ应用都在不断地获取共享目录的控制权，哪个应用抢到了控制权，它就成为master。&nbsp;<br />
@@ -34,21 +28,13 @@ shared filesystem Master-Slave部署方式主要是通过共享存储目录来�
 
 <p>如下 ，3份文件broker都修改为一致 &nbsp;其中dataDirectory 是 数据存储共享目录地址</p>
 
-<p><img alt="" src="http://images2015.cnblogs.com/blog/997896/201706/997896-20170614111825884-1573825922.png"  style="width:700px"/></p>
+<p><img alt="" src="http://images2015.cnblogs.com/blog/997896/201706/997896-20170614111825884-1573825922.png" style="width:700px" />修改 kahaDB目录地址为数据存储共享目录地址</p>
 
-<p>修改 kahaDB目录地址为数据存储共享目录地址</p>
+<p><img alt="" src="http://images2015.cnblogs.com/blog/997896/201706/997896-20170614111956025-158254273.png" style="width:700px" />修改openwire &nbsp;的tcp 连接地址端口分别为 61616&nbsp;61626&nbsp;61636&nbsp;</p>
 
-<p><img alt="" src="http://images2015.cnblogs.com/blog/997896/201706/997896-20170614111956025-158254273.png" style="width:700px" /></p>
-
-<p>&nbsp;修改openwire &nbsp;的tcp 连接地址端口分别为 61616&nbsp;61626&nbsp;61636&nbsp;</p>
-
-<p><img alt="" src="http://images2015.cnblogs.com/blog/997896/201706/997896-20170614112050853-1713021275.png" style="width:700px" /></p>
-
-<p>二 、修改conf 下面的&nbsp;jetty.xml文件，修改管理界面端口 8161 8162 8163 方便测试查看启动的那一个activemq服务</p>
+<p><img alt="" src="http://images2015.cnblogs.com/blog/997896/201706/997896-20170614112050853-1713021275.png" style="width:700px" />二 、修改conf 下面的&nbsp;jetty.xml文件，修改管理界面端口 8161 8162 8163 方便测试查看启动的那一个activemq服务</p>
 
 <p>&nbsp;<img alt="" src="http://images2015.cnblogs.com/blog/997896/201706/997896-20170614112327228-339158880.png" style="width:700px" /></p>
-
-<p>&nbsp;</p>
 
 <h2>三、启动 &nbsp;成功了一个后面的将阻塞等待获取锁&nbsp;</h2>
 
