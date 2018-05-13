@@ -1,0 +1,380 @@
+<h1>深入分析ConcurrentHashMap</h1>
+
+<p>本文是作者原创，发表于InfoQ：<a href="http://www.infoq.com/cn/articles/ConcurrentHashMap" target="_blank">http://www.infoq.com/cn/articles/ConcurrentHashMap</a></p>
+
+<h1><strong>术语定义</strong></h1>
+
+<table border="1" cellpadding="0" cellspacing="0">
+	<tbody>
+		<tr>
+			<td><strong>术语</strong></td>
+			<td><strong>英文</strong></td>
+			<td><strong>解释</strong></td>
+		</tr>
+		<tr>
+			<td>哈希算法</td>
+			<td><strong>hash algorithm</strong></td>
+			<td>是一种将任意内容的输入转换成相同长度输出的加密方式，其输出被称为哈希值。<strong>&nbsp;</strong></td>
+		</tr>
+		<tr>
+			<td>哈希表</td>
+			<td><strong>hash table</strong></td>
+			<td>根据设定的哈希函数H(key)和处理冲突方法将一组关键字映象到一个有限的地址区间上，并以关键字在地址区间中的象作为记录在表中的存储位置，这种表称为哈希表或散列，所得存储位置称为哈希地址或散列地址。</td>
+		</tr>
+	</tbody>
+</table>
+
+<h1><strong>线程不安全的HashMap</strong></h1>
+
+<p>因为<span style="font-size:14px"><strong>多线程环境下，使用Hashmap进行put操作会引起死循环</strong></span>，导致CPU利用率接近100%，所以在并发情况下不能使用HashMap。<br />
+<br />
+如以下代码：</p>
+
+<p>final HashMap&lt;String, String&gt; map = new HashMap&lt;String, String&gt;(2);<br />
+&nbsp; &nbsp; Thread t = new Thread(new Runnable() {<br />
+&nbsp; &nbsp; &nbsp; &nbsp; @Override<br />
+&nbsp; &nbsp; &nbsp; &nbsp; public void run() {<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; for (int i = 0; i &lt; 10000; i++) {<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; new Thread(new Runnable() {<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; @Override<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; public void run() {<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; map.put(UUID.randomUUID().toString(), &quot;&quot;);<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; }<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; }, &quot;ftf&quot; + i).start();<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; }<br />
+&nbsp; &nbsp; &nbsp; &nbsp; }<br />
+&nbsp; &nbsp; }, &quot;ftf&quot;);<br />
+&nbsp; &nbsp; t.start();<br />
+&nbsp; &nbsp; t.join();</p>
+
+<h1><strong>效率低下的</strong><strong>HashTable</strong><strong>容器</strong></h1>
+
+<p><strong>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</strong>HashTable容器使用synchronized来保证线程安全，但在线程竞争激烈的情况下HashTable的效率非常低下。因为当一个线程访问HashTable的同步方法时，<strong>其他线程访问HashTable的同步方法时，可能会进入阻塞或轮询状态</strong>。<strong>如线程1使用put进行添加元素，线程2不但不能使用put方法添加元素，并且也不能使用get方法来获取元素</strong>，所以竞争越激烈效率越低。</p>
+
+<h1><strong>ConcurrentHashMap</strong><strong>的锁分段技术</strong></h1>
+
+<p><strong>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</strong>HashTable容器在竞争激烈的并发环境下表现出效率低下的原因，是因为所有访问HashTable的线程都必须竞争同一把锁，那假如容器里有多把锁，每一把锁用于锁容器其中一部分数据，那么当多线程访问容器里不同数据段的数据时，线程间就不会存在锁竞争，从而可以有效的提高并发访问效率，这就是ConcurrentHashMap所使用的<span style="font-size:14px"><strong>锁分段技术</strong></span>，首先将数据分成一段一段的存储，然后给每一段数据配一把锁，当一个线程占用锁访问其中一个段数据的时候，其他段的数据也能被其他线程访问。</p>
+
+<h1><strong>ConcurrentHashMap</strong><strong>的结构</strong></h1>
+
+<p>我们通过ConcurrentHashMap的类图来分析ConcurrentHashMap的结构。</p>
+
+<p><a href="http://ifeve.com/concurrenthashmap/concurrenthashmap%e7%b1%bb%e5%9b%be/" rel="attachment wp-att-273"><img alt="ConcurrentHashMap类图" src="http://ifeve.com/wp-content/uploads/2012/12/ConcurrentHashMap%E7%B1%BB%E5%9B%BE.jpg" style="height:416px; width:500px" /></a><br />
+ConcurrentHashMap是由Segment数组结构和HashEntry数组结构组成。Segment是一种可重入锁ReentrantLock，在ConcurrentHashMap里扮演锁的角色，HashEntry则用于存储键值对数据。一个ConcurrentHashMap里包含一个Segment数组，Segment的结构和HashMap类似，是一种数组和链表结构， 一个Segment里包含一个HashEntry数组，每个HashEntry是一个链表结构的元素， 每个Segment守护者一个HashEntry数组里的元素,当对HashEntry数组的数据进行修改时，必须首先获得它对应的Segment锁。<br />
+<a href="http://ifeve.com/concurrenthashmap/concurrenthashmap%e7%bb%93%e6%9e%84%e5%9b%be/" rel="attachment wp-att-277"><img alt="ConcurrentHashMap结构图" src="http://ifeve.com/wp-content/uploads/2012/12/ConcurrentHashMap%E7%BB%93%E6%9E%84%E5%9B%BE.jpg" style="height:255px; width:500px" /></a><br />
+<strong>&nbsp;</strong></p>
+
+<h1><strong>ConcurrentHashMap</strong><strong>的初始化</strong></h1>
+
+<p>ConcurrentHashMap初始化方法是通过initialCapacity，loadFactor, concurrencyLevel几个参数来初始化segments数组，段偏移量segmentShift，段掩码segmentMask和每个segment里的HashEntry数组。</p>
+
+<p><strong>初始化</strong><strong>segments</strong><strong>数组</strong>。让我们来看一下初始化segmentShift，segmentMask和segments数组的源代码。</p>
+
+<p><br />
+if&nbsp;(concurrencyLevel &gt; MAX_SEGMENTS)<br />
+concurrencyLevel = MAX_SEGMENTS;<br />
+// Find power-of-two sizes best matching arguments<br />
+int&nbsp;sshift =&nbsp;0;<br />
+int&nbsp;ssize =&nbsp;1;<br />
+while&nbsp;(ssize &lt; concurrencyLevel) {<br />
+++sshift;<br />
+ssize &lt;&lt;=&nbsp;1;<br />
+}<br />
+segmentShift =&nbsp;32&nbsp;- sshift;<br />
+segmentMask = ssize -&nbsp;1;<br />
+this.segments = Segment.newArray(ssize);<br />
+&nbsp;</p>
+
+<p>由上面的代码可知segments数组的长度ssize通过concurrencyLevel计算得出。为了能通过按位与的哈希算法来定位segments数组的索引，必须保证segments数组的长度是2的N次方（power-of-two size），所以必须计算出一个是大于或等于concurrencyLevel的最小的2的N次方值来作为segments数组的长度。假如concurrencyLevel等于14，15或16，ssize都会等于16，即容器里锁的个数也是16。注意concurrencyLevel的最大大小是65535，意味着segments数组的长度最大为65536，对应的二进制是16位。</p>
+
+<p><strong>初始化segmentShift和segmentMask</strong>。这两个全局变量在定位segment时的哈希算法里需要使用，sshift等于ssize从1向左移位的次数，在默认情况下concurrencyLevel等于16，1需要向左移位移动4次，所以sshift等于4。segmentShift用于定位参与hash运算的位数，segmentShift等于32减sshift，所以等于28，这里之所以用32是因为ConcurrentHashMap里的hash()方法输出的最大数是32位的，后面的测试中我们可以看到这点。segmentMask是哈希运算的掩码，等于ssize减1，即15，掩码的二进制各个位的值都是1。因为ssize的最大长度是65536，所以segmentShift最大值是16，segmentMask最大值是65535，对应的二进制是16位，每个位都是1。</p>
+
+<p><strong>初始化每个</strong>Segment。输入参数initialCapacity是ConcurrentHashMap的初始化容量，loadfactor是每个<strong>segment</strong>的负载因子，在构造方法里需要通过这两个参数来初始化数组中的每个<strong>segment</strong><strong>。</strong></p>
+
+<p>if (initialCapacity &gt; MAXIMUM_CAPACITY)<br />
+&nbsp; &nbsp; &nbsp; &nbsp; initialCapacity = MAXIMUM_CAPACITY;<br />
+&nbsp; &nbsp; int c = initialCapacity / ssize;<br />
+&nbsp; &nbsp; if (c * ssize &lt; initialCapacity)<br />
+&nbsp; &nbsp; &nbsp; &nbsp; ++c;<br />
+&nbsp; &nbsp; int cap = 1;<br />
+&nbsp; &nbsp; while (cap &lt; c)<br />
+&nbsp; &nbsp; &nbsp; &nbsp; cap &lt;&lt;= 1;<br />
+&nbsp; &nbsp; for (int i = 0; i &lt; this.segments.length; ++i)<br />
+&nbsp; &nbsp; &nbsp; &nbsp; this.segments[i] = new Segment&lt;K,V&gt;(cap, loadFactor);</p>
+
+<p>上面代码中的变量cap就是segment里HashEntry数组的长度，它等于initialCapacity除以ssize的倍数c，如果c大于1，就会取大于等于c的2的N次方值，所以cap不是1，就是2的N次方。segment的容量threshold＝(int)cap*loadFactor，默认情况下initialCapacity等于16，loadfactor等于0.75，通过运算cap等于1，threshold等于零。</p>
+
+<h2><strong>定位</strong><strong>Segment</strong></h2>
+
+<p>既然ConcurrentHashMap使用分段锁Segment来保护不同段的数据，那么在插入和获取元素的时候，必须先通过哈希算法定位到Segment。可以看到ConcurrentHashMap会首先使用Wang/Jenkins hash的变种算法对元素的hashCode进行一次再哈希。</p>
+
+<p>&nbsp; &nbsp; private&nbsp;static&nbsp;int&nbsp;hash(int&nbsp;h) {<br />
+&nbsp; &nbsp; &nbsp; &nbsp; h += (h &lt;&lt;&nbsp;15) ^&nbsp;0xffffcd7d; h ^= (h &gt;&gt;&gt;&nbsp;10);<br />
+&nbsp; &nbsp; &nbsp; &nbsp; h += (h &lt;&lt;&nbsp;3); h ^= (h &gt;&gt;&gt;&nbsp;6);<br />
+&nbsp; &nbsp; &nbsp; &nbsp; h += (h &lt;&lt;&nbsp;2) + (h &lt;&lt;&nbsp;14);&nbsp;return&nbsp;h ^ (h &gt;&gt;&gt;&nbsp;16);<br />
+&nbsp; &nbsp; }</p>
+
+<p>再哈希，其目的是为了减少哈希冲突，使元素能够均匀的分布在不同的Segment上，从而提高容器的存取效率。假如哈希的质量差到极点，那么所有的元素都在一个Segment中，不仅存取元素缓慢，分段锁也会失去意义。我做了一个测试，不通过再哈希而直接执行哈希计算。</p>
+
+<p>&nbsp; &nbsp; System.out.println(Integer.parseInt(&quot;0001111&quot;,&nbsp;2) &amp;&nbsp;15);<br />
+&nbsp; &nbsp; System.out.println(Integer.parseInt(&quot;0011111&quot;,&nbsp;2) &amp;&nbsp;15);<br />
+&nbsp; &nbsp; System.out.println(Integer.parseInt(&quot;0111111&quot;,&nbsp;2) &amp;&nbsp;15);<br />
+&nbsp; &nbsp;&nbsp;</p>
+
+<p>计算后输出的哈希值全是15，通过这个例子可以发现如果不进行再哈希，哈希冲突会非常严重，因为只要低位一样，无论高位是什么数，其哈希值总是一样。我们再把上面的二进制数据进行再哈希后结果如下，为了方便阅读，不足32位的高位补了0，每隔四位用竖线分割下。</p>
+
+<table>
+	<tbody>
+		<tr>
+			<td><code>1</code></td>
+			<td><code>0100</code><code>｜</code><code>0111</code><code>｜</code><code>0110</code><code>｜</code><code>0111</code><code>｜</code><code>1101</code><code>｜</code><code>1010</code><code>｜</code><code>0100</code><code>｜</code><code>1110</code></td>
+		</tr>
+	</tbody>
+</table>
+
+<p>&nbsp;
+<table>
+	<tbody>
+		<tr>
+			<td><code>3</code></td>
+			<td><code>1111</code><code>｜</code><code>0111</code><code>｜</code><code>0100</code><code>｜</code><code>0011</code><code>｜</code><code>0000</code><code>｜</code><code>0001</code><code>｜</code><code>1011</code><code>｜</code><code>1000</code></td>
+		</tr>
+	</tbody>
+</table>
+</p>
+
+<table>
+	<tbody>
+		<tr>
+			<td><code>4</code></td>
+			<td>&nbsp;</td>
+		</tr>
+	</tbody>
+</table>
+
+<table>
+	<tbody>
+		<tr>
+			<td><code>5</code></td>
+			<td><code>0111</code><code>｜</code><code>0111</code><code>｜</code><code>0110</code><code>｜</code><code>1001</code><code>｜</code><code>0100</code><code>｜</code><code>0110</code><code>｜</code><code>0011</code><code>｜</code><code>1110</code></td>
+		</tr>
+	</tbody>
+</table>
+
+<table>
+	<tbody>
+		<tr>
+			<td><code>6</code></td>
+			<td>&nbsp;</td>
+		</tr>
+	</tbody>
+</table>
+
+<table>
+	<tbody>
+		<tr>
+			<td><code>7</code></td>
+			<td><code>1000</code><code>｜</code><code>0011</code><code>｜</code><code>0000</code><code>｜</code><code>0000</code><code>｜</code><code>1100</code><code>｜</code><code>1000</code><code>｜</code><code>0001</code><code>｜</code><code>1010</code></td>
+		</tr>
+	</tbody>
+</table>
+
+<p>可以发现每一位的数据都散列开了，通过这种再哈希能让数字的每一位都能参加到哈希运算当中，从而减少哈希冲突。ConcurrentHashMap通过以下哈希算法定位segment。</p>
+
+<p>默认情况下segmentShift为28，segmentMask为15，再哈希后的数最大是32位二进制数据，向右无符号移动28位，意思是让高4位参与到hash运算中， (hash &gt;&gt;&gt; segmentShift) &amp; segmentMask的运算结果分别是4，15，7和8，可以看到hash值没有发生冲突。</p>
+
+<table>
+	<tbody>
+		<tr>
+			<td><code>1</code></td>
+			<td><code>final</code>&nbsp;<code>Segment&lt;K,V&gt; segmentFor(</code><code>int</code>&nbsp;<code>hash) {</code></td>
+		</tr>
+	</tbody>
+</table>
+
+<table>
+	<tbody>
+		<tr>
+			<td><code>2</code></td>
+			<td>&nbsp;</td>
+		</tr>
+	</tbody>
+</table>
+
+<table>
+	<tbody>
+		<tr>
+			<td><code>3</code></td>
+			<td><code>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</code><code>return</code>&nbsp;<code>segments[(hash &gt;&gt;&gt; segmentShift) &amp; segmentMask];</code></td>
+		</tr>
+	</tbody>
+</table>
+
+<table>
+	<tbody>
+		<tr>
+			<td><code>4</code></td>
+			<td>&nbsp;</td>
+		</tr>
+	</tbody>
+</table>
+
+<table>
+	<tbody>
+		<tr>
+			<td><code>5</code></td>
+			<td><code>&nbsp;&nbsp;&nbsp;&nbsp;</code><code>}</code></td>
+		</tr>
+	</tbody>
+</table>
+
+<h1><strong>ConcurrentHashMap</strong><strong>的get操作</strong></h1>
+
+<p>Segment的get操作实现非常简单和高效。先经过一次再哈希，然后使用这个哈希值通过哈希运算定位到segment，再通过哈希算法定位到元素，代码如下：</p>
+
+<table>
+	<tbody>
+		<tr>
+			<td><code>1</code></td>
+			<td><code>public</code>&nbsp;<code>V get(Object key) {</code></td>
+		</tr>
+	</tbody>
+</table>
+
+<table>
+	<tbody>
+		<tr>
+			<td><code>2</code></td>
+			<td>&nbsp;</td>
+		</tr>
+	</tbody>
+</table>
+
+<table>
+	<tbody>
+		<tr>
+			<td><code>3</code></td>
+			<td><code>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</code><code>int</code>&nbsp;<code>hash = hash(key.hashCode());</code></td>
+		</tr>
+	</tbody>
+</table>
+
+<table>
+	<tbody>
+		<tr>
+			<td><code>4</code></td>
+			<td>&nbsp;</td>
+		</tr>
+	</tbody>
+</table>
+
+<table>
+	<tbody>
+		<tr>
+			<td><code>5</code></td>
+			<td><code>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</code><code>return</code>&nbsp;<code>segmentFor(hash).get(key, hash);</code></td>
+		</tr>
+	</tbody>
+</table>
+
+<table>
+	<tbody>
+		<tr>
+			<td><code>6</code></td>
+			<td>&nbsp;</td>
+		</tr>
+	</tbody>
+</table>
+
+<table>
+	<tbody>
+		<tr>
+			<td><code>7</code></td>
+			<td><code>&nbsp;&nbsp;&nbsp;</code><code>}</code></td>
+		</tr>
+	</tbody>
+</table>
+
+<p>get操作的高效之处在于整个get过程不需要加锁，除非读到的值是空的才会加锁重读，我们知道HashTable容器的get方法是需要加锁的，那么ConcurrentHashMap的get操作是如何做到不加锁的呢？原因是它的get方法里将要使用的共享变量都定义成volatile，如用于统计当前Segement大小的count字段和用于存储值的HashEntry的value。定义成volatile的变量，能够在线程之间保持可见性，能够被多线程同时读，并且保证不会读到过期的值，但是只能被单线程写（有一种情况可以被多线程写，就是写入的值不依赖于原值），在get操作里只需要读不需要写共享变量count和value，所以可以不用加锁。之所以不会读到过期的值，是根据java内存模型的happen before原则，对volatile字段的写入操作先于读操作，即使两个线程同时修改和获取volatile变量，get操作也能拿到最新的值，这是用volatile替换锁的经典应用场景。</p>
+
+<table>
+	<tbody>
+		<tr>
+			<td><code>1</code></td>
+			<td><code>transient</code>&nbsp;<code>volatile</code>&nbsp;<code>int</code>&nbsp;<code>count;</code></td>
+		</tr>
+	</tbody>
+</table>
+
+<table>
+	<tbody>
+		<tr>
+			<td><code>2</code></td>
+			<td>&nbsp;</td>
+		</tr>
+	</tbody>
+</table>
+
+<table>
+	<tbody>
+		<tr>
+			<td><code>3</code></td>
+			<td><code>volatile</code>&nbsp;<code>V value;</code></td>
+		</tr>
+	</tbody>
+</table>
+
+<p>在定位元素的代码里我们可以发现定位HashEntry和定位Segment的哈希算法虽然一样，都与数组的长度减去一相与，但是相与的值不一样，定位Segment使用的是元素的hashcode通过再哈希后得到的值的高位，而定位HashEntry直接使用的是再哈希后的值。其目的是避免两次哈希后的值一样，导致元素虽然在Segment里散列开了，但是却没有在HashEntry里散列开。</p>
+
+<table>
+	<tbody>
+		<tr>
+			<td><code>1</code></td>
+			<td><code>hash &gt;&gt;&gt; segmentShift) &amp; segmentMask</code><code>//定位Segment所使用的hash算法</code></td>
+		</tr>
+	</tbody>
+</table>
+
+<table>
+	<tbody>
+		<tr>
+			<td><code>2</code></td>
+			<td>&nbsp;</td>
+		</tr>
+	</tbody>
+</table>
+
+<table>
+	<tbody>
+		<tr>
+			<td><code>3</code></td>
+			<td><code>int</code>&nbsp;<code>index = hash &amp; (tab.length -&nbsp;</code><code>1</code><code>);</code><code>// 定位HashEntry所使用的hash算法</code></td>
+		</tr>
+	</tbody>
+</table>
+
+<p><strong>ConcurrentHashMap</strong><strong>的Put操作</strong></p>
+
+<p>由于put方法里需要对共享变量进行写入操作，所以为了线程安全，在操作共享变量时必须得加锁。Put方法首先定位到Segment，然后在Segment里进行插入操作。插入操作需要经历两个步骤，第一步判断是否需要对Segment里的HashEntry数组进行扩容，第二步定位添加元素的位置然后放在HashEntry数组里。</p>
+
+<p><strong>是否需要扩容</strong>。在插入元素前会先判断Segment里的HashEntry数组是否超过容量（threshold），如果超过阀值，数组进行扩容。值得一提的是，Segment的扩容判断比HashMap更恰当，因为HashMap是在插入元素后判断元素是否已经到达容量的，如果到达了就进行扩容，但是很有可能扩容之后没有新元素插入，这时HashMap就进行了一次无效的扩容。</p>
+
+<p><ins><ins><ins><iframe frameborder="0" height="144" id="aswift_5" name="aswift_5" scrolling="no" width="576"></iframe></ins></ins></ins></p>
+
+<p><strong>如何扩容。</strong>扩容的时候首先会创建一个两倍于原容量的数组，然后将原数组里的元素进行再hash后插入到新的数组里。为了高效ConcurrentHashMap不会对整个容器进行扩容，而只对某个segment进行扩容。</p>
+
+<h1><strong>ConcurrentHashMap</strong><strong>的size操作</strong></h1>
+
+<p>如果我们要统计整个ConcurrentHashMap里元素的大小，就必须统计所有Segment里元素的大小后求和。Segment里的全局变量count是一个volatile变量，那么在多线程场景下，我们是不是直接把所有Segment的count相加就可以得到整个ConcurrentHashMap大小了呢？不是的，虽然相加时可以获取每个Segment的count的最新值，但是拿到之后可能累加前使用的count发生了变化，那么统计结果就不准了。所以最安全的做法，是在统计size的时候把所有Segment的put，remove和clean方法全部锁住，但是这种做法显然非常低效。</p>
+
+<p>因为在累加count操作过程中，之前累加过的count发生变化的几率非常小，所以ConcurrentHashMap的做法是先尝试2次通过不锁住Segment的方式来统计各个Segment大小，如果统计的过程中，容器的count发生了变化，则再采用加锁的方式来统计所有Segment的大小。</p>
+
+<p>那么ConcurrentHashMap是如何判断在统计的时候容器是否发生了变化呢？使用modCount变量，在put , remove和clean方法里操作元素前都会将变量modCount进行加1，那么在统计size前后比较modCount是否发生变化，从而得知容器的大小是否发生变化。</p>
+
+<h1><strong>参考资料</strong></h1>
+
+<ol>
+	<li>JDK1.6源代码。</li>
+	<li>《Java并发编程实践》</li>
+	<li><a href="http://www.goldendoc.org/2011/06/juc_concurrenthashmap/">Java并发编程之ConcurrentHashMap</a></li>
+</ol>
