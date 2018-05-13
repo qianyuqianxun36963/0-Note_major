@@ -1,0 +1,306 @@
+<h1>nodejs 模块加载机制</h1>
+
+<p>Nodejs拥有一套简单的模块加载系统，在Nodejs里面文件和模块是一一对应的关系。例如：<code>foo.js</code>加载了同一个目录下的<code>circle.js</code>文件。</p>
+
+<p><code>circle.js</code>文件内容：</p>
+
+<pre>
+<code>const PI = Math.PI;  
+exports.area = (r) =&gt; PI*r*r;  
+exports.circumference = (r) =&gt; 2*PI*r;  </code></pre>
+
+<p><code>foo.js</code>文件内容：</p>
+
+<pre>
+<code>const circle = require(&#39;./circle.js&#39;);  
+console.log(`the area of radius 4 is ${circle.area(4)}`);
+</code></pre>
+
+<p><code>circle</code>模块导出了<code>area</code>和<code>circumference</code>函数，为了根模块能够引用到它，你可以把它们添加到<code>exports</code>对象上。</p>
+
+<p><strong>模块内部的局部变量都是私有的, 因为每个模块都被封装在一个函数内部。</strong>上面的例中<code>PI</code>就是属于<code>circle</code>模块的局部变量。</p>
+
+<p><strong>如果你希望导出一个函数或者一个对象，你应该把该函数或者对象赋值给<code>module.exports</code>而不是<code>exports</code></strong>。</p>
+
+<hr />
+<h3>访问主模块</h3>
+
+<p>如果一个模块直接通过<code>Node.js</code>启动运行，<code>require.main</code>将会设置为该模块。你可以通过如下方式测试当前模块是否为主模块：</p>
+
+<pre>
+<code>console.log(require.main === module);</code></pre>
+
+<ul>
+	<li>1</li>
+</ul>
+
+<p>举个例子，对于<code>foo.js</code>文件，如果通过<code>nodejs foo.js</code>运行，那么该测试将会输出<code>true</code>, 如果通过<code>require(&#39;foo.js&#39;)</code>，测试将输出<code>false</code>。&nbsp;<br />
+由于每个<code>module</code>对象都有一个<code>filename</code>属性，也可以通过<code>require.main.filename</code>查看主模块文件名。</p>
+
+<hr />
+<h3>模块加载</h3>
+
+<p>当我们调用<code>require</code>加载外部文件的时候，将会调用<code>require.resolve</code>函数。具体的解析规则如下：</p>
+
+<pre>
+<code>在Y目录下的模块调用require(X)  
+
+- 1 . 如果X是一个内建核心模块，  
+   a. 返回该模块  
+   b. 停止执行  
+
+- 2. 如果X使用`./`或者`/`或者`../`开头  
+   a. 把(Y+X)作为文件路径来加载(LOAD_AS_FILE)      
+   b. 把(Y+X)作为目录路径来加载(LOAD_AS_DIRECTORY)    
+
+- 3. 加载`node_modules(X, dirname(Y))`(LOAD_NODE_MODULES)    
+
+- 4. 抛出`not found`异常  
+</code></pre>
+
+<p><strong>LOAD_AS_FILE(x)</strong></p>
+
+<ul>
+	<li>A. 如果<code>x</code>是一个文件则把<code>x</code>作为<code>javascript</code>文本文件加载。 停止</li>
+	<li>B. 如果<code>x.js</code>是一个文件则把<code>x.js</code>作为<code>javascript</code>文本文件加载。 停止</li>
+	<li>C. 如果<code>x.json</code>是一个文件则把<code>x.json</code>作为一个<code>javascript</code>对象来解析。 停止</li>
+	<li>D. 如果<code>x.node</code>是一个文件则把<code>x.node</code>作为一个二进制插件。停止</li>
+</ul>
+
+<p><strong>LOAD_AS_DIRECTORY(x)</strong></p>
+
+<ul>
+	<li>A. 如果<code>x/package.json</code>是一个文件&nbsp;<br />
+	a. 解析<code>package.json</code>读取<code>main</code>字段.&nbsp;<br />
+	b. let m = x +&nbsp;<code>main</code>字段值&nbsp;<br />
+	c. LOAD_AS_FILE(m)</li>
+	<li>B. 如果<code>x/index.js</code>是一个文件，则把<code>x/index.js</code>作为<code>javascript</code>文本文件加载。 停止</li>
+	<li>C. 如果<code>x/index.json</code>是一个文件，则把<code>x/index.json</code>作为<code>js</code>对象来解析。停止</li>
+	<li>D. 如果<code>x/index.node</code>是一个文件， 则把<code>x/index.node</code>作为二进制插件加载。停止</li>
+</ul>
+
+<p><strong>NODE_MODULES_PATHS(START)</strong></p>
+
+<ul>
+	<li>let PARTS = path split(START)</li>
+	<li>let I = count of PARTS - 1</li>
+	<li>let DIRS = []</li>
+	<li>while I &gt;= 0,&nbsp;<br />
+	a. if PARTS[I] = &ldquo;node_modules&rdquo; CONTINUE&nbsp;<br />
+	c. DIR = path join(PARTS[0 .. I] + &ldquo;node_modules&rdquo;)&nbsp;<br />
+	b. DIRS = DIRS + DIR&nbsp;<br />
+	c. let I = I - 1</li>
+	<li>return DIRS</li>
+</ul>
+
+<hr />
+<h3>模块缓存</h3>
+
+<p>模块在首次加载完毕之后会被缓存， 这意味着<code>require(&#39;foo.js&#39;)</code>不会导致<code>foo.js</code>被执行两次。 如果希望多次执行模块代码，可以导出<code>export</code>一个函数，该函数负责执行代码。</p>
+
+<h4>模块缓存警告</h4>
+
+<ul>
+	<li>
+	<p>1、模块基于被解析的名字来缓存，由于同一个模块在不同目录被加载可能会得到不同的文件名，所以<code>require(&#39;foo&#39;)</code>，不能保证总是得到相同的对象。</p>
+	</li>
+	<li>
+	<p>2、在一些大小写不敏感的系统，不同的文件名被系统指向同一个文件，但是缓存模块依旧认为它们是两个不同的模块，也就是说，<code>require(&#39;foo&#39;)</code>和<code>require(&#39;FOO&#39;)</code>将会得到两个不同的对象，而不考虑，<code>foo</code>和<code>FOO</code>是否是同一个文件。</p>
+	</li>
+</ul>
+
+<hr />
+<h3>核心模块</h3>
+
+<p><code>Nodejs</code>内置几个被打成二进制形式的包。内置模块将会被优先加载，例如<code>require(&#39;http&#39;)</code>将会加载内置的<code>http</code>模块，即使有一个文件名也为<code>http</code>。</p>
+
+<p><strong>需要注意的是：核心模块在安装的时候已经和<code>node</code>可执行程序打包到一起了。</strong></p>
+
+<hr />
+<h3>循环加载</h3>
+
+<p>考虑有这样几个模块：&nbsp;<br />
+<code>a.js</code></p>
+
+<pre>
+<code>console.log(&#39;a starting&#39;);
+exports.done = false;
+const b = require(&#39;./b.js&#39;);
+console.log(&#39;in a, b.done = %j&#39;, b.done);
+exports.done = true;
+console.log(&#39;a done&#39;);  </code></pre>
+
+<p><code>b.js</code></p>
+
+<pre>
+<code>console.log(&#39;b starting&#39;);
+exports.done = false;
+const a = require(&#39;./a.js&#39;);
+console.log(&#39;in b, a.done = %j&#39;, a.done);
+exports.done = true;
+console.log(&#39;b done&#39;);</code></pre>
+
+<p><code>main.js</code></p>
+
+<pre>
+<code>console.log(&#39;main starting&#39;);
+const a = require(&#39;./a.js&#39;);
+const b = require(&#39;./b.js&#39;);
+console.log(&#39;in main, a.done=%j, b.done=%j&#39;, a.done, b.done);</code></pre>
+
+<p>但<code>main.js</code>开始加载<code>a.js</code>而，<code>a.js</code>开始加载<code>b.js</code>，而<code>b.js</code>又开始加载<code>a.js</code>。为了阻止无限循环模块加载，一个<strong>未加载完成的a模块</strong>将会返回给<code>b.js</code>，接着<code>b.js</code>模块加载完毕，把<code>exports</code>对象返回给<code>a.js</code>。</p>
+
+<p>于此同时<code>main.js</code>两个模块都加载完毕了，运行<code>main.js</code>输出如下：</p>
+
+<pre>
+<code>$ node main.js
+main starting
+a starting
+b starting
+in b, a.done = false
+b done
+in a, b.done = true
+a done
+in main, a.done=true, b.done=true</code></pre>
+
+<hr />
+<h3>文件模块</h3>
+
+<p>如果指定的文件名文件不存在，那么<code>Node.js</code>将会尝试加载不同后缀名的文件主要有：(<code>.js</code>,&nbsp;<code>.json</code>,&nbsp;<code>.node</code>)。&nbsp;<br />
+<code>.js</code>后缀被解析为<code>js</code>文本文件，<code>.json</code>文件被解析文<code>js</code>对象，<code>.node</code>文件被解析为<code>node</code>插件，通过<code>dlopen</code>加载。</p>
+
+<hr />
+<h3>文件夹作为模块</h3>
+
+<p>使用文件夹是一个非常便捷的代码管理方式，提供一个统一的外部入口，供外部调用该文件夹。主要有三种方式可以达到该目的：</p>
+
+<ul>
+	<li>在文件夹的根目录建立一个<code>package.json</code>，使用<code>main</code>字段指定入口脚本文件，例如：</li>
+</ul>
+
+<pre>
+<code>{ &quot;name&quot; : &quot;some-library&quot;,
+  &quot;main&quot; : &quot;./lib/some-library.js&quot; }</code></pre>
+
+<p>在当前目录下有一个<code>some-library</code>文件夹，此时调用<code>require(&#39;./some-library&#39;)</code>将会尝试加载<code>./some-library/lib/some-library.js</code>文件。如果<code>main</code>字段指定的文件找不到，<code>Node.js</code>将会报错：</p>
+
+<pre>
+<code>Error: Cannot find module &#39;some-library&#39;</code></pre>
+
+<p>如果在该文件夹下没有<code>package.json</code>,<code>Node.js</code>将会尝试加载：</p>
+
+<ul>
+	<li>./some-library/index.js</li>
+	<li>./some-library/index.json</li>
+	<li>./some-library/index.node</li>
+</ul>
+
+<hr />
+<h3>从<code>node_modules</code>文件夹加载</h3>
+
+<p>如果传递给<code>require</code>的参数既不是内置模块，模块名称也不是以<code>./</code>、<code>/</code>、<code>../</code>开头，那么<code>Node.js</code>将会尝试寻找父目录下的<code>node_modules</code>文件夹。如果没有找到就再往上面一层查找，直到退回系统根目录。</p>
+
+<p>举个例子：文件<code>/home/ry/project/foo.js</code>，调用<code>require(&#39;bar.js&#39;)</code>，将会查找以下<code>node_modules</code>文件夹：</p>
+
+<ul>
+	<li><code>/home/ry/project/node_modules/bar.js</code></li>
+	<li><code>/home/ry/node_modules/bar.js</code></li>
+	<li><code>/home/node_modules/bar.js</code></li>
+	<li><code>/node_modules/bar.js</code></li>
+</ul>
+
+<hr />
+<h3>从全局文件夹加载模块</h3>
+
+<p><code>NODE_PATH</code>环境变量被配置为用一系列冒号分隔的绝对路径，<code>Nodejs</code>将会去这些目录下寻找模块。<code>NODE_PATH</code>最初在前面的一些模块加载方法都没有出现的时候使用，现在慢慢变得没那么必要了。&nbsp;<br />
+除此之外<code>Node.js</code>还会查找以下目录：</p>
+
+<ul>
+	<li>$HOME/.node_modules</li>
+	<li>$HOME/.node_libraries</li>
+	<li>$PREFIX/lib/node_modules</li>
+</ul>
+
+<p><code>$HOME</code>为当前用户的根目录，<code>$PREFIX</code>通过<code>node_prefix</code>来配置。</p>
+
+<p><strong>基于一些历史方面的原因，建议把模块安装在本地的<code>node_modules</code>文件夹下，这一加载速度最快也最可靠。</strong></p>
+
+<hr />
+<h3>模块包装</h3>
+
+<p>在模块执行之前，<code>Node.js</code>把它包装成一个函数的形式，看起来像这样：</p>
+
+<pre>
+<code>(function (exports, require, module, __filename, __dirname) {
+// Your module code actually lives in here
+});  </code></pre>
+
+<p>通过这种做法带来以下好处：</p>
+
+<ul>
+	<li>保证被<code>let</code>,<code>var</code>,<code>const</code>定义的变量作用域局限于模块内部，而不是全局变量。</li>
+	<li>包装了几个看起来类似于全局变量来指定该模块，例如：&nbsp;
+	<ul>
+		<li><code>module</code>和<code>exports</code>变量，用于从该模块导出数据到其他模块。</li>
+		<li><code>__filename</code>,<code>__dirname</code>,指向该模块的文件绝对路径以及文件夹路径。</li>
+	</ul>
+	</li>
+</ul>
+
+<hr />
+<h3><code>module</code>对象</h3>
+
+<ul>
+	<li>
+	<p>module.children&nbsp;<br />
+	一个数组指定了当前模块引用的其他模块。</p>
+	</li>
+	<li>
+	<p>module.exports&nbsp;<br />
+	一个对象，用于导出数据，如果希望导出的是一个函数，则应该给<code>module.exports</code>赋值，而不是给<code>exports</code>。否则会造成意想不到的后果。</p>
+	</li>
+	<li>
+	<p>exports&nbsp;<br />
+	一个对象，最初指向<code>module.exports</code>，如果你给它赋值，它将会指向对象，而不是最初的<code>module.exports</code>。&nbsp;<br />
+	类似于：</p>
+	</li>
+</ul>
+
+<pre>
+<code>function require(...) {
+  // ...
+  ((module, exports) =&gt; {
+    // Your module code here
+    exports = some_func;        // re-assigns exports, exports is no longer
+                                // a shortcut, and nothing is exported.
+    module.exports = some_func; // makes your module export 0
+  })(module, module.exports);
+  return module;
+}</code></pre>
+
+<ul>
+	<li>
+	<p>module.filename&nbsp;<br />
+	模块的绝对路径名称</p>
+	</li>
+	<li>
+	<p>module.id&nbsp;<br />
+	模块<code>id</code>通常等于<code>module.filename</code></p>
+	</li>
+	<li>
+	<p>module.loaded&nbsp;<br />
+	用于判断模块是否加载完毕，或者正在加载中。</p>
+	</li>
+	<li>
+	<p>module.parent&nbsp;<br />
+	指向首次加载本模块的模块。</p>
+	</li>
+	<li>
+	<p>module.require(id)</p>
+
+	<ul>
+		<li>id: String</li>
+		<li>返回一个module.exports导出的对象。</li>
+	</ul>
+	</li>
+</ul>
