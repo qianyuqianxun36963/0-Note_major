@@ -133,6 +133,8 @@ runoob@runoob:~/mongo$ docker ps
 CONTAINER ID   IMAGE        COMMAND                   ...    PORTS                      NAMES
 cda8830cad5f   mongo:3.2    &quot;/entrypoint.sh mongo&quot;    ...    0.0.0.0:27017-&gt;27017/tcp   suspicious_goodall</pre>
 
+<h4>连接容器</h4>
+
 <p>使用mongo镜像执行mongo 命令连接到刚启动的容器,主机IP为172.17.0.1</p>
 
 <pre>
@@ -146,3 +148,99 @@ For more comprehensive documentation, see
 Questions? Try the support group
   http://groups.google.com/group/mongodb-user
 &gt;</pre>
+
+<p>&nbsp;</p>
+
+<h2>在docker中使用mongo数据库，在局域网访问</h2>
+
+<p>有了docker，基本上就告别了各种软件、数据库的安装，直接从镜像库pull下来，爽，想想以前那真是一个遭罪啊。</p>
+
+<p>这文章就来看一下如何跑mongo的docker镜像，并且可以在局域网访问，内容相对简单，也是记录我的自学过程。</p>
+
+<p>第一步</p>
+
+<p>获得mongo镜像，命令如下，</p>
+
+<pre>
+<code># 拉取mongo镜像
+docker pull mongo
+# 查看本地库mongo镜像
+docker images mongo</code></pre>
+
+<p>第二步</p>
+
+<p>启动mongo镜像，如下</p>
+
+<pre>
+<code># 启动mongo镜像
+docker run -itd -P --name mongo-server mongo bash
+# 查看mongo进程
+docker ps -a</code></pre>
+
+<p>第三步</p>
+
+<p>进入容器并启动mongo，如下</p>
+
+<pre>
+<code># 进入mongo容器，其中&lsquo;mongo-server&rsquo;是mongo容器别名
+docker exec -it mongo-server bash
+# 启动mongo服务
+mongod &amp;
+# 在容器中查看mongo进程
+ps -ef | grep mongo</code></pre>
+
+<p>启动以后会看到如下日志（最后几行），</p>
+
+<pre>
+<code>2017-06-13T07:25:56.318+0000 I FTDC     [initandlisten] Initializing full-time diagnostic data capture with directory &#39;/data/db/diagnostic.data&#39;
+2017-06-13T07:25:56.328+0000 I INDEX    [initandlisten] build index on: admin.system.version properties: { v: 2, key: { version: 1 }, name: &quot;incompatible_with_version_32&quot;, ns: &quot;admin.system.version&quot; }
+2017-06-13T07:25:56.328+0000 I INDEX    [initandlisten]          building index using bulk method; build may temporarily use up to 500 megabytes of RAM
+2017-06-13T07:25:56.329+0000 I INDEX    [initandlisten] build index done.  scanned 0 total records. 0 secs
+2017-06-13T07:25:56.329+0000 I COMMAND  [initandlisten] setting featureCompatibilityVersion to 3.4
+2017-06-13T07:25:56.329+0000 I NETWORK  [thread1] waiting for connections on port 27017</code></pre>
+
+<p>第四步</p>
+
+<p>本地验证测试，输入mongo启动mongo命令行客户端，如下内容</p>
+
+<pre>
+<code>root@01ff7ed6377c:/# mongo
+MongoDB shell version v3.4.4
+connecting to: mongodb://127.0.0.1:27017
+2017-06-13T07:34:00.289+0000 I NETWORK  [thread1] connection accepted from 127.0.0.1:55650 #2 (1 connection now open)
+2017-06-13T07:34:00.290+0000 I NETWORK  [conn2] received client metadata from 127.0.0.1:55650 conn2: { application: { name: &quot;MongoDB Shell&quot; }, driver: { name: &quot;MongoDB Internal Client&quot;, version: &quot;3.4.4&quot; }, os: { type: &quot;Linux&quot;, name: &quot;PRETTY_NAME=&quot;Debian GNU/Linux 8 (jessie)&quot;&quot;, architecture: &quot;x86_64&quot;, version: &quot;Kernel 3.10.0-327.28.3.el7.x86_64&quot; } }</code></pre>
+
+<p>接着输入测试命令，</p>
+
+<pre>
+<code>&gt; show dbs;
+admin  0.000GB
+local  0.000GB
+&gt;</code></pre>
+
+<p>第五步</p>
+
+<p>在局域网访问docker中的mongo，由于启动的时候是使用的随机端口映射，意思是宿主机产生一个随机端口去映射mongo的27017端口，通过&lsquo;docker ps -a&rsquo;命令查看宿主机随机端口，如下，</p>
+
+<pre>
+<code>docker ps -a 
+CONTAINER ID        IMAGE               COMMAND                  CREATED             STATUS              PORTS                      NAMES
+01ff7ed6377c        mongo               &quot;docker-entrypoint.sh&quot;   15 minutes ago      Up 15 minutes       0.0.0.0:32773-&gt;27017/tcp   mongo-server</code></pre>
+
+<p>如上，宿主机随机端口为32773，通过配置robomongo客户端连接mongo，如下，</p>
+
+<p><img alt="image" src="http://static.xiaoqiangge.com/image/39e17b8c-e293-42af-842b-af6f98e5e3e1.png" /></p>
+
+<p>结果正常。</p>
+
+<p>如果要停止mongo可以使用如下命令，</p>
+
+<pre>
+<code># 登入mongo
+mongo
+# 选择使用admin库，在其他的库不行
+use admin
+# 关闭mongo
+db.shutdownServer()</code></pre>
+
+<p>通过&lsquo;ps -ef | grep momgo&rsquo;查看mongo进程是否存在，如果不存在说明关闭成功。</p>
