@@ -1,0 +1,155 @@
+<h1>tomcat 配置优化</h1>
+
+<h2>一.Tomcat内存优化</h2>
+
+<p>　　Tomcat内存优化主要是对 tomcat 启动参数优化，我们可以在 tomcat 的启动脚本 catalina.sh 中设置 java_OPTS 参数。&nbsp;<br />
+　　JAVA_OPTS参数说明&nbsp;<br />
+　　-server 启用jdk 的 server 版；&nbsp;<br />
+　　-Xms java虚拟机初始化时的最小内存；&nbsp;<br />
+　　-Xmx java虚拟机可使用的最大内存；&nbsp;<br />
+　　-XX: PermSize 内存永久保留区域&nbsp;<br />
+　　-XX:MaxPermSize 内存最大永久保留区域&nbsp;<br />
+　　服务器参数配置</p>
+
+<p>　　现公司服务器内存一般都可以加到最大2G ，所以可以采取以下配置：</p>
+
+<p>　　JAVA_OPTS=&rsquo;-Xms1024m -Xmx2048m -XX: PermSize=256M -XX:MaxNewSize=256m -XX:MaxPermSize=256m&rsquo;</p>
+
+<p>　　配置完成后可重启Tomcat ，通过以下命令进行查看配置是否生效：&nbsp;<br />
+　　首先查看Tomcat 进程号：</p>
+
+<p>　　sudo lsof -i:9027</p>
+
+<p>　　我们可以看到Tomcat 进程号是 12222 。&nbsp;<br />
+　　查看是否配置生效：</p>
+
+<p>　　sudo jmap &ndash; heap 12222</p>
+
+<p>　　我们可以看到MaxHeapSize 等参数已经生效。</p>
+
+<p>&nbsp;</p>
+
+<h2>二.Tomcat并发优化</h2>
+
+<p>&nbsp;</p>
+
+<p>　　1.Tomcat连接相关参数</p>
+
+<p>　　在Tomcat 配置文件 server.xml 中的</p>
+
+<pre>
+<code>　　&lt;Connector port=&quot;9027&quot;
+　　protocol=&quot;HTTP/1.1&quot;
+　　maxHttpHeaderSize=&quot;8192&quot;
+　　minProcessors=&quot;100&quot;
+　　maxProcessors=&quot;1000&quot;
+　　acceptCount=&quot;1000&quot;
+　　redirectPort=&quot;8443&quot;
+　　disableUploadTimeout=&quot;true&quot;/&gt;</code></pre>
+
+<p>　　2.调整连接器connector的并发处理能力</p>
+
+<p>　　1&gt;参数说明</p>
+
+<p>　　maxThreads 客户请求最大线程数&nbsp;<br />
+　　minSpareThreads Tomcat初始化时创建的 socket 线程数&nbsp;<br />
+　　maxSpareThreads Tomcat连接器的最大空闲 socket 线程数&nbsp;<br />
+　　enableLookups 若设为true, 则支持域名解析，可把 ip 地址解析为主机名&nbsp;<br />
+　　redirectPort 在需要基于安全通道的场合，把客户请求转发到基于SSL 的 redirectPort 端口&nbsp;<br />
+　　acceptAccount 监听端口队列最大数，满了之后客户请求会被拒绝（不能小于maxSpareThreads ）&nbsp;<br />
+　　connectionTimeout 连接超时&nbsp;<br />
+　　minProcessors 服务器创建时的最小处理线程数&nbsp;<br />
+　　maxProcessors 服务器同时最大处理线程数&nbsp;<br />
+　　URIEncoding URL统一编码</p>
+
+<p>　　2&gt;Tomcat中的配置示例</p>
+
+<pre>
+<code>　　&lt;Connector port=&quot;9027&quot;
+　　protocol=&quot;HTTP/1.1&quot;
+　　maxHttpHeaderSize=&quot;8192&quot;
+　　maxThreads=&quot;1000&quot;
+　　minSpareThreads=&quot;100&quot;
+　　maxSpareThreads=&quot;1000&quot;
+　　minProcessors=&quot;100&quot;
+　　maxProcessors=&quot;1000&quot;
+　　enableLookups=&quot;false&quot;
+　　URIEncoding=&quot;utf-8&quot;
+　　acceptCount=&quot;1000&quot;
+　　redirectPort=&quot;8443&quot;
+　　disableUploadTimeout=&quot;true&quot;/&gt;</code></pre>
+
+<p>　　3.Tomcat缓存优化</p>
+
+<p>　　1&gt;参数说明</p>
+
+<p>　　c ompression 打开压缩功能&nbsp;<br />
+　　compressionMinSize 启用压缩的输出内容大小，这里面默认为2KB&nbsp;<br />
+　　compressableMimeType 压缩类型&nbsp;<br />
+　　connectionTimeout 定义建立客户连接超时的时间. 如果为 -1, 表示不限制建立客户连接的时间</p>
+
+<p>　　2&gt;Tomcat中的配置示例</p>
+
+<pre>
+<code>　　&lt;Connector port=&quot;9027&quot;
+　　protocol=&quot;HTTP/1.1&quot;
+　　maxHttpHeaderSize=&quot;8192&quot;
+　　maxThreads=&quot;1000&quot;
+　　minSpareThreads=&quot;100&quot;
+　　maxSpareThreads=&quot;1000&quot;
+　　minProcessors=&quot;100&quot;
+　　maxProcessors=&quot;1000&quot;
+　　enableLookups=&quot;false&quot;
+　　compression=&quot;on&quot;
+　　compressionMinSize=&quot;2048&quot;
+　　compressableMimeType=&quot;text/html,text/xml,text/javascript,text/css,text/plain&quot;
+　　connectionTimeout=&quot;20000&quot;
+　　URIEncoding=&quot;utf-8&quot;
+　　acceptCount=&quot;1000&quot;
+　　redirectPort=&quot;8443&quot;
+　　disableUploadTimeout=&quot;true&quot;/&gt;</code></pre>
+
+<p>　　4.参考配置</p>
+
+<p>　　1&gt;旧有的配置</p>
+
+<p>　　参考网络对服务器做过如下配置，拿出来分享下：</p>
+
+<pre>
+<code>　　&lt;Connector port=&quot;9027&quot;
+　　protocol=&quot;HTTP/1.1&quot;
+　　maxHttpHeaderSize=&quot;8192&quot;
+　　maxThreads=&quot;1000&quot;
+　　minSpareThreads=&quot;25&quot;
+　　maxSpareThreads=&quot;75&quot;
+　　enableLookups=&quot;false&quot;
+　　compression=&quot;on&quot;
+　　compressionMinSize=&quot;2048&quot;
+　　compressableMimeType=&quot;text/html,text/xml,text/javascript,text/css,text/plain&quot;
+　　connectionTimeout=&quot;20000&quot;
+　　URIEncoding=&quot;utf-8&quot;
+　　acceptCount=&quot;200&quot;
+　　redirectPort=&quot;8443&quot;
+　　disableUploadTimeout=&quot;true&quot; /&gt;</code></pre>
+
+<p>　　后来发现在访问量达到3 百万多的时候出现性能瓶颈。&nbsp;<br />
+　　2&gt;更改后的配置</p>
+
+<pre>
+<code>　　&lt;Connector port=&quot;9027&quot;
+　　protocol=&quot;HTTP/1.1&quot;
+　　maxHttpHeaderSize=&quot;8192&quot;
+　　maxThreads=&quot;1000&quot;
+　　minSpareThreads=&quot;100&quot;
+　　maxSpareThreads=&quot;1000&quot;
+　　minProcessors=&quot;100&quot;
+　　maxProcessors=&quot;1000&quot;
+　　enableLookups=&quot;false&quot;
+　　compression=&quot;on&quot;
+　　compressionMinSize=&quot;2048&quot;
+　　compressableMimeType=&quot;text/html,text/xml,text/javascript,text/css,text/plain&quot;
+　　connectionTimeout=&quot;20000&quot;
+　　URIEncoding=&quot;utf-8&quot;
+　　acceptCount=&quot;1000&quot;
+　　redirectPort=&quot;8443&quot;
+　　disableUploadTimeout=&quot;true&quot;/&gt;</code></pre>
