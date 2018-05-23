@@ -1,0 +1,462 @@
+<h1>PowerDesigner 数据库设计导出到Excel</h1>
+
+<p>在PowerDesigner 中 ctrl+shift+x 弹出执行脚本界面，输入如下代码就会生成 Excel</p>
+
+<h2>代码一：所有的导入一个sheet页</h2>
+
+<p>所有的表在同一个 Sheet 页 中</p>
+
+<blockquote>&#39;****************************************************************************** &nbsp;<br />
+&#39;* File: &nbsp; &nbsp; pdm2excel.txt &nbsp;<br />
+&#39;* Title: &nbsp; &nbsp;pdm export to excel &nbsp;<br />
+&#39;* Purpose: &nbsp;To export the tables and columns to Excel &nbsp;<br />
+&#39;* Model: &nbsp; &nbsp;Physical Data Model &nbsp;<br />
+&#39;* Objects: &nbsp;Table, Column, View &nbsp;<br />
+&#39;* Author: &nbsp; ziyan &nbsp;<br />
+&#39;* Created: &nbsp;2012-05-03 &nbsp;<br />
+&#39;* Version: &nbsp;1.0 &nbsp;<br />
+&#39;****************************************************************************** &nbsp;<br />
+Option Explicit &nbsp;<br />
+&nbsp; &nbsp;Dim rowsNum &nbsp;<br />
+&nbsp; &nbsp;rowsNum = 0 &nbsp;<br />
+&#39;----------------------------------------------------------------------------- &nbsp;<br />
+&#39; Main function &nbsp;<br />
+&#39;----------------------------------------------------------------------------- &nbsp;<br />
+&#39; Get the current active model &nbsp;<br />
+Dim Model &nbsp;<br />
+Set Model = ActiveModel &nbsp;<br />
+If (Model Is Nothing) Or (Not Model.IsKindOf(PdPDM.cls_Model)) Then &nbsp;<br />
+&nbsp; MsgBox &quot;The current model is not an PDM model.&quot; &nbsp;<br />
+Else &nbsp;<br />
+&nbsp;&#39; Get the tables collection &nbsp;<br />
+&nbsp;&#39;创建EXCEL APP &nbsp;<br />
+&nbsp;dim beginrow &nbsp;<br />
+&nbsp;DIM EXCEL, SHEET &nbsp;<br />
+&nbsp;set EXCEL = CREATEOBJECT(&quot;Excel.Application&quot;) &nbsp;<br />
+&nbsp;EXCEL.workbooks.add(-4167)&#39;添加工作表 &nbsp;<br />
+&nbsp;EXCEL.workbooks(1).sheets(1).name =&quot;test&quot; &nbsp;<br />
+&nbsp;set sheet = EXCEL.workbooks(1).sheets(&quot;test&quot;) &nbsp;<br />
+&nbsp;&nbsp;<br />
+&nbsp;ShowProperties Model, SHEET &nbsp;<br />
+&nbsp;EXCEL.visible = true &nbsp;<br />
+&nbsp;&#39;设置列宽和自动换行 &nbsp;<br />
+&nbsp;sheet.Columns(1).ColumnWidth = 20 &nbsp;&nbsp;<br />
+&nbsp;sheet.Columns(2).ColumnWidth = 40 &nbsp;&nbsp;<br />
+&nbsp;sheet.Columns(4).ColumnWidth = 20 &nbsp;&nbsp;<br />
+&nbsp;sheet.Columns(5).ColumnWidth = 20 &nbsp;&nbsp;<br />
+&nbsp;sheet.Columns(6).ColumnWidth = 15 &nbsp;&nbsp;<br />
+&nbsp;sheet.Columns(1).WrapText =true &nbsp;<br />
+&nbsp;sheet.Columns(2).WrapText =true &nbsp;<br />
+&nbsp;sheet.Columns(4).WrapText =true &nbsp;<br />
+&nbsp;End If &nbsp;<br />
+&#39;----------------------------------------------------------------------------- &nbsp;<br />
+&#39; Show properties of tables &nbsp;<br />
+&#39;----------------------------------------------------------------------------- &nbsp;<br />
+Sub ShowProperties(mdl, sheet) &nbsp;<br />
+&nbsp; &nbsp;&#39; Show tables of the current model/package &nbsp;<br />
+&nbsp; &nbsp;rowsNum=0 &nbsp;<br />
+&nbsp; &nbsp;beginrow = rowsNum+1 &nbsp;<br />
+&nbsp; &nbsp;&#39; For each table &nbsp;<br />
+&nbsp; &nbsp;output &quot;begin&quot; &nbsp;<br />
+&nbsp; &nbsp;Dim tab &nbsp;<br />
+&nbsp; &nbsp;For Each tab In mdl.tables &nbsp;<br />
+&nbsp; &nbsp; &nbsp; ShowTable tab,sheet &nbsp;<br />
+&nbsp; &nbsp;Next &nbsp;<br />
+&nbsp; &nbsp;if mdl.tables.count &gt; 0 then &nbsp;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; sheet.Range(&quot;A&quot; &amp; beginrow + 1 &amp; &quot;:A&quot; &amp; rowsNum).Rows.Group &nbsp;<br />
+&nbsp; &nbsp;end if &nbsp;<br />
+&nbsp; &nbsp;output &quot;end&quot; &nbsp;<br />
+End Sub &nbsp;<br />
+&#39;----------------------------------------------------------------------------- &nbsp;<br />
+&#39; Show table properties &nbsp;<br />
+&#39;----------------------------------------------------------------------------- &nbsp;<br />
+Sub ShowTable(tab, sheet) &nbsp;<br />
+&nbsp; &nbsp;If IsObject(tab) Then &nbsp;<br />
+&nbsp; &nbsp; &nbsp;Dim rangFlag &nbsp;<br />
+&nbsp; &nbsp; &nbsp;rowsNum = rowsNum + 1 &nbsp;<br />
+&nbsp; &nbsp; &nbsp; &#39; Show properties &nbsp;<br />
+&nbsp; &nbsp; &nbsp; Output &quot;================================&quot; &nbsp;<br />
+&nbsp; &nbsp; &nbsp; sheet.cells(rowsNum, 1) = &quot;实体名&quot; &nbsp;<br />
+&nbsp; &nbsp; &nbsp; sheet.cells(rowsNum, 2) =tab.name &nbsp;<br />
+&nbsp; &nbsp; &nbsp; sheet.cells(rowsNum, 3) = &quot;&quot; &nbsp;<br />
+&nbsp; &nbsp; &nbsp; sheet.cells(rowsNum, 4) = &quot;表名&quot; &nbsp;<br />
+&nbsp; &nbsp; &nbsp; sheet.cells(rowsNum, 5) = tab.code &nbsp;<br />
+&nbsp; &nbsp; &nbsp; sheet.Range(sheet.cells(rowsNum, 5),sheet.cells(rowsNum, 6)).Merge &nbsp;<br />
+&nbsp; &nbsp; &nbsp; rowsNum = rowsNum + 1 &nbsp;<br />
+&nbsp; &nbsp; &nbsp; sheet.cells(rowsNum, 1) = &quot;属性名&quot; &nbsp;<br />
+&nbsp; &nbsp; &nbsp; sheet.cells(rowsNum, 2) = &quot;说明&quot; &nbsp;<br />
+&nbsp; &nbsp; &nbsp; sheet.cells(rowsNum, 3) = &quot;&quot; &nbsp;<br />
+&nbsp; &nbsp; &nbsp; sheet.cells(rowsNum, 4) = &quot;字段中文名&quot; &nbsp;<br />
+&nbsp; &nbsp; &nbsp; sheet.cells(rowsNum, 5) = &quot;字段名&quot; &nbsp;<br />
+&nbsp; &nbsp; &nbsp; sheet.cells(rowsNum, 6) = &quot;字段类型&quot; &nbsp;<br />
+&nbsp; &nbsp; &nbsp; &#39;设置边框 &nbsp;<br />
+&nbsp; &nbsp; &nbsp; sheet.Range(sheet.cells(rowsNum-1, 1),sheet.cells(rowsNum, 2)).Borders.LineStyle = &quot;1&quot; &nbsp;<br />
+&nbsp; &nbsp; &nbsp; sheet.Range(sheet.cells(rowsNum-1, 4),sheet.cells(rowsNum, 6)).Borders.LineStyle = &quot;1&quot; &nbsp;<br />
+Dim col &#39; running column &nbsp;<br />
+Dim colsNum &nbsp;<br />
+colsNum = 0 &nbsp;<br />
+&nbsp; &nbsp; &nbsp; for each col in tab.columns &nbsp;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; rowsNum = rowsNum + 1 &nbsp;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; colsNum = colsNum + 1 &nbsp;<br />
+&nbsp; &nbsp; &nbsp; sheet.cells(rowsNum, 1) = col.name &nbsp;<br />
+&nbsp; &nbsp; &nbsp; sheet.cells(rowsNum, 2) = col.comment &nbsp;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; sheet.cells(rowsNum, 3) = &quot;&quot; &nbsp;<br />
+<strong>&nbsp; &nbsp; &nbsp; sheet.cells(rowsNum, 4) = col.name&nbsp; &nbsp; &nbsp; //修改了！</strong><br />
+&nbsp; &nbsp; &nbsp; sheet.cells(rowsNum, 5) = col.code &nbsp;<br />
+&nbsp; &nbsp; &nbsp; sheet.cells(rowsNum, 6) = col.datatype &nbsp;<br />
+&nbsp; &nbsp; &nbsp; next &nbsp;<br />
+&nbsp; &nbsp; &nbsp; sheet.Range(sheet.cells(rowsNum-colsNum+1,1),sheet.cells(rowsNum,2)).Borders.LineStyle = &quot;2&quot; &nbsp; &nbsp; &nbsp; &nbsp;&nbsp;<br />
+&nbsp; &nbsp; &nbsp; sheet.Range(sheet.cells(rowsNum-colsNum+1,4),sheet.cells(rowsNum,6)).Borders.LineStyle = &quot;2&quot; &nbsp;<br />
+&nbsp; &nbsp; &nbsp; rowsNum = rowsNum + 1 &nbsp;<br />
+&nbsp;&nbsp;<br />
+&nbsp; &nbsp; &nbsp; Output &quot;FullDescription: &quot; &nbsp; &nbsp; &nbsp; + tab.Name &nbsp;<br />
+&nbsp; &nbsp;End If &nbsp;<br />
+End Sub &nbsp;</blockquote>
+
+<h2>代码二：每个表一个sheet页</h2>
+
+<p>每个表都会新建一个 Sheet 页，第一个 Sheet 页上是所有表的列表</p>
+
+<blockquote>&#39;****************************************************************************** &nbsp;&nbsp;<br />
+&#39;* File: &nbsp; &nbsp; pdm2excel.txt &nbsp;&nbsp;<br />
+&#39;* Title: &nbsp; &nbsp;pdm export to excel &nbsp;&nbsp;<br />
+&#39;* Purpose: &nbsp;To export the tables and columns to Excel &nbsp;&nbsp;<br />
+&#39;* Model: &nbsp; &nbsp;Physical Data Model &nbsp;&nbsp;<br />
+&#39;* Objects: &nbsp;Table, Column, View &nbsp;&nbsp;<br />
+&#39;* Author: &nbsp; Chirs &nbsp;&nbsp;<br />
+&#39;* Created: &nbsp;2015-01-28 &nbsp;&nbsp;<br />
+&#39;* Version: &nbsp;1.0 &nbsp;&nbsp;<br />
+&#39;****************************************************************************** &nbsp;&nbsp;<br />
+Option Explicit &nbsp;&nbsp;<br />
+&nbsp; &nbsp;Dim rowsNum &nbsp;&nbsp;<br />
+&nbsp; &nbsp;rowsNum = 0 &nbsp;&nbsp;<br />
+&#39;----------------------------------------------------------------------------- &nbsp;&nbsp;<br />
+&#39; Main function &nbsp;&nbsp;<br />
+&#39;----------------------------------------------------------------------------- &nbsp;&nbsp;<br />
+&#39; Get the current active model &nbsp;&nbsp;<br />
+Dim Model &nbsp;&nbsp;<br />
+Set Model = ActiveModel &nbsp;&nbsp;<br />
+If (Model Is Nothing) Or (Not Model.IsKindOf(PdPDM.cls_Model)) Then &nbsp;&nbsp;<br />
+&nbsp; MsgBox &quot;The current model is not an PDM model.&quot; &nbsp;&nbsp;<br />
+Else &nbsp;&nbsp;<br />
+&nbsp;&#39; Get the tables collection &nbsp;&nbsp;<br />
+&nbsp;&#39;创建EXCEL APP &nbsp;&nbsp;<br />
+&nbsp;&nbsp;<br />
+&nbsp;&nbsp;<br />
+Dim beginrow &nbsp;<br />
+&nbsp;Dim EXCEL, BOOK, SHEET &nbsp;<br />
+&nbsp;Set EXCEL = CreateObject(&quot;Excel.Application&quot;) &nbsp;<br />
+&nbsp;EXCEL.Visible = True &nbsp;<br />
+&nbsp;Set BOOK = EXCEL.Workbooks.Add(-4167) &#39;新建工作簿 &nbsp;<br />
+&nbsp;&nbsp;<br />
+&nbsp;BOOK.Sheets(1).Name = &quot;数据库表结构&quot; &nbsp;<br />
+&nbsp;Set SHEET = EXCEL.workbooks(1).sheets(&quot;数据库表结构&quot;) &nbsp;<br />
+&nbsp;&nbsp;<br />
+&nbsp;ShowProperties Model, SHEET &nbsp;<br />
+&nbsp;EXCEL.visible = true &nbsp;&nbsp;<br />
+&nbsp;&#39;设置列宽和自动换行 &nbsp;&nbsp;<br />
+&nbsp;SHEET.Columns(1).ColumnWidth = 10 &nbsp; &nbsp;&nbsp;<br />
+&nbsp;SHEET.Columns(2).ColumnWidth = 30 &nbsp; &nbsp;&nbsp;<br />
+&nbsp;SHEET.Columns(3).ColumnWidth = 20 &nbsp; &nbsp;&nbsp;<br />
+&nbsp;&nbsp;<br />
+&nbsp;SHEET.Columns(1).WrapText =true &nbsp;&nbsp;<br />
+&nbsp;SHEET.Columns(2).WrapText =true &nbsp;&nbsp;<br />
+&nbsp;SHEET.Columns(3).WrapText =true &nbsp;&nbsp;<br />
+&nbsp;&nbsp;<br />
+End If &nbsp;<br />
+&nbsp;&nbsp;<br />
+&#39;----------------------------------------------------------------------------- &nbsp;&nbsp;<br />
+&#39; Show properties of tables &nbsp;&nbsp;<br />
+&#39;----------------------------------------------------------------------------- &nbsp;&nbsp;<br />
+Sub ShowProperties(mdl, sheet) &nbsp;&nbsp;<br />
+&nbsp; &nbsp;&#39; Show tables of the current model/package &nbsp;&nbsp;<br />
+&nbsp; &nbsp;rowsNum=0 &nbsp;&nbsp;<br />
+&nbsp; &nbsp;beginrow = rowsNum+1 &nbsp;&nbsp;<br />
+&nbsp; &nbsp;&#39; For each table &nbsp;&nbsp;<br />
+&nbsp; &nbsp;output &quot;begin&quot; &nbsp;&nbsp;<br />
+&nbsp; &nbsp;Dim tab &nbsp;&nbsp;<br />
+&nbsp; &nbsp;For Each tab In mdl.tables &nbsp;&nbsp;<br />
+&nbsp; &nbsp; &nbsp; ShowTable tab,sheet &nbsp;&nbsp;<br />
+&nbsp; &nbsp;Next &nbsp;&nbsp;<br />
+&nbsp; &nbsp;if mdl.tables.count &gt; 0 then &nbsp;&nbsp;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; sheet.Range(&quot;A&quot; &amp; beginrow + 1 &amp; &quot;:A&quot; &amp; rowsNum).Rows.Group &nbsp;&nbsp;<br />
+&nbsp; &nbsp;end if &nbsp;&nbsp;<br />
+&nbsp; &nbsp;output &quot;end&quot; &nbsp;&nbsp;<br />
+End Sub &nbsp;<br />
+&nbsp;&nbsp;<br />
+&#39;----------------------------------------------------------------------------- &nbsp;&nbsp;<br />
+&#39; 数据表查询 &nbsp;&nbsp;<br />
+&#39;----------------------------------------------------------------------------- &nbsp;<br />
+Sub ShowTable(tab, sheet) &nbsp; &nbsp;&nbsp;<br />
+&nbsp; &nbsp;If IsObject(tab) Then &nbsp;&nbsp;<br />
+&nbsp; &nbsp; &nbsp;Dim rangFlag &nbsp;<br />
+&nbsp; &nbsp; &nbsp; sheet.cells(1, 1) = &quot;序号&quot; &nbsp;&nbsp;<br />
+&nbsp; &nbsp; &nbsp; sheet.cells(1, 2) = &quot;表名&quot; &nbsp;<br />
+&nbsp; &nbsp; &nbsp; sheet.cells(1, 3) = &quot;实体名&quot; &nbsp;<br />
+&nbsp; &nbsp; &nbsp; &#39;设置边框 &nbsp;&nbsp;<br />
+&nbsp; &nbsp; &nbsp; sheet.Range(sheet.cells(1, 1),sheet.cells(1, 3)).Borders.LineStyle = &quot;1&quot; &nbsp;<br />
+&nbsp; &nbsp; &nbsp; &#39;设置背景颜色 &nbsp;<br />
+&nbsp; &nbsp; &nbsp; sheet.Range(sheet.cells(1, 1),sheet.cells(1, 3)).Interior.ColorIndex = &quot;19&quot; &nbsp;<br />
+&nbsp;&nbsp;<br />
+&nbsp; &nbsp; &nbsp; rowsNum = rowsNum + 1 &nbsp;<br />
+&nbsp; &nbsp; &nbsp; sheet.cells(rowsNum+1, 1) = rowsNum &nbsp;&nbsp;<br />
+&nbsp; &nbsp; &nbsp; sheet.cells(rowsNum+1, 2) = tab.code &nbsp;<br />
+&nbsp; &nbsp; &nbsp; sheet.cells(rowsNum+1, 3) = tab.name &nbsp;<br />
+&nbsp; &nbsp; &nbsp; &#39;设置边框 &nbsp;<br />
+&nbsp; &nbsp; &nbsp; sheet.Range(sheet.cells(rowsNum+1,1),sheet.cells(rowsNum+1,3)).Borders.LineStyle = &quot;2&quot; &nbsp;<br />
+&nbsp;&nbsp;<br />
+&nbsp; &nbsp; &nbsp; &#39;增加Sheet &nbsp;<br />
+&nbsp; &nbsp; &nbsp; BOOK.Sheets.Add , BOOK.Sheets(BOOK.Sheets.count) &nbsp;<br />
+&nbsp; &nbsp; &nbsp; BOOK.Sheets(rowsNum+1).Name = tab.code &nbsp;&nbsp;<br />
+&nbsp;&nbsp;<br />
+&nbsp; &nbsp; &nbsp; Dim shtn &nbsp;<br />
+&nbsp; &nbsp; &nbsp; Set shtn = EXCEL.workbooks(1).sheets(tab.code) &nbsp;<br />
+&nbsp; &nbsp; &nbsp; &#39;设置列宽和换行 &nbsp;<br />
+&nbsp; &nbsp; &nbsp; &nbsp;shtn.Columns(1).ColumnWidth = 30 &nbsp; &nbsp;&nbsp;<br />
+&nbsp; &nbsp; &nbsp; &nbsp;shtn.Columns(2).ColumnWidth = 20 &nbsp; &nbsp;&nbsp;<br />
+&nbsp; &nbsp; &nbsp; &nbsp;shtn.Columns(3).ColumnWidth = 20 &nbsp;<br />
+&nbsp; &nbsp; &nbsp; &nbsp;shtn.Columns(5).ColumnWidth = 30 &nbsp; &nbsp;&nbsp;<br />
+&nbsp; &nbsp; &nbsp; &nbsp;shtn.Columns(6).ColumnWidth = 20 &nbsp; &nbsp;&nbsp;<br />
+&nbsp;&nbsp;<br />
+&nbsp; &nbsp; &nbsp; &nbsp;shtn.Columns(1).WrapText =true &nbsp;&nbsp;<br />
+&nbsp; &nbsp; &nbsp; &nbsp;shtn.Columns(2).WrapText =true &nbsp;&nbsp;<br />
+&nbsp; &nbsp; &nbsp; &nbsp;shtn.Columns(3).WrapText =true &nbsp;<br />
+&nbsp; &nbsp; &nbsp; &nbsp;shtn.Columns(5).WrapText =true &nbsp;&nbsp;<br />
+&nbsp; &nbsp; &nbsp; &nbsp;shtn.Columns(6).WrapText =true &nbsp;<br />
+&nbsp;&nbsp;<br />
+&nbsp; &nbsp; &nbsp; &nbsp;&#39;设置列标题 &nbsp;<br />
+&nbsp; &nbsp; &nbsp; &nbsp;shtn.cells(1, 1) = &quot;字段中文名&quot; &nbsp;&nbsp;<br />
+&nbsp; &nbsp; &nbsp; &nbsp;shtn.cells(1, 2) = &quot;字段名&quot; &nbsp;<br />
+&nbsp; &nbsp; &nbsp; &nbsp;shtn.cells(1, 3) = &quot;字段类型&quot; &nbsp;<br />
+&nbsp; &nbsp; &nbsp; &nbsp;shtn.cells(1, 5) = tab.code &nbsp;<br />
+&nbsp; &nbsp; &nbsp; &nbsp;shtn.cells(1, 6) = tab.Name &nbsp;<br />
+&nbsp; &nbsp; &nbsp; &nbsp;&#39;设置边框 &nbsp;&nbsp;<br />
+&nbsp; &nbsp; &nbsp; &nbsp;shtn.Range(shtn.cells(1, 1),shtn.cells(1, 3)).Borders.LineStyle = &quot;1&quot; &nbsp;<br />
+&nbsp; &nbsp; &nbsp; &nbsp;shtn.Range(shtn.cells(1, 5),shtn.cells(1, 6)).Borders.LineStyle = &quot;1&quot; &nbsp;<br />
+&nbsp; &nbsp; &nbsp; &nbsp;&#39;设置背景颜色 &nbsp;<br />
+&nbsp; &nbsp; &nbsp; &nbsp;shtn.Range(shtn.cells(1, 1),shtn.cells(1, 3)).Interior.ColorIndex = &quot;19&quot; &nbsp;<br />
+&nbsp; &nbsp; &nbsp; &nbsp;shtn.Range(shtn.cells(1, 5),shtn.cells(1, 6)).Interior.ColorIndex = &quot;19&quot; &nbsp;<br />
+&nbsp;&nbsp;<br />
+&nbsp; &nbsp; &nbsp; Dim col &#39; running column &nbsp;&nbsp;<br />
+&nbsp; &nbsp; &nbsp; Dim colsNum &nbsp;<br />
+&nbsp; &nbsp; &nbsp; Dim rNum &nbsp;&nbsp;<br />
+&nbsp; &nbsp; &nbsp; colsNum = 0 &nbsp;<br />
+&nbsp; &nbsp; &nbsp; rNum = 0 &nbsp;&nbsp;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; for each col in tab.columns &nbsp;&nbsp;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; rNum = rNum + 1 &nbsp;&nbsp;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; colsNum = colsNum + 1 &nbsp;&nbsp;<br />
+&nbsp;&nbsp;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; shtn.cells(rNum+1, 1) = col.name &nbsp;&nbsp;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; shtn.cells(rNum+1, 2) = col.code &nbsp;&nbsp;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; shtn.cells(rNum+1, 3) = col.datatype &nbsp;&nbsp;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; next &nbsp;&nbsp;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; shtn.Range(shtn.cells(rNum-colsNum+2,1),shtn.cells(rNum+1,3)).Borders.LineStyle = &quot;2&quot; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;&nbsp;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; rNum = rNum + 1 &nbsp;&nbsp;<br />
+&nbsp;&nbsp;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; Output &quot;FullDescription: &quot; &nbsp; &nbsp; &nbsp; + tab.Name &nbsp;<br />
+&nbsp;&nbsp;<br />
+&nbsp; &nbsp;End If &nbsp; &nbsp;&nbsp;<br />
+End Sub &nbsp;</blockquote>
+
+<h2>&nbsp;</h2>
+
+<h2>实际中的修改</h2>
+
+<p>替换第一个脚本倒数第十句</p>
+
+<p>&nbsp; &nbsp; &nbsp; Dim point&nbsp;<br />
+&nbsp; &nbsp; &nbsp; point = InStr(col.comment,&quot;,&quot;) + InStr(col.comment,&quot;，&quot;) + InStr(col.comment,&quot; &quot;) + InStr(col.comment,&quot;:&quot;) + InStr(col.comment,&quot;：&quot;)<br />
+&nbsp; &nbsp; &nbsp; if point &gt; 0 then<br />
+&nbsp; &nbsp; &nbsp; &nbsp; sheet.cells(rowsNum, 4) = left(col.comment,point-1)<br />
+&nbsp; &nbsp; &nbsp; else<br />
+&nbsp; &nbsp; &nbsp; &nbsp; sheet.cells(rowsNum, 4) = col.comment<br />
+&nbsp; &nbsp; &nbsp; end if</p>
+
+<p>&nbsp;</p>
+
+<p><span style="font-size:16px">几个参考知识</span></p>
+
+<h3>VBScript InStr 函数</h3>
+
+<p><a href="http://www.w3school.com.cn/vbscript/vbscript_ref_functions.asp" title="VBScript 函数">VBScript 函数参考手册</a></p>
+
+<h4>定义和用法</h4>
+
+<p>InStr 函数可返回一个字符串在另一个字符串中首次出现的位置。</p>
+
+<p>InStr 函数可返回下面的值：</p>
+
+<ul>
+	<li>如果 string1 为 &quot;&quot;（零长度） - InStr 返回 0</li>
+	<li>如果 string1 为 Null - InStr 返回 Null</li>
+	<li>如果 string2 为 &quot;&quot; - InStr 返回 start</li>
+	<li>如果 string2 为 Null - InStr 返回 Null</li>
+	<li>如果 string2 没有找到 - InStr 返回 0</li>
+	<li>如果在 string1 中找到 string2，InStr 返回找到匹配字符串的位置。</li>
+	<li>如果 start &gt; Len(string1) - InStr 返回 0</li>
+</ul>
+
+<p>提示：请参阅&nbsp;<a href="http://www.w3school.com.cn/vbscript/func_instrrev.asp" title="VBScript InStrRev 函数">InStrRev 函数</a>。</p>
+
+<h4>语法</h4>
+
+<pre>
+InStr([start,]string1,string2[,compare])</pre>
+
+<table>
+	<tbody>
+		<tr>
+			<th>参数</th>
+			<th>描述</th>
+		</tr>
+		<tr>
+			<td>start</td>
+			<td>可选的。规定每次搜索的起始位置。默认是搜索起始位置是第一个字符。如果已规定 compare 参数，则必须有此参数。</td>
+		</tr>
+		<tr>
+			<td>string1</td>
+			<td>必需的。需要被搜索的字符串。</td>
+		</tr>
+		<tr>
+			<td>string2</td>
+			<td>必需的。需搜索的字符串。</td>
+		</tr>
+		<tr>
+			<td>compare</td>
+			<td>
+			<p>必需的。规定要使用的字符串比较类型。默认是 0 。可采用下列值：</p>
+
+			<ul>
+				<li>0 = vbBinaryCompare - 执行二进制比较。</li>
+				<li>1 = vbTextCompare - 执行文本比较。</li>
+			</ul>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>&nbsp;</p>
+
+<h3>VBScript InStrRev 函数</h3>
+
+<p><a href="http://www.w3school.com.cn/vbscript/vbscript_ref_functions.asp" title="VBScript 函数">VBScript 函数参考手册</a></p>
+
+<h4>定义和用法</h4>
+
+<p>InStrRev 函数可返回一个字符串在另一个字符串中首次出现的位置。搜索从字符串的末端开始，但是返回的位置是从字符串的起点开始计数的。</p>
+
+<p>InStrRev 函数可返回下面的值：</p>
+
+<ul>
+	<li>如果 string1 为 &quot;&quot;（零长度） - InStr 返回 0</li>
+	<li>如果 string1 为 Null - InStr 返回 Null</li>
+	<li>如果 string2 为 &quot;&quot; - InStr 返回 start</li>
+	<li>如果 string2 为 Null - InStr 返回 Null</li>
+	<li>如果 string2 没有找到 - InStr 返回 0</li>
+	<li>如果在 string1 中找到 string2，InStr 返回找到匹配字符串的位置。</li>
+	<li>如果 start &gt; Len(string1) - InStr 返回 0</li>
+</ul>
+
+<p>提示：请参阅&nbsp;<a href="http://www.w3school.com.cn/vbscript/func_instr.asp" title="VBScript InStr 函数">InStr 函数</a>。</p>
+
+<h4>语法</h4>
+
+<pre>
+InStrRev(string1,string2[,start[,compare]])</pre>
+
+<table>
+	<tbody>
+		<tr>
+			<th>参数</th>
+			<th>描述</th>
+		</tr>
+		<tr>
+			<td>start</td>
+			<td>可选的。规定每次搜索的起始位置。默认是搜索起始位置是第一个字符。如果已规定 compare 参数，则必须有此参数。</td>
+		</tr>
+		<tr>
+			<td>string1</td>
+			<td>必需的。需要被搜索的字符串。</td>
+		</tr>
+		<tr>
+			<td>string2</td>
+			<td>必需的。需搜索的字符串。</td>
+		</tr>
+		<tr>
+			<td>compare</td>
+			<td>
+			<p>必需的。规定要使用的字符串比较类型。默认是 0 。可采用下列值：</p>
+
+			<ul>
+				<li>0 = vbBinaryCompare - 执行二进制比较。</li>
+				<li>1 = vbTextCompare - 执行文本比较。</li>
+			</ul>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>&nbsp;</p>
+
+<h3>2、怎么截取固定符号前后的字符串</h3>
+
+<p>请教：想截取&ldquo;/&rdquo;前后两边的各一位数字，谢谢！<br />
+项目1/1号<br />
+Q项目1/2号<br />
+R-Q项目1/3号</p>
+
+<p>使用Mid函数和InStr函数</p>
+
+<p>s = &quot;项目1/1号&quot;<br />
+s = Mid(s, InStr(1, s, &quot;/&quot;) - 1, 3)</p>
+
+<p>&nbsp;</p>
+
+<h3>3、left 函数 截取左侧字符串</h3>
+
+<p>left(col.comment,InStr(col.comment,&quot;,&quot;))</p>
+
+<p>&nbsp;</p>
+
+<h3>4、if else 语句</h3>
+
+<p>If...Then...Else 语句<br />
+<br />
+根据表达式的值有条件地执行一组语句。</p>
+
+<p>If condition Then statements [Else elsestatements ]</p>
+
+<p>或者，使用块形式的语法：</p>
+
+<p>If condition Then<br />
+[statements]<br />
+[ElseIf condition-n Then<br />
+[elseifstatements]] . . .<br />
+[Else<br />
+[elsestatements]]<br />
+End If</p>
+
+<p>参数<br />
+condition</p>
+
+<p>一个或多个下面两种类型的表达式：</p>
+
+<p>数值或字符串表达式，其运算结果是 True 或 False。如果 condition 是 Null，则 condition 被视为 False。</p>
+
+<p>形如 TypeOf objectname Is objecttype 的表达式。objectname 是任何对象的引用，而 objecttype 则是任何有效的对象类型。如果 objectname 是 objecttype 所指定的一种对象类型，则表达式为 True；否则为 False。</p>
+
+<p>Statements</p>
+
+<p>如果 condition 为 True 时，执行的一条或多条（以冒号分开）语句。</p>
+
+<p>condition-n</p>
+
+<p>同 condition。</p>
+
+<p>elseifstatements</p>
+
+<p>如果相关的 condition-n 为 True时，执行的一条或多条语句。</p>
+
+<p>elsestatements</p>
+
+<p>如果前面没有 condition 或 condition-n 表达式为 True 时，执行的一条或多条语句。</p>

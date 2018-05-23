@@ -1,0 +1,155 @@
+<h1><a href="http://www.cnblogs.com/nttzliyu/p/6821220.html" id="cb_post_title_url">PowerDesigner中常用的脚本</a></h1>
+
+<h2>运行脚本的位置</h2>
+
+<p>Tools &gt; Execute Commands &gt; Edit/Run Script &nbsp;</p>
+
+<p><strong>快捷键 shift+ctrl+x</strong></p>
+
+<h2>Name转到Comment注释字段</h2>
+
+<pre>
+Option   Explicit 
+ValidationMode   =   True 
+InteractiveMode   =   im_Batch 
+
+Dim   mdl   &#39;   the   current   model 
+
+&#39;   get   the   current   active   model 
+Set   mdl   =   ActiveModel 
+If   (mdl   Is   Nothing)   Then 
+      MsgBox   &quot;There   is   no   current   Model &quot; 
+ElseIf   Not   mdl.IsKindOf(PdPDM.cls_Model)   Then 
+      MsgBox   &quot;The   current   model   is   not   an   Physical   Data   model. &quot; 
+Else 
+      ProcessFolder   mdl 
+End   If 
+
+&#39;   This   routine   copy   name   into   comment   for   each   table,   each   column   and   each   view 
+&#39;   of   the   current   folder 
+Private   sub   ProcessFolder(folder)    
+      Dim   Tab   &#39;running     table    
+      for   each   Tab   in   folder.tables    
+            if   not   tab.isShortcut then
+                     if  trim(tab.comment)=&quot;&quot; then&#39;如果有表的注释,则不改变它.如果没有表注释.则把name添加到注释里面.
+                        tab.comment   =   tab.name
+                     end if  
+                  Dim   col   &#39;   running   column    
+                  for   each   col   in   tab.columns   
+                        if trim(col.comment)=&quot;&quot; then &#39;如果col的comment为空,则填入name,如果已有注释,则不添加;这样可以避免已有注释丢失.
+                           col.comment=   col.name   
+                        end if 
+                  next    
+            end   if    
+      next    
+  
+      Dim   view   &#39;running   view    
+      for   each   view   in   folder.Views    
+            if   not   view.isShortcut and trim(view.comment)=&quot;&quot;  then    
+                  view.comment   =   view.name    
+            end   if    
+      next    
+  
+      &#39;   go   into   the   sub-packages    
+      Dim   f   &#39;   running   folder    
+      For   Each   f   In   folder.Packages    
+            if   not   f.IsShortcut   then    
+                  ProcessFolder   f    
+            end   if    
+      Next    
+end   sub 
+</pre>
+
+<p>&nbsp;</p>
+
+<h2>Comment注释字段转到Name （这样用于逆向生成）</h2>
+
+<pre>
+Option   Explicit    
+ValidationMode   =   True    
+InteractiveMode   =   im_Batch    
+  
+Dim   mdl   &#39;   the   current   model    
+  
+&#39;   get   the   current   active   model    
+Set   mdl   =   ActiveModel    
+If   (mdl   Is   Nothing)   Then    
+      MsgBox   &quot;There   is   no   current   Model &quot;    
+ElseIf   Not   mdl.IsKindOf(PdPDM.cls_Model)   Then    
+      MsgBox   &quot;The   current   model   is   not   an   Physical   Data   model. &quot;    
+Else    
+      ProcessFolder   mdl    
+End   If    
+  
+Private   sub   ProcessFolder(folder)    
+On Error Resume Next   
+      Dim   Tab   &#39;running     table    
+      for   each   Tab   in   folder.tables    
+            if   not   tab.isShortcut   then    
+                  tab.name   =   tab.comment   
+                  Dim   col   &#39;   running   column    
+                  for   each   col   in   tab.columns    
+                  if col.comment=&quot;&quot; then   
+                  else  
+                        col.name=   col.comment    
+                  end if  
+                  next    
+            end   if    
+      next    
+  
+      Dim   view   &#39;running   view    
+      for   each   view   in   folder.Views    
+            if   not   view.isShortcut   then    
+                  view.name   =   view.comment    
+            end   if    
+      next    
+  
+      &#39;   go   into   the   sub-packages    
+      Dim   f   &#39;   running   folder    
+      For   Each   f   In   folder.Packages    
+            if   not   f.IsShortcut   then    
+                  ProcessFolder   f    
+            end   if    
+      Next    
+end   sub </pre>
+
+<h2>字段都转到大写的</h2>
+
+<pre>
+Option Explicit
+ValidationMode = True
+InteractiveMode = im_Batch
+Dim mdl 
+Set mdl = ActiveModel
+If (mdl Is Nothing) Then
+ MsgBox &quot;There is no current Model&quot;
+ElseIf Not mdl.IsKindOf(PdPDM.cls_Model) Then
+ MsgBox &quot;The current model is not an Physical Data model.&quot;
+Else
+ ProcessFolder mdl
+End If
+
+Private sub ProcessFolder(folder)
+ Dim Tab
+ for each Tab in folder.tables
+   tab.code = UCase(tab.code)
+   Dim col
+   for each col in tab.columns
+    col.code= UCase(col.code)
+   next
+   Dim idx
+   for each idx in tab.indexes
+    idx.code= UCase(idx.code)
+   next
+   Dim key
+   for each key in tab.keys
+    key.code= UCase(key.code)
+   next
+ next
+ Dim f  
+ For Each f In folder.Packages
+  if not f.IsShortcut then
+   ProcessFolder f
+  end if
+ Next
+end sub</pre>
