@@ -1,0 +1,261 @@
+<h1>​mysql几种性能测试的工具使用</h1>
+
+<h2>一、mysqlslap</h2>
+
+<p>&nbsp; &nbsp; 安装：装了mysql就有了<br />
+&nbsp; &nbsp; 作用：模拟并发测试数据库性能。<br />
+&nbsp; &nbsp; 优点：简单，容易使用。<br />
+&nbsp; &nbsp; 不足：不能指定生成的数据规模，测试过程不清楚针对十万级还是百万级数据做的测试，感觉不太适合做综合测试，比较适合针对既有数据库，对单个sql进行优化的测试。<br />
+&nbsp; &nbsp; 使用方法：<br />
+&nbsp; &nbsp;&nbsp;可以使用mysqlslap --help来显示使用方法：<br />
+​<br />
+&nbsp; &nbsp; &nbsp;Default options are read from the following files in the given order:<br />
+​<br />
+&nbsp; &nbsp; &nbsp;/etc/mysql/my.cnf /etc/my.cnf ~/.my.cnf<br />
+​<br />
+&nbsp; &nbsp; &nbsp;--engines：代表要测试的引擎，可以有多个，用分隔符隔开。<br />
+​<br />
+&nbsp; &nbsp; &nbsp;--iterations：代表要运行这些测试多少次。<br />
+​<br />
+&nbsp; &nbsp; &nbsp;--auto-generate-sql ：代表用系统自己生成的SQL脚本来测试。<br />
+​<br />
+&nbsp; &nbsp; &nbsp;--auto-generate-sql-load-type： 代表要测试的是读还是写还是两者混合的（read,write,update,mixed）<br />
+​<br />
+&nbsp; &nbsp; &nbsp;--number-of-queries：代表总共要运行多少次查询。每个客户运行的查询数量可以用查询总数/并发数来计算。<br />
+​<br />
+&nbsp; &nbsp; --debug-info 代表要额外输出CPU以及内存的相关信息。<br />
+​<br />
+&nbsp; &nbsp; --number-int-cols ：创建测试表的 int 型字段数量<br />
+​<br />
+&nbsp; &nbsp; --auto-generate-sql-add-autoincrement : 代表对生成的表自动添加auto_increment列，从5.1.18版本开始<br />
+​<br />
+&nbsp; &nbsp; --number-char-cols 创建测试表的 char 型字段数量。<br />
+​<br />
+&nbsp; &nbsp; --create-schema 测试的schema，MySQL中schema也就是database。<br />
+​<br />
+&nbsp; &nbsp; --query &nbsp;使用自定义脚本执行测试，例如可以调用自定义的一个存储过程或者sql语句来执行测试。<br />
+​<br />
+&nbsp; &nbsp;&nbsp;--only-print 如果只想打印看看SQL语句是什么，可以用这个选项。<br />
+​<br />
+&nbsp; &nbsp; mysqlslap -u root -p --concurrency=100 --iterations=1 --auto-generate-sql --auto-generate-sql-add-autoincrement --auto-generate-sql-load-type=mixed --engine=myisam --number-of-queries=10<br />
+​<br />
+或：<br />
+&nbsp; &nbsp;&nbsp;指定数据库和sql语句:<br />
+​<br />
+&nbsp; &nbsp; mysqlslap -h localhost -P 123456 --concurrency=100 --iterations=1 --create-schema=&#39;mysql&#39; --query=&#39;select * from user;&#39; --number-of-queries=10 -u root -p<br />
+​<br />
+&nbsp; &nbsp;&nbsp;要是看到底做了什么可以加上：--only-print<br />
+Benchmark<br />
+&nbsp; &nbsp; &nbsp; &nbsp; Average number of seconds to run all queries: 25.225 seconds<br />
+&nbsp; &nbsp; &nbsp; &nbsp; Minimum number of seconds to run all queries: 25.225 seconds<br />
+&nbsp; &nbsp; &nbsp; &nbsp; Maximum number of seconds to run all queries: 25.225 seconds<br />
+&nbsp; &nbsp; &nbsp; &nbsp; Number of clients running queries: 100<br />
+&nbsp; &nbsp; &nbsp; &nbsp; Average number of queries per client: 0<br />
+​<br />
+&nbsp; &nbsp; 以上表明100个客户端同时运行要25秒<br />
+​<br />
+&nbsp; &nbsp; 再如:<br />
+​<br />
+&nbsp; &nbsp; mysqlslap -uroot -p123456 --concurrency=100 --iterations=1 --engine=myisam --create-schema=&#39;haodingdan112&#39; --query=&#39;select * &nbsp;From order_boxing_transit where id = 10&#39; --number-of-queries=1 --debug-info</p>
+
+<h2>二、sysbench&nbsp;</h2>
+
+<p>安装：<br />
+&nbsp; &nbsp; 可以从http://sourceforge.net/projects/sysbench/ 下载<br />
+&nbsp; &nbsp; tar zxf sysbench-0.4.12.tar.gz<br />
+&nbsp; &nbsp; cd sysbench-0.4.12<br />
+&nbsp; &nbsp; ./autogen.sh<br />
+&nbsp; &nbsp; ./configure &amp;&amp; make &amp;&amp; make install<br />
+​<br />
+&nbsp; &nbsp; strip /usr/local/bin/sysbench<br />
+​<br />
+&nbsp; &nbsp; 安装时候可能会报错，后来baidu发现个好文 http://blog.csdn.net/icelemon1314/article/details/7004955 怕以后找不到，也贴过来吧<br />
+​<br />
+&nbsp; &nbsp;&nbsp;1.如果mysql不是默认路径安装，那么需要通过指定--with-mysql-includes和--with-mysql-libs参数来加载mysql安装路径<br />
+​<br />
+2.如果报错：<br />
+&nbsp; &nbsp; ../libtool: line 838: X--tag=CC: command not found<br />
+&nbsp; &nbsp; ../libtool: line 871: libtool: ignoring unknown tag : command not found<br />
+&nbsp; &nbsp; ../libtool: line 838: X--mode=link: command not found<br />
+&nbsp; &nbsp; ../libtool: line 1004: *** Warning: inferring the mode of operation is deprecated.: command not found<br />
+&nbsp; &nbsp; ../libtool: line 1005: *** Future versions of Libtool will require --mode=MODE be specified.: command not found<br />
+&nbsp; &nbsp; ../libtool: line 2231: X-g: command not found<br />
+&nbsp; &nbsp; ../libtool: line 2231: X-O2: command not found<br />
+&nbsp; &nbsp;&nbsp;那么执行下根目录的：autogen.sh文件，然后重新configure &amp;&amp; make &amp;&amp; make install<br />
+​<br />
+3.如果报错：<br />
+&nbsp; &nbsp; sysbench: error while loading shared libraries: libmysqlclient.so.18: cannot open shared object file: No such file or directory<br />
+​<br />
+&nbsp; &nbsp; 那么执行下：<br />
+&nbsp; &nbsp;&nbsp;ln -s /usr/local/mysql5.5/mysql/lib/libmysqlclient.so.18 /usr/lib64/<br />
+​<br />
+4.如果执行autogen.sh时，报如下错误：<br />
+&nbsp; &nbsp; ./autogen.sh: line 3: aclocal: command not found<br />
+&nbsp; &nbsp; 那么需要安装一个软件：<br />
+&nbsp; &nbsp;&nbsp;yum install automake<br />
+&nbsp; &nbsp; 然后需要增加一个参数：查找： AC_PROG_LIBTOOL 将其注释，然后增加AC_PROG_RANLIB&nbsp;<br />
+&nbsp; &nbsp; 作用：模拟并发,可以执行CPU/内存/线程/IO/数据库等方面的性能测试。数据库目前支持MySQL/Oracle/PostgreSQL<br />
+&nbsp; &nbsp; 优点：可以指定测试数据的规模，可以单独测试读、写的性能，也可以测试读写混合的性能。<br />
+&nbsp; &nbsp; 不足：测试的时候，由于网络原因，测试的非常慢，但是最终给的结果却很好，并发支持很高，所以给我的感觉是并不太准确。当然也可能我没搞明白原理<br />
+​<br />
+使用方法：<br />
+&nbsp; &nbsp; 准备数据&nbsp;<br />
+&nbsp; &nbsp; sysbench --test=oltp --mysql-table-engine=myisam --oltp-table-size=400000 --mysql-db=dbtest2 --mysql-user=root --mysql-host=192.168.1.101 --mysql-password=pwd prepare<br />
+​<br />
+​<br />
+执行测试<br />
+&nbsp; &nbsp; sysbench --num-threads=100 --max-requests=4000 --test=oltp --mysql-table-engine=innodb --oltp-table-size=400000 --mysql-db=dbtest1 --mysql-user=root --mysql-host=192.168.1.101 --mysql-password=pwd run&nbsp;<br />
+​<br />
+&nbsp; &nbsp; sysbench 0.4.12: multi-threaded system evaluation benchmark<br />
+&nbsp; &nbsp; No DB drivers specified, using mysql<br />
+&nbsp; &nbsp; Running the test with following options:<br />
+&nbsp; &nbsp; Number of threads: 100<br />
+&nbsp; &nbsp; Doing OLTP test.<br />
+&nbsp; &nbsp; Running mixed OLTP test<br />
+&nbsp; &nbsp; Using Special distribution (12 iterations, 1 pct of values are returned in 75 pct cases)<br />
+&nbsp; &nbsp; Using &quot;BEGIN&quot; for starting transactions<br />
+&nbsp; &nbsp; Using auto_inc on the id column<br />
+&nbsp; &nbsp; Maximum number of requests for OLTP test is limited to 4000<br />
+&nbsp; &nbsp; Threads started!<br />
+&nbsp; &nbsp; Done.<br />
+&nbsp; &nbsp; OLTP test statistics:<br />
+&nbsp; &nbsp; queries performed:<br />
+&nbsp; &nbsp; read: 56014<br />
+&nbsp; &nbsp; write: 20005<br />
+&nbsp; &nbsp; other: 8002<br />
+&nbsp; &nbsp; total: 84021<br />
+&nbsp; &nbsp; transactions: 4001 (259.14 per sec.)<br />
+&nbsp; &nbsp; deadlocks: 0 (0.00 per sec.)<br />
+&nbsp; &nbsp; read/write requests: 76019 (4923.75 per sec.)<br />
+&nbsp; &nbsp; other operations: 8002 (518.29 per sec.)<br />
+&nbsp; &nbsp; Test execution summary:<br />
+&nbsp; &nbsp; total time: 15.4393s<br />
+&nbsp; &nbsp; total number of events: 4001<br />
+&nbsp; &nbsp; total time taken by event execution: 1504.7744<br />
+&nbsp; &nbsp; per-request statistics:<br />
+&nbsp; &nbsp; min: 33.45ms<br />
+&nbsp; &nbsp; avg: 376.10ms<br />
+&nbsp; &nbsp; max: 861.53ms<br />
+&nbsp; &nbsp; approx. 95 percentile: 505.65ms<br />
+&nbsp; &nbsp; Threads fairness:<br />
+&nbsp; &nbsp; events (avg/stddev): 40.0100/0.67<br />
+&nbsp; &nbsp; execution time (avg/stddev): 15.0477/0.22</p>
+
+<h2>​​三、tpcc-mysql&nbsp;</h2>
+
+<p>&nbsp; &nbsp; 安装：<br />
+&nbsp; &nbsp; export C_INCLUDE_PATH=/usr/include/mysql<br />
+&nbsp; &nbsp; export PATH=/usr/bin:$PATH<br />
+&nbsp; &nbsp; export LD_LIBRARY_PATH=/usr/lib/mysql<br />
+&nbsp; &nbsp; cd /tmp/tpcc/src<br />
+&nbsp; &nbsp; make&nbsp;<br />
+&nbsp; &nbsp;&nbsp;然后就会在 /tmp/tpcc-mysql 下生成 tpcc 命令行工具 tpcc_load 、 tpcc_start<br />
+​<br />
+&nbsp; &nbsp; 作用：测试mysql数据库的整体性能<br />
+&nbsp; &nbsp; 优点：符合tpcc标准，有标准的方法，模拟真实的交易活动，结果比较可靠。<br />
+&nbsp; &nbsp; 不足：不能单独测试读或者写的性能，对于一些以查询为主或者只写的应用，就没有这么大的意义了。<br />
+&nbsp; &nbsp; 使用方法：<br />
+&nbsp; &nbsp; 加载数据<br />
+&nbsp; &nbsp; 创建库<br />
+&nbsp; &nbsp; mysql&gt;create database tpcc10;<br />
+&nbsp; &nbsp; 创建表：<br />
+&nbsp; &nbsp; shell&gt;mysql tpcc10 &lt; create_table.sql<br />
+&nbsp; &nbsp; 添加外键：<br />
+&nbsp; &nbsp; shell&gt;mysql tpcc10 &lt; add_fkey_idx.sql<br />
+​<br />
+&nbsp; &nbsp; 加载数据:<br />
+​<br />
+1、单进程加载：<br />
+&nbsp; &nbsp; shell&gt;./tpcc_load 192.168.11.172 tpcc10 root pwd 300<br />
+&nbsp; &nbsp; |主机||数据库||用户||密码||warehouse|<br />
+​<br />
+2、并发加载：（推荐，但需要修改一下）<br />
+​<br />
+&nbsp; &nbsp; shell&gt;./load.sh tpcc300 300<br />
+&nbsp; &nbsp; |数据库||warehouse|<br />
+​<br />
+3、测试<br />
+&nbsp; &nbsp; ./tpcc_start -h192.168.11.172 -d tpcc -u root -p &#39;pwd&#39; -w 10 -c 10 -r 10 -l 60 -i 10 -f /mnt/hgfs/mysql/tpcc100_2013522.txt<br />
+&nbsp; &nbsp; ***************************************<br />
+&nbsp; &nbsp; *** ###easy### TPC-C Load Generator ***<br />
+&nbsp; &nbsp; ***************************************<br />
+&nbsp; &nbsp; option h with value &#39;192.168.11.172&#39;<br />
+&nbsp; &nbsp; option d with value &#39;tpcc&#39;<br />
+&nbsp; &nbsp; option u with value &#39;root&#39;<br />
+&nbsp; &nbsp; option p with value &#39;pwd&#39;<br />
+&nbsp; &nbsp; option w with value &#39;1&#39;<br />
+&nbsp; &nbsp; option c with value &#39;100&#39;<br />
+&nbsp; &nbsp; option r with value &#39;120&#39;<br />
+&nbsp; &nbsp; option l with value &#39;60&#39;<br />
+&nbsp; &nbsp; option i with value &#39;10&#39;<br />
+&nbsp; &nbsp; option f with value &#39;/mnt/hgfs/mysql/tpcc100_2013522.txt&#39;<br />
+&nbsp; &nbsp; &lt;Parameters&gt;<br />
+&nbsp; &nbsp; [server]: 192.168.11.172<br />
+&nbsp; &nbsp; [port]: 3306<br />
+&nbsp; &nbsp; [DBname]: tpcc<br />
+&nbsp; &nbsp; [user]: root<br />
+&nbsp; &nbsp; [pass]: pwd<br />
+&nbsp; &nbsp; [warehouse]: 1<br />
+&nbsp; &nbsp; [connection]: 100<br />
+&nbsp; &nbsp; [rampup]: 120 (sec.)<br />
+&nbsp; &nbsp; [measure]: 60 (sec.)<br />
+&nbsp; &nbsp; RAMP-UP TIME.(120 sec.)<br />
+&nbsp; &nbsp; MEASURING START.<br />
+&nbsp; &nbsp; 10, 245(77):10.923|28.902, 242(0):3.677|10.796, 25(0):1.579|2.198, 24(0):17.451|21.047, 25(4):19.999|33.776<br />
+&nbsp; &nbsp; 20, 262(75):9.070|11.917, 263(0):3.407|4.716, 26(0):1.608|1.776, 27(0):11.347|16.408, 26(1):19.166|21.018<br />
+&nbsp; &nbsp; 30, 247(90):11.130|14.131, 241(0):2.367|2.654, 24(0):0.960|1.095, 24(0):9.308|16.538, 25(3):19.999|24.874<br />
+&nbsp; &nbsp; 40, 237(69):11.840|13.009, 239(1):3.638|7.245, 24(0):0.692|0.773, 23(0):8.756|10.456, 23(1):19.527|20.495<br />
+&nbsp; &nbsp; 50, 252(69):10.548|17.925, 256(0):2.652|2.893, 26(0):1.177|3.579, 27(0):14.648|15.018, 25(4):19.999|26.398<br />
+&nbsp; &nbsp; 60, 256(78):9.323|11.328, 251(1):3.895|5.380, 25(0):0.785|1.542, 25(0):11.382|15.829, 26(0):18.481|18.855<br />
+&nbsp; &nbsp; STOPPING THREADS....................................................................................................<br />
+&nbsp; &nbsp; &lt;Raw Results&gt;<br />
+&nbsp; &nbsp; [0] sc:1041 lt:458 rt:0 fl:0&nbsp;<br />
+&nbsp; &nbsp; [1] sc:1490 lt:2 rt:0 fl:0&nbsp;<br />
+&nbsp; &nbsp; [2] sc:150 lt:0 rt:0 fl:0&nbsp;<br />
+&nbsp; &nbsp; [3] sc:150 lt:0 rt:0 fl:0&nbsp;<br />
+&nbsp; &nbsp; [4] sc:137 lt:13 rt:0 fl:0&nbsp;<br />
+&nbsp; &nbsp; in 60 sec.<br />
+&nbsp; &nbsp; &lt;Raw Results2(sum ver.)&gt;<br />
+&nbsp; &nbsp; [0] sc:1041 lt:458 rt:0 fl:0&nbsp;<br />
+&nbsp; &nbsp; [1] sc:1490 lt:2 rt:0 fl:0&nbsp;<br />
+&nbsp; &nbsp; [2] sc:150 lt:0 rt:0 fl:0&nbsp;<br />
+&nbsp; &nbsp; [3] sc:150 lt:0 rt:0 fl:0&nbsp;<br />
+&nbsp; &nbsp; [4] sc:137 lt:13 rt:0 fl:0&nbsp;<br />
+&nbsp; &nbsp; &lt;Constraint Check&gt; (all must be [OK])<br />
+&nbsp; &nbsp; [transaction percentage]<br />
+&nbsp; &nbsp; Payment: 43.36% (&gt;=43.0%) [OK]<br />
+&nbsp; &nbsp; Order-Status: 4.36% (&gt;= 4.0%) [OK]<br />
+&nbsp; &nbsp; Delivery: 4.36% (&gt;= 4.0%) [OK]<br />
+&nbsp; &nbsp; Stock-Level: 4.36% (&gt;= 4.0%) [OK]<br />
+&nbsp; &nbsp; [response time (at least 90% passed)]<br />
+&nbsp; &nbsp; New-Order: 69.45% [NG] *<br />
+&nbsp; &nbsp; Payment: 99.87% [OK]<br />
+&nbsp; &nbsp; Order-Status: 100.00% [OK]<br />
+&nbsp; &nbsp; Delivery: 100.00% [OK]<br />
+&nbsp; &nbsp; Stock-Level: 91.33% [OK]<br />
+&nbsp; &nbsp; &lt;TpmC&gt;<br />
+&nbsp; &nbsp; 1499.000 TpmC<br />
+&nbsp; &nbsp; 关于Tpcc的概念请参见http://baike.baidu.com/view/2776305.htm&nbsp;<br />
+&nbsp; &nbsp; 这里把测试用例介绍贴一下<br />
+&nbsp; &nbsp; TPC-C测试用到的模型是一个大型的商品批发销售公司，它拥有若干个分布在不同区域的商品仓库。当业务扩展的时候，公司将添加新的仓库。<br />
+&nbsp; &nbsp; 每个仓库负责为10个销售点供货，其中每个销售点为3000个客户提供服务，每个客户提交的订单中，平均每个订单有10项产品，<br />
+&nbsp; &nbsp; 所有订单中约1%的产品在其直接所属的仓库中没有存货，必须由其他区域的仓库来供货。同时，每个仓库都要维护公司销售的100000种商品的库存记录。</p>
+
+<h2>​四、 The MySQL Benchmark Suite</h2>
+
+<p>&nbsp; &nbsp; &nbsp; &nbsp; 这个测试工具是随着MySQL绑定发行的，基于Perl语言和其中的两个模块：DBI和Benchmark。如果有需要，它支持所有支持DBI驱动的数据库。可以通过修改bench-init.pl的选项以符合需要。另外提醒的是，它不支持多CPU。<br />
+&nbsp; &nbsp; &nbsp; &nbsp; 进行测试时，执行run-all-tests脚本，具体的命令选项请看README。</p>
+
+<h2>五、 MySQL super-smack</h2>
+
+<p>&nbsp; &nbsp; &nbsp; &nbsp;这是一个强大的广受赞誉的压力测试工具，支持MySQL和PostgreSQL。<br />
+&nbsp; &nbsp; &nbsp; &nbsp;http://jeremy.zawodny.com/mysql/super-smack/<br />
+&nbsp; &nbsp; &nbsp; 安装很简单，请先仔细阅读目录里的指导文件。<br />
+&nbsp; &nbsp; &nbsp; &nbsp;Preparing test data<br />
+&nbsp; &nbsp; &nbsp; &nbsp;做测试时，最好用自己的数据。因为使用真实的数据，使测试变得接近现实和客观。<br />
+&nbsp; &nbsp; &nbsp; Configuration<br />
+&nbsp; &nbsp; &nbsp; smack的文件设置，看起来很简单。</p>
+
+<h2>&nbsp;六、MyBench: A Home-Grown Solution</h2>
+
+<p>&nbsp; &nbsp; &nbsp; MyBench一种基于Perl语言易于扩展的测试工具。</p>
