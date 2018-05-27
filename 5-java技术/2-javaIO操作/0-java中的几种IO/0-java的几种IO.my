@@ -131,9 +131,7 @@
 
 <p>在linux中，默认情况下所有的socket都是blocking，一个典型的读操作流程大概是这样：</p>
 
-<p><img alt="" src="http://hi.csdn.net/attachment/201007/31/0_1280550787I2K8.gif" /></p>
-
-<p>1.当用户进程调用了recvfrom这个系统调用，kernel就开始了IO的第一个阶段：准备数据。(<strong>用户态切换到内核态-准备数据</strong>)</p>
+<p><img alt="" src="http://hi.csdn.net/attachment/201007/31/0_1280550787I2K8.gif" />1.当用户进程调用了recvfrom这个系统调用，kernel就开始了IO的第一个阶段：准备数据。(<strong>用户态切换到内核态-准备数据</strong>)</p>
 
 <p>2.对于network io来说，很多时候数据在一开始还没有到达，这个时候kernel就要等待足够的数据到来。而在用户进程这边，整个进程会被阻塞。(<strong>用户态-阻塞，内核态-准备数据中</strong>)</p>
 
@@ -166,9 +164,7 @@
 
 <p>&nbsp;详细流程如下：</p>
 
-<p><img alt="" src="http://hi.csdn.net/attachment/201007/31/0_128055089469yL.gif" /></p>
-
-<p>1.当用户进程发出read操作时，如果kernel中的数据还没有准备好，那么它并不会block用户进程，而是立刻返回一个error。(<strong>用户态 不阻塞------内核态-准备数据中</strong>)</p>
+<p><img alt="" src="http://hi.csdn.net/attachment/201007/31/0_128055089469yL.gif" />1.当用户进程发出read操作时，如果kernel中的数据还没有准备好，那么它并不会block用户进程，而是立刻返回一个error。(<strong>用户态 不阻塞------内核态-准备数据中</strong>)</p>
 
 <p>2.从用户进程角度讲 ，它发起一个read操作后，并不需要等待，而是用户进程马上获取结果，如果结果是error，它就知道数据还没有准备好，于是它可以再次发送read操作。(<strong>用户态 不阻塞-------内核态-准备数据中</strong>)</p>
 
@@ -179,9 +175,7 @@
 
 <p>IO multiplexing使用select，epoll机制，select/epoll的好处就在于单个process就可以同时处理多个网络连接的IO。它的基本原理就是select/epoll这个function会不断的轮询所负责的所有socket，当某个socket有数据到达了，就通知用户进程(通过listener监听)。它的流程如图：</p>
 
-<p><img alt="" src="http://hi.csdn.net/attachment/201007/31/0_1280551028YEeQ.gif" /></p>
-
-<p>1.当用户进程调用了select，那么整个进程会被block，而同时，kernel会&ldquo;监视&rdquo;所有select负责的socket，当任何一个socket中的数据准备好了，select就会返回。(<strong>用户态-阻塞，内核态-准备数据中并通知</strong>)</p>
+<p><img alt="" src="http://hi.csdn.net/attachment/201007/31/0_1280551028YEeQ.gif" />1.当用户进程调用了select，那么整个进程会被block，而同时，kernel会&ldquo;监视&rdquo;所有select负责的socket，当任何一个socket中的数据准备好了，select就会返回。(<strong>用户态-阻塞，内核态-准备数据中并通知</strong>)</p>
 
 <p>2.这个时候用户进程再调用read操作，将数据从kernel拷贝到用户进程。(<strong>用户态-阻塞，内核态-拷贝数据会用户进程</strong>)</p>
 
@@ -191,15 +185,11 @@
 
 <p>linux下的asynchronous IO其实用得很少。先看一下它的流程：</p>
 
-<p><img alt="" src="http://hi.csdn.net/attachment/201007/31/0_1280551287S777.gif" /></p>
-
-<p>用户进程发起read操作之后，立刻就可以开始去做其它的事。而另一方面，从kernel的角度，当它受到一个asynchronous read之后，首先它会立刻返回，所以不会对用户进程产生任何block。然后，kernel会等待数据准备完成，然后将数据拷贝到用户内存，当这一切都完成之后，kernel会给用户进程发送一个signal，告诉它read操作完成了。</p>
+<p><img alt="" src="http://hi.csdn.net/attachment/201007/31/0_1280551287S777.gif" />用户进程发起read操作之后，立刻就可以开始去做其它的事。而另一方面，从kernel的角度，当它受到一个asynchronous read之后，首先它会立刻返回，所以不会对用户进程产生任何block。然后，kernel会等待数据准备完成，然后将数据拷贝到用户内存，当这一切都完成之后，kernel会给用户进程发送一个signal，告诉它read操作完成了。</p>
 
 <h3><strong>2.6 各个IO Model的比较如图所示：</strong></h3>
 
-<p><img alt="" src="http://hi.csdn.net/attachment/201007/31/0_1280551552NVgW.gif" /></p>
-
-<p>经过上面的介绍，会发现non-blocking IO和asynchronous IO的区别还是很明显的。在non-blocking IO中，虽然进程大部分时间都不会被block，但是它仍然要求进程去主动的check，并且当数据准备完成以后，也需要进程主动的再次调用recvfrom来将数据拷贝到用户内存。而asynchronous IO则完全不同。它就像是用户进程将整个IO操作交给了他人（kernel）完成，然后他人做完后发信号通知。在此期间，用户进程不需要去检查IO操作的状态，也不需要主动的去拷贝数据。</p>
+<p><img alt="" src="http://hi.csdn.net/attachment/201007/31/0_1280551552NVgW.gif" />经过上面的介绍，会发现non-blocking IO和asynchronous IO的区别还是很明显的。在non-blocking IO中，虽然进程大部分时间都不会被block，但是它仍然要求进程去主动的check，并且当数据准备完成以后，也需要进程主动的再次调用recvfrom来将数据拷贝到用户内存。而asynchronous IO则完全不同。它就像是用户进程将整个IO操作交给了他人（kernel）完成，然后他人做完后发信号通知。在此期间，用户进程不需要去检查IO操作的状态，也不需要主动的去拷贝数据。</p>
 
 <h2><strong>3.阻塞/非阻塞，同步/异步 ?</strong></h2>
 
@@ -209,7 +199,7 @@
 
 <p>　　非阻塞IO会在发出IO请求后立即得到回应，即使数据包没有准备好，也会返回一个错误标识，使得操作进程不会阻塞在那里。操作进程会通过多次请求的方式直到数据准备好，返回成功的标识。</p>
 
-<h3><strong>3.2同步（synchronous）与异步（asynchronous）IO</strong></h3>
+<h3><strong>3.2 同步（synchronous）与异步（asynchronous）IO</strong></h3>
 
 <p>　　先来看看正式点的定义，POSIX标准将IO模型分为了两种：同步IO和异步IO，Richard Stevens在《Unix网络编程卷》中也总结道：</p>
 
