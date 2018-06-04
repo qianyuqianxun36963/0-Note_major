@@ -1,0 +1,190 @@
+<h1>centos5升级</h1>
+
+<p>本文将教你如何升级centos到最新版本。<br />
+centos中&ldquo;update&rdquo;命令可以一次性更新所有软件到最新版本。<br />
+注意：不推荐使用update的y选项，-y选项会让你在安装每项更新前都进行确认（译者注：这样会非常费时间，更新进度忙）；<br />
+对于centos 5.X和6.X的系统我们在更新后需要重新安装应用程序恢复数据，庆幸的是centos7不需要这么麻烦，可以直接升级。为了安全起见，如果你有重要数据的话还是建议升级系统前做好备份。<br />
+以下是centos 7.X升级的步骤</p>
+
+<p><strong>一、检查系统版本</strong></p>
+
+<p>$ cat /etc/redhat-release<br />
+CentOS Linux release 7.1.1503 (Core)</p>
+
+<p><strong>二、备份重要数据</strong></p>
+
+<p>（例如/etc, /var,/opt）。如果centos是安装在虚拟机上，那么可以使用快照进行备份。像VMware虚拟机可以快照备份，当然更奢侈一点是备份整个虚拟机。也可以针对重要程序数据进行备份，例如MySQL, Appache, Nginx, DNS等等。<br />
+<br />
+<strong>三、运行yum命令升级</strong></p>
+
+<p>$ sudo yum clean all<br />
+$ sudo yum update</p>
+
+<p>sudo yum update&nbsp;</p>
+
+<p><strong>四、重启系统</strong></p>
+
+<p>$ sudo reboot</p>
+
+<p><strong>五、查看现在系统版本</strong></p>
+
+<p>$ cat /etc/redhat-release<br />
+CentOS Linux release 7.3.1611 (Core)<br />
+希望本文能够协助你顺利升级centos 7到最新版本。<br />
+注意：在升级前记得检查系统正常运行，以及系统服务services已经安装。</p>
+
+<p>&nbsp;</p>
+
+<h2>遇到的问题</h2>
+
+<p>执行yum update 升级系统的时候，毫无意外的遇到问题了。</p>
+
+<p>Loaded plugins: fastestmirror, security<br />
+Loading mirror speeds from cached hostfile<br />
+http://centos.alt.ru/repository/centos/5/x86_64/repodata/repomd.xml: [Errno 14] HTTP Error 404: Not Found<br />
+Trying other mirror.<br />
+Error: Cannot retrieve repository metadata (repomd.xml) for repository: CentALT. Please verify its path and try again<br />
+&nbsp;</p>
+
+<p>实在没办法，然后就去找，这里的&nbsp;http://centos.alt.ru/repository/centos/5 配置在哪里。</p>
+
+<p>到常去的配置目录 :&nbsp;<span style="font-size:16px"><strong>cd /etc/yum.repos.d</strong></span></p>
+
+<p><span style="font-size:16px"><strong>果不其然，在vcentalt.repo 里找到 :</strong></span></p>
+
+<p>[CentALT]<br />
+name=CentALT Packages for Enterprise Linux 5 - $basearch<br />
+baseurl=http://centos.alt.ru/repository/centos/5/$basearch/<br />
+enabled=1<br />
+gpgcheck=0</p>
+
+<p>将其中http://centos.alt.ru/repository/centos/5 替换为官方提供的centos5遗留地址：http://vault.centos.org&nbsp;</p>
+
+<p>[CentALT]<br />
+name=CentALT Packages for Enterprise Linux 5 - $basearch<br />
+baseurl=http://vault.centos.org/5.11/centosplus/$basearch/<br />
+enabled=1<br />
+gpgcheck=0<br />
+&nbsp;</p>
+
+<h3>然后执行依然报错</h3>
+
+<p>CentALT/primary_db &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;| 128 kB &nbsp; &nbsp; 00:01 &nbsp; &nbsp;&nbsp;<br />
+http://mirrors.aliyun.com/centos/5/addons/x86_64/repodata/repomd.xml: [Errno 14] HTTP Error 404: Not Found<br />
+Trying other mirror.<br />
+&nbsp;</p>
+
+<h3>修改同级目录下的：&nbsp;<strong>CentOS-Base.repo</strong></h3>
+
+<h4><span style="font-size:14px">原文件</span></h4>
+
+<p># CentOS-Base.repo<br />
+#<br />
+# The mirror system uses the connecting IP address of the client and the<br />
+# update status of each mirror to pick mirrors that are updated to and<br />
+# geographically close to the client. &nbsp;You should use this for CentOS updates<br />
+# unless you are manually picking other mirrors.<br />
+#<br />
+# If the mirrorlist= does not work for you, as a fall back you can try the<br />
+# remarked out baseurl= line instead.<br />
+#<br />
+#</p>
+
+<p>[base]<br />
+name=CentOS-$releasever - Base - mirrors.aliyun.com<br />
+failovermethod=priority<br />
+baseurl=http://mirrors.aliyun.com/centos/$releasever/os/$basearch/<br />
+&nbsp; &nbsp; &nbsp; &nbsp; http://mirrors.aliyuncs.com/centos/$releasever/os/$basearch/<br />
+#mirrorlist=http://mirrorlist.centos.org/?release=$releasever&amp;arch=$basearch&amp;repo=os<br />
+gpgcheck=1<br />
+gpgkey=http://mirrors.aliyun.com/centos/RPM-GPG-KEY-CentOS-5</p>
+
+<p>#released updates<br />
+[updates]<br />
+name=CentOS-$releasever - Updates - mirrors.aliyun.com<br />
+failovermethod=priority<br />
+baseurl=http://mirrors.aliyun.com/centos/$releasever/updates/$basearch/<br />
+&nbsp; &nbsp; &nbsp; &nbsp; http://mirrors.aliyuncs.com/centos/$releasever/updates/$basearch/<br />
+#mirrorlist=http://mirrorlist.centos.org/?release=$releasever&amp;arch=$basearch&amp;repo=updates<br />
+gpgcheck=1<br />
+gpgkey=http://mirrors.aliyun.com/centos/RPM-GPG-KEY-CentOS-5</p>
+
+<p>#additional packages that may be useful<br />
+[extras]<br />
+name=CentOS-$releasever - Extras - mirrors.aliyun.com<br />
+failovermethod=priority<br />
+baseurl=http://mirrors.aliyun.com/centos/$releasever/extras/$basearch/<br />
+&nbsp; &nbsp; &nbsp; &nbsp; http://mirrors.aliyuncs.com/centos/$releasever/extras/$basearch/<br />
+#mirrorlist=http://mirrorlist.centos.org/?release=$releasever&amp;arch=$basearch&amp;repo=extras<br />
+gpgcheck=1<br />
+gpgkey=http://mirrors.aliyun.com/centos/RPM-GPG-KEY-CentOS-5</p>
+
+<h4><strong><span style="font-size:14px">新文件</span></strong></h4>
+
+<p># CentOS-Base.repo<br />
+#<br />
+# The mirror system uses the connecting IP address of the client and the<br />
+# update status of each mirror to pick mirrors that are updated to and<br />
+# geographically close to the client. &nbsp;You should use this for CentOS updates<br />
+# unless you are manually picking other mirrors.<br />
+#<br />
+# If the mirrorlist= does not work for you, as a fall back you can try the&nbsp;<br />
+# remarked out baseurl= line instead.<br />
+#<br />
+#<br />
+&nbsp;<br />
+[base]<br />
+name=CentOS-$releasever - Base - mirrors.aliyun.com<br />
+failovermethod=priority<br />
+baseurl=http://vault.centos.org/5.11/os/$basearch/<br />
+#mirrorlist=http://mirrorlist.centos.org/?release=$releasever&amp;arch=$basearch&amp;repo=os<br />
+gpgcheck=1<br />
+gpgkey=http://mirrors.aliyun.com/centos/RPM-GPG-KEY-CentOS-5<br />
+&nbsp;<br />
+#released updates&nbsp;<br />
+[updates]<br />
+name=CentOS-$releasever - Updates - mirrors.aliyun.com<br />
+failovermethod=priority<br />
+baseurl=http://vault.centos.org/5.11/updates/$basearch/<br />
+#mirrorlist=http://mirrorlist.centos.org/?release=$releasever&amp;arch=$basearch&amp;repo=updates<br />
+gpgcheck=1<br />
+gpgkey=http://mirrors.aliyun.com/centos/RPM-GPG-KEY-CentOS-5<br />
+&nbsp;<br />
+#additional packages that may be useful<br />
+[extras]<br />
+name=CentOS-$releasever - Extras - mirrors.aliyun.com<br />
+failovermethod=priority<br />
+baseurl=http://vault.centos.org/5.11/extras/$basearch/<br />
+#mirrorlist=http://mirrorlist.centos.org/?release=$releasever&amp;arch=$basearch&amp;repo=extras<br />
+gpgcheck=1<br />
+gpgkey=http://mirrors.aliyun.com/centos/RPM-GPG-KEY-CentOS-5<br />
+&nbsp;<br />
+#packages used/produced in the build but not released<br />
+[addons]<br />
+name=CentOS-$releasever - Addons - mirrors.aliyun.com<br />
+failovermethod=priority<br />
+baseurl=http://vault.centos.org/5.11/addons/$basearch/<br />
+#mirrorlist=http://mirrorlist.centos.org/?release=$releasever&amp;arch=$basearch&amp;repo=addons<br />
+gpgcheck=1<br />
+gpgkey=http://mirror.centos.org/centos/RPM-GPG-KEY-CentOS-5<br />
+&nbsp;<br />
+#additional packages that extend functionality of existing packages<br />
+[centosplus]<br />
+name=CentOS-$releasever - Plus - mirrors.aliyun.com<br />
+failovermethod=priority<br />
+baseurl=http://vault.centos.org/5.11/centosplus/$basearch/<br />
+#mirrorlist=http://mirrorlist.centos.org/?release=$releasever&amp;arch=$basearch&amp;repo=centosplus<br />
+gpgcheck=1<br />
+enabled=0<br />
+gpgkey=http://mirrors.aliyun.com/centos/RPM-GPG-KEY-CentOS-5<br />
+&nbsp;<br />
+#contrib - packages by Centos Users<br />
+[contrib]<br />
+name=CentOS-$releasever - Contrib - mirrors.aliyun.com<br />
+failovermethod=priority<br />
+baseurl=http://vault.centos.org/5.11/contrib/$basearch/<br />
+#mirrorlist=http://mirrorlist.centos.org/?release=$releasever&amp;arch=$basearch&amp;repo=contrib<br />
+gpgcheck=1<br />
+enabled=0<br />
+gpgkey=http://mirrors.aliyun.com/centos/RPM-GPG-KEY-CentOS-5<br />
+&nbsp;</p>

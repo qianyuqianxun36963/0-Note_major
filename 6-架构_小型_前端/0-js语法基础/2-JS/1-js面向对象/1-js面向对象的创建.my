@@ -1,0 +1,227 @@
+<h1>Javascript 面向对象编程（一）：封装</h1>
+
+<p>Javascript是一种基于对象（object-based）的语言，你遇到的所有东西几乎都是对象。但是，它又不是一种真正的面向对象编程（OOP）语言，因为它的语法中没有<code>class</code>（类）。</p>
+
+<p>那么，如果我们要把&quot;属性&quot;（property）和&quot;方法&quot;（method），封装成一个对象，甚至要从原型对象生成一个实例对象，我们应该怎么做呢？</p>
+
+<h2><strong>一、 生成实例对象的原始模式</strong></h2>
+
+<p>假定我们把猫看成一个对象，它有&quot;名字&quot;和&quot;颜色&quot;两个属性。</p>
+
+<blockquote>　　var Cat = {
+<p>　　　　name : &#39;&#39;,</p>
+
+<p>　　　　color : &#39;&#39;</p>
+
+<p>　　}&nbsp;</p>
+</blockquote>
+
+<p>现在，我们需要根据这个原型对象的规格（schema），生成两个实例对象。</p>
+
+<blockquote>
+<p>　　var cat1 = {}; // 创建一个空对象</p>
+
+<p>　　　　cat1.name = &quot;大毛&quot;; // 按照原型对象的属性赋值</p>
+
+<p>　　　　cat1.color = &quot;黄色&quot;;</p>
+
+<p>　　var cat2 = {};</p>
+
+<p>　　　　cat2.name = &quot;二毛&quot;;</p>
+
+<p>　　　　cat2.color = &quot;黑色&quot;;</p>
+</blockquote>
+
+<p>好了，这就是最简单的封装了，把两个属性封装在一个对象里面。但是，这样的写法有两个缺点，一是如果多生成几个实例，写起来就非常麻烦；二是实例与原型之间，没有任何办法，可以看出有什么联系。</p>
+
+<h2><strong>二、 原始模式的改进</strong></h2>
+
+<p>我们可以写一个函数，解决代码重复的问题。</p>
+
+<blockquote>
+<p>　　function Cat(name,color) {</p>
+
+<p>　　　　return {</p>
+
+<p>　　　　　　name:name,</p>
+
+<p>　　　　　　color:color</p>
+
+<p>　　　　}</p>
+
+<p>　　}</p>
+</blockquote>
+
+<p>然后生成实例对象，就等于是在调用函数：</p>
+
+<blockquote>
+<p>　　var cat1 = Cat(&quot;大毛&quot;,&quot;黄色&quot;);</p>
+
+<p>　　var cat2 = Cat(&quot;二毛&quot;,&quot;黑色&quot;);</p>
+</blockquote>
+
+<p>这种方法的问题依然是，<code>cat1</code>和<code>cat2</code>之间没有内在的联系，不能反映出它们是同一个原型对象的实例。</p>
+
+<h2><strong>三、 构造函数模式</strong></h2>
+
+<p>为了解决从原型对象生成实例的问题，Javascript提供了一个构造函数（Constructor）模式。</p>
+
+<p>所谓&quot;构造函数&quot;，其实就是一个普通函数，但是内部使用了<a href="http://www.ruanyifeng.com/blog/2010/04/using_this_keyword_in_javascript.html" target="_blank"><code>this</code>变量</a>。对构造函数使用<code>new</code>运算符，就能生成实例，并且<code>this</code>变量会绑定在实例对象上。</p>
+
+<p>比如，猫的原型对象现在可以这样写，</p>
+
+<blockquote>
+<p>　　function Cat(name,color){</p>
+
+<p>　　　　this.name=name;</p>
+
+<p>　　　　this.color=color;</p>
+
+<p>　　}</p>
+</blockquote>
+
+<p>我们现在就可以生成实例对象了。</p>
+
+<blockquote>
+<p>　　var cat1 = new Cat(&quot;大毛&quot;,&quot;黄色&quot;);</p>
+
+<p>　　var cat2 = new Cat(&quot;二毛&quot;,&quot;黑色&quot;);</p>
+
+<p>　　alert(cat1.name); // 大毛</p>
+
+<p>　　alert(cat1.color); // 黄色</p>
+</blockquote>
+
+<p>这时<code>cat1</code>和<code>cat2</code>会自动含有一个<code>constructor</code>属性，指向它们的构造函数。</p>
+
+<blockquote>
+<p>　　alert(cat1.constructor == Cat); //true</p>
+
+<p>　　alert(cat2.constructor == Cat); //true</p>
+</blockquote>
+
+<p>Javascript还提供了一个<code>instanceof</code>运算符，验证原型对象与实例对象之间的关系。</p>
+
+<blockquote>
+<p>　　alert(cat1 instanceof Cat); //true</p>
+
+<p>　　alert(cat2 instanceof Cat); //true</p>
+</blockquote>
+
+<h2><strong>四、构造函数模式的问题</strong></h2>
+
+<p>构造函数方法很好用，但是存在一个浪费内存的问题。</p>
+
+<p>请看，我们现在为<code>Cat</code>对象添加一个不变的属性<code>type</code>（种类），再添加一个方法<code>eat</code>（吃）。那么，原型对象<code>Cat</code>就变成了下面这样：</p>
+
+<blockquote>
+<p>　　function Cat(name,color){</p>
+
+<p>　　　　this.name = name;</p>
+
+<p>　　　　this.color = color;</p>
+
+<p>　　　　this.type = &quot;猫科动物&quot;;</p>
+
+<p>　　　　this.eat = function(){alert(&quot;吃老鼠&quot;);};</p>
+
+<p>　　}</p>
+</blockquote>
+
+<p>还是采用同样的方法，生成实例：</p>
+
+<blockquote>
+<p>　　var cat1 = new Cat(&quot;大毛&quot;,&quot;黄色&quot;);</p>
+
+<p>　　var cat2 = new Cat (&quot;二毛&quot;,&quot;黑色&quot;);</p>
+
+<p>　　alert(cat1.type); // 猫科动物</p>
+
+<p>　　cat1.eat(); // 吃老鼠</p>
+</blockquote>
+
+<p>表面上好像没什么问题，但是实际上这样做，有一个很大的弊端。那就是对于每一个实例对象，<code>type</code>属性和<code>eat()</code>方法都是一模一样的内容，每一次生成一个实例，都必须为重复的内容，多占用一些内存。这样既不环保，也缺乏效率。</p>
+
+<blockquote>
+<p>　　alert(cat1.eat == cat2.eat); //false</p>
+</blockquote>
+
+<p>能不能让<code>type</code>属性和<code>eat()</code>方法在内存中只生成一次，然后所有实例都指向那个内存地址呢？回答是可以的。</p>
+
+<h2><strong>五、 Prototype模式</strong></h2>
+
+<p>Javascript规定，每一个构造函数都有一个<code>prototype</code>属性，指向另一个对象。这个对象的所有属性和方法，都会被构造函数的实例继承。</p>
+
+<p>这意味着，我们可以把那些不变的属性和方法，直接定义在<code>prototype</code>对象上。</p>
+
+<blockquote>
+<p>　　function Cat(name,color){</p>
+
+<p>　　　　this.name = name;</p>
+
+<p>　　　　this.color = color;</p>
+
+<p>　　}</p>
+
+<p>　　Cat.prototype.type = &quot;猫科动物&quot;;</p>
+
+<p>　　Cat.prototype.eat = function(){alert(&quot;吃老鼠&quot;)};</p>
+</blockquote>
+
+<p>然后，生成实例。</p>
+
+<blockquote>
+<p>　　var cat1 = new Cat(&quot;大毛&quot;,&quot;黄色&quot;);</p>
+
+<p>　　var cat2 = new Cat(&quot;二毛&quot;,&quot;黑色&quot;);</p>
+
+<p>　　alert(cat1.type); // 猫科动物</p>
+
+<p>　　cat1.eat(); // 吃老鼠</p>
+</blockquote>
+
+<p>这时所有实例的<code>type</code>属性和<code>eat()</code>方法，其实都是同一个内存地址，指向<code>prototype</code>对象，因此就提高了运行效率。</p>
+
+<blockquote>
+<p>　　alert(cat1.eat == cat2.eat); //true</p>
+</blockquote>
+
+<h2><strong>六、 Prototype模式的验证方法</strong></h2>
+
+<p>为了配合<code>prototype</code>属性，Javascript定义了一些辅助方法，帮助我们使用它。，</p>
+
+<p><strong>6.1 isPrototypeOf()</strong></p>
+
+<p>这个方法用来判断，某个<code>proptotype</code>对象和某个实例之间的关系。</p>
+
+<blockquote>
+<p>　　alert(Cat.prototype.isPrototypeOf(cat1)); //true</p>
+
+<p>　　alert(Cat.prototype.isPrototypeOf(cat2)); //true</p>
+</blockquote>
+
+<p><strong>6.2 hasOwnProperty()</strong></p>
+
+<p>每个实例对象都有一个<code>hasOwnProperty()</code>方法，用来判断某一个属性到底是本地属性，还是继承自<code>prototype</code>对象的属性。</p>
+
+<blockquote>
+<p>　　alert(cat1.hasOwnProperty(&quot;name&quot;)); // true</p>
+
+<p>　　alert(cat1.hasOwnProperty(&quot;type&quot;)); // false</p>
+</blockquote>
+
+<p><strong>6.3 in运算符</strong></p>
+
+<p><code>in</code>运算符可以用来判断，某个实例是否含有某个属性，不管是不是本地属性。</p>
+
+<blockquote>
+<p>　　alert(&quot;name&quot; in cat1); // true</p>
+
+<p>　　alert(&quot;type&quot; in cat1); // true</p>
+</blockquote>
+
+<p><code>in</code>运算符还可以用来遍历某个对象的所有属性。</p>
+
+<blockquote>
+<p>　　for(var prop in cat1) { alert(&quot;cat1[&quot;+prop+&quot;]=&quot;+cat1[prop]); }</p>
+</blockquote>

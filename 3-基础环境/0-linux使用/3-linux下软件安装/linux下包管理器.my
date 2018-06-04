@@ -1,0 +1,131 @@
+<h1>Linux程序包管理发展史那点事</h1>
+
+<h2>起源</h2>
+
+<p>Linux上的应用程序被开发出来后，一般以源码形式或者编译后的二进制格式提供给用户使用。对于以源码形式提供的应用程序，用户需要借组编译器，自行编译成二进制格式才能使用。而即便是编译后的二进制包，用户也<strong>需要根据安装文档将应用程序的二进制程序、库文件、配置文件和帮助文件复制到指定路径下。这个过程十分繁琐</strong>。面对这个恼人的问题，Linux业界人士怎么能忍得下去，千呼万唤始出来，终于诞生了程序包管理器。</p>
+
+<p>有了程序包管理器之后，应用程序提供者可将应用程序的二进制程序、库文件。配置文件、帮助文件等以特定形式组织成一个或有限几个&ldquo;包&rdquo;文件（不同程序包管理器的组织形式不同）。<strong>用户可下载打包好的程序包文件，然后通过程序包管理器的命令实现应用程序的安装，而不再需要手动的复制程序文件到指定的路径下，这些工作都交由程序包管理器来完成了。</strong></p>
+
+<p>最开始研发出的程序包管理器是Debian的dpt，全名是Debian Package Tool，后更名为dpkg，其程序包的后缀是.deb。后来RedHat也研发出了程序包管理器RedHat Package Manager，简称rpm，其程序包后缀为.rpm。在RedHat的推动下，rpm成为了Linux程序包管理器中的事实上的标准。RedHat对强大后的rpm进行了重新的解释，rpm的全称变为&ldquo;rpm is Package Manager&rdquo;。SUSE使用的程序包管理器也是rpm，但它的程序包与RedHat的是不兼容的。此外，Gentoo也有自己的程序包管理器ports。</p>
+
+<h2>rpm 安装</h2>
+
+<p>以安装 Mysql5.6为例</p>
+
+<h3>步骤</h3>
+
+<p>整体步骤下来就是：</p>
+
+<ol>
+	<li>下载安装包</li>
+	<li>检查并移出已安装 的Msql 相关软件</li>
+	<li>检查安装条件</li>
+	<li>安装</li>
+</ol>
+
+<h3>一、下载安装包</h3>
+
+<p>先下载 RPM Bundle 安装包（全家桶，不用一个个下），下载地址：</p>
+
+<blockquote>
+<p><a href="https://dev.mysql.com/downloads/mysql/5.6.html#downloads" target="_blank">https://dev.mysql.com/downloads/mysql/5.6.html#downloads</a></p>
+</blockquote>
+
+<p>其中&nbsp;<code>Select Platform</code>&nbsp;选择&nbsp;<code>Red Hat Enterprise Linux / Oracle Linux</code>，因为 CentOS 就是 Red Hat 系列的。</p>
+
+<p>关于这个么大一个 RPM 安装包列表，怎么找到自己要安装的是哪个呢？细心观察容易发现规律：</p>
+
+<ol>
+	<li>先找对应自己的 CentOS 系统的版本，比如我的是 CentOS6.5，怎么就先看 Linux6 的，其实 rpm 安装包的命名也包含系统版本信息，如&nbsp;<code>MySQL-server-5.6.35-1.el6.x86_64.rpm</code>&nbsp;中的 el6。</li>
+	<li>再找对应自己的操作系统位数的，64位的是&nbsp;<code>(x86, 64-bit)</code>，32位的是&nbsp;<code>(x86, 32-bit)</code>。</li>
+	<li>再找 Bundle 集合包还是单独的 RPM 文件。Bundle 的文件名一般如&nbsp;<code>MySQL-5.6.35-1.el6.x86_64.rpm-bundle.tar</code>（64位）。单个的 RPM 安装包一般名如&nbsp;<code>MySQL-server-5.6.35-1.el6.x86_64.rpm</code>（64位）</li>
+</ol>
+
+<p>一般下载 Bundle 全家桶，下载过来再解压，不然一个个下载太麻烦。&nbsp;<br />
+我的系统是 CentOS6.5 64位，所以下的是&nbsp;<code>MySQL-5.6.35-1.el6.x86_64.rpm-bundle.tar</code></p>
+
+<p>其实没什么新鲜事，现在过来的 Bundle 解压一下就能看到包含的 RPM 安装包了，解压：</p>
+
+<pre>
+<code># tar -zxf MySQL-5.6.35-1.el6.x86_64.rpm-bundle.tar -C MySQL-bundle</code>
+</pre>
+
+<p>以上命令表示，把 .tar 文件解压到我们当前目录的 MySQL-bundle 目录下。查看解压出来的 RPM 安装包列表：</p>
+
+<pre>
+<code># cd MySQL-bundle
+# ll</code></pre>
+
+<h3>二、检查并移除已安装 的Msql 相关软件</h3>
+
+<pre>
+<code># rpm -qa | grep -i mysql
+mysql-libs-5.1.71-1.el6.i686 </code></pre>
+
+<p>以上显示系统已经安装了&nbsp;<code>mysql-libs-5.1.71-1.el6.i686</code>。</p>
+
+<p><a href="http://www.linuxidc.com/Linux/2015-01/111413.htm" target="_blank">这篇文章</a>&nbsp;提到说它是好几个软件的依赖，其中在 mini 版本中 postfix 软件依赖 mysql-libs。</p>
+
+<p>直接删除的话，会有依赖风险。</p>
+
+<p>官方文档&nbsp;<a href="https://dev.mysql.com/doc/refman/5.5/en/linux-installation-rpm.html" target="_blank">Installing MySQL on Linux Using RPM Packages</a>&nbsp;说先安装&nbsp;<code>MySQL-shared-compat</code>&nbsp;然后再手动移除&nbsp;<code>mysql-libs</code>。原文截取如下：</p>
+
+<pre>
+<code>MySQL-shared-compat can safely be installed alongside mysql-libs because libraries are installed to different locations. 
+Therefore, it is possible to install MySQL-shared-compat first, then manually remove mysql-libs before continuing with 
+the installation. After mysql-libs is removed, the dynamic linker stops looking for the client library in the location where mysql-libs 
+puts it, and the library provided by the MySQL-shared-compat package takes over.
+
+Another alternative is to install packages using yum. In a directory containing all RPM packages for a MySQL release, 
+yum install MySQL*rpm installs them in the correct order and removes mysql-libs in one step without conflicts.</code></pre>
+
+<p>先安装&nbsp;<code>MySQL-shared-compat</code></p>
+
+<pre>
+<code># rpm -ivh MySQL-shared-compat-5.6.35-1.el6.x86_64.rpm</code>
+</pre>
+
+<p>再次查看：</p>
+
+<pre>
+<code># rpm -qa | grep -i mysql</code>
+</pre>
+
+<p>然后移除&nbsp;<code>mysql-libs</code></p>
+
+<pre>
+<code># yum remove mysql-libs</code></pre>
+
+<h3>三、检查安装条件</h3>
+
+<p>测试 MySQL-server 安装。<code>--test</code>&nbsp;选项不会安装饱，只是简单地检查潜在的安装冲突。</p>
+
+<pre>
+<code># rpm -ivh --test MySQL-server-5.6.21-1.el6.i686.rpm</code>
+</pre>
+
+<p>如果提示缺<code>libaio</code>&nbsp;相关依赖，则安装：</p>
+
+<pre>
+<code># yum install libaio.x86_64 libaio-devel.x86_64</code>
+</pre>
+
+<p>参考：<a href="http://serverfault.com/questions/430572/mysql-5-6-install-error-from-missing-dependency-libaio" target="_blank">MYSQL 5.6 install error from missing dependency libaio</a></p>
+
+<p>如果提示缺<code>libnuma</code>&nbsp;相关依赖，则安装：</p>
+
+<pre>
+<code># yum install numactl</code>
+</pre>
+
+<p>参考：<a href="http://www.jianshu.com/p/b2ce80c565b0" target="_blank">Centos 6.5安装配置mysql</a></p>
+
+<p>没问题的话（再有问题就继续 Google 即可），就可以安装了：</p>
+
+<pre>
+<code># rpm -ivh MySQL-server-5.6.21-1.el6.i686.rpm</code></pre>
+
+<h2>&nbsp;</h2>
+
+<ol>
+</ol>
