@@ -1,0 +1,116 @@
+<h1>Ueditor富编辑器做弹出或是某些情况第二次打开的时候会渲染失败</h1>
+
+<h2>Ueditor编辑渲染时报错</h2>
+
+<p>今天在做个弹出页面中需要富文本编辑，整个系统架构的富文本都是用Ueditor；</p>
+
+<p>所以这里也是使用UE.getEditor(&quot;container&quot;);</p>
+
+<p>但第一次弹出渲染正常，当第二次就不能正常渲染了，通过百度找到几种方法一一尝试最终找到：</p>
+
+<p>UE.delEditor(&quot;container&quot;);//可能是缓存问题导致的，因此先删除缓存中已有的富文本，</p>
+
+<p>UE.getEditor(&quot;container&quot;);//再重新渲染</p>
+
+<p>一切正常，但在ie中又不起作用（stupid IE，go to die 吧 IE）；</p>
+
+<p>探究其原因原来是ueditor.all.js中的delEditor方法中调用的destroy方法，中用到var container = me.container.parentNode; parentNode为空，因此会不执行；</p>
+
+<p>第一种方法是只能修改ueditor.all.js文件，但开发中不喜欢修改第三方库，以免造成以后更新会覆盖而导致bug再现，但又没测试到的问题；（不推荐）</p>
+
+<p>第二种方法是：观察ueditor.all.js文件，原来getEditor其实就是调用ueditor api中的方法，将渲染实例，存入数组instances[]中，由此而引发缓存问题，二次不能渲染问题；</p>
+
+<p>那解决起来就比较简单：</p>
+
+<p>正常渲染某个container为富文本的做法是：UE.getEditor(&quot;container&quot;);但这里我们不用这个方法，我们直接自己模仿ueditor.all.js中getEditor()方法来实现container的渲染：</p>
+
+<p>var editor = new UE.ui.Editor(opt);<br />
+editor.render(id);</p>
+
+<p>其中opt，id就是UE.getEditor(id,[opt])方法的签名，opt是可选项，而且可以看出，如果一个页面渲染多个container；editor只需实例化一次就ok</p>
+
+<p>var editor = new UE.ui.Editor(opt);<br />
+editor.render(id1);</p>
+
+<p>editor.render(id2);</p>
+
+<p>editor.render(id3);</p>
+
+<p>&nbsp;</p>
+
+<h2>源代码片段</h2>
+
+<h3>出错位置代码</h3>
+
+<p>出错的是文件 ueditor.all.js 中下面黑体的语句</p>
+
+<p>&nbsp; &nbsp; /**<br />
+&nbsp; &nbsp; &nbsp;* 销毁编辑器实例，使用textarea代替<br />
+&nbsp; &nbsp; &nbsp;* @method destroy<br />
+&nbsp; &nbsp; &nbsp;* @example<br />
+&nbsp; &nbsp; &nbsp;* ```javascript<br />
+&nbsp; &nbsp; &nbsp;* editor.destroy();<br />
+&nbsp; &nbsp; &nbsp;* ```<br />
+&nbsp; &nbsp; &nbsp;*/<br />
+&nbsp; &nbsp; destroy: function () {</p>
+
+<p>&nbsp; &nbsp; &nbsp; &nbsp; var me = this;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; me.fireEvent(&#39;destroy&#39;);<br />
+&nbsp; &nbsp; &nbsp; &nbsp; <strong>var container = me.container.parentNode; //这里显示了me.container 为null.</strong><br />
+&nbsp; &nbsp; &nbsp; &nbsp; var textarea = me.textarea;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; if (!textarea) {<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; textarea = document.createElement(&#39;textarea&#39;);<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; container.parentNode.insertBefore(textarea, container);<br />
+&nbsp; &nbsp; &nbsp; &nbsp; } else {<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; textarea.style.display = &#39;&#39;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; }</p>
+
+<p>&nbsp; &nbsp; &nbsp; &nbsp; textarea.style.width = me.iframe.offsetWidth + &#39;px&#39;;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; textarea.style.height = me.iframe.offsetHeight + &#39;px&#39;;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; textarea.value = me.getContent();<br />
+&nbsp; &nbsp; &nbsp; &nbsp; textarea.id = me.key;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; container.innerHTML = &#39;&#39;;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; domUtils.remove(container);<br />
+&nbsp; &nbsp; &nbsp; &nbsp; var key = me.key;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; //trace:2004<br />
+&nbsp; &nbsp; &nbsp; &nbsp; for (var p in me) {<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; if (me.hasOwnProperty(p)) {<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; delete this[p];<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; }<br />
+&nbsp; &nbsp; &nbsp; &nbsp; }<br />
+&nbsp; &nbsp; &nbsp; &nbsp; UE.delEditor(key);<br />
+&nbsp; &nbsp; },</p>
+
+<p>&nbsp;</p>
+
+<h3>官方的getEditor方法</h3>
+
+<p>&nbsp; &nbsp; /**<br />
+&nbsp; &nbsp; &nbsp;* @file<br />
+&nbsp; &nbsp; &nbsp;* @name UE<br />
+&nbsp; &nbsp; &nbsp;* @short UE<br />
+&nbsp; &nbsp; &nbsp;* @desc UEditor的顶部命名空间<br />
+&nbsp; &nbsp; &nbsp;*/<br />
+&nbsp; &nbsp; /**<br />
+&nbsp; &nbsp; &nbsp;* @name getEditor<br />
+&nbsp; &nbsp; &nbsp;* @since 1.2.4+<br />
+&nbsp; &nbsp; &nbsp;* @grammar UE.getEditor(id,[opt]) &nbsp;=&gt; &nbsp;Editor实例<br />
+&nbsp; &nbsp; &nbsp;* @desc 提供一个全局的方法得到编辑器实例<br />
+&nbsp; &nbsp; &nbsp;*<br />
+&nbsp; &nbsp; &nbsp;* * &#39;&#39;id&#39;&#39; &nbsp;放置编辑器的容器id, 如果容器下的编辑器已经存在，就直接返回<br />
+&nbsp; &nbsp; &nbsp;* * &#39;&#39;opt&#39;&#39; 编辑器的可选参数<br />
+&nbsp; &nbsp; &nbsp;* @example<br />
+&nbsp; &nbsp; &nbsp;* &nbsp;UE.getEditor(&#39;containerId&#39;,{onready:function(){//创建一个编辑器实例<br />
+&nbsp; &nbsp; &nbsp;* &nbsp; &nbsp; &nbsp;this.setContent(&#39;hello&#39;)<br />
+&nbsp; &nbsp; &nbsp;* &nbsp;}});<br />
+&nbsp; &nbsp; &nbsp;* &nbsp;UE.getEditor(&#39;containerId&#39;); //返回刚创建的实例<br />
+&nbsp; &nbsp; &nbsp;*<br />
+&nbsp; &nbsp; &nbsp;*/<br />
+&nbsp; &nbsp; UE.getEditor = function (id, opt) {<br />
+&nbsp; &nbsp; &nbsp; &nbsp; var editor = instances[id];<br />
+&nbsp; &nbsp; &nbsp; &nbsp; if (!editor) {<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; editor = instances[id] = new UE.ui.Editor(opt);<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; editor.render(id);<br />
+&nbsp; &nbsp; &nbsp; &nbsp; }<br />
+&nbsp; &nbsp; &nbsp; &nbsp; return editor;<br />
+&nbsp; &nbsp; };</p>

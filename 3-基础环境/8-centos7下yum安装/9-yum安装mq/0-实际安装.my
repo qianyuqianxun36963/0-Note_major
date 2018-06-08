@@ -1,0 +1,139 @@
+<h1><a href="https://www.cnblogs.com/crazylqy/p/6567253.html" id="cb_post_title_url">yum 安装rabbitMQ</a></h1>
+
+<p>&nbsp;环境：linux centos6.5</p>
+
+<h2><strong>1.安装erlang</strong></h2>
+
+<p>下载rpm仓库：wget http://packages.erlang-solutions.com/erlang-solutions-1.0-1.noarch.rpm</p>
+
+<p>安装rpm仓库<br />
+rpm -Uvh erlang-solutions-1.0-1.noarch.rpm</p>
+
+<p>安装erlang<br />
+yum -y install erlang</p>
+
+<p>安装完成后，运行：</p>
+
+<p><img alt="" src="https://images2015.cnblogs.com/blog/464291/201703/464291-20170317164901338-73095240.png" /></p>
+
+<p>安装成功。</p>
+
+<h2><strong>2.安装RabbitMQ</strong></h2>
+
+<p>下载RabbitMQ的rpm：wget http://www.rabbitmq.com/releases/rabbitmq-server/v3.6.9/rabbitmq-server-3.6.9-1.el7.noarch.rpm</p>
+
+<p>yum -y install rabbitmq-server-3.6.9-1.el7.noarch.rpm</p>
+
+<p>注：</p>
+
+<p>如果报：Requires: socat</p>
+
+<p>更新源wget &ndash;no-cache http://www.convirture.com/repos/definitions/rhel/6.x/convirt.repo -O /etc/yum.repos.d/convirt.repo</p>
+
+<p>yum install socat</p>
+
+<p>启动rabbitmq服务:&nbsp;&nbsp;&nbsp;</p>
+
+<p>前台运行：rabbitmq-server&nbsp;start&nbsp;(用户关闭连接后,自动结束进程)&nbsp;&nbsp;</p>
+
+<p>后台运行：rabbitmq-server&nbsp;-detached&nbsp;</p>
+
+<h2><strong>3.安装插件</strong></h2>
+
+<p>启动web管理界面</p>
+
+<p>rabbitmq-plugins enable rabbitmq_management</p>
+
+<p>增加访问用户，默认用户guest只能本地访问。</p>
+
+<p>rabbitmqctl add_user admin 123456</p>
+
+<p>设置角色：</p>
+
+<p>rabbitmqctl set_user_tags admin administrator</p>
+
+<p>设置默认vhost（&ldquo;/&rdquo;）访问权限</p>
+
+<p>rabbitmqctl set_permissions -p &ldquo;/&rdquo; admin &ldquo;.&rdquo; &ldquo;.&rdquo; &ldquo;.*&rdquo;</p>
+
+<p>浏览器访问：http://IP:15672</p>
+
+<p>用户名admin，密码123456进行登录</p>
+
+<p>遇到问题参考：http://blog.csdn.net/qq315737546/article/details/53105418</p>
+
+<p>脚本</p>
+
+<pre>
+启服务
+sudo service rabbitmq-server  {start|stop|status|rotate-logs|restart|condrestart|try-restart|reload|force-reload}
+
+Usage: /etc/init.d/rabbitmq-server {start|stop|status|rotate-logs|restart|condrestart|try-restart|reload|force-reload}
+
+装插件
+sudo rabbitmq-plugins enable rabbitmq_management
+
+建用户
+sudo  rabbitmqctl add_user admin ucsmy1234
+
+设置角色：
+sudo  rabbitmqctl set_user_tags admin administrator
+
+设置权限
+sudo rabbitmqctl set_permissions -p &quot;/&quot; admin &quot;.&quot; &quot;.&quot; &quot;.*&quot;
+</pre>
+
+<h3><strong>4、好了，到这里rabbitmq已经配置好了，可以启动了：</strong></h3>
+
+<ul>
+	<li>我们再来查看看一下rabbitmq的默认监听端口5672：&nbsp;&nbsp;</li>
+	<li>#netstat&nbsp;-tnlp|grep&nbsp;5672&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>最好我们就可以在浏览器上输入http://ip:15672/登录管理界面了：&nbsp;&nbsp;</li>
+	<li>使用登录的名户名和密码默认都算guest，登录后的页面如下：&nbsp;&nbsp;</li>
+	<li>另一台机器访问rabbitmq(就是本机之外),需要打开15672端口&nbsp;&nbsp;</li>
+	<li>#vi&nbsp;/etc/sysconfig/iptables&nbsp;&nbsp;把15672端口加进去。然后重启service&nbsp;iptables&nbsp;restart</li>
+</ul>
+
+<h2><strong>5、添加远程管理账户</strong></h2>
+
+<p>如果要从远程登录怎么做呢？处于安全考虑，guest这个默认的用户只能通过http://localhost:15672来登录，其他的IP无法直接用这个guest帐号。这里我们可以通过配置文件来实现从远程登录管理界面，只要编辑<strong>/etc/rabbitmq/rabbitmq.config</strong>文件（没有就新增），添加以下配置就可以了。</p>
+
+<p>[&nbsp;<br />
+{rabbit,&nbsp;[{tcp_listeners,&nbsp;[5672]},&nbsp;{loopback_users,&nbsp;[&quot;asdf&quot;]}]}&nbsp;<br />
+].</p>
+
+<p>现在添加了一个新授权用户asdf,可以远程使用这个用户名。记得要先用命令添加这个命令才行：</p>
+
+<pre>
+$  cd /usr/lib/rabbitmq/bin/
+#用户名与密码
+$ sudo rabbitmqctl add_user asdf 123456
+#用户设置为administrator才能远程访问
+$ sudo rabbitmqctl set_user_tags asdf administrator         
+$ sudo rabbitmqctl set_permissions -p / asdf &quot;.*&quot; &quot;.*&quot; &quot;.*&quot;
+</pre>
+
+<p>其实也可以通过管理平台页面直接添加用户和密码等信息。<strong>如果还不能远程访问或远程登录检查是不是5672, 15672端口没有开放！！！！！！</strong></p>
+
+<h2><strong>6. 用户管理</strong></h2>
+
+<p>用户管理包括增加用户，删除用户，查看用户列表，修改用户密码。<br />
+<br />
+相应的命令<br />
+<br />
+(1) 新增一个用户<br />
+<br />
+rabbitmqctl&nbsp; add_user&nbsp; Username&nbsp; Password<br />
+<br />
+(2) 删除一个用户<br />
+<br />
+rabbitmqctl&nbsp; delete_user&nbsp; Username<br />
+<br />
+(3) 修改用户的密码<br />
+<br />
+rabbitmqctl&nbsp; change_password&nbsp; Username&nbsp; Newpassword<br />
+<br />
+(4) 查看当前用户列表<br />
+&nbsp;</p>
+
+<p>rabbitmqctl&nbsp; list_users</p>

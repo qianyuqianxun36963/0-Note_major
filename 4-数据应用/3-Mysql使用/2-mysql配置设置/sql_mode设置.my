@@ -1,0 +1,233 @@
+<h1>Mysql only_full_group_by以及其他关于sql_mode原因报错详细解决方案</h1>
+
+<h2>报错信息：</h2>
+
+<pre>
+<code>1.ERROR&nbsp;1055&nbsp;(42000): Expression&nbsp;#7&nbsp;of&nbsp;SELECT&nbsp;list&nbsp;is&nbsp;not&nbsp;in&nbsp;GROUP&nbsp;BY&nbsp;clause&nbsp;and&nbsp;contains nonaggregated column&nbsp;&#39;postscan.verifyDelayLog.auditor&#39;&nbsp;which&nbsp;is&nbsp;not&nbsp;functionally dependent&nbsp;on&nbsp;columns&nbsp;in&nbsp;GROUP&nbsp;BY&nbsp;clause; this&nbsp;is&nbsp;incompatible&nbsp;with&nbsp;sql_mode=only_full_group_by</code></pre>
+
+<h2>原因：</h2>
+
+<pre>
+<code>1.mysql&nbsp;5.7中的sql_mode的值为：</code></pre>
+
+<p><code>2.ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_AUTO_CREATE_USER,NO_ENGINE_SUBSTITUTION</code></p>
+
+<h2>怎么查看呢：</h2>
+
+<pre>
+<code>1.我的mysql5.7部署在linux上的，然后我使用navicat&nbsp;12连接的,就说怎么使用navicat&nbsp;12查看吧</code></pre>
+
+<p><code>2.使用navicat&nbsp;打开数据库,然后工具--&gt;命令列界面 （快捷方式F6）</code></p>
+
+<p><code>3.然后输入：<strong>SELECT&nbsp;@@sql_mode;</strong></code></p>
+
+<p><code>4.看到值为：</code></p>
+
+<p><code>5.ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_AUTO_CREATE_USER,NO_ENGINE_SUBSTITUTION</code></p>
+
+<h2>解决办法1：</h2>
+
+<pre>
+
+&nbsp;</pre>
+
+<p><code>1.我所使用的mysql运行时指定的配置如下：</code></p>
+
+<p><code>2./apps/mysql5.7.18/bin/mysqld --defaults-file=/apps/my3306.cnf --basedir=/apps/mysql5.7.18&nbsp;--datadir=/apps/mysql/data/3306&nbsp;--plugin-dir=/apps/mysql5.7.18/lib/mysql/plugin --user=mysql --log-error=/apps/mysql/data/3306/BJ-DYC-VM-5-106.err --open-files-limit=8192&nbsp;--pid-file=/apps/mysql/data/3306/BJ-DYC-VM-5-106.pid --socket=/tmp/mysql_3306.sock --port=3306</code></p>
+
+<p><code>4.那么我修改的是/apps/my3306.cnf，你没意见吧哈哈</code></p>
+
+<p><code>5.找到：</code></p>
+
+<p><code>6.sql_mode =&nbsp;&quot;ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_AUTO_CREATE_USER,NO_ENGINE_SUBSTITUTION&quot;</code></p>
+
+<p><code>8.修改为：</code></p>
+
+<p><code>9.sql_mode =&nbsp;&quot;STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_AUTO_CREATE_USER,NO_ENGINE_SUBSTITUTION&quot;</code></p>
+
+<p><code>11.因为修改了mysql配置文件，所以重新启动mysql</code></p>
+
+<p><code>12./apps/mysql5.7.18/bin/mysqld --defaults-file=/apps/my3306.cnf --basedir=/apps/mysql5.7.18&nbsp;--datadir=/apps/mysql/data/3306&nbsp;--plugin-dir=/apps/mysql5.7.18/lib/mysql/plugin --user=mysql --log-error=/apps/mysql/data/3306/BJ-DYC-VM-5-106.err --open-files-limit=8192&nbsp;--pid-file=/apps/mysql/data/3306/BJ-DYC-VM-5-106.pid --socket=/tmp/mysql_3306.sock --port=3306</code></p>
+
+<h2>验证一下：</h2>
+
+<pre>
+<code>1.进入命令列界面</code></pre>
+
+<p><code>2.然后输入：SELECT @@sql_mode;</code></p>
+
+<p><code>3.看到值为：</code></p>
+
+<p><code>4.STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_AUTO_CREATE_USER,NO_ENGINE_SUBSTITUTION</code></p>
+
+<p><code>6.至此，你不用遵守：如下约定了：</code></p>
+
+<p><code>7.&nbsp;对于GROUP&nbsp;BY聚合操作，如果在SELECT中的列，没有在GROUP&nbsp;BY中出现，那么这个SQL是不合法的，因为列不在GROUP&nbsp;BY从句中，所以对于设置了这个mode的数据库，在使用group&nbsp;by&nbsp;的时候，就要用MAX(),SUM(),ANT_VALUE()这种聚合函数，才能完成GROUPBY&nbsp;的聚合操作。</code></p>
+
+<h2>解决办法2</h2>
+
+<pre>
+<code>1.第二种办法不用修改配置文件，使用navicat修改</code></pre>
+
+<p><code>2.进入命令行界面（F6）</code></p>
+
+<p><code>3.输入：SELECT&nbsp;@@GLOBAL.sql_mode;</code></p>
+
+<p><code>4.结果：ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_AUTO_CREATE_USER,NO_ENGINE_SUBSTITUTION</code></p>
+
+<p><code>6.然后我们来修改sql_mode</code></p>
+
+<p><code>7.输入：set&nbsp;GLOBAL&nbsp;sql_mode =&#39;STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_AUTO_CREATE_USER,NO_ENGINE_SUBSTITUTION &#39;;</code></p>
+
+<p><code>9.再运行你的sql：</code></p>
+
+<p><code>10.SELECT</code></p>
+
+<p><code>11.&nbsp;id,ip</code></p>
+
+<p><code>12.FROM</code></p>
+
+<p><code>13.&nbsp;ip_meta_backup</code></p>
+
+<p><code>14.GROUP&nbsp;BY</code></p>
+
+<p><code>15.&nbsp;ip</code></p>
+
+<p><code>16.HAVING</code></p>
+
+<p><code>17.&nbsp;count(ip) &gt;&nbsp;1</code></p>
+
+<p><code>18.*****恭喜你，成功了*****</code></p>
+
+<p><code>19.</code></p>
+
+<p><code>20.</code></p>
+
+<p><code>21.</code></p>
+
+<p><code>22.然后你再运行你的sql是不是可以运行啦</code></p>
+
+<p><code>23.</code></p>
+
+<p><code>24.SET&nbsp;GLOBAL&nbsp;sql_mode =&#39;STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_AUTO_CREATE_USER,NO_ENGINE_SUBSTITUTION&#39;;</code></p>
+
+<p><code>25.</code></p>
+
+<p><code>26.SELECT&nbsp;@@GLOBAL.sql_mode;</code></p>
+
+<h2>解决办法3</h2>
+
+<pre>
+
+&nbsp;</pre>
+
+<p><code>1.第三种办法不用修改配置文件，使用navicat修改</code></p>
+
+<p><code>2.进入命令行界面（F6）</code></p>
+
+<p><code>3.输入：SELECT&nbsp;@@sql_mode; 注意：这边缺省了session,完整的是：SELECT&nbsp;@@SESSION.sql_mode;</code></p>
+
+<p><code>4.结果：ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_AUTO_CREATE_USER,NO_ENGINE_SUBSTITUTION</code></p>
+
+<p><code>6.然后我们来修改sql_mode</code></p>
+
+<p><code>7.输入：set&nbsp;SESSION&nbsp;sql_mode =&#39;STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_AUTO_CREATE_USER,NO_ENGINE_SUBSTITUTION &#39;;</code></p>
+
+<p><code>9.再运行你的sql：</code></p>
+
+<p><code>10.SELECT</code></p>
+
+<p><code>11.&nbsp;id,ip</code></p>
+
+<p><code>12.FROM</code></p>
+
+<p><code>13.&nbsp;ip_meta_backup</code></p>
+
+<p><code>14.GROUP&nbsp;BY</code></p>
+
+<p><code>15.&nbsp;ip</code></p>
+
+<p><code>16.HAVING</code></p>
+
+<p><code>17.&nbsp;count(ip) &gt;&nbsp;1</code></p>
+
+<p><code>18.*****还是报only_full_group_by错*****</code></p>
+
+<p><code>20.##############解决方法###################</code></p>
+
+<p><code>22.在你查询的语句之前set&nbsp;sql_mode</code></p>
+
+<p><code>24.set&nbsp;SESSION&nbsp;sql_mode =&#39;STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_AUTO_CREATE_USER,NO_ENGINE_SUBSTITUTION &#39;;</code></p>
+
+<p><code>25.SELECT</code></p>
+
+<p><code>26.&nbsp;id,ip</code></p>
+
+<p><code>27.FROM</code></p>
+
+<p><code>28.&nbsp;ip_meta_backup</code></p>
+
+<p><code>29.GROUP&nbsp;BY</code></p>
+
+<p><code>30.&nbsp;ip</code></p>
+
+<p><code>31.HAVING</code></p>
+
+<p><code>32.&nbsp;count(ip) &gt;&nbsp;1</code></p>
+
+<p><code>33.以后再新建查询（包含group&nbsp;by）语句也不用再加set&nbsp;sql_mode 直到你关闭这次连接为止</code></p>
+
+<p><code>38.然后你再运行你的sql是不是可以运行啦</code></p>
+
+<p><code>40.SET&nbsp;GLOBAL&nbsp;sql_mode =&#39;STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_AUTO_CREATE_USER,NO_ENGINE_SUBSTITUTION&#39;;</code></p>
+
+<p><code>42.SELECT&nbsp;@@GLOBAL.sql_mode;</code></p>
+
+<h3>对于办法3解决的解释</h3>
+
+<pre>
+
+&nbsp;</pre>
+
+<p><code>1.其实讲第三种方法的时候说过SELECT&nbsp;@@sql_mode; 其实这边缺省了session,完整的是：SELECT&nbsp;@@SESSION.sql_mode;</code></p>
+
+<p><code>2.SESSION是当前会话的意思----&gt;这句话就解释了直到你关闭这次连接为止</code></p>
+
+<p><code>4.那为什么在命令行set&nbsp;sql_mode,然后再新建查询还是没用呢？</code></p>
+
+<p><code>5.其实你只要在新建查询中输入SELECT&nbsp;@@sql_mode;你会发现你在命令行中的设置并没有生效</code></p>
+
+<p><code>6.所以，我们只能重新在这次连接（会话）的新建查询中重新set&nbsp;sql_mode,之后这次连接（这次会话）不再需要</code></p>
+
+<p><code>7.这一段语言解释了&ldquo;在你查询的语句之前set&nbsp;sql_mode&rdquo;这句话</code></p>
+
+<h2>对办法2办法3两种方法的说明</h2>
+
+<pre>
+<code>1.这两种set&nbsp;sql_mode方法，都会随着在我部署linux上的mysql重启而恢复到我指定的配置文件的my.cnf里面设置的sql-mode选项中的内容</code></pre>
+
+<p><code>2.这句话比较绕</code></p>
+
+<p><code>3.意思就是：linux上的mysql重启后，你在navicat上设置的就不再有效，而是依据你指定的配置文件中的设定，就是my.cnf这个文件中设定</code></p>
+
+<h2>附上其他mode解释</h2>
+
+<pre>
+<code>1.STRICT_TRANS_TABLES： 在该模式下，如果一个值不能插入到一个事务表中，则中断当前的操作，对非事务表不做限制</code>
+</pre>
+
+<p><code>3.NO_ZERO_IN_DATE： 在严格模式下，不允许日期和月份为零</code></p>
+
+<p><code>5.NO_ZERO_DATE： 设置该值，mysql数据库不允许插入零日期，插入零日期会抛出错误而不是警告。</code></p>
+
+<p><code>7.ERROR_FOR_DIVISION_BY_ZERO：在INSERT或UPDATE过程中，如果数据被零除，则产生错误而非警告。如 果未给出该模式，那么数据被零除时MySQL返回NULL</code></p>
+
+<p><code>9.NO_AUTO_CREATE_USER： 禁止GRANT创建密码为空的用户</code></p>
+
+<p><code>11.NO_ENGINE_SUBSTITUTION： 如果需要的存储引擎被禁用或未编译，那么抛出错误。不设置此值时，用默认的存储引擎替代，并抛出一个异常</code></p>
+
+<p><code>13.PIPES_AS_CONCAT： 将&quot;||&quot;视为字符串的连接操作符而非或运算符，这和Oracle数据库是一样的，也和字符串的拼接函数Concat相类似</code></p>
+
+<p><code>15.ANSI_QUOTES： 启用ANSI_QUOTES后，不能用双引号来引用字符串，因为它被解释为识别符</code></p>
+
+<p><code>17.NO_AUTO_VALUE_ON_ZERO： 该值影响自增长列的插入。默认设置下，插入0或NULL代表生成下一个自增长值。如果用户 希望插入的值为0，而该列又是自增长的，那么这个选项就有用了。</code></p>
