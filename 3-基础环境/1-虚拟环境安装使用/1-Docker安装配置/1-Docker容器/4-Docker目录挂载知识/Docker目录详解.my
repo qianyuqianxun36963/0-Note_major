@@ -1,0 +1,57 @@
+<h2>Docker如何重启后数据不丢失，教你挂载数据卷Volume</h2>
+
+<p>大家在使用Docker部署web应用或者mysql数据库时，会发现当容器重启后，容器运行过程中产生的日志或者数据库数据都会被清空，那么我们如何保存这些数据呢？这就需要了解docker如何挂载宿主机磁盘目录，用来永久存储数据。</p>
+
+<p>1. 创建容器时执行Docker Volume</p>
+
+<p>使用 docker run 命令，可以运行一个 Docker容器,使用镜像ubuntu/nginx，挂载本地目录/tmp/source到容器目录/tmp/destination</p>
+
+<p>docker run -itd --volume /tmp/source:/tmp/destination --name test ubuntu/nginx bash</p>
+
+<p>基于ubuntu/nginx镜像创建了一个Docker容器。</p>
+
+<p>指定容器的名称为test，由 &ndash;&ndash;name 选项指定。</p>
+
+<p>Docker Volume 由 &ndash;&ndash;volume （可以简写为-v）选项指定，主机的 /tmp/source 目录与容器中的 /tmp/destination 目录一一对应。</p>
+
+<p>2. 查看Docker Volume</p>
+
+<p>使用 docker inspect 命令，可以查看 Docker容器 的详细信息:</p>
+
+<p>docker inspect --format=&#39;{{json .Mounts}}&#39;test | python -m json.tool[{&quot;Destination&quot;: &quot;/tmp/destination&quot;,&quot;Mode&quot;: &quot;&quot;,&quot;Propagation&quot;: &quot;&quot;,&quot;RW&quot;: true,&quot;Source&quot;: &quot;/tmp/source&quot;,&quot;Type&quot;: &quot;bind&quot;}]</p>
+
+<p>使用 &ndash;&ndash;format 选项，可以选择性查看需要的容器信息。 .Mount 为容器的 Docker Volume 信息。</p>
+
+<p>python -m json.tool 可以将输出的json字符串格式化显示。</p>
+
+<p>Source 表示主机上的目录，即 /tmp/source 。</p>
+
+<p>Destination 为容器中的目录，即 /tmp/destination。</p>
+
+<p>3. 本机文件可以同步到容器</p>
+
+<p>在本机/tmp/source目录中新建hello.txt文件</p>
+
+<p>touch /tmp/source/hello.txtls /tmp/source/hello.txt</p>
+
+<p>hello.txt文件在容器/tmp/destination/目录中可见</p>
+
+<p>使用 docker exec 命令，可以在容器中执行命令。</p>
+
+<p>docker exectest ls /tmp/destination/hello.txt</p>
+
+<p>所以在宿主机对目录 /tmp/source/ 的修改，可以同步到容器目录 /tmp/destination/ 中。</p>
+
+<p>4. 容器文件可以同步到宿主机</p>
+
+<p>在容器/tmp/destination目录中新建world.txt文件</p>
+
+<p>docker exec test touch /tmp/destination/world.txtdocker exec test ls /tmp/destination/hello.txtworld.txt</p>
+
+<p>world.txt文件在宿主机/tmp/source/目录中可见</p>
+
+<p>ls /tmp/source/hello.txt world.txt</p>
+
+<p><img src="http://t10.baidu.com/it/u=2199220860,1775891966&amp;fm=173&amp;s=4605F40A58DBF7E3400719D4030050A8&amp;w=640&amp;h=417&amp;img.JPEG" /></p>
+
+<p>本文由百家号作者上传并发布，百家号仅提供信息发布平台。文章仅代表作者个人观点，不代表百度立场。未经作者许可，不得转载。</p>
