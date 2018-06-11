@@ -1,0 +1,348 @@
+<h1>Vue.js组件化开发实践</h1>
+
+<p>2017年05月24日 17:41:08</p>
+
+<p>阅读数：716</p>
+
+<blockquote>
+<p>Vue.js 是一套构建用户界面的&nbsp;渐进式框架。它非常容易与其它库或已有项目整合，而无须从头开始重构整个项目；另一方面，Vue 完全有能力驱动采用单文件组件来开发的更为复杂的单页应用。</p>
+
+<p>https://segmentfault.com/a/1190000008591915</p>
+</blockquote>
+
+<p>目前在我参与开发维护的项目中已经使用上了Vue.js的一些基本功能，下面两幅图来自项目截图。</p>
+
+<p><img alt="" src="https://segmentfault.com/img/bVKdir?w=344&amp;h=366" /></p>
+
+<p><img alt="" src="https://segmentfault.com/img/bVKdiu?w=472&amp;h=453" /></p>
+
+<h2>Vue.js基本功能</h2>
+
+<blockquote>
+<ul>
+	<li>
+	<p>视图元素响应式</p>
+	</li>
+	<li>
+	<p>数据双向绑定，解放DOM操作</p>
+	</li>
+	<li>
+	<p>只关注视图层，渐进式插件</p>
+	</li>
+</ul>
+</blockquote>
+
+<h3>视图元素响应式</h3>
+
+<pre>
+<code>//视图
+&lt;div id=&quot;app&quot;&gt;{{msg}}&lt;/div&gt;</code></pre>
+
+<pre>
+<code>//JS逻辑
+var vm = new Vue({
+  el: &#39;#app&#39;,
+  data: {
+    msg: &#39;hello world&#39;
+  }
+})</code></pre>
+
+<p>上图中，我们在视图里声明一个变量<code>msg</code>，它被包在一个双花括号&rdquo;{{}}&rdquo;中，以此表明它是一个Vue所管理的视图变量元素。同时，我们在JS中新建一个Vue对象，其中的<code>el</code>对应&rdquo;#app&rdquo;，表示改Vue对象管辖的视图范围为id是<code>app</code>所对应的区域；<code>data</code>中有一个<code>msg</code>属性，对应视图中的双花括号变量<code>msg</code>。一旦我们新建好这个Vue对象，所有对于该对象data属性中的msg进行操作，会同步反应在视图中的{{msg}}上，这个视图变量元素即具有响应式。</p>
+
+<h3>数据双向绑定，解放DOM操作</h3>
+
+<blockquote>
+<ul>
+	<li>
+	<p>双向绑定：可以理解为JS逻辑中的数据的更改会实时的反映在视图上；同时任何从视图中过来的数据或者事件，能够实时的反映在逻辑中。</p>
+	</li>
+	<li>
+	<p>一旦视图和逻辑之间规定好需要绑定的数据和事件，那么业务逻辑就能专注数据处理，而无需手动管理DOM，这样就实现了视图和逻辑各司其职。</p>
+	</li>
+</ul>
+</blockquote>
+
+<p>一个例子：</p>
+
+<p>输入框中的输入的字符串实时显示在视图上；同时当用户点击视图中的一个按钮时，视图中的字符串反向之后在输出到视图上。</p>
+
+<p>DOM操作</p>
+
+<pre>
+<code>//视图
+&lt;div id=&quot;app&quot;&gt;
+    &lt;p id=&quot;msg&quot;&gt;&lt;/p&gt;&lt;input id=&quot;inputMsg&quot; type=&quot;text&quot;&gt;
+    &lt;p id=&quot;gsm&quot;&gt;&lt;/p&gt;&lt;button id=&quot;reverseMsg&quot;&gt;Reverse&lt;/button&gt;
+&lt;/div&gt;</code></pre>
+
+<pre>
+<code>//逻辑
+document.getElementById(&#39;inputMsg&#39;).addEventListener(&#39;input&#39;, function({
+  document.getElementById(&#39;msg&#39;).innerText = this.value
+}), false)
+
+document.getElementById(&#39;reverseMsg&#39;).addEventListener(&#39;click&#39;, function({
+  var msg = document.getElementById(&#39;msg&#39;).innerText
+  document.getElementById(&#39;gsm&#39;).innerText = msg.split(&#39;&#39;).reverse().join(&#39;&#39;)
+}), false)
+</code></pre>
+
+<p>Vue处理</p>
+
+<pre>
+<code>//视图
+&lt;div id=&quot;app&quot;&gt;
+    &lt;p&gt;{{msg}}&lt;/p&gt;&lt;input v-model=&quot;msg&quot; type=&quot;text&quot;&gt;
+    &lt;p&gt;{{gsm}}&lt;/p&gt;&lt;button v-on:click=&quot;reverseMsg&quot;&gt;Reverse&lt;/button&gt;
+&lt;/div&gt;</code></pre>
+
+<pre>
+<code>//逻辑
+var vm = new Vue({
+    el: &#39;#app&#39;,
+    data: {
+        msg: &quot;&quot;,
+        gsm: &#39;&#39;
+    },
+    methods: {
+        reverseMsg: function(){
+            this.gsm = this.msg.split(&#39;&#39;).reverse().join(&#39;&#39;)
+        }
+    }
+})</code></pre>
+
+<h2>Vue.js组件</h2>
+
+<blockquote>
+<ul>
+	<li>
+	<p>易维护</p>
+	</li>
+	<li>
+	<p>易复用</p>
+	</li>
+</ul>
+</blockquote>
+
+<p>组件系统是 Vue.js 另一个重要概念，因为它提供了一种抽象，让我们可以用独立可复用的小组件来构建大型应用。如果我们考虑到这点，几乎任意类型的应用的界面都可以抽象为一个组件树。</p>
+
+<p><img alt="" src="https://segmentfault.com/img/bVx1rf?w=1406&amp;h=544" /></p>
+
+<h4>一个自定义的按钮</h4>
+
+<pre>
+<code>&lt;div id=&#39;app&#39;&gt;
+  &lt;wds-button&gt;&lt;/wds-button&gt;
+&lt;/div&gt;
+
+&lt;template id=&#39;template-wds-button&#39;&gt;
+  &lt;button class=&quot;wds-button&quot;&gt;默认按钮&lt;/button&gt;
+&lt;/template&gt;</code></pre>
+
+<pre>
+<code>var wdsButton = {
+  template: &#39;#template-wds-button&#39;
+}
+
+var vm = new Vue({
+  el: &#39;#app&#39;,
+  components: {
+    &#39;wds-button&#39;: wdsButton
+  }
+})</code></pre>
+
+<h5>父组件传递数据到子组件:&nbsp;<code>props</code></h5>
+
+<pre>
+<code>&lt;div id=&#39;app&#39;&gt;
+  &lt;wds-button&gt;&lt;/wds-button&gt;
+  &lt;wds-button type=&quot;success&quot; btn-name=&quot;成功按钮&quot;&gt;&lt;/wds-button&gt;
+&lt;/div&gt;
+
+&lt;template id=&#39;template-wds-button&#39;&gt;
+  &lt;button v-bind:class=&quot;[&#39;wds-button&#39;, type ? &#39;wds-button--&#39; + type: &#39;&#39;]&quot;&gt;{{btnName}}&lt;/button&gt;
+&lt;/template&gt;</code></pre>
+
+<pre>
+<code>var wdsButton = {
+    props: {
+        btnName: {
+            type: String,
+            default: &#39;默认按钮&#39;
+        },
+        type: {
+            type: String,
+            default: &#39;&#39;
+        }
+    },
+    template: &#39;#template-wds-button&#39;
+}
+
+var vm = new Vue({
+  el: &#39;#app&#39;,
+  components: {
+    &#39;wds-button&#39;: wdsButton
+  }
+})</code></pre>
+
+<h5>was-button 组件描述</h5>
+
+<p>Props</p>
+
+<table>
+	<thead>
+		<tr>
+			<th>参数</th>
+			<th>说明</th>
+			<th>类型</th>
+			<th>可选值</th>
+			<th>默认值</th>
+		</tr>
+	</thead>
+	<tbody>
+		<tr>
+			<td>btnName</td>
+			<td>按钮名字</td>
+			<td>String</td>
+			<td>&mdash;</td>
+			<td>默认按钮</td>
+		</tr>
+		<tr>
+			<td>type</td>
+			<td>按钮类型</td>
+			<td>String</td>
+			<td>success/warning/danger</td>
+			<td>&mdash;</td>
+		</tr>
+	</tbody>
+</table>
+
+<h5>子组件将数据传回父组件：<code>自定义Event</code></h5>
+
+<pre>
+<code>&lt;div id=&#39;app&#39;&gt;
+  &lt;wds-button v-on:wds-button-click-event=&quot;alertButtonName&quot; type=&quot;warning&quot; btn-name=&quot;警告按钮&quot;&gt;&lt;/wds-button&gt;
+&lt;/div&gt;
+
+&lt;template id=&#39;template-wds-button&#39;&gt;
+  &lt;button class=&quot;wds-button&quot; v-bind:class=&quot;[&#39;wds-button&#39;, type ? &#39;wds-button--&#39; + type: &#39;&#39;]&quot; v-on:click=&quot;wdsButtonClick&quot;&gt;{{btnName}}&lt;/button&gt;
+&lt;/template&gt;</code></pre>
+
+<pre>
+<code>var wdsButton = {
+    props: {
+        btnName: {
+            type: String,
+            default: &#39;默认按钮&#39;
+        },
+        type: {
+            type: String,
+            default: &#39;&#39;
+        }
+    },
+    methods: {
+      wdsButtonClick: function(){
+        this.$emit(&#39;wds-button-click-event&#39;, this.btnName, this.type)
+      }
+    },
+    template: &#39;#template-wds-button&#39;
+}
+
+var vm = new Vue({
+  el: &#39;#app&#39;,
+  components: {
+    &#39;wds-button&#39;: wdsButton
+  },
+  methods: {
+    alertButtonName: function(btnName, type){
+      alert(btnName)
+    }
+  }
+})</code></pre>
+
+<h5>was-button 组件描述</h5>
+
+<p>Props</p>
+
+<table>
+	<thead>
+		<tr>
+			<th>参数</th>
+			<th>说明</th>
+			<th>类型</th>
+			<th>可选值</th>
+			<th>默认值</th>
+		</tr>
+	</thead>
+	<tbody>
+		<tr>
+			<td>btnName</td>
+			<td>按钮名字</td>
+			<td>String</td>
+			<td>&mdash;</td>
+			<td>默认按钮</td>
+		</tr>
+		<tr>
+			<td>type</td>
+			<td>按钮类型</td>
+			<td>String</td>
+			<td>success/warning/danger</td>
+			<td>&mdash;</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>events</p>
+
+<table>
+	<thead>
+		<tr>
+			<th>事件名称</th>
+			<th>说明</th>
+			<th>回调参数</th>
+		</tr>
+	</thead>
+	<tbody>
+		<tr>
+			<td>wds-button-click-event</td>
+			<td>点击按钮回调事件</td>
+			<td>btnName, type</td>
+		</tr>
+	</tbody>
+</table>
+
+<h2>Vue.js单文件组件</h2>
+
+<blockquote>
+<ul>
+	<li>
+	<p>组件应该内聚自己的样式(HTML/CSS)和逻辑(JS)</p>
+	</li>
+	<li>
+	<p>一个组件对应一个文件</p>
+	</li>
+</ul>
+</blockquote>
+
+<p>文件和组件一一对应：<code>&nbsp;.vue</code>文件</p>
+
+<p><img alt="" src="https://segmentfault.com/img/bVKdiO?w=1246&amp;h=1370" /></p>
+
+<p><code>.vue</code>文件无法直接运行在浏览器上，通过webpack + vue-loader的方式来将Vue组件转化为JS模块。</p>
+
+<blockquote>
+<ul>
+	<li>
+	<p>webpack： 前端资源模块化管理打包工具。</p>
+	</li>
+	<li>
+	<p>vue-loader: webpack下处理<code>.vue</code>文件的的插件。</p>
+	</li>
+</ul>
+</blockquote>
+
+<p>一个例子：</p>
+
+<p>一个页面中有多个按钮，每点击一个按钮弹出toast信息，<code>按钮</code>和<code>toast</code>都自定义。代码可以下载<a href="http://www.jianshu.com/writer#/notebooks/8411855/notes/9820034/preview" target="_blank">这里</a>。</p>
+
+<p><img alt="" src="https://segmentfault.com/img/bVKdi5?w=358&amp;h=640" /></p>

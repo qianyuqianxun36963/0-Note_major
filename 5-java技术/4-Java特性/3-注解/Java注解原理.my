@@ -1,0 +1,354 @@
+<h1>注解原理</h1>
+
+<h2>一、<strong>注解的基本概念和原理及其简单实用</strong></h2>
+
+<p>注解（Annotation）提供了一种安全的类似注释的机制，为我们在代码中添加信息提供了一种形式化得方法，使我们可以在稍后某个时刻方便的使用这些数据（通过解析注解来使用这些数据），用来将任何的信息或者元数据与程序元素（类、方法、成员变量等）进行关联。其实就是更加直观更加明了的说明，这些说明信息与程序业务逻辑没有关系，并且是供指定的工具或框架使用的。Annotation像一种修饰符一样，应用于包、类型、构造方法、方法、成员变量、参数及本地变量的申明语句中。</p>
+
+<p>Annotation其实是一种接口。通过<a href="http://lib.csdn.net/base/17" target="_blank" title="Java EE知识库">Java</a>的反射机制相关的API来访问Annotation信息。相关类（框架或工具中的类）根据这些信息来决定如何使用该程序元素或改变它们的行为。Java语言解释器在工作时会忽略这些Annotation，因此在JVM中这些Annotation是&ldquo;不起作用&rdquo;的，只能通过配套的工具才能对这些Annotation类型的信息进行访问和处理。</p>
+
+<p>&nbsp;</p>
+
+<h2>Annotation和interface的异同：</h2>
+
+<p>1、&nbsp;<a href="mailto:annotition%E7%9A%84%E7%B1%BB%E5%9E%8B%E4%BD%BF%E7%94%A8%E5%85%B3%E9%94%AE%E5%AD%97@interface%E8%80%8C%E4%B8%8D%E6%98%AFinterface%E3%80%82%E5%AE%83%E7%BB%A7%E6%89%BF%E4%BA%86java.lang.annotition.Annotition" target="_blank">annotition的类型使用关键字@interface而不是interface。它继承了java.lang.annotition.Annotition</a>接口，并非申明了一个interface。</p>
+
+<p>2、&nbsp;Annotation类型、方法定义是独特的、受限制的。Annotation类型的方法必须申明为无参数、无异常抛出的。这些方法定义了Annotation的成员：方法名称为了成员名，而方法返回值称为了成员的类型。而方法返回值必须为primitive类型、Class类型、枚举类型、Annotation类型或者由前面类型之一作为元素的一位数组。方法的后面可以使用default和一个默认数值来申明成员的默认值，null不能作为成员的默认值，这与我们在非Annotation类型中定义方法有很大不同。Annotation类型和他的方法不能使用Annotation类型的参数，成员不能是generic。只有返回值类型是Class的方法可以在Annotation类型中使用generic，因为此方法能够用类转换将各种类型转换为Class。</p>
+
+<p>3、&nbsp;Annotation类型又与接口有着近似之处。它们可以定义常量、静态成员类型（比如枚举类型定义）。Annotation类型也可以如接口一般被实现或者继承。</p>
+
+<p>&nbsp;</p>
+
+<p>*<strong>&nbsp;元注解@Target,@Retention,@Documented,@Inherited&nbsp;</strong><br />
+*&nbsp;<br />
+* @Target&nbsp;表示该注解用于什么地方，可能的&nbsp;ElemenetType&nbsp;参数包括：&nbsp;<br />
+* ElemenetType.CONSTRUCTOR&nbsp;构造器声明&nbsp;<br />
+* ElemenetType.FIELD&nbsp;域声明（包括&nbsp;enum&nbsp;实例）&nbsp;<br />
+* ElemenetType.LOCAL_VARIABLE&nbsp;局部变量声明&nbsp;<br />
+* ElemenetType.METHOD&nbsp;方法声明&nbsp;<br />
+* ElemenetType.PACKAGE&nbsp;包声明&nbsp;<br />
+* ElemenetType.PARAMETER&nbsp;参数声明&nbsp;<br />
+* ElemenetType.TYPE&nbsp;类，接口（包括注解类型）或enum声明&nbsp;<br />
+*&nbsp;<br />
+* @Retention&nbsp;表示在什么级别保存该注解信息。可选的&nbsp;RetentionPolicy&nbsp;参数包括：&nbsp;<br />
+* RetentionPolicy.SOURCE&nbsp;注解将被编译器丢弃&nbsp;<br />
+* RetentionPolicy.CLASS&nbsp;注解在class文件中可用，但会被VM丢弃&nbsp;<br />
+* RetentionPolicy.RUNTIME VM将在运行期也保留注释，因此可以通过反射机制读取注解的信息。&nbsp;<br />
+*&nbsp;<br />
+* @Documented&nbsp;将此注解包含在&nbsp;javadoc&nbsp;中&nbsp;<br />
+*&nbsp;<br />
+* @Inherited&nbsp;允许子类继承父类中的注解</p>
+
+<p>@Target(ElementType.METHOD)&nbsp;<br />
+@Retention(RetentionPolicy.RUNTIME)&nbsp;<br />
+@Documented&nbsp;<br />
+@Inherited</p>
+
+<p>下面的示例来简单的讲述<a href="http://lib.csdn.net/base/17" target="_blank" title="Java EE知识库">spring</a>注解原理：</p>
+
+<p>本例实现了在set方法上和在字段属性上注解的处理解析。</p>
+
+<h2>&nbsp;1、定义注解</h2>
+
+<ol start="1">
+	<li>package&nbsp;com.yt.annotation;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>import&nbsp;java.lang.annotation.ElementType;&nbsp;&nbsp;</li>
+	<li>import&nbsp;java.lang.annotation.Retention;&nbsp;&nbsp;</li>
+	<li>import&nbsp;java.lang.annotation.RetentionPolicy;&nbsp;&nbsp;</li>
+	<li>import&nbsp;java.lang.annotation.Target;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>/**&nbsp;</li>
+	<li>&nbsp;*&nbsp;@Description:定义注解&nbsp;</li>
+	<li>&nbsp;*&nbsp;@ClassName:&nbsp;ZxfResource&nbsp;</li>
+	<li>&nbsp;*&nbsp;@Project:&nbsp;spring-aop&nbsp;</li>
+	<li>&nbsp;*&nbsp;@Author:&nbsp;zxf&nbsp;</li>
+	<li>&nbsp;*&nbsp;@Date:&nbsp;2011-6-7&nbsp;</li>
+	<li>&nbsp;*/&nbsp;&nbsp;</li>
+	<li>//&nbsp;在运行时执行&nbsp;&nbsp;</li>
+	<li>@Retention(RetentionPolicy.RUNTIME)&nbsp;&nbsp;</li>
+	<li>//&nbsp;注解适用地方(字段和方法)&nbsp;&nbsp;</li>
+	<li>@Target({&nbsp;ElementType.FIELD,&nbsp;ElementType.METHOD&nbsp;})&nbsp;&nbsp;</li>
+	<li>public&nbsp;@interface&nbsp;ZxfResource&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;//注解的name属性&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;String&nbsp;name()&nbsp;default&nbsp;&quot;&quot;;&nbsp;&nbsp;</li>
+	<li>}&nbsp;&nbsp;</li>
+</ol>
+
+<h2>&nbsp;2、带有注解的服务类</h2>
+
+<ol start="1">
+	<li>package&nbsp;com.yt.annotation;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>/**&nbsp;</li>
+	<li>&nbsp;*&nbsp;@Description:&nbsp;带有注解的服务&nbsp;</li>
+	<li>&nbsp;*&nbsp;@ClassName:&nbsp;UserDaoImpl&nbsp;</li>
+	<li>&nbsp;*&nbsp;@Project:&nbsp;spring-aop&nbsp;</li>
+	<li>&nbsp;*&nbsp;@Author:&nbsp;zxf&nbsp;</li>
+	<li>&nbsp;*&nbsp;@Date:&nbsp;2011-6-7&nbsp;</li>
+	<li>&nbsp;*/&nbsp;&nbsp;</li>
+	<li>public&nbsp;class&nbsp;UserServiceImpl&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;UserDaoImpl&nbsp;userDao;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;User1DaoImpl&nbsp;user1Dao;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;//&nbsp;字段上的注解,可以配置name属性&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;@ZxfResource&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;User2DaoImpl&nbsp;user2Dao;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;//&nbsp;set方法上的注解，带有name属性&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;@ZxfResource(name&nbsp;=&nbsp;&quot;userDao&quot;)&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;void&nbsp;setUserDao(UserDaoImpl&nbsp;userDao)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;this.userDao&nbsp;=&nbsp;userDao;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;//&nbsp;set方法上的注解，没有配置name属性&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;@ZxfResource&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;void&nbsp;setUser1Dao(User1DaoImpl&nbsp;user1Dao)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;this.user1Dao&nbsp;=&nbsp;user1Dao;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;void&nbsp;show()&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;userDao.show();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;user1Dao.show1();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;user2Dao.show2();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;System.out.println(&quot;这里是Service方法........&quot;);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>}&nbsp;&nbsp;</li>
+</ol>
+
+<h2>&nbsp;3、要注入的DAO</h2>
+
+<ol start="1">
+	<li>package&nbsp;com.yt.annotation;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>/**&nbsp;</li>
+	<li>&nbsp;*&nbsp;@Description:&nbsp;要注入的DAo类&nbsp;</li>
+	<li>&nbsp;*&nbsp;@ClassName:&nbsp;UserDaoImpl&nbsp;</li>
+	<li>&nbsp;*&nbsp;@Project:&nbsp;spring-aop&nbsp;</li>
+	<li>&nbsp;*&nbsp;@Author:&nbsp;zxf&nbsp;</li>
+	<li>&nbsp;*&nbsp;@Date:&nbsp;2011-6-7&nbsp;</li>
+	<li>&nbsp;*/&nbsp;&nbsp;</li>
+	<li>public&nbsp;class&nbsp;UserDaoImpl&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;String&nbsp;name&nbsp;;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;void&nbsp;show(){&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;System.out.println(&quot;这里是dao方法........&quot;);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>}&nbsp;&nbsp;</li>
+</ol>
+
+<p>&nbsp;</p>
+
+<ol start="1">
+	<li>&lt;?xml&nbsp;version=&quot;1.0&quot;&nbsp;encoding=&quot;UTF-8&quot;?&gt;&nbsp;&nbsp;</li>
+	<li>&lt;beans&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;bean&nbsp;id&nbsp;=&nbsp;&quot;userDao&quot;&nbsp;class=&quot;com.yt.annotation.UserDaoImpl&quot;&nbsp;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;bean&nbsp;id&nbsp;=&nbsp;&quot;user1Dao&quot;&nbsp;class=&quot;com.yt.annotation.User1DaoImpl&quot;&nbsp;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;bean&nbsp;id&nbsp;=&nbsp;&quot;user2Dao&quot;&nbsp;class=&quot;com.yt.annotation.User2DaoImpl&quot;&nbsp;/&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;bean&nbsp;id&nbsp;=&nbsp;&quot;userService&quot;&nbsp;class&nbsp;=&nbsp;&quot;com.yt.annotation.UserServiceImpl&quot;&nbsp;/&gt;&nbsp;&nbsp;</li>
+	<li>&lt;/beans&gt;&nbsp;&nbsp;</li>
+</ol>
+
+<p>&nbsp;</p>
+
+<h2>&nbsp;4、注解处理器</h2>
+
+<ol start="1">
+	<li>package&nbsp;com.yt.annotation;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>import&nbsp;java.beans.Introspector;&nbsp;&nbsp;</li>
+	<li>import&nbsp;java.beans.PropertyDescriptor;&nbsp;&nbsp;</li>
+	<li>import&nbsp;java.lang.reflect.Field;&nbsp;&nbsp;</li>
+	<li>import&nbsp;java.lang.reflect.Method;&nbsp;&nbsp;</li>
+	<li>import&nbsp;java.util.ArrayList;&nbsp;&nbsp;</li>
+	<li>import&nbsp;java.util.HashMap;&nbsp;&nbsp;</li>
+	<li>import&nbsp;java.util.Iterator;&nbsp;&nbsp;</li>
+	<li>import&nbsp;java.util.List;&nbsp;&nbsp;</li>
+	<li>import&nbsp;java.util.Map;&nbsp;&nbsp;</li>
+	<li>import&nbsp;org.apache.log4j.Logger;&nbsp;&nbsp;</li>
+	<li>import&nbsp;org.dom4j.Document;&nbsp;&nbsp;</li>
+	<li>import&nbsp;org.dom4j.DocumentException;&nbsp;&nbsp;</li>
+	<li>import&nbsp;org.dom4j.Element;&nbsp;&nbsp;</li>
+	<li>import&nbsp;org.dom4j.io.SAXReader;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>/**&nbsp;</li>
+	<li>&nbsp;*&nbsp;@Description:&nbsp;spring中的注解原理&nbsp;</li>
+	<li>&nbsp;*&nbsp;@ClassName:&nbsp;ClassPathXMLApplicationContext&nbsp;</li>
+	<li>&nbsp;*&nbsp;@Project:&nbsp;spring-aop&nbsp;</li>
+	<li>&nbsp;*&nbsp;@Author:&nbsp;zxf&nbsp;</li>
+	<li>&nbsp;*&nbsp;@Date:&nbsp;2011-6-3&nbsp;</li>
+	<li>&nbsp;*/&nbsp;&nbsp;</li>
+	<li>public&nbsp;class&nbsp;ClassPathXMLApplicationContext&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;Logger&nbsp;log&nbsp;=&nbsp;Logger.getLogger(ClassPathXMLApplicationContext.class);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;List&lt;BeanDefine&gt;&nbsp;beanList&nbsp;=&nbsp;new&nbsp;ArrayList&lt;BeanDefine&gt;();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;Map&lt;String,&nbsp;Object&gt;&nbsp;sigletions&nbsp;=&nbsp;new&nbsp;HashMap&lt;String,&nbsp;Object&gt;();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;ClassPathXMLApplicationContext(String&nbsp;fileName)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//读取配置文件中管理的bean&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;this.readXML(fileName);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//实例化bean&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;this.instancesBean();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//注解处理器&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;this.annotationInject();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;/**&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;*&nbsp;读取Bean配置文件&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;*&nbsp;@param&nbsp;fileName&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;*&nbsp;@return&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;*/&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;@SuppressWarnings(&quot;unchecked&quot;)&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;void&nbsp;readXML(String&nbsp;fileName)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Document&nbsp;document&nbsp;=&nbsp;null;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;SAXReader&nbsp;saxReader&nbsp;=&nbsp;new&nbsp;SAXReader();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;try&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ClassLoader&nbsp;classLoader&nbsp;=&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Thread.currentThread().getContextClassLoader();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;document&nbsp;=&nbsp;saxReader.read(classLoader.getResourceAsStream(fileName));&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Element&nbsp;beans&nbsp;=&nbsp;document.getRootElement();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;for&nbsp;(Iterator&lt;Element&gt;&nbsp;beansList&nbsp;=&nbsp;beans.elementIterator();&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;beansList.hasNext();)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Element&nbsp;element&nbsp;=&nbsp;beansList.next();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;BeanDefine&nbsp;bean&nbsp;=&nbsp;new&nbsp;BeanDefine(&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;element.attributeValue(&quot;id&quot;),&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;element.attributeValue(&quot;class&quot;));&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;beanList.add(bean);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;catch&nbsp;(DocumentException&nbsp;e)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;log.info(&quot;读取配置文件出错....&quot;);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;/**&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;*&nbsp;实例化Bean&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;*/&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;void&nbsp;instancesBean()&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;for&nbsp;(BeanDefine&nbsp;bean&nbsp;:&nbsp;beanList)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;try&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;sigletions.put(bean.getId(),&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Class.forName(bean.getClassName()).newInstance());&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;catch&nbsp;(Exception&nbsp;e)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;log.info(&quot;实例化Bean出错...&quot;);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;/**&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;*&nbsp;注解处理器&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;*&nbsp;如果注解ZxfResource配置了name属性，则根据name所指定的名称获取要注入的实例引用，&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;*&nbsp;如果注解ZxfResource;没有配置name属性，则根据属性所属类型来扫描配置文件获取要&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;*&nbsp;注入的实例引用&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;*&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;*/&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;void&nbsp;annotationInject(){&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;for(String&nbsp;beanName:sigletions.keySet()){&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Object&nbsp;bean&nbsp;=&nbsp;sigletions.get(beanName);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if(bean!=null){&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;this.propertyAnnotation(bean);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;this.fieldAnnotation(bean);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;/**&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;*&nbsp;处理在set方法加入的注解&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;*&nbsp;@param&nbsp;bean&nbsp;处理的bean&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;*/&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;void&nbsp;propertyAnnotation(Object&nbsp;bean){&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;try&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//获取其属性的描述&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;PropertyDescriptor[]&nbsp;ps&nbsp;=&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Introspector.getBeanInfo(bean.getClass()).getPropertyDescriptors();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;for(PropertyDescriptor&nbsp;proderdesc&nbsp;:&nbsp;ps){&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//获取所有set方法&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Method&nbsp;setter&nbsp;=&nbsp;proderdesc.getWriteMethod();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//判断set方法是否定义了注解&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if(setter!=null&nbsp;&amp;&amp;&nbsp;setter.isAnnotationPresent(ZxfResource.class)){&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//获取当前注解，并判断name属性是否为空&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ZxfResource&nbsp;resource&nbsp;=&nbsp;setter.getAnnotation(ZxfResource.class);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;String&nbsp;name&nbsp;=&quot;&quot;;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Object&nbsp;value&nbsp;=&nbsp;null;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if(resource.name()!=null&amp;&amp;!&quot;&quot;.equals(resource.name())){&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//获取注解的name属性的内容&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;name&nbsp;=&nbsp;resource.name();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;value&nbsp;=&nbsp;sigletions.get(name);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}else{&nbsp;//如果当前注解没有指定name属性,则根据类型进行匹配&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;for(String&nbsp;key&nbsp;:&nbsp;sigletions.keySet()){&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//判断当前属性所属的类型是否在配置文件中存在&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if(proderdesc.getPropertyType().isAssignableFrom(sigletions.get(key).getClass())){&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//获取类型匹配的实例对象&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;value&nbsp;=&nbsp;sigletions.get(key);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;break;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//允许访问private方法&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;setter.setAccessible(true);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//把引用对象注入属性&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;setter.invoke(bean,&nbsp;value);&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;catch&nbsp;(Exception&nbsp;e)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;log.info(&quot;set方法注解解析异常..........&quot;);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;/**&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;*&nbsp;处理在字段上的注解&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;*&nbsp;@param&nbsp;bean&nbsp;处理的bean&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;*/&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;void&nbsp;fieldAnnotation(Object&nbsp;bean){&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;try&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//获取其全部的字段描述&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Field[]&nbsp;fields&nbsp;=&nbsp;bean.getClass().getFields();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;for(Field&nbsp;f&nbsp;:&nbsp;fields){&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if(f!=null&nbsp;&amp;&amp;&nbsp;f.isAnnotationPresent(ZxfResource.class)){&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ZxfResource&nbsp;resource&nbsp;=&nbsp;f.getAnnotation(ZxfResource.class);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;String&nbsp;name&nbsp;=&quot;&quot;;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Object&nbsp;value&nbsp;=&nbsp;null;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if(resource.name()!=null&amp;&amp;!&quot;&quot;.equals(resource.name())){&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;name&nbsp;=&nbsp;resource.name();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;value&nbsp;=&nbsp;sigletions.get(name);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}else{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;for(String&nbsp;key&nbsp;:&nbsp;sigletions.keySet()){&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//判断当前属性所属的类型是否在配置文件中存在&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if(f.getType().isAssignableFrom(sigletions.get(key).getClass())){&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//获取类型匹配的实例对象&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;value&nbsp;=&nbsp;sigletions.get(key);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;break;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//允许访问private字段&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;f.setAccessible(true);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//把引用对象注入属性&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;f.set(bean,&nbsp;value);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;catch&nbsp;(Exception&nbsp;e)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;log.info(&quot;字段注解解析异常..........&quot;);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;/**&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;*&nbsp;获取Map中的对应的bean实例&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;*&nbsp;@param&nbsp;beanId&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;*&nbsp;@return&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;*/&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;Object&nbsp;getBean(String&nbsp;beanId)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return&nbsp;sigletions.get(beanId);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;static&nbsp;void&nbsp;main(String[]&nbsp;args)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ClassPathXMLApplicationContext&nbsp;path&nbsp;=&nbsp;new&nbsp;ClassPathXMLApplicationContext(&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&quot;configAnnotation.xml&quot;);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;UserServiceImpl&nbsp;userService&nbsp;=(UserServiceImpl)path.getBean(&quot;userService&quot;);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;userService.show();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>} &nbsp;</li>
+</ol>
