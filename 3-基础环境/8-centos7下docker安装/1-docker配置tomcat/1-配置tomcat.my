@@ -1,0 +1,234 @@
+<h1>在CentOS7下从0开始搭建docker并发布tomcat项目</h1>
+
+<p>一切从0开始，我也是个小白：</p>
+
+<p>1.检查你的系统是不是高于3.8的内核，如果没有请升级CentOS7或者Ubuntu 14</p>
+
+<p>#uname -a</p>
+
+<p>2.CentOS7下安装docker</p>
+
+<p>#yum -y install docker</p>
+
+<p>3.查看docker版本</p>
+
+<p>#docker version</p>
+
+<p>4.启动docker服务</p>
+
+<p>#<strong>systemctl start docker</strong></p>
+
+<p>#docker service start</p>
+
+<p>5.查看本地镜像</p>
+
+<p>#docker images</p>
+
+<p>6.如果没有本地镜像，可以下载一个centos7的镜像来作为基础运行环境</p>
+
+<p>#docker pull centos:7.2.1511</p>
+
+<p>7.再次查看本地镜像</p>
+
+<p>#docker images</p>
+
+<ol start="1">
+	<li>REPOSITORY&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;TAG&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;IMAGE&nbsp;ID&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;CREATED&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;SIZE&nbsp;&nbsp;</li>
+	<li>docker.io/centos&nbsp;&nbsp;&nbsp;&nbsp;7.2.1511&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;feac5e0dfdb2&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;8&nbsp;months&nbsp;ago&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;194.6&nbsp;MB&nbsp;&nbsp;</li>
+</ol>
+
+<p>8.在本地先备好jdk和tomcat，此处采用jdk1.7和tomcat7</p>
+
+<p>#cd /root/software/</p>
+
+<p>#wget&nbsp;http://zhibo100.oss-cn-hangzhou.aliyuncs.com/software/jdk-7u79-linux-x64.tar.gz</p>
+
+<p>#wget&nbsp;http://zhibo100.oss-cn-hangzhou.aliyuncs.com/software/apache-tomcat-7.0.59.tar.gz</p>
+
+<p>需要其他版本的jdk和tomcat操作方法类似。</p>
+
+<p>9.挂载宿主主机到镜像容器的/mnt/software/下：</p>
+
+<p>#docker run -i -t -v /root/software/:/mnt/software/ &nbsp;--privileged=true&nbsp; feac5e /bin/bash</p>
+
+<p>10.进入到/mnt/software/下解压jdk和tomcat并将其移动到/opt/目录下</p>
+
+<p>#cd /mnt/software/</p>
+
+<p>#tar -zxvf jdk-7u79-linux-x64.tar.gz</p>
+
+<p>#tar -zxvf&nbsp;apache-tomcat-7.0.59.tar.gz</p>
+
+<p>#mv jdk1.7.0_79/ /opt/jdk</p>
+
+<p>#mv apache-tomcat-7.0.59 /opt/tomcat</p>
+
+<p>11.配置JAVA环境变量并检测</p>
+
+<p>#vi ~/.bashrc</p>
+
+<p>在文件末尾加上</p>
+
+<p>export JAVA_HOME=/opt/jdk<br />
+export PATH=$JAVA_HOME/bin:$PATH<br />
+export CLASSPATH=.:$JAVA_HOME/lib/dt.jar:$JAVA_HOME/lib/tools.jar</p>
+
+<p>保存退出</p>
+
+<p>#source ~/.bashrc</p>
+
+<p>#java -version</p>
+
+<ol start="1">
+	<li>java&nbsp;version&nbsp;&quot;1.7.0_79&quot;&nbsp;&nbsp;</li>
+	<li>Java(TM)&nbsp;SE&nbsp;Runtime&nbsp;Environment&nbsp;(build&nbsp;1.7.0_79-b15)&nbsp;&nbsp;</li>
+	<li>Java&nbsp;HotSpot(TM)&nbsp;64-Bit&nbsp;Server&nbsp;VM&nbsp;(build&nbsp;24.79-b02,&nbsp;mixed&nbsp;mode)&nbsp;&nbsp;</li>
+</ol>
+
+<p>12.编写系统启动脚本并赋予权限</p>
+
+<p>#vi /root/run.sh</p>
+
+<p>加入以下代码</p>
+
+<p>#!/bin/bash<br />
+source ~/.bashrc<br />
+sh /opt/tomcat/bin/catalina.sh run</p>
+
+<p>#chmod u+x /root/run.sh</p>
+
+<p>13.退出容器，并查看确认没有正在运行的容器</p>
+
+<p>#exit</p>
+
+<p>#docker ps</p>
+
+<p>14.查询所有容器</p>
+
+<p>#docker ps -a</p>
+
+<ol start="1">
+	<li>CONTAINER&nbsp;ID&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;IMAGE&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;COMMAND&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;CREATED&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;STATUS&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;PORTS&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;NAMES&nbsp;&nbsp;</li>
+	<li>ee0ee8ac3a93&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;feac&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&quot;/bin/bash&quot;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;13&nbsp;minutes&nbsp;ago&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Exited&nbsp;(0)&nbsp;About&nbsp;a&nbsp;minute&nbsp;ago&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;sad_noyce&nbsp;&nbsp;</li>
+</ol>
+
+<p>15.根据当前的容器ID创建新的镜像</p>
+
+<p>#docker commit ee0ee sdzn.com/tomcat:0.1</p>
+
+<p>16.查看当前的镜像</p>
+
+<p>#docker images</p>
+
+<ol start="1">
+	<li>REPOSITORY&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;TAG&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;IMAGE&nbsp;ID&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;CREATED&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;SIZE&nbsp;&nbsp;</li>
+	<li>sdzn.com/tomcat&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;0.1&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;af0647ada992&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;56&nbsp;seconds&nbsp;ago&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;514.6&nbsp;MB&nbsp;&nbsp;</li>
+	<li>docker.io/centos&nbsp;&nbsp;&nbsp;&nbsp;7.2.1511&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;feac5e0dfdb2&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;8&nbsp;months&nbsp;ago&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;194.6&nbsp;MB&nbsp;&nbsp;</li>
+</ol>
+
+<p>17.以守护进程方式启动新的镜像并传入启动参数</p>
+
+<p>#docker run -d -p 58080:8080 --name tomcat1 sdzn.com/tomcat:0.1 /root/run.sh</p>
+
+<p>18.查看正在运行的镜像</p>
+
+<p>#docker ps</p>
+
+<ol start="1">
+	<li>CONTAINER&nbsp;ID&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;IMAGE&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;COMMAND&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;CREATED&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;STATUS&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;PORTS&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;NAMES&nbsp;&nbsp;</li>
+	<li>10fe153d9d6d&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;sdzn.com/tomcat:0.1&nbsp;&nbsp;&nbsp;&quot;/root/run.sh&quot;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;14&nbsp;seconds&nbsp;ago&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Up&nbsp;6&nbsp;seconds&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;0.0.0.0:58080-&gt;8080/tcp&nbsp;&nbsp;&nbsp;tomcat1&nbsp;&nbsp;</li>
+</ol>
+
+<p><br />
+19.访问镜像：</p>
+
+<p>http://127.0.0.1:58080</p>
+
+<p><img alt="" src="https://img-blog.csdn.net/20170524173014599?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQvbGlzaGlyb25n/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70/gravity/Center" style="height:463px; width:800px" /><br />
+<br />
+20.停止容器并移除</p>
+
+<p>#docker ps -a</p>
+
+<ol start="1">
+	<li>CONTAINER&nbsp;ID&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;IMAGE&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;COMMAND&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;CREATED&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;STATUS&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;PORTS&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;NAMES&nbsp;&nbsp;</li>
+	<li>148df39831f0&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;af&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&quot;/bin/bash&quot;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;56&nbsp;seconds&nbsp;ago&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Exited&nbsp;(2)&nbsp;14&nbsp;seconds&nbsp;ago&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;admiring_kalam&nbsp;&nbsp;</li>
+	<li>10fe153d9d6d&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;sdzn.com/tomcat:0.1&nbsp;&nbsp;&nbsp;&quot;/root/run.sh&quot;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;6&nbsp;minutes&nbsp;ago&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Up&nbsp;6&nbsp;minutes&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;0.0.0.0:58080-&gt;8080/tcp&nbsp;&nbsp;&nbsp;tomcat1&nbsp;&nbsp;</li>
+	<li>ee0ee8ac3a93&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;feac&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&quot;/bin/bash&quot;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;25&nbsp;minutes&nbsp;ago&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Exited&nbsp;(0)&nbsp;13&nbsp;minutes&nbsp;ago&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;sad_noyce&nbsp;&nbsp;</li>
+</ol>
+
+<p>#docker stop 10f</p>
+
+<p>#docker ps -a</p>
+
+<ol start="1">
+	<li>CONTAINER&nbsp;ID&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;IMAGE&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;COMMAND&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;CREATED&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;STATUS&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;PORTS&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;NAMES&nbsp;&nbsp;</li>
+	<li>148df39831f0&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;af&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&quot;/bin/bash&quot;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;2&nbsp;minutes&nbsp;ago&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Exited&nbsp;(2)&nbsp;2&nbsp;minutes&nbsp;ago&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;admiring_kalam&nbsp;&nbsp;</li>
+	<li>10fe153d9d6d&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;sdzn.com/tomcat:0.1&nbsp;&nbsp;&nbsp;&quot;/root/run.sh&quot;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;8&nbsp;minutes&nbsp;ago&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Exited&nbsp;(137)&nbsp;About&nbsp;a&nbsp;minute&nbsp;ago&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;tomcat1&nbsp;&nbsp;</li>
+	<li>ee0ee8ac3a93&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;feac&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&quot;/bin/bash&quot;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;27&nbsp;minutes&nbsp;ago&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Exited&nbsp;(0)&nbsp;15&nbsp;minutes&nbsp;ago&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;sad_noyce&nbsp;&nbsp;</li>
+</ol>
+
+<p>#docker images</p>
+
+<ol start="1">
+	<li>REPOSITORY&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;TAG&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;IMAGE&nbsp;ID&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;CREATED&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;SIZE&nbsp;&nbsp;</li>
+	<li>sdzn.com/tomcat&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;0.1&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;af0647ada992&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;12&nbsp;minutes&nbsp;ago&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;514.6&nbsp;MB&nbsp;&nbsp;</li>
+	<li>docker.io/centos&nbsp;&nbsp;&nbsp;&nbsp;7.2.1511&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;feac5e0dfdb2&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;8&nbsp;months&nbsp;ago&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;194.6&nbsp;MB&nbsp;&nbsp;</li>
+</ol>
+
+<p>#docker start 10f</p>
+
+<p>#docker ps</p>
+
+<p>#docker stop 10f</p>
+
+<p>#docker ps -a</p>
+
+<ol start="1">
+	<li>CONTAINER&nbsp;ID&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;IMAGE&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;COMMAND&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;CREATED&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;STATUS&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;PORTS&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;NAMES&nbsp;&nbsp;</li>
+	<li>148df39831f0&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;af&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&quot;/bin/bash&quot;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;6&nbsp;minutes&nbsp;ago&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Exited&nbsp;(2)&nbsp;6&nbsp;minutes&nbsp;ago&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;admiring_kalam&nbsp;&nbsp;</li>
+	<li>10fe153d9d6d&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;sdzn.com/tomcat:0.1&nbsp;&nbsp;&nbsp;&quot;/root/run.sh&quot;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;12&nbsp;minutes&nbsp;ago&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Exited&nbsp;(137)&nbsp;13&nbsp;seconds&nbsp;ago&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;tomcat1&nbsp;&nbsp;</li>
+	<li>ee0ee8ac3a93&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;feac&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&quot;/bin/bash&quot;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;31&nbsp;minutes&nbsp;ago&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Exited&nbsp;(0)&nbsp;19&nbsp;minutes&nbsp;ago&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;sad_noyce&nbsp;&nbsp;</li>
+</ol>
+
+<p>#docker ps -a</p>
+
+<ol start="1">
+	<li>CONTAINER&nbsp;ID&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;IMAGE&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;COMMAND&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;CREATED&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;STATUS&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;PORTS&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;NAMES&nbsp;&nbsp;</li>
+	<li>10fe153d9d6d&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;sdzn.com/tomcat:0.1&nbsp;&nbsp;&nbsp;&quot;/root/run.sh&quot;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;12&nbsp;minutes&nbsp;ago&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Exited&nbsp;(137)&nbsp;30&nbsp;seconds&nbsp;ago&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;tomcat1&nbsp;&nbsp;</li>
+	<li>ee0ee8ac3a93&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;feac&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&quot;/bin/bash&quot;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;31&nbsp;minutes&nbsp;ago&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Exited&nbsp;(0)&nbsp;19&nbsp;minutes&nbsp;ago&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;sad_noyce&nbsp;&nbsp;</li>
+</ol>
+
+<p>#docker rm 10f</p>
+
+<p>#docker rm ee0ee</p>
+
+<p>21.移除已创建的镜像</p>
+
+<p>#docker images</p>
+
+<ol start="1">
+	<li>REPOSITORY&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;TAG&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;IMAGE&nbsp;ID&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;CREATED&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;SIZE&nbsp;&nbsp;</li>
+	<li>sdzn.com/tomcat&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;0.1&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;af0647ada992&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;17&nbsp;minutes&nbsp;ago&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;514.6&nbsp;MB&nbsp;&nbsp;</li>
+	<li>docker.io/centos&nbsp;&nbsp;&nbsp;&nbsp;7.2.1511&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;feac5e0dfdb2&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;8&nbsp;months&nbsp;ago&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;194.6&nbsp;MB&nbsp;&nbsp;</li>
+</ol>
+
+<p>#docker rmi af064</p>
+
+<p>#docker images</p>
+
+<ol start="1">
+	<li>REPOSITORY&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;TAG&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;IMAGE&nbsp;ID&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;CREATED&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;SIZE&nbsp;&nbsp;</li>
+	<li>docker.io/centos&nbsp;&nbsp;&nbsp;&nbsp;7.2.1511&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;feac5e0dfdb2&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;8&nbsp;months&nbsp;ago&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;194.6&nbsp;MB&nbsp;&nbsp;</li>
+</ol>
+
+<p>至此结束，演示了从0开始搭环境，发布启动tomcat到清楚整个容器和镜像的完整过程。</p>
+
+<p>后续如何配置多个项目公用一个tomcat的文章待续。<br />
+&nbsp;</p>
+
+<p>资料参考：</p>
+
+<p>1.https://my.oschina.net/sunchp/blog/616526</p>
+
+<p>2.http://blog.csdn.net/u011627980/article/details/51898234</p>

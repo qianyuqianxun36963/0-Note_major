@@ -1,0 +1,185 @@
+<h1><strong>CentOS 7 使用yum安装配置和使用svn</strong></h1>
+
+<h2><strong>检查已安装版本</strong></h2>
+
+<p>#检查是否安装了低版本的SVN<br />
+rpm -qa subversion<br />
+#卸载旧版本SVN<br />
+yum remove subversion</p>
+
+<h2><strong>安装SVN</strong></h2>
+
+<p>安装必须的软件包<br />
+yum install subversion&nbsp; &nbsp; &nbsp; &nbsp; //其实只安装这个就可以了。<br />
+yum install mod_dav_svn&nbsp; &nbsp;//这里是提供了http访问的途径，拓展svn功能。<br />
+yum install httpd httpd-devel subversion mod_dav_svn&nbsp; mod_auth_mysql</p>
+
+<p>确认已安装了svn模块</p>
+
+<p>[root@iZ23xz8uttcZ ~]# cd /etc/httpd/modules<br />
+[root@iZ23xz8uttcZ ~]# ls | grep svn<br />
+mod_authz_svn.so<br />
+mod_dav_svn.so</p>
+
+<h2><strong>初始化svn仓库</strong></h2>
+
+<p><strong>1 新建一个目录用于存储SVN所有文件</strong><br />
+mkdir -p /var/svn/jsou<br />
+&nbsp;<br />
+<strong>2 新建一个版本仓库</strong><br />
+svnadmin create /var/svn/jsou<br />
+&nbsp;<br />
+<strong>3 初始化版本仓库中的目录，导入原始代码</strong><br />
+如果原代码已经有svn的相关文件，则切换到原代码目录，先删除这些svn相关的文件和文件夹。<br />
+假定/root/others 存放源代码<br />
+[root@iZ23xz8uttcZ ~] cd /root/others&nbsp;<br />
+[root@iZ23xz8uttcZ ~] find ./ -name &quot;*.svn&quot; | xargs rm -rf<br />
+[root@iZ23xz8uttcZ ~] svn import /root/others file:///var/svn/jx/ -m &quot;init&nbsp;project&quot;</p>
+
+<h2><strong>修改配置</strong></h2>
+
+<h3><strong>授权文件&nbsp;authz</strong></h3>
+
+<p>### This file is an example authorization file for svnserve.<br />
+### Its format is identical to that of mod_authz_svn authorization<br />
+### files.<br />
+### As shown below each section defines authorizations for the path and<br />
+### (optional) repository specified by the section name.<br />
+### The authorizations follow. An authorization line can refer to:<br />
+### &nbsp;- a single user,<br />
+### &nbsp;- a group of users defined in a special [groups] section,<br />
+### &nbsp;- an alias defined in a special [aliases] section,<br />
+### &nbsp;- all authenticated users, using the &#39;$authenticated&#39; token,<br />
+### &nbsp;- only anonymous users, using the &#39;$anonymous&#39; token,<br />
+### &nbsp;- anyone, using the &#39;*&#39; wildcard.<br />
+###<br />
+### A match can be inverted by prefixing the rule with &#39;~&#39;. Rules can<br />
+### grant read (&#39;r&#39;) access, read-write (&#39;rw&#39;) access, or no access<br />
+### (&#39;&#39;).</p>
+
+<p>[aliases]<br />
+# joe = /C=XZ/ST=Dessert/L=Snake City/O=Snake Oil, Ltd./OU=Research Institute/CN=Joe Average</p>
+
+<p>[groups]<br />
+# harry_and_sally = harry,sally<br />
+# harry_sally_and_joe = harry,sally,&amp;joe</p>
+
+<p>admin &nbsp; &nbsp; = wenhua,lumq,wangxj,zhuyi,zhangxh</p>
+
+<p>jxpt_wh &nbsp; = wangjialu,huangjinpeng,liyahui</p>
+
+<p>jwjx_jsou = lumingqi,chenyi,wangyajun,zhengchao,chenshuang,yanchangci,honghao,wangguoqiang,chengshaoming,cuihaonan,zhangjunping</p>
+
+<p>ksxt_jsou = lumingqi,chenyi,wangyajun,zhengchao,chenshuang,wangyu,liuyazi,liuxuemin,liuqin,luojunyong,chenyuji,renxiaonan</p>
+
+<p># [/foo/bar]<br />
+# harry = rw<br />
+# &amp;joe = r<br />
+# * =</p>
+
+<p># [repository:/baz/fuz]<br />
+# @harry_and_sally = rw<br />
+# * = r</p>
+
+<p>[/]<br />
+@admin &nbsp; &nbsp; = rw<br />
+@jwjx_jsou = rw</p>
+
+<p>[/jsou]<br />
+@admin &nbsp; &nbsp; = rw<br />
+@jwjx_jsou = rw<br />
+@jxpt_wh &nbsp; = rw</p>
+
+<p>[/ksxt]<br />
+@admin &nbsp; &nbsp; = rw<br />
+@ksxt_jsou = rw<br />
+&nbsp;</p>
+
+<h3><strong>用户密码文件 passwd</strong></h3>
+
+<p>### This file is an example password file for svnserve.<br />
+### Its format is similar to that of svnserve.conf. As shown in the<br />
+### example below it contains one section labelled [users].<br />
+### The name and password for each user follow, one account per line.</p>
+
+<p>[users]<br />
+wenhua = wenhua123<br />
+lumq = lumq123<br />
+wangxj = wangxj123<br />
+zhuyi = zhuyi123<br />
+zhangxh = zhangxh123</p>
+
+<p>lumingqi &nbsp; &nbsp; &nbsp;= wenhualumingqi<br />
+wangyajun &nbsp; &nbsp; = wenhuawangyajun<br />
+chenyi &nbsp; &nbsp; &nbsp; &nbsp;= wenhuachenyi<br />
+honghao &nbsp; &nbsp; &nbsp; = wenhuahonghao<br />
+cuihaonan &nbsp; &nbsp; = wenhuacuihaonan<br />
+wangguoqiang &nbsp;= wenhuawangguoqiang<br />
+chengshaoming = wenhuachengshaoming<br />
+zhengchao &nbsp; &nbsp; = wenhuazhengchao<br />
+yanchangci &nbsp; &nbsp;= wenhuayanchangci<br />
+zhangjunping &nbsp;= wenhuazhangjunping<br />
+chenshuang &nbsp; &nbsp;= wenhuachenshuang</p>
+
+<p>wangjialu &nbsp; &nbsp; = wenhuawangjialu<br />
+huangjinpeng &nbsp;= wenhuahuangjinpeng<br />
+liyahui &nbsp; &nbsp; &nbsp; = wenhualiyahui</p>
+
+<p>wangyu &nbsp; &nbsp; &nbsp; &nbsp;= wenhua123<br />
+liuxuemin &nbsp; &nbsp; = wenhua123<br />
+liuyazi &nbsp; &nbsp; &nbsp; = wenhua123<br />
+liuqin &nbsp; &nbsp; &nbsp; &nbsp;= wenhua123<br />
+luojunyong &nbsp; &nbsp;= wenhua123<br />
+chenyuji &nbsp; &nbsp; &nbsp;= wenhua123<br />
+renxiaonan &nbsp; &nbsp;= wenhua123</p>
+
+<p># sally = sallyssecret</p>
+
+<h3><strong>svn配置文件&nbsp;svnserve.conf</strong></h3>
+
+<p>[general]</p>
+
+<p>...</p>
+
+<p>anon-access = none<br />
+auth-access = write<br />
+password-db = passwd<br />
+authz-db = authz<br />
+realm = jsou<br />
+...</p>
+
+<p>[sasl]</p>
+
+<p>...</p>
+
+<h2><strong>启动svn版本库</strong></h2>
+
+<p><strong>a. 启动SVN</strong></p>
+
+<pre>
+svnserve -d -r /var/svn/jsou</pre>
+
+<p>其中 -d 表示守护进程， -r 表示在后台执行&nbsp;<br />
+/var/svn/jsou&nbsp; 为svn的安装目录&nbsp;</p>
+
+<p><strong>b. 查看SVN进程</strong></p>
+
+<pre>
+# ps -ef|grep svn|grep -v grep
+root 12538 1 0 14:40 ? 00:00:00 svnserve -d -r /var/svn/jx</pre>
+
+<p><strong>c. 检测SVN端口</strong></p>
+
+<pre>
+# netstat -ln |grep 3690
+tcp 0 0 0.0.0.0:3690 0.0.0.0:* LISTEN</pre>
+
+<p><strong>d. 停止重启SVN：</strong></p>
+
+<pre>
+# kill -9 12538 //停止 svn 的进程
+# svnserve -d -r /var/svn/jsou // 启动</pre>
+
+<h2><strong>验证连接</strong></h2>
+
+<p>在svn客户端输入：svn://192.168.1.101&nbsp; 然后会让你输入用户名和密码。</p>
