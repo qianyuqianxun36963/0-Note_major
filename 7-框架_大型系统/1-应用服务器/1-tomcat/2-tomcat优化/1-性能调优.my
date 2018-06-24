@@ -1,0 +1,221 @@
+<h1>tomcat性能优化(性能总览)</h1>
+
+<p><strong>1.增加JVM堆内存大小</strong></p>
+
+<p>1）JVM通常不去调用垃圾回收器，所以服务器可以更多关注处理web请求，并要求尽快完成。</p>
+
+<p>2）更改文件(catalina.sh)</p>
+
+<p><a href="https://www.jb51.net/article/107053.htm#">?</a></p>
+
+<table border="0" cellpadding="0" cellspacing="0">
+	<tbody>
+		<tr>
+			<td>
+			<p>1</p>
+
+			<p>2</p>
+
+			<p>3</p>
+
+			<p>4</p>
+
+			<p>5</p>
+
+			<p>6</p>
+			</td>
+			<td>
+			<p><code>JAVA_OPTS=&rdquo;-Djava.awt.headless=</code><code>true</code> <code>-Dfile.encoding=UTF-8</code></p>
+
+			<p><code>&nbsp;&nbsp;&nbsp;</code><code>-server -Xms1024m -Xmx1024m</code></p>
+
+			<p><code>&nbsp;&nbsp;&nbsp;</code><code>-XX:NewSize=512m -XX:MaxNewSize=512m -XX:PermSize=512m</code></p>
+
+			<p><code>&nbsp;&nbsp;&nbsp;</code><code>-XX:MaxPermSize=512m -XX:+DisableExplicitGC&rdquo;</code></p>
+
+			<p><code>&nbsp;</code><code>-Xms &ndash; 指定初始化时化的栈内存</code></p>
+
+			<p><code>&nbsp;</code><code>-Xmx &ndash; 指定最大栈内存</code></p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p><strong>2.修复JRE内存泄漏</strong></p>
+
+<p>1）最新的tomcat版本6.0.26及以上就可以解决这个错误，因为它包含了一个监听器来处理JRE和PermGen的内存泄漏。</p>
+
+<p>2）更改server.xml</p>
+
+<p><a href="https://www.jb51.net/article/107053.htm#">?</a></p>
+
+<table border="0" cellpadding="0" cellspacing="0">
+	<tbody>
+		<tr>
+			<td>
+			<p>1</p>
+			</td>
+			<td>
+			<p><code>&lt;Listener className=&ldquo;org.apache.catalina.core.JreMemoryLeakPreventionListener&rdquo; /&gt;</code></p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p><strong>3.线程池设置</strong></p>
+
+<p>maxThreads的值应该根据流量的大小，</p>
+
+<p>如果值过低，将有没有足够的线程来处理所有的请求，请求将进入等待状态，只有当一个的处理线程释放后才被处理；</p>
+
+<p>如果设置的太大，Tomcat的启动将花费更多时间。因此它取决于我们给maxThreads设置一个正确的值。</p>
+
+<p>其中和最大连接数相关的参数为maxProcessors 和 acceptCount 。如果要加大并发连接数，应同时加大这两个参数。</p>
+
+<p><a href="https://www.jb51.net/article/107053.htm#">?</a></p>
+
+<table border="0" cellpadding="0" cellspacing="0">
+	<tbody>
+		<tr>
+			<td>
+			<p>1</p>
+
+			<p>2</p>
+
+			<p>3</p>
+
+			<p>4</p>
+
+			<p>5</p>
+
+			<p>6</p>
+
+			<p>7</p>
+
+			<p>8</p>
+
+			<p>9</p>
+
+			<p>10</p>
+
+			<p>11</p>
+
+			<p>12</p>
+
+			<p>13</p>
+
+			<p>14</p>
+
+			<p>15</p>
+
+			<p>16</p>
+
+			<p>17</p>
+			</td>
+			<td>
+			<p><code>&lt;Connector port=&ldquo;</code><code>9027</code><code>&rdquo;</code></p>
+
+			<p><code>&nbsp;&nbsp;</code><code>protocol=&ldquo;HTTP/</code><code>1.1</code><code>&rdquo;</code></p>
+
+			<p><code>&nbsp;&nbsp;</code><code>maxHttpHeaderSize=&ldquo;</code><code>8192</code><code>&rdquo;</code></p>
+
+			<p><code>&nbsp;&nbsp;</code><code>maxThreads=&ldquo;</code><code>1000</code><code>&rdquo;</code></p>
+
+			<p><code>&nbsp;&nbsp;</code><code>minSpareThreads=&ldquo;</code><code>100</code><code>&rdquo;</code></p>
+
+			<p><code>&nbsp;&nbsp;</code><code>maxSpareThreads=&ldquo;</code><code>1000</code><code>&rdquo;</code></p>
+
+			<p><code>&nbsp;&nbsp;</code><code>minProcessors=&ldquo;</code><code>100</code><code>&rdquo;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 最小空闲连接线程数，用于提高系统处理性能</code></p>
+
+			<p><code>&nbsp;&nbsp;</code><code>maxProcessors=&ldquo;</code><code>1000</code><code>&rdquo;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 最大连接线程数，即：并发处理的最大请求数</code></p>
+
+			<p><code>&nbsp;&nbsp;</code><code>enableLookups=&ldquo;</code><code>false</code><code>&rdquo;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 是否反查域名，取值为： </code><code>true</code> <code>或 </code><code>false</code> <code>。为了提高处理能力，应设置为 </code><code>false</code></p>
+
+			<p><code>&nbsp;&nbsp;</code><code>compression=&ldquo;on&rdquo;</code></p>
+
+			<p><code>&nbsp;&nbsp;</code><code>compressionMinSize=&ldquo;</code><code>2048</code><code>&rdquo;</code></p>
+
+			<p><code>&nbsp;&nbsp;</code><code>compressableMimeType=&ldquo;text/html,text/xml,text/javascript,text/css,text/plain&rdquo;</code></p>
+
+			<p><code>&nbsp;&nbsp;</code><code>connectionTimeout=&ldquo;</code><code>20000</code><code>&rdquo;&nbsp;&nbsp;&nbsp; 网络连接超时，单位：毫秒。设置为 </code><code>0</code> <code>表示永不超时，这样设置有隐患的。通常可设置为</code><code>30000</code> <code>毫秒。</code></p>
+
+			<p><code>&nbsp;&nbsp;</code><code>URIEncoding=&ldquo;utf-</code><code>8</code><code>&rdquo;</code></p>
+
+			<p><code>&nbsp;&nbsp;</code><code>acceptCount=&ldquo;</code><code>1000</code><code>&rdquo;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 允许的最大连接数，应大于等于 maxProcessors</code></p>
+
+			<p><code>&nbsp;&nbsp;</code><code>redirectPort=&ldquo;</code><code>8443</code><code>&rdquo;</code></p>
+
+			<p><code>&nbsp;&nbsp;</code><code>disableUploadTimeout=&ldquo;</code><code>true</code><code>&rdquo;/&gt;</code></p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p><strong>4.压缩</strong></p>
+
+<p><a href="https://www.jb51.net/article/107053.htm#">?</a></p>
+
+<table border="0" cellpadding="0" cellspacing="0">
+	<tbody>
+		<tr>
+			<td>
+			<p>1</p>
+
+			<p>2</p>
+			</td>
+			<td>
+			<p><code>compression=&ldquo;on&rdquo;</code></p>
+
+			<p><code>compressionMinSize=&ldquo;</code><code>2048</code><code>&rdquo;</code></p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>当文件的大小大于等于2048bytes时才会压缩</p>
+
+<p><strong>5.数据库性能调优</strong></p>
+
+<p>Tomcat性能在等待数据库查询被执行期间会降低</p>
+
+<p>确保所有数据库连接正确地关闭。</p>
+
+<p>最大空闲数（maxIdle），最大连接数（maxActive）,最大建立连接等待时间（maxWait）属性的值。</p>
+
+<p><strong>6.其它选项</strong></p>
+
+<p>开启浏览器的缓存，这样读取存放在webapps文件夹里的静态内容会更快，大大推动整体性能<br />
+每当开机时，Tomcat服务器应当自动地重启</p>
+
+<p>一般情况下HTTPS请求会比HTTP请求慢。如果你想要更好的安全性，即使慢一点我们还是要选择HTTPS</p>
+
+<p>设置TOMCAT启用GZIP压缩</p>
+
+<p><a href="https://www.jb51.net/article/107053.htm#">?</a></p>
+
+<table border="0" cellpadding="0" cellspacing="0">
+	<tbody>
+		<tr>
+			<td>
+			<p>1</p>
+
+			<p>2</p>
+
+			<p>3</p>
+
+			<p>4</p>
+			</td>
+			<td>
+			<p><code>compression=&rdquo;on&rdquo; 打开压缩功能</code></p>
+
+			<p><code>compressionMinSize=&rdquo;50&Prime; 启用压缩的输出内容大小，默认为2KB</code></p>
+
+			<p><code>noCompressionUserAgents=&rdquo;gozilla, traviata&rdquo; 对于以下的浏览器，不启用压缩</code></p>
+
+			<p><code>compressableMimeType=&rdquo;text</code><code>/html</code><code>,text</code><code>/xml</code><code>,text</code><code>/javascript</code><code>,text</code><code>/css</code><code>,text</code><code>/plain</code><code>&ldquo;　哪些资源类型需要压缩</code></p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>以上所述是小编给大家介绍的tomcat性能优化(性能总览)，希望对大家有所帮助，如果大家有任何疑问请给我留言，小编会及时回复大家的。在此也非常感谢大家对脚本之家网站的支持！</p>

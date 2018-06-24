@@ -1,10 +1,35 @@
 <h1>centos7安装redis(yum方式)</h1>
 
-<h2>1.安装软件：</h2>
+<h2>mongodb启停</h2>
 
-<p>yum &nbsp;-y &nbsp;install &nbsp;mongodb &nbsp;mongodb-devel &nbsp;mongodb-server</p>
+<p>systemctl start mongod</p>
 
-<h2>2.修改配置文件：</h2>
+<p>systemctl stop mongod</p>
+
+<p>systemctl enable mongod&nbsp;systemctl daemon-reload&nbsp; &nbsp;//开机启动</p>
+
+<h2>1.配置仓库文件</h2>
+
+<p>安装前注意: 此教程是通过yum安装的.仅限64位centos系统</p>
+
+<p>创建仓库文件:&nbsp;</p>
+
+<p>vi /etc/yum.repos.d/mongodb-org-3.4.repo</p>
+
+<p>然后复制下面配置,保存退出</p>
+
+<p>[mongodb-org-3.4]<br />
+name=MongoDB Repository<br />
+baseurl=https://repo.mongodb.org/yum/<strong>redhat</strong>/$releasever/mongodb-org/3.4/<strong>x86_64</strong>/<br />
+gpgcheck=1<br />
+enabled=1<br />
+gpgkey=https://www.mongodb.org/static/pgp/server-3.4.asc</p>
+
+<h2>2.安装软件：</h2>
+
+<p>yum -y install mongodb mongodb-devel mongodb-server</p>
+
+<h2>3.修改配置文件：</h2>
 
 <p>vim /etc/mongod.conf<br />
 fork = true<br />
@@ -14,7 +39,7 @@ unixSocketPrefix = /var/run/mongodb<br />
 dbpath = /var/lib/mongodb<br />
 port=27017</p>
 
-<h2>3.启动服务：</h2>
+<h2>4.启动服务：</h2>
 
 <p>systemctl start mongod</p>
 
@@ -22,12 +47,45 @@ port=27017</p>
 
 <p>mongo</p>
 
-<h2>4.测试：</h2>
+<h2>5.测试：</h2>
 
 <p><img alt="d6df71c1dacc23dd21ae01c846c21719.png (416Ã135)" src="http://i2.51cto.com/images/blog/201804/01/d6df71c1dacc23dd21ae01c846c21719.png?x-oss-process=image/watermark,size_16,text_QDUxQ1RP5Y2a5a6i,color_FFFFFF,t_100,g_se,x_10,y_10,shadow_90,type_ZmFuZ3poZW5naGVpdGk=" /></p>
 
-<h2>5.开机启动：</h2>
+<h2>6.开机启动：</h2>
 
 <p>systemctl enable mongod</p>
 
 <p>systemctl daemon-reload</p>
+
+<h2>7.远程访问</h2>
+
+<p>记得关闭防火墙！</p>
+
+<p><strong>systemctl stop firewalld</strong>&nbsp;</p>
+
+<p>mongo 192.168.1.101:27017&nbsp; //本次使用</p>
+
+<p>mongo 远程主机ip或DNS:MongoDB端口号/数据库名 -u user -p password</p>
+
+<h2>常见问题</h2>
+
+<p>在使用过程中，由于远程连接访问不了新装mongodb，于是百度了一个解决方法，使用service启动了mongodb。结果有些文件就变成root用户的了。</p>
+
+<p>然而，使用systemctl start启动的时候，它会默认的使用mongodb:mongodb这个用户启动，于是就尴尬了。。</p>
+
+<h3>启动报错</h3>
+
+<p>Job for mongod.service failed because the control process exited with error code. See &quot;systemctl status mongod.service&quot; and &quot;journalctl -xe&quot; for details.<br />
+Failed to start High-performance, schema-free document-oriented database.</p>
+
+<h3>解决方法</h3>
+
+<p>有可能是权限问题</p>
+
+<p>chown -R mongodb:mongodb /var/log/mongodb<br />
+chown -R mongodb:mongodb /var/run/mongodb<br />
+chown -R mongodb:mongodb &nbsp;/var/lib/mongodb</p>
+
+<p>并且把进程ip的存放文件清掉</p>
+
+<p>rm -rf /var/run/mongodb/mongod.pid</p>

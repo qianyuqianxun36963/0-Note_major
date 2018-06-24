@@ -4,7 +4,7 @@
 
 <p>systemctl start rabbitmq-server</p>
 
-<p>systemctl stop&nbsp;rabbitmq-server</p>
+<p>systemctl stop rabbitmq-server</p>
 
 <p>systemctl enable rabbitmq-server</p>
 
@@ -42,11 +42,19 @@ yum -y install erlang</p>
 
 <p>后台运行：rabbitmq-server&nbsp;-detached&nbsp;</p>
 
-<h2><strong>3.安装插件</strong></h2>
+<h2><strong>3.配置用户、权限、管理页</strong></h2>
 
-<p>启动web管理界面</p>
+<p>安装web管理界面插件</p>
 
 <p>rabbitmq-plugins enable rabbitmq_management</p>
+
+<p>修改外网访问配置文件</p>
+
+<p>编辑<strong>/etc/rabbitmq/rabbitmq.config</strong>文件（没有就新增），添加以下配置就可以了。</p>
+
+<p>[&nbsp;<br />
+{rabbit,&nbsp;[{tcp_listeners,&nbsp;[<strong>5672</strong>]},&nbsp;{loopback_users,&nbsp;[&quot;<strong>admin</strong>&quot;]}]}&nbsp; &nbsp;//注意，这里不是端口 15672 而是5672；说是15672 没开放。 用户使用的是自己创建的用户名。<br />
+].</p>
 
 <p>增加访问用户，默认用户guest只能本地访问。</p>
 
@@ -66,60 +74,48 @@ yum -y install erlang</p>
 
 <p>遇到问题参考：http://blog.csdn.net/qq315737546/article/details/53105418</p>
 
-<p>脚本</p>
-
-<pre>
-启服务
-sudo service rabbitmq-server  {start|stop|status|rotate-logs|restart|condrestart|try-restart|reload|force-reload}
-
-Usage: /etc/init.d/rabbitmq-server {start|stop|status|rotate-logs|restart|condrestart|try-restart|reload|force-reload}
-
-装插件
-sudo rabbitmq-plugins enable rabbitmq_management
-
-建用户
-sudo  rabbitmqctl add_user admin ucsmy1234
-
-设置角色：
-sudo  rabbitmqctl set_user_tags admin administrator
-
-设置权限
-sudo rabbitmqctl set_permissions -p &quot;/&quot; admin &quot;.&quot; &quot;.&quot; &quot;.*&quot;
-</pre>
-
-<h3><strong>4、好了，到这里rabbitmq已经配置好了，可以启动了：</strong></h3>
-
 <ul>
-	<li>我们再来查看看一下rabbitmq的默认监听端口5672：&nbsp;&nbsp;</li>
-	<li>#netstat&nbsp;-tnlp|grep&nbsp;5672&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</li>
-	<li>最好我们就可以在浏览器上输入http://ip:15672/登录管理界面了：&nbsp;&nbsp;</li>
-	<li>使用登录的名户名和密码默认都算guest，登录后的页面如下：&nbsp;&nbsp;</li>
-	<li>另一台机器访问rabbitmq(就是本机之外),需要打开15672端口&nbsp;&nbsp;</li>
-	<li>#vi&nbsp;/etc/sysconfig/iptables&nbsp;&nbsp;把15672端口加进去。然后重启service&nbsp;iptables&nbsp;restart</li>
 </ul>
 
-<h2><strong>5、添加远程管理账户</strong></h2>
+<h2><strong>4.简单使用</strong></h2>
 
-<p>如果要从远程登录怎么做呢？处于安全考虑，guest这个默认的用户只能通过http://localhost:15672来登录，其他的IP无法直接用这个guest帐号。这里我们可以通过配置文件来实现从远程登录管理界面，只要编辑<strong>/etc/rabbitmq/rabbitmq.config</strong>文件（没有就新增），添加以下配置就可以了。</p>
+<p>好了，到这里rabbitmq已经配置好了，可以启动了：</p>
+
+<p>我们再来查看看一下rabbitmq的默认监听端口5672：&nbsp;&nbsp;<br />
+#netstat&nbsp;-tnlp|grep&nbsp;5672&nbsp;</p>
+
+<p>最后我们就可以在浏览器上输入http://ip:15672/登录管理界面了：&nbsp;&nbsp;<br />
+使用登录的名户名和密码默认都算guest，登录后的页面如下：&nbsp;&nbsp;</p>
+
+<p>另一台机器访问rabbitmq(就是本机之外),需要打开15672端口&nbsp;&nbsp;<br />
+#vi&nbsp;/etc/sysconfig/iptables&nbsp;&nbsp;把15672端口加进去。然后重启service&nbsp;iptables&nbsp;restart</p>
+
+<h2><strong>5.安装中注意点</strong></h2>
+
+<h3><strong>1、添加远程管理账户</strong></h3>
+
+<p>如果要从远程登录怎么做呢？处于安全考虑，guest这个默认的用户只能通过http://localhost:15672来登录，其他的IP无法直接用这个guest帐号。这里我们可以通过配置文件来实现从远程登录管理界面.</p>
+
+<p>第一步：编辑<strong>/etc/rabbitmq/rabbitmq.config</strong>文件（没有就新增），添加以下配置就可以了。</p>
 
 <p>[&nbsp;<br />
-{rabbit,&nbsp;[{tcp_listeners,&nbsp;[5672]},&nbsp;{loopback_users,&nbsp;[&quot;asdf&quot;]}]}&nbsp;<br />
+{rabbit,&nbsp;[{tcp_listeners,&nbsp;[<strong>5672</strong>]},&nbsp;{loopback_users,&nbsp;[&quot;<strong>admin</strong>&quot;]}]}&nbsp; &nbsp;//注意，这里不是端口 15672 而是5672；说是15672 没开放。 用户使用的是自己创建的用户名。<br />
 ].</p>
 
-<p>现在添加了一个新授权用户asdf,可以远程使用这个用户名。记得要先用命令添加这个命令才行：</p>
+<p>第二步：现在添加了一个新授权用户asdf,可以远程使用这个用户名。记得要先用命令添加这个命令才行：</p>
 
 <pre>
 $  cd /usr/lib/rabbitmq/bin/
 #用户名与密码
-$ sudo rabbitmqctl add_user asdf 123456
+$ sudo rabbitmqctl add_user admin 123456
 #用户设置为administrator才能远程访问
-$ sudo rabbitmqctl set_user_tags asdf administrator         
-$ sudo rabbitmqctl set_permissions -p / asdf &quot;.*&quot; &quot;.*&quot; &quot;.*&quot;
+$ sudo rabbitmqctl set_user_tags adminadministrator         
+$ sudo rabbitmqctl set_permissions -p / admin&quot;.*&quot; &quot;.*&quot; &quot;.*&quot;
 </pre>
 
 <p>其实也可以通过管理平台页面直接添加用户和密码等信息。<strong>如果还不能远程访问或远程登录检查是不是5672, 15672端口没有开放！！！！！！</strong></p>
 
-<h2><strong>6. 用户管理</strong></h2>
+<h3><strong>2、用户管理</strong></h3>
 
 <p>用户管理包括增加用户，删除用户，查看用户列表，修改用户密码。<br />
 <br />
@@ -137,7 +133,43 @@ rabbitmqctl&nbsp; delete_user&nbsp; Username<br />
 <br />
 rabbitmqctl&nbsp; change_password&nbsp; Username&nbsp; Newpassword<br />
 <br />
-(4) 查看当前用户列表<br />
-&nbsp;</p>
+(4) 查看当前用户列表</p>
 
 <p>rabbitmqctl&nbsp; list_users</p>
+
+<p>(5) 查看用户权限列表</p>
+
+<p>rabbitmqctl&nbsp;list_permissions&nbsp;-p</p>
+
+<p>(6) <code>查看用户的权限</code></p>
+
+<p>rabbitmqctl&nbsp;list_user_permissions username</p>
+
+<h3><strong>3、权限管理</strong></h3>
+
+<p>设置角色：</p>
+
+<p>sudo &nbsp;rabbitmqctl set_user_tags admin administrator</p>
+
+<p>设置权限</p>
+
+<p>sudo rabbitmqctl set_permissions -p &quot;/&quot; admin &quot;.&quot; &quot;.&quot; &quot;.*&quot;</p>
+
+<h2><strong>6.脚本</strong></h2>
+
+<pre>
+启服务
+sudo service rabbitmq-server  {start|stop|status|rotate-logs|restart|condrestart|try-restart|reload|force-reload}
+Usage: /etc/init.d/rabbitmq-server {start|stop|status|rotate-logs|restart|condrestart|try-restart|reload|force-reload}
+
+装插件
+sudo rabbitmq-plugins enable rabbitmq_management
+
+建用户
+sudo  rabbitmqctl add_user admin ucsmy1234
+
+设置角色：
+sudo  rabbitmqctl set_user_tags admin administrator
+
+设置权限
+sudo rabbitmqctl set_permissions -p &quot;/&quot; admin &quot;.&quot; &quot;.&quot; &quot;.*&quot;</pre>

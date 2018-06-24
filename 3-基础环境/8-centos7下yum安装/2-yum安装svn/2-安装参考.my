@@ -1,0 +1,82 @@
+<p><strong>CentOS 7 使用yum安装配置和使用svn.</strong></p>
+
+<p><strong>二 检查已安装版本</strong></p>
+
+<p>#检查是否安装了低版本的SVN<br />
+[root@iZ23xz8uttcZ ~]# rpm -qa subversion<br />
+#卸载旧版本SVN<br />
+[root@iZ23xz8uttcZ ~]# yum remove subversion<br />
+&nbsp;<br />
+<strong>三 安装SVN</strong><br />
+&nbsp;安装必须的软件包<br />
+[root@iZ23xz8uttcZ ~] yum install subversion&nbsp;<br />
+[root@iZ23xz8uttcZ ~] yum install mod_dav_svn&nbsp;<br />
+[root@iZ23xz8uttcZ ~]# yum install httpd httpd-devel subversion mod_dav_svn&nbsp;<br />
+mod_auth_mysql</p>
+
+<p>确认已安装了svn模块</p>
+
+<p>[root@iZ23xz8uttcZ ~]# cd /etc/httpd/modules<br />
+[root@iZ23xz8uttcZ ~]# ls | grep svn<br />
+mod_authz_svn.so<br />
+mod_dav_svn.so</p>
+
+<p>&nbsp;</p>
+
+<p><strong>四，基本的SVN服务器配置&nbsp;</strong></p>
+
+<p><strong>1 新建一个目录用于存储SVN所有文件</strong><br />
+[root@iZ23xz8uttcZ ~] mkdir /root/project<br />
+&nbsp;<br />
+<strong>2 新建一个版本仓库</strong><br />
+[root@iZ23xz8uttcZ ~] svnadmin create /root/svn/project<br />
+&nbsp;<br />
+<strong>3 初始化版本仓库中的目录，导入原始代码</strong><br />
+如果原代码已经有svn的相关文件，则切换到原代码目录，先删除这些svn相关的文件和文件夹。<br />
+假定/root/others 存放源代码<br />
+[root@iZ23xz8uttcZ ~] cd /root/others&nbsp;<br />
+[root@iZ23xz8uttcZ ~] find ./ -name &quot;*.svn&quot; | xargs rm -rf<br />
+[root@iZ23xz8uttcZ ~] svn import /root/others file:///root/svn/project/ -m &quot;init&nbsp;project&quot;<br />
+&nbsp;<br />
+<strong>4. 配置工程用户，并设置用户权限</strong><br />
+进入工程的配置目录：<br />
+[root@iZ23xz8uttcZ ~] cd /source/svn/project/conf<br />
+下面一共三个文件：authz passwd svnserve.conf<br />
+passwd： 里面保存用户信息，基本格式为：user = passwd<br />
+authz: 里面保存用户的分组信息，以及每个组的访问权限<br />
+svnserve.conf： 里面保存服务器的基本配置(下面介绍)<br />
+<br />
+passwd里面添加用户<br />
+打开passwd文件，并添加以下内容：<br />
+[users]<br />
+admin = 12345<br />
+<br />
+authz配置用户权限<br />
+打开authz文件，并添加以下内容：<br />
+[groups]&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;<br />
+[project:/]<br />
+admin = rw<br />
+* =<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;<br />
+以上表示admin具有所有的读写权限。<br />
+也可以配置组的权限，具体的组权限配置可参考我的另一篇博客：<br />
+Linux 下SVN安全及权限配置<a href="http://blog.csdn.net/u010587274/article/details/51015532" target="_blank">点击打开链接</a><br />
+&nbsp;<br />
+<strong>5 修改svnserve.conf，让用户和策略配置生效</strong><br />
+打开svnserve.conf文件，并修改svnserve.conf文件，修改的内容如下:<br />
+[general]<br />
+anon-access = none<br />
+auth-access = write<br />
+password-db = passwd<br />
+authz-db = authz<br />
+&nbsp;<br />
+<strong>6 &nbsp;启动服务器</strong><br />
+[root@iZ23xz8uttcZ ~] svnserve -d -r /root/svn<br />
+&nbsp;<br />
+<strong>7 测试服务器</strong><br />
+[root@iZ23xz8uttcZ ~] svn co svn://192.168.32.186/project<br />
+（假设你的IP是：192.168.32.186）<br />
+按提示先输入用户密码，再输入svn的用户名、密码，就可以了。<br />
+<br />
+<strong>温馨提示：此时您可在本地客户端，找到 SVN CheckOut，点击，会弹出一个弹出框，URL of&nbsp;<br />
+repository: 下输入：svn://192.168.32.186/project &nbsp;，之后输入您之前设置的用户和密码就可以啦！！！</strong>&nbsp;</p>

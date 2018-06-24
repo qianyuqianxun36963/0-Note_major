@@ -1,0 +1,251 @@
+<h1>rabbitMQ安装及配置远程访问web管理界面</h1>
+
+<p>#1 更新</p>
+
+<p>apt-get update<br />
+apt-get upgrade</p>
+
+<p>#2 安装Erlang</p>
+
+<p>wget http://packages.erlang-solutions.com/ubuntu/erlang_solutions.asc<br />
+apt-key add erlang_solutions.asc<br />
+apt-get update<br />
+apt-get install erlang<br />
+apt-get install erlang-nox</p>
+
+<p>#3 安装RabbitMQ(apt安装)</p>
+
+<p>添加RabbitMQ仓库源：</p>
+
+<p>vim /etc/apt/sources.list</p>
+
+<p>在文件中添加一行：</p>
+
+<p>deb http://www.rabbitmq.com/debian/ testing main</p>
+
+<p>添加密钥：</p>
+
+<p>wget https://www.rabbitmq.com/rabbitmq-signing-key-public.asc<br />
+apt-key add rabbitmq-signing-key-public.asc</p>
+
+<p>安装rabbitmq-server：</p>
+
+<p>apt-get update</p>
+
+<p>apt-get install rabbitmq-server</p>
+
+<p>deb文件安装</p>
+
+<p>wget&nbsp;http://www.rabbitmq.com/releases/rabbitmq-server/v3.6.9/rabbitmq-server_3.6.9-1_all.deb</p>
+
+<p>dpkg -i&nbsp;rabbitmq-server_3.6.9-1_all.deb</p>
+
+<p>启动RabbitMQ服务：</p>
+
+<p>service rabbitmq-server restart</p>
+
+<p>#4&nbsp;RabbitMQ web管理接口</p>
+
+<p>启用rabbitmq-management插件：</p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>1</p>
+			</td>
+			<td>
+			<p>$sudorabbitmq-pluginsenablerabbitmq_management</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>重启RabbitMQ：</p>
+
+<p>service rabbitmq-server restart</p>
+
+<p>使用浏览器访问&nbsp;http://127.0.0.1:15672，使用默认的guest/guest用户登录：</p>
+
+<p>在3.3.1和之后的版本中，出于安全的考虑，guest这个默认的用户只能通过http://localhost:15672 来登录，其他的IP无法直接使用这个账号。 这对于服务器上没有安装桌面的情况是无法管理维护的，除非通过在前面添加一层代理向外提供服务，这个又有些麻烦了，这里通过配置文件来实现这个功能</p>
+
+<p>&nbsp;</p>
+
+<p>只要编辑 /etc/rabbitmq/rabbitmq.config 文件，添加以下配置就可以了。</p>
+
+<p>&nbsp;</p>
+
+<p>[<br />
+{rabbit, [{tcp_listeners, [5672]}, {loopback_users, [&quot;admin&quot;]}]}<br />
+].</p>
+
+<p>&nbsp;</p>
+
+<p>现在添加了一个新授权用户admin，可以通过外网使用这个用户名和密码访问.(记得要先用命令添加这个命令才行,&nbsp;&nbsp;#rabbitmqctl &nbsp;add_user&nbsp;admin&nbsp;admin)我是通过在管理平台里直接添加的用户和密码的，我的<a href="http://lib.csdn.net/base/softwaretest" target="_blank" title="软件测试知识库">测试</a>环境装有桌面的。</p>
+
+<p>&nbsp;</p>
+
+<p>&nbsp;</p>
+
+<table border="0" cellpadding="0" cellspacing="0">
+	<tbody>
+		<tr>
+			<td>
+			<p><code>rabbitmqctl add_user admin admin</code></p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>&nbsp;</p>
+
+<p>&nbsp;</p>
+
+<p>管理</p>
+
+<p>Rabbitmq服务器的主要通过rabbitmqctl和rabbimq-plugins两个工具来管理，以下是一些常用功能。</p>
+
+<p>1）. 服务器启动与关闭</p>
+
+<p>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 启动: rabbitmq-server &ndash;detached</p>
+
+<p>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 关闭:rabbitmqctl stop</p>
+
+<p>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 若单机有多个实例，则在rabbitmqctlh后加&ndash;n 指定名称</p>
+
+<p>2）. 插件管理</p>
+
+<p>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 开启某个插件：rabbitmq-pluginsenable xxx</p>
+
+<p>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 关闭某个插件：rabbitmq-pluginsdisablexxx</p>
+
+<p>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 注意：重启服务器后生效。</p>
+
+<p>3）.virtual_host管理</p>
+
+<p>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 新建virtual_host: rabbitmqctladd_vhost&nbsp; xxx</p>
+
+<p>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 撤销virtual_host:rabbitmqctl&nbsp; delete_vhost xxx</p>
+
+<p>4）. 用户管理</p>
+
+<p>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 新建用户：rabbitmqctl add_user xxxpwd</p>
+
+<p>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 删除用户:&nbsp;&nbsp; rabbitmqctl delete_user xxx</p>
+
+<p>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 改密码: rabbimqctlchange_password {username} {newpassword}</p>
+
+<p>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 设置用户角色：rabbitmqctlset_user_tags {username} {tag ...}</p>
+
+<p>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Tag可以为 administrator,monitoring, management</p>
+
+<p>5）. 权限管理</p>
+
+<p>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 权限设置：set_permissions [-pvhostpath] {user} {conf} {write} {read}</p>
+
+<p>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Vhostpath</p>
+
+<p>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Vhost路径</p>
+
+<p>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; user</p>
+
+<p>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 用户名</p>
+
+<p>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Conf</p>
+
+<p>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 一个正则表达式match哪些配置资源能够被该用户访问。</p>
+
+<p>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Write</p>
+
+<p>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 一个正则表达式match哪些配置资源能够被该用户读。</p>
+
+<p>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Read</p>
+
+<p>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 一个正则表达式match哪些配置资源能够被该用户访问。</p>
+
+<p>6）. 获取服务器状态信息</p>
+
+<p>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 服务器状态：rabbitmqctl status</p>
+
+<p>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 队列信息：rabbitmqctl list_queues[-p vhostpath] [queueinfoitem ...]</p>
+
+<p>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Queueinfoitem可以为：name，durable，auto_delete，arguments，messages_ready，</p>
+
+<p>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; messages_unacknowledged，messages，consumers，memory</p>
+
+<p>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Exchange信息：rabbitmqctllist_exchanges[-p vhostpath] [exchangeinfoitem ...]</p>
+
+<p>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Exchangeinfoitem有：name，type，durable，auto_delete，internal，arguments.</p>
+
+<p>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Binding信息：rabbitmqctllist_bindings[-p vhostpath] [bindinginfoitem ...]&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</p>
+
+<p>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Bindinginfoitem有：source_name，source_kind，destination_name，destination_kind，routing_key，arguments</p>
+
+<p>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Connection信息：rabbitmqctllist_connections [connectioninfoitem ...]</p>
+
+<p>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Connectioninfoitem有：recv_oct，recv_cnt，send_oct，send_cnt，send_pend等。</p>
+
+<p>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Channel信息：rabbitmqctl&nbsp; list_channels[channelinfoitem ...]</p>
+
+<p>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Channelinfoitem有consumer_count，messages_unacknowledged，messages_uncommitted，acks_uncommitted，messages_unconfirmed，prefetch_count，client_flow_blocked</p>
+
+<h1>安装常见问题：</h1>
+
+<p>1、启动rabbitmq-server时，报错信息：Starting rabbitmq-server: FAILED - check /var/log/rabbitmq/startup_{log, _err}</p>
+
+<p>&nbsp;&nbsp;&nbsp; &nbsp;&nbsp; 解决：使用netstat 查看是否存在，如果存在用kiss 将其杀死，在启动，我试过可以解决。</p>
+
+<h3>rabbitmq配置</h3>
+
+<p>一般情况下，RabbitMQ的默认配置就足够了。如果希望特殊设置的话，有两个途径：</p>
+
+<p>一个是环境变量的配置文件 rabbitmq-env.conf ；</p>
+
+<p>一个是配置信息的配置文件 rabbitmq.config；</p>
+
+<p>注意，这两个文件默认是没有的，如果需要必须自己创建。</p>
+
+<p>rabbitmq-env.conf</p>
+
+<p>这个文件的位置是确定和不能改变的，位于：/etc/rabbitmq目录下（这个目录需要自己创建）。</p>
+
+<p>文件的内容包括了RabbitMQ的一些环境变量，常用的有：</p>
+
+<p>#RABBITMQ_NODE_PORT=&nbsp;&nbsp; &nbsp;//端口号</p>
+
+<p>#HOSTNAME=</p>
+
+<p>RABBITMQ_NODENAME=mq</p>
+
+<p>RABBITMQ_CONFIG_FILE=&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;//配置文件的路径</p>
+
+<p>RABBITMQ_MNESIA_BASE=/rabbitmq/data&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;//需要使用的MNESIA数据库的路径</p>
+
+<p>RABBITMQ_LOG_BASE=/rabbitmq/log&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;//log的路径</p>
+
+<p>RABBITMQ_PLUGINS_DIR=/rabbitmq/plugins&nbsp;&nbsp; &nbsp;//插件的路径</p>
+
+<p>具体的列表见：<a href="http://www.rabbitmq.com/configure.html#define-environment-variables" target="_blank">http://www.rabbitmq.com/configure.html#define-environment-variables</a></p>
+
+<p>rabbitmq.config</p>
+
+<p>这是一个标准的erlang配置文件。它必须符合erlang配置文件的标准。</p>
+
+<p>它既有默认的目录，也可以在rabbitmq-env.conf文件中配置。</p>
+
+<p>文件的内容详见：<a href="http://www.rabbitmq.com/configure.html#config-items" target="_blank">http://www.rabbitmq.com/configure.html#config-items</a></p>
+
+<p>##&nbsp;运行如下的命令，增加用户<strong>admin</strong>，密码&nbsp;<strong>admin</strong>&nbsp;</p>
+
+<p>[root@localhost sbin]#&nbsp;<strong>./rabbitmqctl&nbsp; list_users</strong>&nbsp;<br />
+Listing users ...<br />
+[root@localhost sbin]#&nbsp;<strong>./rabbitmqctl add_user admin admin</strong>&nbsp;<br />
+Creating user &quot;admin&quot; ...<br />
+[root@localhost sbin]#<strong>./rabbitmqctl set_user_tags admin administrator</strong>&nbsp;<br />
+Setting tags for user &quot;admin&quot; to [administrator] ...<br />
+[root@localhost sbin]#<strong>./rabbitmqctl set_permissions -p &quot;/&quot; admin &quot;.*&quot; &quot;.*&quot; &quot;.*&quot;</strong>&nbsp;<br />
+Setting permissions for user &quot;admin&quot; in vhost &quot;/&quot; ...<br />
+[root@localhost sbin]#&nbsp;<strong>./rabbitmqctl list_users</strong>&nbsp;<br />
+Listing users ...<br />
+admin&nbsp;&nbsp; &nbsp;[administrator]<br />
+[root@localhost sbin]#</p>
