@@ -51,8 +51,32 @@ export PATH=$TOMCAT_HOME/bin:$PATH</p>
 &nbsp; &lt;role rolename=&quot;manager-jmx&quot;/&gt;<br />
 &nbsp; &lt;role rolename=&quot;manager-status&quot;/&gt;<br />
 &nbsp; &lt;user username=&quot;tomcat&quot; password=&quot;tomcat&quot; roles=&quot;manager-gui,manager-script,manager-jmx,manager-status&quot;/&gt;<br />
-&lt;/tomcat-users&gt;<br />
-&nbsp;</p>
+&lt;/tomcat-users&gt;</p>
+
+<h2>配置tomcat项目路径、静态资源路径</h2>
+
+<p>修改$TOMCAT_HOME/conf/server.xml</p>
+
+<p>添加下面语句，然后，项目路径加resource可以访问静态资源。</p>
+
+<p>&nbsp; &nbsp; &nbsp; <strong>&lt;Host name=&quot;localhost&quot; &nbsp;appBase=&quot;/home/wenhua/webapps/project/xuexi&quot;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; unpackWARs=&quot;true&quot; autoDeploy=&quot;true&quot;&gt;</strong></p>
+
+<p>&nbsp; &nbsp; &nbsp; &nbsp; &lt;!-- SingleSignOn valve, share authentication between web applications<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;Documentation at: /docs/config/valve.html --&gt;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &lt;!--<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &lt;Valve className=&quot;org.apache.catalina.authenticator.SingleSignOn&quot; /&gt;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; --&gt;</p>
+
+<p>&nbsp; &nbsp; &nbsp; &nbsp; &lt;!-- Access log processes all example.<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;Documentation at: /docs/config/valve.html<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;Note: The pattern used is equivalent to using pattern=&quot;common&quot; --&gt;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &lt;Valve className=&quot;org.apache.catalina.valves.AccessLogValve&quot; directory=&quot;logs&quot;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;prefix=&quot;localhost_access_log&quot; suffix=&quot;.txt&quot;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;pattern=&quot;%h %l %u %t &amp;quot;%r&amp;quot; %s %b&quot; /&gt;<br />
+<strong>&nbsp; &nbsp; &nbsp; &nbsp; &lt;Context path=&quot;&quot; docBase=&quot;/home/wenhua/webapps/project/xuexi/jxpt-web&quot; reloadable=&quot;true&quot;/&gt;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &lt;Context path=&quot;/resource&quot; docBase=&quot;/home/wenhua/nfs/jxpt/resource&quot;/&gt;</strong><br />
+&nbsp; &nbsp; &nbsp; &lt;/Host&gt;</p>
 
 <h2>修改可访问的ip</h2>
 
@@ -71,7 +95,45 @@ export PATH=$TOMCAT_HOME/bin:$PATH</p>
     &lt;Valve className=&quot;org.apache.catalina.valves.RemoteAddrValve&quot;
          allow=&quot;127\.\d+\.\d+\.\d+|::1|0:0:0:0:0:0:0:1&quot; /&gt;
     --&gt;
-&lt;/Context&gt;</code></pre>
+&lt;/Context&gt;</code>
+</pre>
+
+<h2>修改tomcat的启动脚本</h2>
+
+<p>修改$TOMCAT_HOME/bin/catalina.sh</p>
+
+<h3>将jdk配置加入tomcat启动脚本</h3>
+
+<p>添加下面语句：</p>
+
+<p>export JAVA_HOME=/usr/local/jdk1.8<br />
+export JAVA_HOME=/usr/local/jdk1.8/jre</p>
+
+<h3>spring 环境区分</h3>
+
+<p>JAVA_OPTS=&quot;-Ddruid.registerToSysProperty=true -Dspring.profiles.active=<strong>test</strong>&quot;</p>
+
+<h3>优化tomcat参数</h3>
+
+<p>CATALINA_OPTS=&quot;-server -Xms2000m -Xmx2000m -Xdebug -Xnoagent -Djava.compiler=NONE -Xrunjdwp:transport=dt_socket,server=y,suspend=n,address=8900&quot;</p>
+
+<h3>配置tomcat远程监控</h3>
+
+<p>CATALINA_OPTS=&quot;$CATALINA_OPTS -Djava.rmi.server.hostname=<strong>210.28.216.100</strong> -Dcom.sun.management.jmxremote -Dcom.sun.management.jmxremote.port=<strong>18080</strong>&nbsp;-Dcom.sun.management.jmxremote.ssl=false -Dcom.sun.management.jmxremote.authenticate=false&quot;</p>
+
+<h2>教学平台session共享相关的配置</h2>
+
+<p>&nbsp;tomcat必须是Tomcat8版本，JDK必须为JDK8版本。<br />
+&nbsp; &nbsp; 使用Tomcat8+redis的方式：<br />
+&nbsp; &nbsp; 首先，在Tomcat的lib目录下放入三个jar：jxpt-session-0.0.1.jar,jedis-2.9.0.jar,commons-pool2-2.4.2.jar<br />
+&nbsp; &nbsp; 其次，修改tomcat的context.xml，加入如下代码配置redis服务器路径:<br />
+&nbsp; &nbsp; &lt;Valve className=&quot;cn.ulearning.jxpt.session.RedisSessionHandlerValve&quot; /&gt;<br />
+&nbsp; &nbsp; &lt;Manager className=&quot;cn.ulearning.jxpt.session.RedisSessionManager&quot;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; host=&quot;122.152.203.227&quot;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; port=&quot;6379&quot;&nbsp;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; database=&quot;1&quot;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; password=&quot;xxx&quot;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; maxInactiveInterval=&quot;1800&quot;/&gt;</p>
 
 <h2>启动Tomcat</h2>
 
