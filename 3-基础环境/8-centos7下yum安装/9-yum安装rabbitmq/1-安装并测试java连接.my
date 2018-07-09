@@ -1,0 +1,226 @@
+<h1><a href="https://www.cnblogs.com/uptothesky/p/6094357.html" id="cb_post_title_url">在CentOS7上安装RabbitMQ</a></h1>
+
+<p>首先需要安装erlang，参考：<a href="http://fedoraproject.org/wiki/EPEL/FAQ#howtouse" target="_blank">http://fedoraproject.org/wiki/EPEL/FAQ#howtouse</a></p>
+
+<pre>
+rpm -Uvh http://download.fedoraproject.org/pub/epel/7/x86_64/e/epel-release-7-8.noarch.rpm
+yum install erlang</pre>
+
+<p>安装过程中会有提示，一路输入&ldquo;y&rdquo;即可。</p>
+
+<p>完成后安装RabbitMQ：</p>
+
+<p>先下载rpm：</p>
+
+<pre>
+wget http://www.rabbitmq.com/releases/rabbitmq-server/v3.6.6/rabbitmq-server-3.6.6-1.el7.noarch.rpm</pre>
+
+<p>下载完成后安装：</p>
+
+<pre>
+yum install rabbitmq-server-3.6.6-1.el7.noarch.rpm </pre>
+
+<p>完成后启动服务：</p>
+
+<pre>
+service rabbitmq-server start</pre>
+
+<p>可以查看服务状态：</p>
+
+<pre>
+service rabbitmq-server status
+</pre>
+
+<p>这里可以看到log文件的位置，转到文件位置，打开文件：</p>
+
+<p>这里显示的是没有找到配置文件，我们可以自己创建这个文件</p>
+
+<pre>
+cd /etc/rabbitmq/
+vi rabbitmq.config</pre>
+
+<p>编辑内容如下：</p>
+
+<pre>
+[{rabbit, [{loopback_users, []}]}].</pre>
+
+<p>这里的意思是开放使用，rabbitmq默认创建的用户guest，密码也是guest，这个用户默认只能是本机访问，localhost或者127.0.0.1，从外部访问需要添加上面的配置。</p>
+
+<p>保存配置后重启服务：</p>
+
+<pre>
+service rabbitmq-server stop
+service rabbitmq-server start</pre>
+
+<p>此时就可以从外部访问了，但此时再看log文件，发现内容还是原来的，还是显示没有找到配置文件，可以手动删除这个文件再重启服务，不过这不影响使用</p>
+
+<pre>
+rm rabbit\@mythsky.log 
+service rabbitmq-server stop
+service rabbitmq-server start
+</pre>
+
+<p>开放5672端口：</p>
+
+<pre>
+firewall-cmd --zone=public --add-port=5672/tcp --permanent
+firewall-cmd --reload </pre>
+
+<p>在Windows上进行测试：</p>
+
+<p>新建.net core控制台项目，引用RabbitMQ.Client包：</p>
+
+<pre>
+Install-Package RabbitMQ.Client</pre>
+
+<p>测试代码：</p>
+
+<p><a href="javascript:void(0);" onclick="copyCnblogsCode(this)" title="复制代码"><img alt="复制代码" src="https://common.cnblogs.com/images/copycode.gif" /></a></p>
+
+<pre>
+public static void Main(string[] args)
+        {
+            ConnectionFactory factory = new ConnectionFactory();
+            factory.UserName = &quot;guest&quot;;
+            factory.Password = &quot;guest&quot;;
+            factory.VirtualHost = &quot;/&quot;;
+            factory.HostName = &quot;localhost&quot;;
+            //factory.HostName = &quot;10.255.19.111&quot;;
+            try
+            {
+                IConnection conn = factory.CreateConnection();
+                IModel model = conn.CreateModel();
+                string exchangeName = &quot;test&quot;;
+                string queueName = &quot;testq&quot;;
+                string routingKey = &quot;first&quot;;
+
+                model.ExchangeDeclare(exchangeName, ExchangeType.Direct);
+                model.QueueDeclare(queueName, false, false, false, null);
+                model.QueueBind(queueName, exchangeName, routingKey, null);
+                byte[] messageBodyBytes = System.Text.Encoding.UTF8.GetBytes(&quot;Hello, world!&quot;);
+                model.BasicPublish(exchangeName, routingKey, null, messageBodyBytes);
+                Console.WriteLine(&quot;message sended.&quot;);
+
+                bool noAck = false;
+                BasicGetResult result = model.BasicGet(queueName, noAck);
+                if (result == null)
+                {
+                    Console.Write(&quot;no message.&quot;);
+                }
+                else
+                {
+                    IBasicProperties props = result.BasicProperties;
+                    byte[] body = result.Body;
+                    model.BasicAck(result.DeliveryTag, false);
+                    string message = System.Text.Encoding.UTF8.GetString(body);
+                    Console.Write(message);
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.Write(ex.Message);
+            }
+        }
+</pre>
+
+<p>&nbsp;也可以使用官网的例子（这里更清晰）：</p>
+
+<p><a href="http://www.rabbitmq.com/tutorials/tutorial-one-dotnet.html" target="_blank">http://www.rabbitmq.com/tutorials/tutorial-one-dotnet.html</a></p>
+
+<p>发送端：</p>
+
+<pre>
+using System;
+using RabbitMQ.Client;
+using System.Text;
+
+class Send
+{
+    public static void Main()
+    {
+        var factory = new ConnectionFactory() { HostName = &quot;localhost&quot; };
+        using(var connection = factory.CreateConnection())
+        using(var channel = connection.CreateModel())
+        {
+            channel.QueueDeclare(queue: &quot;hello&quot;,
+                                 durable: false,
+                                 exclusive: false,
+                                 autoDelete: false,
+                                 arguments: null);
+
+            string message = &quot;Hello World!&quot;;
+            var body = Encoding.UTF8.GetBytes(message);
+
+            channel.BasicPublish(exchange: &quot;&quot;,
+                                 routingKey: &quot;hello&quot;,
+                                 basicProperties: null,
+                                 body: body);
+            Console.WriteLine(&quot; [x] Sent {0}&quot;, message);
+        }
+
+        Console.WriteLine(&quot; Press [enter] to exit.&quot;);
+        Console.ReadLine();
+    }
+}
+</pre>
+
+<p>接收端：</p>
+
+<pre>
+using RabbitMQ.Client;
+using RabbitMQ.Client.Events;
+using System;
+using System.Text;
+
+class Receive
+{
+    public static void Main()
+    {
+        var factory = new ConnectionFactory() { HostName = &quot;localhost&quot; };
+        using(var connection = factory.CreateConnection())
+        using(var channel = connection.CreateModel())
+        {
+            channel.QueueDeclare(queue: &quot;hello&quot;,
+                                 durable: false,
+                                 exclusive: false,
+                                 autoDelete: false,
+                                 arguments: null);
+
+            var consumer = new EventingBasicConsumer(channel);
+            consumer.Received += (model, ea) =&gt;
+            {
+                var body = ea.Body;
+                var message = Encoding.UTF8.GetString(body);
+                Console.WriteLine(&quot; [x] Received {0}&quot;, message);
+            };
+            channel.BasicConsume(queue: &quot;hello&quot;,
+                                 noAck: true,
+                                 consumer: consumer);
+
+            Console.WriteLine(&quot; Press [enter] to exit.&quot;);
+            Console.ReadLine();
+        }
+    }
+}</pre>
+
+<p>在Windows上发送，在CentOS上接收，效果如图：</p>
+
+<p><img alt="" src="https://images2015.cnblogs.com/blog/321801/201611/321801-20161124101144206-1744682710.png" />开启管理UI：</p>
+
+<pre>
+rabbitmq-plugins enable rabbitmq_management
+firewall-cmd --zone=public --add-port=15672/tcp --permanent
+firewall-cmd --reload</pre>
+
+<p>在Windows下打开地址：</p>
+
+<pre>
+http://10.255.19.111:15672</pre>
+
+<p><img alt="" src="https://images2015.cnblogs.com/blog/321801/201611/321801-20161124142617612-1449679471.png" /></p>
+
+<p>用户名和密码都是 guest</p>
+
+<p><img alt="" src="https://images2015.cnblogs.com/blog/321801/201611/321801-20161124142641456-143022910.png" /></p>
+
+<p>这样就可以方便管理RabbitMQ了。</p>
