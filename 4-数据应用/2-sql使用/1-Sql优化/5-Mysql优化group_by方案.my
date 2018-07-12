@@ -1,0 +1,63 @@
+<h1>MySQL优化GROUP BY方案</h1>
+
+<p>执行GROUP BY子句的最一般的方法：先扫描整个表，然后创建一个新的临时表，表中每个组的所有行应为连续的，最后使用该临时表来找到组并应用聚集函数(如果有聚集函数)。在某些情况中，MySQL通过访问索引就可以得到结果，而不用创建临时表。此类查询的 EXPLAIN 输出显示 Extra列的值为 Using index for group-by。</p>
+
+<h2><strong>一、松散索引扫描</strong></h2>
+
+<h3>满足条件</h3>
+
+<p>查询针对一个表。</p>
+
+<p>GROUP BY 使用索引的最左前缀。<br />
+只可以使用MIN()和MAX()聚集函数，并且它们均指向相同的列。</p>
+
+<p>2.示例</p>
+
+<p>表t1(c1,c2,c3,c4) 有一个索引 idx(c1，c2，c3)：</p>
+
+<p>SELECT c1, c2 FROM t1 GROUP BY c1, c2;</p>
+
+<p>SELECT DISTINCT c1, c2 FROM t1;</p>
+
+<p>SELECT c1, MIN(c2) FROM t1 GROUP BY c1;</p>
+
+<p>SELECT c1, c2 FROM t1 WHERE c1 &lt; const GROUP BY c1, c2;</p>
+
+<p>SELECT MAX(c3), MIN(c3), c1, c2 FROM t1 WHERE c2 &gt; const GROUP BY c1, c2;</p>
+
+<p>SELECT c2 FROM t1 WHERE c1 &lt; const GROUP BY c1, c2;</p>
+
+<p>SELECT c1, c2 FROM t1 WHERE c3 = const GROUP BY c1, c2；</p>
+
+<h3><br />
+不满足条件</h3>
+
+<p>示例：</p>
+
+<p>1. 除了MIN()或MAX()，还有其它累积函数，例如：</p>
+
+<p>SELECT c1, SUM(c2) FROM t1 GROUP BY c1;</p>
+
+<p>2. GROUP BY子句中的域不引用索引开头，例如：</p>
+
+<p>SELECT c1,c2 FROM t1 GROUP BY c2, c3;</p>
+
+<p>3. 查询引用了GROUP BY 部分后面的关键字的一部分，并且没有等于常量的等式，例如：&nbsp;&nbsp;</p>
+
+<p>SELECT c1,c3 FROM t1 GROUP BY c1, c2；</p>
+
+<h2><br />
+<strong>二、紧凑索引扫描</strong></h2>
+
+<p>如果不满足松散索引扫描条件，执行GROUP BY仍然可以不用创建临时表。如果WHERE子句中有范围条件，该方法只读取满足这些条件的关键字。</p>
+
+<p>否则，进行索引扫描。该方法读取由WHERE子句定义的范围。</p>
+
+<p>1. GROUP BY 中有一个漏洞，但已经由条件c2 = &#39;a&#39;覆盖。</p>
+
+<p>SELECT c1，c2，c3 FROM t1 WHERE c2 = &#39;a&#39; GROUP BY c1，c3;</p>
+
+<p>2. GROUP BY 不是满足最左前缀，但是有一个条件提供该元素的常量：</p>
+
+<p>SELECT c1，c2，c3 FROM t1 WHERE c1 = &#39;a&#39; GROUP BY c2，c3;<br />
+&nbsp;</p>
