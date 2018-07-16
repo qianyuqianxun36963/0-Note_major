@@ -1,0 +1,169 @@
+<h1>xargs命令</h1>
+
+<h2>xargs实际使用</h2>
+
+<p>xargs用作替换工具，读取输入数据重新格式化后输出。</p>
+
+<p>例如：</p>
+
+<p>vi filelist</p>
+
+<blockquote>1.log<br />
+2.log<br />
+3.log</blockquote>
+
+<p>cat filelist 显示的时候会带换行。 显示的跟文件内容一致。</p>
+
+<p>cat filelist | xargs 显示时候会将换行变成了空格。显示成 1.log 2.log 3.log</p>
+
+<p>cat filelist | xargs rm 相对于 rm&nbsp;1.log 2.log 3.log</p>
+
+<h2>网上命令介绍</h2>
+
+<p><strong>xargs命令</strong>是给其他命令传递参数的一个过滤器，也是组合多个命令的一个工具。它擅长将标准输入数据转换成命令行参数，xargs能够处理管道或者stdin并将其转换成特定命令的命令参数。xargs也可以将单行或多行文本输入转换为其他格式，例如多行变单行，单行变多行。xargs的默认命令是<a href="http://man.linuxde.net/echo" target="_blank" title="echo命令">echo</a>，空格是默认定界符。这意味着通过管道传递给xargs的输入将会包含换行和空白，不过通过xargs的处理，换行和空白将被空格取代。xargs是构建单行命令的重要组件之一。</p>
+
+<h2>xargs命令用法</h2>
+
+<p>xargs用作替换工具，读取输入数据重新格式化后输出。</p>
+
+<p>定义一个测试文件，内有多行文本数据：</p>
+
+<pre>
+<a href="http://man.linuxde.net/cat" target="_blank" title="cat命令">cat</a> <a href="http://man.linuxde.net/test" target="_blank" title="test命令">test</a>.txt
+
+a b c d e f g
+h i j k l m n
+o p q
+r s t
+u v <a href="http://man.linuxde.net/w" target="_blank" title="w命令">w</a> x y z
+</pre>
+
+<p>多行输入单行输出：</p>
+
+<pre>
+cat test.txt | xargs
+
+a b c d e f g h i j k l m n o p q r s t u v w x y z</pre>
+
+<p><strong>-n选项</strong>多行输出：</p>
+
+<pre>
+cat test.txt | xargs -n3
+
+a b c
+d e f
+g h i
+j k l
+m n o
+p q r
+s t u
+v w x
+y z</pre>
+
+<p><strong>-d选项</strong>可以自定义一个定界符：</p>
+
+<pre>
+echo &quot;nameXnameXnameXname&quot; | xargs -dX
+
+name name name name</pre>
+
+<p>结合<strong>-n选项</strong>使用：</p>
+
+<pre>
+echo &quot;nameXnameXnameXname&quot; | xargs -dX -n2
+
+name name
+name name</pre>
+
+<p><strong>读取stdin，将格式化后的参数传递给命令</strong></p>
+
+<p>假设一个命令为 sk.sh 和一个保存参数的文件arg.txt：</p>
+
+<pre>
+#!/bin/bash
+#sk.sh命令内容，打印出所有参数。
+
+echo $*
+</pre>
+
+<p>arg.txt文件内容：</p>
+
+<pre>
+cat arg.txt
+
+aaa
+bbb
+ccc
+</pre>
+
+<p>xargs的一个<strong>选项-I</strong>，使用-I指定一个替换字符串{}，这个字符串在xargs扩展时会被替换掉，当-I与xargs结合使用，每一个参数命令都会被执行一次：</p>
+
+<pre>
+cat arg.txt | xargs -I {} ./sk.sh -p {} -l
+
+-p aaa -l
+-p bbb -l
+-p ccc -l
+</pre>
+
+<p>复制所有图片文件到 /data/images 目录下：</p>
+
+<pre>
+<a href="http://man.linuxde.net/ls" target="_blank" title="ls命令">ls</a> *.jpg | xargs -n1 -I <a href="http://man.linuxde.net/cp" target="_blank" title="cp命令">cp</a> {} /data/images</pre>
+
+<p><strong>xargs结合<a href="http://man.linuxde.net/find" target="_blank" title="find命令">find</a>使用</strong></p>
+
+<p>用<a href="http://man.linuxde.net/rm" target="_blank" title="rm命令">rm</a>&nbsp;删除太多的文件时候，可能得到一个错误信息：/bin/rm Argument list too long. 用xargs去避免这个问题：</p>
+
+<pre>
+find . -<a href="http://man.linuxde.net/type" target="_blank" title="type命令">type</a> f -name &quot;*.log&quot; -print0 | xargs -0 rm -f</pre>
+
+<p>xargs -0将\0作为定界符。</p>
+
+<p>统计一个源代码目录中所有<a href="http://man.linuxde.net/php" target="_blank" title="php命令">php</a>文件的行数：</p>
+
+<pre>
+find . -type f -name &quot;*.php&quot; -print0 | xargs -0 <a href="http://man.linuxde.net/wc" target="_blank" title="wc命令">wc</a> -l</pre>
+
+<p>查找所有的jpg 文件，并且压缩它们：</p>
+
+<pre>
+find . -type f -name &quot;*.jpg&quot; -print | xargs <a href="http://man.linuxde.net/tar" target="_blank" title="tar命令">tar</a> -czvf images.tar.gz
+</pre>
+
+<p><strong>xargs其他应用</strong></p>
+
+<p>假如你有一个文件包含了很多你希望下载的URL，你能够使用xargs下载所有链接：</p>
+
+<pre>
+cat url-list.txt | xargs <a href="http://man.linuxde.net/wget" target="_blank" title="wget命令">wget</a> -c
+</pre>
+
+<h3>子Shell（Subshells）</h3>
+
+<p>运行一个shell脚本时会启动另一个命令解释器.，就好像你的命令是在命令行提示下被解释的一样，类似于批处理文件里的一系列命令。每个shell脚本有效地运行在父shell(parent shell)的一个子进程里。这个父shell是指在一个控制终端或在一个xterm窗口中给你命令指示符的进程。</p>
+
+<pre>
+cmd1 | ( cmd2; cmd3; cmd4 ) | cmd5</pre>
+
+<p>如果cmd2 是<a href="http://man.linuxde.net/cd" target="_blank" title="cd命令">cd</a>&nbsp;/，那么就会改变子Shell的工作目录，这种改变只是局限于子shell内部，cmd5则完全不知道工作目录发生的变化。子shell是嵌在圆括号()内部的命令序列，子Shell内部定义的变量为局部变量。</p>
+
+<p>子shell可用于为一组命令设定临时的环境变量：</p>
+
+<pre>
+COMMAND1
+COMMAND2
+COMMAND3
+(
+  IFS=:
+  PATH=/bin
+  <a href="http://man.linuxde.net/unset" target="_blank" title="unset命令">unset</a> TERMINFO
+  <a href="http://man.linuxde.net/set" target="_blank" title="set命令">set</a> -C
+  shift 5
+  COMMAND4
+  COMMAND5
+  <a href="http://man.linuxde.net/exit" target="_blank" title="exit命令">exit</a> 3 # 只是从子shell退出。
+)
+# 父shell不受影响，变量值没有更改。
+COMMAND6
+COMMAND7</pre>
