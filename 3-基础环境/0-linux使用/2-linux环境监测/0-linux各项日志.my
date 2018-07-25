@@ -1,0 +1,197 @@
+<h1>linux服务器的日志管理</h1>
+
+<h2>消息紧急程度排行</h2>
+
+<p>emerg:该系统不可用&nbsp;<br />
+alert：需要立即修改&nbsp;<br />
+crit：紧急情况&nbsp;<br />
+err：错误信息&nbsp;<br />
+warning：预警信息&nbsp;<br />
+notice：具有重要性的普通条件&nbsp;<br />
+info：提供信息的消息&nbsp;<br />
+debug：不包含函数条件或问题的其他信息&nbsp;<br />
+none：没有重要级，通常用于排错</p>
+
+<p>有时候出错了，查看一下日志对排错是有很大帮助的，下面就来介绍一下各种日志文件</p>
+
+<h2>#/var/log/messages不仅是服务器的系统日志，还是许多服务的日志</h2>
+
+<p>[root@bogon ~]# tail -n10 /var/log/messages &nbsp; &nbsp; #查看最新的十条日志信息<br />
+Jun 26 05:21:46 localhost systemd: Starting Network Manager Script Dispatcher Service...<br />
+Jun 26 05:21:46 localhost dbus-daemon: dbus[518]: [system] Activating via systemd: service name=&#39;org.freedesktop.nm_dispatcher&#39; unit=&#39;dbus-org.freedesktop.nm-dispatcher.service&#39;<br />
+Jun 26 05:21:46 localhost dhclient[3825]: bound to 192.168.1.107 -- renewal in 2798 seconds.<br />
+Jun 26 05:21:46 localhost dbus[518]: [system] Successfully activated service &#39;org.freedesktop.nm_dispatcher&#39;<br />
+Jun 26 05:21:46 localhost dbus-daemon: dbus[518]: [system] Successfully activated service &#39;org.freedesktop.nm_dispatcher&#39;<br />
+Jun 26 05:21:46 localhost systemd: Started Network Manager Script Dispatcher Service.<br />
+Jun 26 05:21:46 localhost nm-dispatcher: req:1 &#39;dhcp4-change&#39; [ens33]: new request (5 scripts)<br />
+Jun 26 05:21:46 localhost nm-dispatcher: req:1 &#39;dhcp4-change&#39; [ens33]: start running ordered scripts...<br />
+Jun 26 05:30:01 localhost systemd: Started Session 60 of user root.<br />
+Jun 26 05:30:01 localhost systemd: Starting Session 60 of user root.<br />
+[root@bogon ~]#&nbsp;</p>
+
+<h2>#有时候我们可能需要实时查看日志</h2>
+
+<p>tail -f /var/log/messages &nbsp; &nbsp; #该命令会一直刷新显示日志文件信息<br />
+执行效果就省略了</p>
+
+<h2>#查看系统安全日志ssh，telent，ftp等等</h2>
+
+<p>[root@bogon ~]# tail -n5 /var/log/secure&nbsp;<br />
+Jun 26 04:53:28 localhost polkitd[564]: Registered Authentication Agent for unix-process:9638:2696360 (system bus name :1.231 [/usr/bin/pkttyagent --notify-fd 5 --fallback], object path /org/freedesktop/PolicyKit1/AuthenticationAgent, locale en_US.UTF-8)<br />
+Jun 26 04:53:29 localhost polkitd[564]: Unregistered Authentication Agent for unix-process:9638:2696360 (system bus name :1.231, object path /org/freedesktop/PolicyKit1/AuthenticationAgent, locale en_US.UTF-8) (disconnected from bus)<br />
+Jun 26 05:38:08 localhost gdm-password]: gkr-pam: unlocked login keyring<br />
+Jun 26 05:38:31 localhost polkitd[564]: Registered Authentication Agent for unix-process:12161:2966633 (system bus name :1.246 [/usr/bin/pkttyagent --notify-fd 5 --fallback], object path /org/freedesktop/PolicyKit1/AuthenticationAgent, locale en_US.UTF-8)<br />
+Jun 26 05:38:33 localhost polkitd[564]: Unregistered Authentication Agent for unix-process:12161:2966633 (system bus name :1.246, object path /org/freedesktop/PolicyKit1/AuthenticationAgent, locale en_US.UTF-8) (disconnected from bus)</p>
+
+<p><br />
+#上面的是什么啊，都看不懂，那我就直接查看ssh相关的信息吧，我一直使用ssh连接控制centos7<br />
+[root@bogon ~]# cat /var/log/secure |grep ssh<br />
+Jun 25 15:32:33 bogon sshd[1032]: Server listening on 0.0.0.0 port 22.<br />
+Jun 25 15:32:33 bogon sshd[1032]: Server listening on :: port 22.<br />
+Jun 25 18:31:12 bogon sshd[947]: Server listening on 0.0.0.0 port 22.<br />
+Jun 25 18:31:12 bogon sshd[947]: Server listening on :: port 22.<br />
+Jun 25 18:36:49 bogon sshd[11299]: Connection closed by 192.168.1.100 [preauth]<br />
+Jun 25 18:38:26 bogon sshd[11318]: Address 192.168.1.100 maps to bogon, but this does not map back to the address - POSSIBLE BREAK-IN ATTEMPT! &nbsp; #看到没，我从100这个ip登录的</p>
+
+<p>#/var/log/wtmp是用来记录登录者的信息数据，是个二进制文件，使用cat查看是乱码，还记得用什么命令查看二进制文件吗（答案是xxd）</p>
+
+<p>#既然如此，那我们就需要根据系统的设计，用last读取这个文件的内容了<br />
+[root@bogon ~]# last<br />
+root &nbsp; &nbsp; pts/1 &nbsp; &nbsp; &nbsp; &nbsp;192.168.1.100 &nbsp; &nbsp;Sun Jun 25 22:00 &nbsp; still logged in &nbsp;&nbsp;<br />
+root &nbsp; &nbsp; pts/0 &nbsp; &nbsp; &nbsp; &nbsp;:0 &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; Sun Jun 25 21:25 &nbsp; still logged in &nbsp;&nbsp;<br />
+root &nbsp; &nbsp; :0 &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; :0 &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; Sun Jun 25 21:24 &nbsp; still logged in &nbsp;&nbsp;<br />
+(unknown :0 &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; :0 &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; Sun Jun 25 21:24 - 21:24 &nbsp;(00:00) &nbsp; &nbsp;<br />
+reboot &nbsp; system boot &nbsp;3.10.0-514.el7.x Sun Jun 25 21:24 - 05:49 &nbsp;(08:25) &nbsp; &nbsp;<br />
+root &nbsp; &nbsp; pts/1 &nbsp; &nbsp; &nbsp; &nbsp;192.168.190.1 &nbsp; &nbsp;Sun Jun 25 20:36 - 21:19 &nbsp;(00:42) &nbsp; &nbsp;<br />
+root &nbsp; &nbsp; pts/1 &nbsp; &nbsp; &nbsp; &nbsp;:0 &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; Sun Jun 25 20:09 - 20:09 &nbsp;(00:00) &nbsp; &nbsp;<br />
+root &nbsp; &nbsp; pts/1 &nbsp; &nbsp; &nbsp; &nbsp;192.168.1.100 &nbsp; &nbsp;Sun Jun 25 20:05 - 20:07 &nbsp;(00:01) &nbsp; &nbsp;<br />
+root &nbsp; &nbsp; pts/1 &nbsp; &nbsp; &nbsp; &nbsp;192.168.1.100 &nbsp; &nbsp;Sun Jun 25 19:21 - 20:04 &nbsp;(00:42) &nbsp; &nbsp;<br />
+root &nbsp; &nbsp; pts/1 &nbsp; &nbsp; &nbsp; &nbsp;192.168.1.100 &nbsp; &nbsp;Sun Jun 25 19:10 - 19:10 &nbsp;(00:00) &nbsp; &nbsp;<br />
+root &nbsp; &nbsp; pts/1 &nbsp; &nbsp; &nbsp; &nbsp;192.168.1.100 &nbsp; &nbsp;Sun Jun 25 19:09 - 19:09 &nbsp;(00:00) &nbsp; &nbsp;<br />
+bp &nbsp; &nbsp; &nbsp; pts/1 &nbsp; &nbsp; &nbsp; &nbsp;192.168.1.100 &nbsp; &nbsp;Sun Jun 25 19:08 - 19:09 &nbsp;(00:00) &nbsp; &nbsp;<br />
+root &nbsp; &nbsp; pts/1 &nbsp; &nbsp; &nbsp; &nbsp;192.168.1.100 &nbsp; &nbsp;Sun Jun 25 18:38 - 18:38 &nbsp;(00:00) &nbsp; &nbsp;<br />
+root &nbsp; &nbsp; pts/0 &nbsp; &nbsp; &nbsp; &nbsp;:0 &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; Sun Jun 25 18:32 - 21:23 &nbsp;(02:50) &nbsp; &nbsp;<br />
+root &nbsp; &nbsp; :0 &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; :0 &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; Sun Jun 25 18:32 - 21:23 &nbsp;(02:51) &nbsp; &nbsp;<br />
+(unknown :0 &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; :0 &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; Sun Jun 25 18:31 - 18:32 &nbsp;(00:01) &nbsp; &nbsp;<br />
+reboot &nbsp; system boot &nbsp;3.10.0-514.el7.x Sun Jun 25 18:30 - 05:49 &nbsp;(11:19) &nbsp; &nbsp;<br />
+root &nbsp; &nbsp; :0 &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; :0 &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; Sun Jun 25 08:54 - 08:58 &nbsp;(00:03) &nbsp; &nbsp;<br />
+(unknown :0 &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; :0 &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; Sun Jun 25 08:41 - 08:54 &nbsp;(00:13) &nbsp; &nbsp;<br />
+reboot &nbsp; system boot &nbsp;3.10.0-514.el7.x Sun Jun 25 15:32 - 05:49 &nbsp;(14:17) &nbsp; &nbsp;</p>
+
+<p>wtmp begins Sun Jun 25 15:32:02 2017<br />
+[root@bogon ~]#&nbsp;</p>
+
+<h3><br />
+#查看每个使用者最近登录系统的时间</h3>
+
+<p>[root@bogon ~]# lastlog|grep -E &#39;root|bp&#39; &nbsp; &nbsp; &nbsp;#查看这两个帐号<br />
+root &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; pts/1 &nbsp; &nbsp;192.168.1.100 &nbsp; &nbsp;Sun Jun 25 22:00:07 -0700 2017<br />
+bp &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; pts/1 &nbsp; &nbsp;192.168.1.100 &nbsp; &nbsp;Sun Jun 25 19:08:40 -0700 2017<br />
+[root@bogon ~]# lastlog|grep -e &#39;bp|root&#39;<br />
+[root@bogon ~]# lastlog|grep -E &#39;bp|root&#39; &nbsp; &nbsp; &nbsp;#看到了吧，-e -E是有区别的，我开始时在这里就错用了-e<br />
+root &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; pts/1 &nbsp; &nbsp;192.168.1.100 &nbsp; &nbsp;Sun Jun 25 22:00:07 -0700 2017<br />
+bp &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; pts/1 &nbsp; &nbsp;192.168.1.100 &nbsp; &nbsp;Sun Jun 25 19:08:40 -0700 2017<br />
+[root@bogon ~]# lastlog|grep -E &#39;bp | root&#39; &nbsp; &nbsp;#能看出来这里错在哪里吗 &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;root前面多了个空格，所以配置时寻找的是root前面带空格的，而文件root是顶格写的，当然找不着<br />
+bp &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; pts/1 &nbsp; &nbsp;192.168.1.100 &nbsp; &nbsp;Sun Jun 25 19:08:40 -0700 2017<br />
+[root@bogon ~]#&nbsp;</p>
+
+<h2><br />
+#服务器的邮件日志/var/log/messages,iptables（防火墙）日志也是在这里</h2>
+
+<h3>#查看系统启动信息</h3>
+
+<p>[root@bogon rsyslog.d]# dmesg|head -10 &nbsp; &nbsp; &nbsp;#如果启动过程中提示有硬件损坏，那么可以用dmesg|grep erro查看<br />
+[ &nbsp; &nbsp;0.000000] Initializing cgroup subsys cpuset<br />
+[ &nbsp; &nbsp;0.000000] Initializing cgroup subsys cpu<br />
+[ &nbsp; &nbsp;0.000000] Initializing cgroup subsys cpuacct<br />
+[ &nbsp; &nbsp;0.000000] Linux version 3.10.0-514.el7.x86_64 (builder@kbuilder.dev.centos.org) (gcc version 4.8.5 20150623 (Red Hat 4.8.5-11) (GCC) ) #1 SMP Tue Nov 22 16:42:41 UTC 2016<br />
+[ &nbsp; &nbsp;0.000000] Command line: BOOT_IMAGE=/vmlinuz-3.10.0-514.el7.x86_64 root=UUID=d46a9d1b-4fff-4097-ad89-09b482daa766 ro crashkernel=auto rhgb quiet LANG=en_US.UTF-8<br />
+[ &nbsp; &nbsp;0.000000] Disabled fast string operations<br />
+[ &nbsp; &nbsp;0.000000] e820: BIOS-provided physical RAM map:<br />
+[ &nbsp; &nbsp;0.000000] BIOS-e820: [mem 0x0000000000000000-0x000000000009ebff] usable<br />
+[ &nbsp; &nbsp;0.000000] BIOS-e820: [mem 0x000000000009ec00-0x000000000009ffff] reserved<br />
+[ &nbsp; &nbsp;0.000000] BIOS-e820: [mem 0x00000000000dc000-0x00000000000fffff] reserved</p>
+
+<h3>#cron日志</h3>
+
+<p>[root@bogon rsyslog.d]# head -10 /var/log/cron&nbsp;<br />
+Jun 25 15:32:34 bogon crond[1048]: (CRON) INFO (RANDOM_DELAY will be scaled with factor 17% if used.)<br />
+Jun 25 07:33:11 bogon crond[1048]: (CRON) INFO (running with inotify support)<br />
+Jun 25 07:40:02 bogon CROND[10035]: (root) CMD (/usr/lib64/sa/sa1 1 1)<br />
+Jun 25 07:50:01 bogon CROND[10126]: (root) CMD (/usr/lib64/sa/sa1 1 1)<br />
+Jun 25 08:00:01 bogon CROND[10215]: (root) CMD (/usr/lib64/sa/sa1 1 1)<br />
+Jun 25 08:01:01 bogon CROND[10230]: (root) CMD (run-parts /etc/cron.hourly)<br />
+Jun 25 08:01:01 bogon run-parts(/etc/cron.hourly)[10230]: starting 0anacron<br />
+Jun 25 08:01:01 bogon anacron[10240]: Anacron started on 2017-06-25<br />
+Jun 25 08:01:01 bogon run-parts(/etc/cron.hourly)[10242]: finished 0anacron<br />
+Jun 25 08:01:01 bogon anacron[10240]: Will run job `cron.daily&#39; in 28 min.<br />
+[root@bogon rsyslog.d]#&nbsp;</p>
+
+<h2>#查看服务启动日志 systemctl status</h2>
+
+<p>systemctl status rabbitmq-server.service</p>
+
+<p>● rabbitmq-server.service - RabbitMQ broker<br />
+&nbsp; &nbsp;Loaded: loaded (/usr/lib/systemd/system/rabbitmq-server.service; disabled; vendor preset: disabled)<br />
+&nbsp; &nbsp;Active: failed (Result: exit-code) since 五 2018-07-13 10:04:20 CST; 51s ago<br />
+&nbsp; Process: 7238 ExecStop=/usr/sbin/rabbitmqctl stop (code=exited, status=0/SUCCESS)<br />
+&nbsp; Process: 6922 ExecStart=/usr/sbin/rabbitmq-server (code=exited, status=1/FAILURE)<br />
+&nbsp;Main PID: 6922 (code=exited, status=1/FAILURE)<br />
+&nbsp; &nbsp;Status: &quot;Exited.&quot;</p>
+
+<p>7月 13 10:04:20 localhost.localdomain rabbitmqctl[7238]: * epmd reports: node &#39;rabbit&#39; not running at all<br />
+7月 13 10:04:20 localhost.localdomain rabbitmqctl[7238]: no other nodes on localhost<br />
+7月 13 10:04:20 localhost.localdomain rabbitmqctl[7238]: * suggestion: start the node<br />
+7月 13 10:04:20 localhost.localdomain rabbitmqctl[7238]: current node details:<br />
+7月 13 10:04:20 localhost.localdomain rabbitmqctl[7238]: - node name: &#39;rabbitmq-cli-08@localhost&#39;<br />
+7月 13 10:04:20 localhost.localdomain rabbitmqctl[7238]: - home dir: .<br />
+7月 13 10:04:20 localhost.localdomain rabbitmqctl[7238]: - cookie hash: gKffgrNvZMB/ZfZS+ThEqw==<br />
+7月 13 10:04:20 localhost.localdomain systemd[1]: Failed to start RabbitMQ broker.<br />
+7月 13 10:04:20 localhost.localdomain systemd[1]: Unit rabbitmq-server.service entered failed state.<br />
+7月 13 10:04:20 localhost.localdomain systemd[1]: rabbitmq-server.service failed.<br />
+&nbsp;</p>
+
+<h2>#查看系统日志 journalctl -xe</h2>
+
+<p>7月 13 10:04:20 localhost.localdomain rabbitmqctl[7238]: DIAGNOSTICS<br />
+7月 13 10:04:20 localhost.localdomain rabbitmqctl[7238]: ===========<br />
+7月 13 10:04:20 localhost.localdomain rabbitmqctl[7238]: attempted to contact: [rabbit@localhost]<br />
+7月 13 10:04:20 localhost.localdomain rabbitmqctl[7238]: rabbit@localhost:<br />
+7月 13 10:04:20 localhost.localdomain rabbitmqctl[7238]: * connected to epmd (port 4369) on localhost<br />
+7月 13 10:04:20 localhost.localdomain rabbitmqctl[7238]: * epmd reports: node &#39;rabbit&#39; not running at all<br />
+7月 13 10:04:20 localhost.localdomain rabbitmqctl[7238]: no other nodes on localhost<br />
+7月 13 10:04:20 localhost.localdomain rabbitmqctl[7238]: * suggestion: start the node<br />
+7月 13 10:04:20 localhost.localdomain rabbitmqctl[7238]: current node details:<br />
+7月 13 10:04:20 localhost.localdomain rabbitmqctl[7238]: - node name: &#39;rabbitmq-cli-08@localhost&#39;<br />
+7月 13 10:04:20 localhost.localdomain rabbitmqctl[7238]: - home dir: .<br />
+7月 13 10:04:20 localhost.localdomain rabbitmqctl[7238]: - cookie hash: gKffgrNvZMB/ZfZS+ThEqw==<br />
+7月 13 10:04:20 localhost.localdomain systemd[1]: Failed to start RabbitMQ broker.<br />
+-- Subject: Unit rabbitmq-server.service has failed<br />
+-- Defined-By: systemd<br />
+-- Support: http://lists.freedesktop.org/mailman/listinfo/systemd-devel<br />
+--&nbsp;<br />
+-- Unit rabbitmq-server.service has failed.<br />
+--&nbsp;<br />
+-- The result is failed.<br />
+7月 13 10:04:20 localhost.localdomain systemd[1]: Unit rabbitmq-server.service entered failed state.<br />
+7月 13 10:04:20 localhost.localdomain systemd[1]: rabbitmq-server.service failed.<br />
+7月 13 10:04:20 localhost.localdomain polkitd[736]: Unregistered Authentication Agent for unix-process:6915:179385464 (system bus name :1.1292, object path /org/freedesktop/PolicyKit1/AuthenticationAgent, loca<br />
+7月 13 10:04:31 localhost.localdomain kernel: usb 1-1.5: USB disconnect, device number 12<br />
+7月 13 10:04:33 localhost.localdomain kernel: usb 1-1.5: new low-speed USB device number 13 using ehci-pci<br />
+7月 13 10:04:33 localhost.localdomain kernel: usb 1-1.5: New USB device found, idVendor=046d, idProduct=c077<br />
+7月 13 10:04:33 localhost.localdomain kernel: usb 1-1.5: New USB device strings: Mfr=1, Product=2, SerialNumber=0<br />
+7月 13 10:04:33 localhost.localdomain kernel: usb 1-1.5: Product: USB Optical Mouse<br />
+7月 13 10:04:33 localhost.localdomain kernel: usb 1-1.5: Manufacturer: Logitech<br />
+7月 13 10:04:33 localhost.localdomain kernel: input: Logitech USB Optical Mouse as /devices/pci0000:00/0000:00:1a.0/usb1/1-1/1-1.5/1-1.5:1.0/input/input32749<br />
+7月 13 10:04:33 localhost.localdomain kernel: hid-generic 0003:046D:C077.7FEC: input,hidraw0: USB HID v1.11 Mouse [Logitech USB Optical Mouse] on usb-0000:00:1a.0-1.5/input0<br />
+7月 13 10:05:26 localhost.localdomain kernel: usb 1-1.5: USB disconnect, device number 13<br />
+7月 13 10:05:28 localhost.localdomain kernel: usb 1-1.5: new low-speed USB device number 14 using ehci-pci<br />
+7月 13 10:05:28 localhost.localdomain kernel: usb 1-1.5: New USB device found, idVendor=046d, idProduct=c077<br />
+7月 13 10:05:28 localhost.localdomain kernel: usb 1-1.5: New USB device strings: Mfr=1, Product=2, SerialNumber=0<br />
+7月 13 10:05:28 localhost.localdomain kernel: usb 1-1.5: Product: USB Optical Mouse<br />
+7月 13 10:05:28 localhost.localdomain kernel: usb 1-1.5: Manufacturer: Logitech<br />
+7月 13 10:05:28 localhost.localdomain kernel: input: Logitech USB Optical Mouse as /devices/pci0000:00/0000:00:1a.0/usb1/1-1/1-1.5/1-1.5:1.0/input/input32750<br />
+7月 13 10:05:28 localhost.localdomain kernel: hid-generic 0003:046D:C077.7FED: input,hidraw0: USB HID v1.11 Mouse [Logitech USB Optical Mouse] on usb-0000:00:1a.0-1.5/input0<br />
+&nbsp;</p>
+
+<p>&nbsp;</p>

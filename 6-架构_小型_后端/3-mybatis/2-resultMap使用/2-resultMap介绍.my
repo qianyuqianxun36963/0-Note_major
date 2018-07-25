@@ -1,0 +1,223 @@
+<h1><strong>Mybatis的介绍以及使用 -&nbsp;resultMap使用</strong></h1>
+
+<p><strong>resultMap是Mybatis最强大的元素，它可以将查询到的复杂数据（比如<strong>查询到</strong>几个表中数据）<strong>映射</strong>到一个结果集当中。</strong></p>
+
+<p><strong>resultMap包含的元素：</strong></p>
+
+<p>&nbsp;</p>
+
+<pre>
+&lt;!--column不做限制，可以为任意表的字段，而property须为type 定义的pojo属性--&gt;
+&lt;resultMap id=&quot;唯一的标识&quot; type=&quot;映射的pojo对象&quot;&gt;
+  &lt;id column=&quot;表的主键字段，或者可以为查询语句中的别名字段&quot; jdbcType=&quot;字段类型&quot; property=&quot;映射pojo对象的主键属性&quot; /&gt;
+  &lt;result column=&quot;表的一个字段（可以为任意表的一个字段）&quot; jdbcType=&quot;字段类型&quot; property=&quot;映射到pojo对象的一个属性（须为type定义的pojo对象中的一个属性）&quot;/&gt;
+  &lt;association property=&quot;pojo的一个对象属性&quot; javaType=&quot;pojo关联的pojo对象&quot;&gt;
+    &lt;id column=&quot;关联pojo对象对应表的主键字段&quot; jdbcType=&quot;字段类型&quot; property=&quot;关联pojo对象的主席属性&quot;/&gt;
+    &lt;result  column=&quot;任意表的字段&quot; jdbcType=&quot;字段类型&quot; property=&quot;关联pojo对象的属性&quot;/&gt;
+  &lt;/association&gt;
+  &lt;!-- 集合中的property须为oftype定义的pojo对象的属性--&gt;
+  &lt;collection property=&quot;pojo的集合属性&quot; ofType=&quot;集合中的pojo对象&quot;&gt;
+    &lt;id column=&quot;集合中pojo对象对应的表的主键字段&quot; jdbcType=&quot;字段类型&quot; property=&quot;集合中pojo对象的主键属性&quot; /&gt;
+    &lt;result column=&quot;可以为任意表的字段&quot; jdbcType=&quot;字段类型&quot; property=&quot;集合中的pojo对象的属性&quot; /&gt;  
+  &lt;/collection&gt;
+&lt;/resultMap&gt;</pre>
+
+<p>&nbsp;</p>
+
+<p><strong>如果collection标签是使用嵌套查询，格式如下：</strong></p>
+
+<pre>
+ &lt;collection column=&quot;传递给嵌套查询语句的字段参数&quot; property=&quot;pojo对象中集合属性&quot; ofType=&quot;集合属性中的pojo对象&quot; select=&quot;嵌套的查询语句&quot; &gt; 
+ &lt;/collection&gt;</pre>
+
+<p><strong><strong><strong>注意：&lt;collection&gt;标签中的column：要传递给select查询语句的参数，如果传递多个参数，格式为column= &rdquo; {参数名1=表字段1,参数名2=表字段2} ；</strong></strong></strong></p>
+
+<p>&nbsp;</p>
+
+<p><strong>以下以实例介绍resultMap的用法：</strong></p>
+
+<p>一、简单需求：一个商品的结果映射；</p>
+
+<p>1、创建商品pojo对象：</p>
+
+<p><a href="javascript:void(0);" onclick="copyCnblogsCode(this)" title="复制代码"><img alt="复制代码" src="https://common.cnblogs.com/images/copycode.gif" /></a></p>
+
+<pre>
+public class TShopSku  {
+    /**
+     * 主键ID
+     */
+    private Long id;
+
+    /**
+     * 商品名
+     */
+    private String skuName;
+
+    /**
+     * 分类ID
+     */
+    private Long categoryId;
+
+   
+    /**
+     * 主键ID
+     * @return ID 
+     */
+    public Long getId() {
+        return id;
+    }
+
+    /**
+     * 主键ID,
+     * @param id 
+     */
+    public void setId(Long id) {
+        this.id = id;
+    }
+
+    /**
+     * 商品名
+     * @return SKU_NAME 商品名
+     */
+    public String getSkuName() {
+        return skuName;
+    }
+
+    /**
+     * 商品名
+     * @param skuName 商品名
+     */
+    public void setSkuName(String skuName) {
+        this.skuName = skuName == null ? null : skuName.trim();
+    }
+
+    /**
+     * 分类ID
+     * @return CATEGORY_ID 分类ID
+     */
+    public Long getCategoryId() {
+        return categoryId;
+    }
+
+    /**
+     * 分类ID
+     * @param categoryId 分类ID
+     */
+    public void setCategoryId(Long categoryId) {
+        this.categoryId = categoryId;
+    }
+</pre>
+
+<p>&nbsp;</p>
+
+<p><strong>对应的resultMap：</strong></p>
+
+<pre>
+&lt;resultMap id=&quot;BaseResultMap&quot; type=&quot;com.meikai.shop.entity.TShopSku&quot;&gt;
+    &lt;id column=&quot;ID&quot; jdbcType=&quot;BIGINT&quot; property=&quot;id&quot; /&gt;
+    &lt;result column=&quot;SKU_NAME&quot; jdbcType=&quot;VARCHAR&quot; property=&quot;skuName&quot; /&gt;
+    &lt;result column=&quot;CATEGORY_ID&quot; jdbcType=&quot;BIGINT&quot; property=&quot;categoryId&quot; /&gt;
+&lt;/resultMap&gt;&nbsp;</pre>
+
+<p><strong>二、商品pojo类添加属性集合：</strong></p>
+
+<p>一个商品会有一些属性，现在需要将查询出的商品属性添加到商品对象中，首先需要在原商品pojo类的基础上中添加属性的集合：</p>
+
+<p>&nbsp;</p>
+
+<pre>
+    /**
+     * 属性集合
+     */
+    private List&lt;TShopAttribute&gt; attributes;
+   
+    /**
+     * 获得属性集合
+     */
+    public List&lt;TShopAttribute&gt; getAttributes() {
+        return attributes;
+    }
+    
+    /**
+     * 设置属性集合
+     * @param attributes
+     */
+     public void setAttributes(List&lt;TShopAttribute&gt; attributes) {
+        this.attributes = attributes;
+     }</pre>
+
+<p>&nbsp;</p>
+
+<p><strong>将Collection标签添加到resultMap中，这里有两种方式：</strong></p>
+
+<p><strong>1、嵌套结果：</strong></p>
+
+<p><strong>对应的resultMap：</strong></p>
+
+<p>&nbsp;</p>
+
+<pre>
+&lt;resultMap id=&quot;BasePlusResultMap&quot; type=&quot;com.meikai.shop.entity.TShopSku&quot;&gt;
+    &lt;id column=&quot;ID&quot; jdbcType=&quot;BIGINT&quot; property=&quot;id&quot; /&gt;
+    &lt;result column=&quot;SKU_NAME&quot; jdbcType=&quot;VARCHAR&quot; property=&quot;skuName&quot; /&gt;
+    &lt;result column=&quot;CATEGORY_ID&quot; jdbcType=&quot;BIGINT&quot; property=&quot;categoryId&quot; /&gt;
+    &lt;collection property=&quot;attributes&quot; ofType=&quot;com.meikai.shop.entity.TShopAttribute&quot; &gt; 
+        &lt;id column=&quot;AttributeID&quot; jdbcType=&quot;BIGINT&quot; property=&quot;id&quot; /&gt;
+        &lt;result column=&quot;attribute_NAME&quot; jdbcType=&quot;VARCHAR&quot; property=&quot;attributeName&quot; /&gt;
+    &lt;/collection&gt;
+&lt;/resultMap&gt;</pre>
+
+<p>&nbsp;</p>
+
+<p><strong>查询语句：</strong></p>
+
+<pre>
+&lt;select id=&quot;getById&quot;  resultMap=&quot;basePlusResultMap&quot;&gt;
+    select s.ID,s.SKU_NAME,s.CATEGORY_ID,a.ID,a.ATTRIBUTE_NAME
+    from t_shop_sku s,t_shop_attribute a 
+    where s.ID =a.SKU_ID and s.ID = #{id,jdbcType =BIGINT};
+&lt;/select&gt;</pre>
+
+<p>&nbsp;</p>
+
+<p><strong>2、关联的嵌套查询（<strong>在collection中添加select属性</strong>）：</strong></p>
+
+<p><strong><strong>商品结果集映射resultMap：</strong></strong></p>
+
+<pre>
+&lt;resultMap id=&quot;BasePlusResultMap&quot; type=&quot;com.meikai.shop.entity.TShopSku&quot;&gt;
+    &lt;id column=&quot;ID&quot; jdbcType=&quot;BIGINT&quot; property=&quot;id&quot; /&gt;
+    &lt;result column=&quot;SKU_NAME&quot; jdbcType=&quot;VARCHAR&quot; property=&quot;skuName&quot; /&gt;
+    &lt;result column=&quot;CATEGORY_ID&quot; jdbcType=&quot;BIGINT&quot; property=&quot;categoryId&quot; /&gt;
+    &lt;collection column=&quot;{skuId=ID}&quot; property=&quot;attributes&quot; ofType=&quot;com.meikai.shop.entity.TShopAttribute&quot; select=&quot;getAttribute&quot; &gt; 
+    &lt;/collection&gt;
+&lt;/resultMap&gt;</pre>
+
+<p><strong>collection的select会执行下面的查询属性语句：</strong></p>
+
+<pre>
+&lt;select id=&quot;getAttribute&quot;  resultMap=&quot;AttributeResultMap&quot;&gt;
+    select a.ID,s.ATTRIBUTE_NAME
+    from t_shop_attribute a
+    where  a.ID = #{skuId,jdbcType =BIGINT};
+&lt;/select&gt;</pre>
+
+<p>&nbsp;属性结果集映射：</p>
+
+<pre>
+&lt;resultMap id=&quot;AttributeResultMap&quot; type=&quot;com.meikai.shop.entity.TShopAttribute&quot;&gt;
+    &lt;id column=&quot;ID&quot; jdbcType=&quot;BIGINT&quot; property=&quot;id&quot; /&gt;
+    &lt;result column=&quot;ATTRIBUTE_NAME&quot; jdbcType=&quot;VARCHAR&quot; property=&quot;attributeName&quot; /&gt;
+&lt;/resultMap&gt;</pre>
+
+<p><strong><strong>BasePlusResultMap包含了属性查询语句的Collection</strong></strong></p>
+
+<p><strong>所以通过下面的查询商品语句就可获得商品以及其包含的属性集合</strong><strong>：</strong></p>
+
+<pre>
+&lt;select id=&quot;getById&quot;  resultMap=&quot;BasePlusResultMap&quot;&gt;
+    select s.ID,s.SKU_NAME,s.CATEGORY_ID
+    from t_shop_sku s
+    where  s.ID = #{id,jdbcType =BIGINT};
+&lt;/select&gt;</pre>
