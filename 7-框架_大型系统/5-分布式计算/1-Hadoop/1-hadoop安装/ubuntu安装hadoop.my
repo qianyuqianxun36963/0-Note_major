@@ -1,0 +1,297 @@
+<h1>ubuntu安装hadoop详细步骤</h1>
+
+<p>hadoop官方网站对其安装配置hadoop的步骤太粗略，在这篇博客中，我会详细介绍在ubuntu中如何安装hadoop，并处理可能出现的一些问题。这里介绍的方法是用一台机器虚拟多个节点，这个方法已在如下环境中测试通过：<br />
+OS: Ubuntu 13.10<br />
+Hadoop: 2.2.0 (2.x.x)<br />
+个人认为在其他版本上安装Hadoop 2.x.x的方法基本相同，因此如果严格按照我给的步骤，应该不会有问题。</p>
+
+<h2>前提</h2>
+
+<p>安装 jdk 和 openssh<br />
+$ sudo apt-get install openjdk-7-jdk<br />
+$ java -version<br />
+java version &quot;1.7.0_55&quot;<br />
+OpenJDK Runtime Environment (IcedTea 2.4.7) (7u55-2.4.7-1ubuntu1~0.13.10.1)<br />
+OpenJDK 64-Bit Server VM (build 24.51-b03, mixed mode)<br />
+$ sudo apt-get install openssh-server<br />
+openjdk的默认路径是 /usr/lib/jvm/java-7-openjdk-amd64. 如果你的默认路径和我的不同，请再后面的操作中替换此路径。</p>
+
+<h2>添加Hadoop用户组和用户</h2>
+
+<p>$ sudo addgroup hadoop<br />
+$ sudo adduser --ingroup hadoop hduser<br />
+$ sudo adduser hduser sudo<br />
+然后切换到hduser账户</p>
+
+<h2>配置SSH</h2>
+
+<p>现在你在hduser账户中。 请注意下面命令中 &#39;&#39; 是两个单引号 &lsquo;</p>
+
+<p>$ ssh-keygen -t rsa -P &#39;&#39;<br />
+将public key加入到authorized_keys中，这样hadoop在运行ssh时就不需要输入密码了</p>
+
+<p>$ cat ~/.ssh/id_rsa.pub &gt;&gt; ~/.ssh/authorized_keys<br />
+现在我们测试一下ssh</p>
+
+<p>$ ssh localhost</p>
+
+<p>如果你被询问是否确认连接，输入yes。如果你发现在即不需要输密码，cool -- 至少到目前位置你是正确的。否则，请debug。<br />
+$ exit<br />
+&nbsp;</p>
+
+<h2>下载Hadoop 2.2.0 (2.x.x)</h2>
+
+<p>$ cd ~<br />
+$ wget http://www.trieuvan.com/apache/hadoop/common/hadoop-2.2.0/hadoop-2.2.0.tar.gz<br />
+$ sudo tar -xzvf hadoop-2.2.0.tar.gz -C /usr/local<br />
+$ cd /usr/local<br />
+$ sudo mv hadoop-2.2.0 hadoop<br />
+$ sudo chown -R hduser:hadoop hadoop</p>
+
+<p>&nbsp;</p>
+
+<h2>配置Hadoop环境</h2>
+
+<p>$ cd ~<br />
+$ vim .bashrc<br />
+<br />
+将下面的内容复制到.bashrc中<br />
+#Hadoop variables<br />
+export JAVA_HOME=/usr/lib/jvm/java-7-openjdk-amd64<br />
+export HADOOP_INSTALL=/usr/local/hadoop<br />
+export PATH=$PATH:$HADOOP_INSTALL/bin<br />
+export PATH=$PATH:$HADOOP_INSTALL/sbin<br />
+export HADOOP_MAPRED_HOME=$HADOOP_INSTALL<br />
+export HADOOP_COMMON_HOME=$HADOOP_INSTALL<br />
+export HADOOP_HDFS_HOME=$HADOOP_INSTALL<br />
+export YARN_HOME=$HADOOP_INSTALL<br />
+###end of paste<br />
+<br />
+退出.bashrc</p>
+
+<p>$ cd /usr/local/hadoop/etc/hadoop<br />
+$ vim hadoop-env.sh</p>
+
+<p>&nbsp;</p>
+
+<p>将下面的三行加入到hadoop-env.sh中，删除原来的 &quot;export JAVA_HOME&quot;那行<br />
+# begin of paste<br />
+export JAVA_HOME=/usr/lib/jvm/java-7-openjdk-amd64/<br />
+export HADOOP_COMMON_LIB_NATIVE_DIR=&quot;/usr/local/hadoop/lib/native/&quot;<br />
+export HADOOP_OPTS=&quot;$HADOOP_OPTS -Djava.library.path=/usr/local/hadoop/lib/&quot;<br />
+### end of paste<br />
+<br />
+退出terminal再重新打开</p>
+
+<p>&nbsp;</p>
+
+<h2>配置Hadoop</h2>
+
+<p>$ cd /usr/local/hadoop/etc/hadoop<br />
+$ vim core-site.xml<br />
+将下面的内容复制到 &lt;configuration&gt; 标签内</p>
+
+<pre>
+
+&nbsp;</pre>
+
+<ol>
+	<li>
+	<p><code>&lt;property&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;name&gt;fs.default.name&lt;/name&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;value&gt;hdfs://localhost:9000&lt;/value&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;/property&gt;</code></p>
+	</li>
+</ol>
+
+<p>$ vim yarn-site.xml</p>
+
+<p>将下面的内容复制到 &lt;configuration&gt; 标签内</p>
+
+<pre>
+
+&nbsp;</pre>
+
+<ol>
+	<li>
+	<p><code>&lt;property&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;name&gt;yarn.nodemanager.aux-services&lt;/name&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;value&gt;mapreduce_shuffle&lt;/value&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;/property&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;property&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;name&gt;yarn.nodemanager.aux-services.mapreduce.shuffle.class&lt;/name&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;value&gt;org.apache.hadoop.mapred.ShuffleHandler&lt;/value&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;/property&gt;</code></p>
+	</li>
+</ol>
+
+<p>$ mv mapred-site.xml.template mapred-site.xml<br />
+$ vim mapred-site.xml</p>
+
+<p>将下面的内容复制到 &lt;configuration&gt; 标签内</p>
+
+<pre>
+
+&nbsp;</pre>
+
+<ol>
+	<li>
+	<p><code>&lt;property&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;name&gt;mapreduce.framework.name&lt;/name&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;value&gt;yarn&lt;/value&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;/property&gt;</code></p>
+	</li>
+</ol>
+
+<p>$ mkdir -p ~/mydata/hdfs/namenode<br />
+$ mkdir -p ~/mydata/hdfs/datanode<br />
+$ vim hdfs-site.xml</p>
+
+<p>将下面的内容复制到 &lt;configuration&gt; 标签内</p>
+
+<pre>
+
+&nbsp;</pre>
+
+<ol>
+	<li>
+	<p><code>&lt;property&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;name&gt;dfs.replication&lt;/name&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;value&gt;1&lt;/value&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;/property&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;property&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;name&gt;dfs.namenode.name.dir&lt;/name&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;value&gt;file:/home/hduser/mydata/hdfs/namenode&lt;/value&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;/property&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;property&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;name&gt;dfs.datanode.data.dir&lt;/name&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;value&gt;file:/home/hduser/mydata/hdfs/datanode&lt;/value&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;/property&gt;</code></p>
+	</li>
+</ol>
+
+<h2>格式化 namenode</h2>
+
+<p>第一次启动hadoop服务之前，必须执行格式化namenode</p>
+
+<p>$ hdfs namenode -format</p>
+
+<p>&nbsp;</p>
+
+<h2>启动服务</h2>
+
+<p>$ start-dfs.sh &amp;&amp; start-yarn.sh<br />
+使用jps查看服务</p>
+
+<p>$ jps</p>
+
+<p>如果一切顺利，你会看到：<br />
+17785 SecondaryNameNode<br />
+17436 NameNode<br />
+17591 DataNode<br />
+18096 NodeManager<br />
+17952 ResourceManager<br />
+23635 Jps<br />
+<br />
+当执行start-dfs.sh的时候，你可能会看到&nbsp;&nbsp;WARN util.NativeCodeLoader: Unable to load native-hadoop library for your platform... using builtin-java classes where applicable，不用担心，其实可以正常使用，我们会在trouble shooting那一节谈到这个问题。&nbsp;</p>
+
+<h2>测试并运行示例</h2>
+
+<p>$ cd /usr/local/hadoop<br />
+$ hadoop jar ./share/hadoop/mapreduce/hadoop-mapreduce-client-jobclient-2.2.0-tests.jar TestDFSIO -write -nrFiles 20 -fileSize 10<br />
+$ hadoop jar ./share/hadoop/mapreduce/hadoop-mapreduce-client-jobclient-2.2.0-tests.jar TestDFSIO -clean<br />
+$ hadoop jar ./share/hadoop/mapreduce/hadoop-mapreduce-examples-2.2.0.jar pi 2 5</p>
+
+<h2>网页界面</h2>
+
+<p>Cluster status: http://localhost:8088<br />
+HDFS status: http://localhost:50070<br />
+Secondary NameNode status: http://localhost:50090</p>
+
+<h2>Trouble-shooting</h2>
+
+<h3>1. Unable to load native-hadoop library for your platform.</h3>
+
+<p>这是一个警告，基本不会影响hadoop的使用，但是在之后我们还是给予解决这个warning的方法。通常来讲，出现这个warning的原因是你在64位的系统上，但是hadoop的package是为32位的机器编译的。在这种情况下，确认你不要忘记在hadoop-env.sh中加入这几行：</p>
+
+<p>export HADOOP_COMMON_LIB_NATIVE_DIR=&quot;/usr/local/hadoop/lib/native/&quot;<br />
+export HADOOP_OPTS=&quot;$HADOOP_OPTS -Djava.library.path=/usr/local/hadoop/lib/&quot;</p>
+
+<p>否则你的hadoop不能正常工作。如果你用的系统和hadoop的package相符(32位)，这两行是不必要的。<br />
+<br />
+我们不希望有warning，如何解决？方法是自己重新编译源代码。重新编译其实很简单：<br />
+安装 maven<br />
+$ sudo apt-get install maven<br />
+<br />
+安装 protobuf-2.5.0 or later<br />
+$ curl -# -O https://protobuf.googlecode.com/files/protobuf-2.5.0.tar.gz<br />
+$ tar -xzvf protobuf-2.5.0.tar.gz<br />
+$ cd protobuf-2.5.0<br />
+$ ./configure --prefix=/usr<br />
+$ make<br />
+$ sudo make install<br />
+$ cd ..<br />
+<br />
+现在并编译hadoop源代码，注意编译之前需要先给源代码打个补丁<br />
+$ wget http://www.eu.apache.org/dist/hadoop/common/stable/hadoop-2.2.0-src.tar.gz<br />
+$ tar -xzvf hadoop-2.2.0-src.tar.gz<br />
+$ cd hadoop-2.2.0-src<br />
+$ wget https://issues.apache.org/jira/secure/attachment/12614482/HADOOP-10110.patch<br />
+$ patch -p0 &lt; HADOOP-10110.patch<br />
+$ mvn package -Pdist,native -DskipTests -Dtar<br />
+<br />
+现在到 hadoop-dist/target/ 目录下, 你会看到 hadoop-2.2.0.tar.gz or hadoop-2.2.0, 他们就是编译后的hadoop包。 你可以使用自己编译的包，同样按照之前的步骤安装64位的hadoop。如果你已经安装了32位的hadoop，只需要替换 /usr/local/hadoop/lib/native 目录，然后将如下两行从hadoop-env.sh中移除即可：<br />
+export HADOOP_COMMON_LIB_NATIVE_DIR=&quot;/usr/local/hadoop/lib/native/&quot;<br />
+export HADOOP_OPTS=&quot;$HADOOP_OPTS -Djava.library.path=/usr/local/hadoop/lib/&quot;</p>
+
+<h3>2. datanode 不能被启动</h3>
+
+<p>一个常用的方法是先删掉datanode对应的文件夹试试，注意这样做可能会丢失你的数据。另一种方法是到&nbsp;/usr/local/hadoop/logs/hadoop-hduser-datanode-*.log 中检查原因并对症下药。</p>

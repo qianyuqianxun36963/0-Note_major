@@ -1,0 +1,467 @@
+<h1><a href="https://www.cnblogs.com/zengxiaoliang/p/6478859.html" id="cb_post_title_url">Hadoop2.7.3+Spark2.1.0完全分布式集群搭建过程</a></h1>
+
+<h2><strong>1.选取三台服务器（CentOS系统64位）</strong></h2>
+
+<p>　　114.55.246.88&nbsp;主节点</p>
+
+<p>　　114.55.246.77&nbsp;从节点</p>
+
+<p>　　114.55.246.93&nbsp;从节点</p>
+
+<p>&nbsp; &nbsp; &nbsp;之后的操作如果是用普通用户操作的话也必须知道root用户的密码，因为有些操作是得用root用户操作。如果是用root用户操作的话就不存在以上问题。</p>
+
+<p>　　我是用root用户操作的。</p>
+
+<h2><strong>2.修改hosts文件</strong></h2>
+
+<p>　　修改三台服务器的hosts文件。</p>
+
+<p>　　vi /etc/hosts</p>
+
+<p>　　在原文件的基础最后面加上：</p>
+
+<pre>
+114.55.246.88 Master
+114.55.246.77 Slave1
+114.55.246.93 Slave2</pre>
+
+<p>　　修改完成后保存执行如下命令。</p>
+
+<p>　　source /etc/hosts</p>
+
+<h2><strong>3.ssh无密码验证配置</strong></h2>
+
+<p>　　<strong>3.1安装和启动ssh协议</strong></p>
+
+<p>　　我们需要两个服务：ssh和rsync。</p>
+
+<p>　　可以通过下面命令查看是否已经安装：</p>
+
+<p>　　rpm -qa|grep openssh</p>
+
+<p>　　rpm -qa|grep rsync</p>
+
+<p>　　如果没有安装ssh和rsync，可以通过下面命令进行安装：</p>
+
+<p>　　yum install ssh&nbsp;（安装ssh协议）</p>
+
+<p>　　yum install rsync&nbsp;（rsync是一个远程数据同步工具，可通过LAN/WAN快速同步多台主机间的文件）</p>
+
+<p>　　service sshd restart&nbsp;（启动服务）</p>
+
+<p>　　<strong>3.2&nbsp;配置Master无密码登录所有Salve</strong></p>
+
+<p>　　配置Master节点，以下是在Master节点的配置操作。</p>
+
+<p>　　1）在Master节点上生成密码对，在Master节点上执行以下命令：</p>
+
+<p>　　ssh-keygen -t rsa -P &#39;&#39;</p>
+
+<p>　　生成的密钥对：id_rsa和id_rsa.pub，默认存储在&quot;/root/.ssh&quot;目录下。</p>
+
+<p>　　2）接着在Master节点上做如下配置，把id_rsa.pub追加到授权的key里面去。</p>
+
+<p>　　cat ~/.ssh/id_rsa.pub &gt;&gt; ~/.ssh/authorized_keys</p>
+
+<p>　　3）修改ssh配置文件&quot;/etc/ssh/sshd_config&quot;的下列内容，将以下内容的注释去掉：</p>
+
+<p>　　RSAAuthentication yes # 启用 RSA 认证</p>
+
+<p>　　PubkeyAuthentication yes # 启用公钥私钥配对认证方式</p>
+
+<p>　　AuthorizedKeysFile .ssh/authorized_keys # 公钥文件路径（和上面生成的文件同）</p>
+
+<p>　　4）重启ssh服务，才能使刚才设置有效。</p>
+
+<p>　　service sshd restart</p>
+
+<p>　　5）验证无密码登录本机是否成功。</p>
+
+<p>　　ssh localhost</p>
+
+<p>　　6）接下来的就是把公钥复制到所有的Slave机器上。使用下面的命令进行复制公钥：</p>
+
+<p>　　scp /root/.ssh/id_rsa.pub root@Slave1:/root/</p>
+
+<p>　　scp /root/.ssh/id_rsa.pub root@Slave2:/root/</p>
+
+<p>　　</p>
+
+<p>　　接着配置Slave节点，以下是在Slave1节点的配置操作。</p>
+
+<p>　　1）在&quot;/root/&quot;下创建&quot;.ssh&quot;文件夹，如果已经存在就不需要创建了。</p>
+
+<p>　　mkdir /root/.ssh</p>
+
+<p>　　2）将Master的公钥追加到Slave1的授权文件&quot;authorized_keys&quot;中去。</p>
+
+<p>　　cat /root/id_rsa.pub &gt;&gt; /root/.ssh/authorized_keys</p>
+
+<p>　　3）修改&quot;/etc/ssh/sshd_config&quot;，具体步骤参考前面Master设置的第3步和第4步。</p>
+
+<p>　　4）用Master使用ssh无密码登录Slave1</p>
+
+<p>　　ssh&nbsp;114.55.246.77</p>
+
+<p>　　5）把&quot;/root/&quot;目录下的&quot;id_rsa.pub&quot;文件删除掉。</p>
+
+<p>　　rm &ndash;r /root/id_rsa.pub</p>
+
+<p>　　重复上面的5个步骤把Slave2服务器进行相同的配置。</p>
+
+<p>　　<strong>3.3&nbsp;配置所有Slave无密码登录Master</strong></p>
+
+<p>　　以下是在Slave1节点的配置操作。</p>
+
+<p>　　1）创建&quot;Slave1&quot;自己的公钥和私钥，并把自己的公钥追加到&quot;authorized_keys&quot;文件中，执行下面命令：</p>
+
+<p>　　ssh-keygen -t rsa -P &#39;&#39;</p>
+
+<p>　　cat /root/.ssh/id_rsa.pub &gt;&gt; /root/.ssh/authorized_keys</p>
+
+<p>　　2）将Slave1节点的公钥&quot;id_rsa.pub&quot;复制到Master节点的&quot;/root/&quot;目录下。</p>
+
+<p>　　scp /root/.ssh/id_rsa.pub root@Master:/root/</p>
+
+<p>　　</p>
+
+<p>　　以下是在Master节点的配置操作。</p>
+
+<p>　　1）将Slave1的公钥追加到Master的授权文件&quot;authorized_keys&quot;中去。</p>
+
+<p>　　cat ~/id_rsa.pub &gt;&gt; ~/.ssh/authorized_keys</p>
+
+<p>　　2）删除Slave1复制过来的&quot;id_rsa.pub&quot;文件。</p>
+
+<p>　　rm &ndash;r /root/id_rsa.pub</p>
+
+<p>&nbsp;</p>
+
+<p>　　配置完成后测试从Slave1到Master无密码登录。</p>
+
+<p>　　ssh&nbsp;114.55.246.88</p>
+
+<p>　　按照上面的步骤把Slave2和Master之间建立起无密码登录。这样，Master能无密码验证登录每个Slave，每个Slave也能无密码验证登录到Master。</p>
+
+<h2><strong>4.安装基础环境（JAVA和SCALA环境）</strong></h2>
+
+<p>　　<strong>4.1&nbsp;Java1.8环境搭建</strong></p>
+
+<p>　　1）下载jdk-8u121-linux-x64.tar.gz解压</p>
+
+<p>　　tar -zxvf&nbsp;jdk-8u121-linux-x64.tar.gz</p>
+
+<p>　　2）添加Java环境变量，在/etc/profile中添加：</p>
+
+<pre>
+export JAVA_HOME=/usr/local/jdk1.8.0_121
+PATH=$JAVA_HOME/bin:$PATH
+CLASSPATH=.:$JAVA_HOME/lib/rt.jar
+export JAVA_HOME PATH CLASSPATH</pre>
+
+<p>　　3）保存后刷新配置</p>
+
+<p>　　source /etc/profile</p>
+
+<p>　　<strong>4.2&nbsp;Scala2.11.8环境搭建</strong></p>
+
+<p>　　1）下载scala安装包scala-2.11.8.rpm安装</p>
+
+<p>　　rpm -ivh&nbsp;scala-2.11.8.rpm</p>
+
+<p>　　2）添加Scala环境变量，在/etc/profile中添加：</p>
+
+<pre>
+export SCALA_HOME=/usr/share/scala
+export PATH=$SCALA_HOME/bin:$PATH</pre>
+
+<p>　　3）保存后刷新配置</p>
+
+<p>　　source /etc/profile</p>
+
+<h2><strong>5.Hadoop2.7.3完全分布式搭建</strong></h2>
+
+<p>　　以下是在Master节点操作：</p>
+
+<p>　　1）下载二进制包hadoop-2.7.3.tar.gz</p>
+
+<p>　　2）解压并移动到相应目录，我习惯将软件放到/opt目录下，命令如下：</p>
+
+<p>　　tar -zxvf hadoop-2.7.3.tar.gz</p>
+
+<p>　　mv hadoop-2.7.3 /opt</p>
+
+<p>　　3）修改相应的配置文件。</p>
+
+<p>　　修改/etc/profile，增加如下内容：</p>
+
+<p>&nbsp;</p>
+
+<pre>
+ export HADOOP_HOME=/opt/hadoop-2.7.3/
+ export PATH=$PATH:$HADOOP_HOME/bin
+ export PATH=$PATH:$HADOOP_HOME/sbin
+ export HADOOP_MAPRED_HOME=$HADOOP_HOME
+ export HADOOP_COMMON_HOME=$HADOOP_HOME
+ export HADOOP_HDFS_HOME=$HADOOP_HOME
+ export YARN_HOME=$HADOOP_HOME
+ export HADOOP_ROOT_LOGGER=INFO,console
+ export HADOOP_COMMON_LIB_NATIVE_DIR=$HADOOP_HOME/lib/native
+ export HADOOP_OPTS=&quot;-Djava.library.path=$HADOOP_HOME/lib&quot;</pre>
+
+<p>&nbsp;</p>
+
+<p>　　修改完成后执行：</p>
+
+<p>　　source /etc/profile</p>
+
+<p>&nbsp;</p>
+
+<p>　　修改$HADOOP_HOME/etc/hadoop/hadoop-env.sh，修改JAVA_HOME 如下：</p>
+
+<pre>
+  export JAVA_HOME=/usr/local/jdk1.8.0_121</pre>
+
+<p>　　</p>
+
+<p>　　修改$HADOOP_HOME/etc/hadoop/slaves，将原来的localhost删除，改成如下内容：</p>
+
+<pre>
+Slave1
+Slave2</pre>
+
+<p>　　</p>
+
+<p>　　修改$HADOOP_HOME/etc/hadoop/core-site.xml</p>
+
+<p>&nbsp;</p>
+
+<pre>
+&lt;configuration&gt;
+      &lt;property&gt;
+          &lt;name&gt;fs.defaultFS&lt;/name&gt;
+          &lt;value&gt;hdfs://Master:9000&lt;/value&gt;
+      &lt;/property&gt;
+      &lt;property&gt;
+         &lt;name&gt;io.file.buffer.size&lt;/name&gt;
+         &lt;value&gt;131072&lt;/value&gt;
+     &lt;/property&gt;
+     &lt;property&gt;
+          &lt;name&gt;hadoop.tmp.dir&lt;/name&gt;
+          &lt;value&gt;/opt/hadoop-2.7.3/tmp&lt;/value&gt;
+     &lt;/property&gt;
+&lt;/configuration&gt;</pre>
+
+<p>　　</p>
+
+<p>　　修改$HADOOP_HOME/etc/hadoop/hdfs-site.xml</p>
+
+<p>&nbsp;</p>
+
+<pre>
+&lt;configuration&gt;
+    &lt;property&gt;
+      &lt;name&gt;dfs.namenode.secondary.http-address&lt;/name&gt;
+      &lt;value&gt;Master:50090&lt;/value&gt;
+    &lt;/property&gt;
+    &lt;property&gt;
+      &lt;name&gt;dfs.replication&lt;/name&gt;
+      &lt;value&gt;2&lt;/value&gt;
+    &lt;/property&gt;
+    &lt;property&gt;
+      &lt;name&gt;dfs.namenode.name.dir&lt;/name&gt;
+      &lt;value&gt;file:/opt/hadoop-2.7.3/hdfs/name&lt;/value&gt;
+    &lt;/property&gt;
+    &lt;property&gt;
+      &lt;name&gt;dfs.datanode.data.dir&lt;/name&gt;
+      &lt;value&gt;file:/opt/hadoop-2.7.3/hdfs/data&lt;/value&gt;
+    &lt;/property&gt;
+&lt;/configuration&gt;</pre>
+
+<p>&nbsp;</p>
+
+<p>　　复制template，生成xml，命令如下：</p>
+
+<p>　　cp mapred-site.xml.template mapred-site.xml</p>
+
+<p>　　修改$HADOOP_HOME/etc/hadoop/mapred-site.xml</p>
+
+<p>&nbsp;</p>
+
+<pre>
+&lt;configuration&gt;
+ &lt;property&gt;
+    &lt;name&gt;mapreduce.framework.name&lt;/name&gt;
+    &lt;value&gt;yarn&lt;/value&gt;
+  &lt;/property&gt;
+  &lt;property&gt;
+          &lt;name&gt;mapreduce.jobhistory.address&lt;/name&gt;
+          &lt;value&gt;Master:10020&lt;/value&gt;
+  &lt;/property&gt;
+  &lt;property&gt;
+          &lt;name&gt;mapreduce.jobhistory.address&lt;/name&gt;
+          &lt;value&gt;Master:19888&lt;/value&gt;
+  &lt;/property&gt;
+&lt;/configuration&gt;</pre>
+
+<p>&nbsp;</p>
+
+<p>　　修改$HADOOP_HOME/etc/hadoop/yarn-site.xml</p>
+
+<p>&nbsp;</p>
+
+<pre>
+&lt;configuration&gt;
+     &lt;property&gt;
+         &lt;name&gt;yarn.nodemanager.aux-services&lt;/name&gt;
+         &lt;value&gt;mapreduce_shuffle&lt;/value&gt;
+     &lt;/property&gt;
+     &lt;property&gt;
+         &lt;name&gt;yarn.resourcemanager.address&lt;/name&gt;
+         &lt;value&gt;Master:8032&lt;/value&gt;
+     &lt;/property&gt;
+     &lt;property&gt;
+         &lt;name&gt;yarn.resourcemanager.scheduler.address&lt;/name&gt;
+         &lt;value&gt;Master:8030&lt;/value&gt;
+     &lt;/property&gt;
+     &lt;property&gt;
+         &lt;name&gt;yarn.resourcemanager.resource-tracker.address&lt;/name&gt;
+         &lt;value&gt;Master:8031&lt;/value&gt;
+     &lt;/property&gt;
+     &lt;property&gt;
+         &lt;name&gt;yarn.resourcemanager.admin.address&lt;/name&gt;
+         &lt;value&gt;Master:8033&lt;/value&gt;
+     &lt;/property&gt;
+     &lt;property&gt;
+         &lt;name&gt;yarn.resourcemanager.webapp.address&lt;/name&gt;
+         &lt;value&gt;Master:8088&lt;/value&gt;
+     &lt;/property&gt;
+&lt;/configuration&gt;</pre>
+
+<p>&nbsp;</p>
+
+<p>　　4）复制Master节点的hadoop文件夹到Slave1和Slave2上。</p>
+
+<p>　　scp -r /opt/hadoop-2.7.3 root@Slave1:/opt</p>
+
+<p>　　scp -r /opt/hadoop-2.7.3 root@Slave2:/opt</p>
+
+<p>&nbsp;</p>
+
+<p>　　5）在Slave1和Slave2上分别修改/etc/profile，过程同Master一样。</p>
+
+<p>　　6）在Master节点启动集群，启动之前格式化一下namenode：</p>
+
+<p>　　hadoop namenode -format</p>
+
+<p>　　启动：</p>
+
+<p>　　/opt/hadoop-2.7.3/sbin/start-all.sh</p>
+
+<p>　　至此hadoop的完全分布式环境搭建完毕。</p>
+
+<p>　　</p>
+
+<p>　　7）查看集群是否启动成功：</p>
+
+<p>　　jps</p>
+
+<p>　　Master显示：</p>
+
+<p>　　SecondaryNameNode</p>
+
+<p>　　ResourceManager</p>
+
+<p>　　NameNode</p>
+
+<p>　　</p>
+
+<p>　　Slave显示：</p>
+
+<p>　　NodeManager</p>
+
+<p>　　DataNode</p>
+
+<h2><strong>6.Spark2.1.0完全分布式环境搭建</strong></h2>
+
+<p>　　以下操作都在Master节点进行。</p>
+
+<p>　　1）下载二进制包spark-2.1.0-bin-hadoop2.7.tgz</p>
+
+<p>　　2）解压并移动到相应目录，命令如下：</p>
+
+<p>　　tar -zxvf&nbsp;spark-2.1.0-bin-hadoop2.7.tgz</p>
+
+<p>　　mv hadoop-2.7.3 /opt</p>
+
+<p>　　3）修改相应的配置文件。</p>
+
+<p>　　修改/etc/profie，增加如下内容：</p>
+
+<pre>
+export SPARK_HOME=/opt/spark-2.1.0-bin-hadoop2.7/
+export PATH=$PATH:$SPARK_HOME/bin</pre>
+
+<p>　　</p>
+
+<p>　　复制spark-env.sh.template成spark-env.sh</p>
+
+<p>　　cp spark-env.sh.template spark-env.sh</p>
+
+<p>　　修改$SPARK_HOME/conf/spark-env.sh，添加如下内容：</p>
+
+<p>&nbsp;</p>
+
+<pre>
+export JAVA_HOME=/usr/local/jdk1.8.0_121
+export SCALA_HOME=/usr/share/scala
+export HADOOP_HOME=/opt/hadoop-2.7.3
+export HADOOP_CONF_DIR=/opt/hadoop-2.7.3/etc/hadoop
+export SPARK_MASTER_IP=114.55.246.88
+export SPARK_MASTER_HOST=114.55.246.88
+export SPARK_LOCAL_IP=114.55.246.88
+export SPARK_WORKER_MEMORY=1g
+export SPARK_WORKER_CORES=2
+export SPARK_HOME=/opt/spark-2.1.0-bin-hadoop2.7
+export SPARK_DIST_CLASSPATH=$(/opt/hadoop-2.7.3/bin/hadoop classpath)</pre>
+
+<p>&nbsp;</p>
+
+<p>　　复制slaves.template成slaves</p>
+
+<p>　　cp slaves.template slaves</p>
+
+<p>　　修改$SPARK_HOME/conf/slaves，添加如下内容：</p>
+
+<pre>
+Master
+Slave1
+Slave2</pre>
+
+<p>　　4）将配置好的spark文件复制到Slave1和Slave2节点。</p>
+
+<p>　　scp /opt/spark-2.1.0-bin-hadoop2.7 root@Slave1:/opt</p>
+
+<p>&nbsp; &nbsp; &nbsp;&nbsp;scp /opt/spark-2.1.0-bin-hadoop2.7 root@Slave2:/opt</p>
+
+<p>　　5）修改Slave1和Slave2配置。</p>
+
+<p>　　在Slave1和Slave2上分别修改/etc/profile，增加Spark的配置，过程同Master一样。</p>
+
+<p>　　在Slave1和Slave2修改$SPARK_HOME/conf/spark-env.sh，将export SPARK_LOCAL_IP=114.55.246.88改成Slave1和Slave2对应节点的IP。</p>
+
+<p>　　6）在Master节点启动集群。</p>
+
+<p>　　/opt/spark-2.1.0-bin-hadoop2.7/sbin/start-all.sh</p>
+
+<p>　　7）查看集群是否启动成功：</p>
+
+<p>　　jps</p>
+
+<p>　　Master在Hadoop的基础上新增了：</p>
+
+<p>　　Master</p>
+
+<p>　　Slave在Hadoop的基础上新增了：</p>
+
+<p>　　Worker</p>

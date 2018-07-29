@@ -1,0 +1,446 @@
+<h1>ubuntu实际安装hadoop</h1>
+
+<h2>服务器功能规划</h2>
+
+<table>
+	<thead>
+		<tr>
+			<th>master</th>
+			<th>slaveA</th>
+			<th>slaveB</th>
+		</tr>
+	</thead>
+	<tbody>
+		<tr>
+			<td>NameNode</td>
+			<td>ResourceManage</td>
+			<td>&nbsp;</td>
+		</tr>
+		<tr>
+			<td>DataNode</td>
+			<td>DataNode</td>
+			<td>DataNode</td>
+		</tr>
+		<tr>
+			<td>NodeManager</td>
+			<td>NodeManager</td>
+			<td>NodeManager</td>
+		</tr>
+		<tr>
+			<td>HistoryServer</td>
+			<td>&nbsp;</td>
+			<td>SecondaryNameNode</td>
+		</tr>
+	</tbody>
+</table>
+
+<h2>安装前设置</h2>
+
+<p>在安装Hadoop之前，需要进入Linux环境下，连接Linux使用SSH(安全Shell)。按照下面提供的步骤设立Linux环境。</p>
+
+<h3>创建用户</h3>
+
+<p>在开始时，建议创建一个单独的用户Hadoop以从Unix文件系统隔离Hadoop文件系统。按照下面给出的步骤来创建用户：</p>
+
+<ul>
+	<li>使用&nbsp;&ldquo;su&rdquo;&nbsp;命令开启root&nbsp;.</li>
+	<li>创建用户从root帐户使用命令 &ldquo;useradd username&rdquo;.</li>
+	<li>现在，可以使用命令打开一个现有的用户帐户&ldquo;su username&rdquo;.</li>
+</ul>
+
+<p>打开Linux终端，输入以下命令来创建一个用户。</p>
+
+<pre>
+$ su 
+   password: 
+# useradd hadoop
+# passwd hadoop 
+   New passwd: [这里密码为 hadoop]
+   Retype new passwd</pre>
+
+<h3>创建目录</h3>
+
+<p>在home目录下新建目录hadoop，注意，用户属组都要为hadoop:hadoop</p>
+
+<p>mkdir /home/hadoop</p>
+
+<p>chown -R hadoop:hadoop /home/hadoop</p>
+
+<h2>SSH设置</h2>
+
+<h3>SSH安装</h3>
+
+<h4>安装软件</h4>
+
+<p>SSH分客户端openssh-client和openssh-server<br />
+如果你只是想登陆别的机器的SSH只需要安装openssh-client（ubuntu有默认安装，如果没有则sudo apt-get install openssh-client），如果要使本机开放SSH服务就需要安装openssh-server<br />
+sudo apt-get install openssh-server<br />
+然后确认sshserver是否启动了：<br />
+ps -e |grep ssh<br />
+如果看到sshd那说明ssh-server已经启动了。<br />
+如果没有则可以这样启动：sudo /etc/init.d/ssh start</p>
+
+<h4>修改配置</h4>
+
+<p>ssh-server配置文件位于/ etc/ssh/sshd_config，在这里可以定义SSH的服务端口，默认端口是22，你可以自己定义成其他端口号，如222。<br />
+然后重启SSH服务：<br />
+sudo /etc/init.d/ssh stop<br />
+sudo /etc/init.d/ssh start</p>
+
+<h4>SSH登录</h4>
+
+<p>然后使用以下方式登陆SSH：<br />
+ssh tuns@192.168.0.100 tuns为192.168.0.100机器上的用户，需要输入密码。<br />
+断开连接：exit</p>
+
+<p>SSH设置需要在集群上做不同的操作，如启动，停止，分布式守护shell操作。认证不同的Hadoop用户，需要一种用于Hadoop用户提供的公钥/私钥对，并用不同的用户共享。</p>
+
+<p>下面的命令用于生成使用SSH键值对。复制公钥形成 id_rsa.pub 到authorized_keys 文件中，并提供拥有者具有authorized_keys文件的读写权限。</p>
+
+<pre>
+$ ssh-keygen -t rsa 
+$ cat ~/.ssh/id_rsa.pub &gt;&gt; ~/.ssh/authorized_keys 
+$ chmod 0600 ~/.ssh/authorized_keys 
+</pre>
+
+<h3>设置SSH无密码登录</h3>
+
+<p>Hadoop集群中的各个机器间会相互地通过SSH访问，每次访问都输入密码是不现实的，所以要配置各个机器间的</p>
+
+<p>SSH是无密码登录的。</p>
+
+<p>1、 在master上生成公钥(这里以hadoop用户登录)</p>
+
+<pre>
+<code>hadoop# ssh-keygen -t rsa</code></pre>
+
+<p>一路回车，都设置为默认值，然后再当前用户的Home目录下的<code>.ssh</code>目录中会生成公钥文件<code>（id_rsa.pub）</code>和私钥文件<code>（id_rsa）</code>。</p>
+
+<p>2、 分发公钥</p>
+
+<pre>
+<code># ssh-copy-id hadoop@master
+# ssh-copy-id hadoop@slaveA
+# ssh-copy-id hadoop@slaveB</code></pre>
+
+<p><code>这里注意：ssh-copy-id 是将当前用户的公钥分发到指定机器上的指定用户。</code></p>
+
+<p><code>例如在master机器上，当前用户执行ssh-copy-id hadoop@slaveA。</code></p>
+
+<p><code>当前用户就能通过ssh hadoop@master用hadoop免密账号登录master。</code></p>
+
+<p>3、 设置slaveA、slaveB到其他机器的无密钥登录</p>
+
+<p>同样的在slaveA、slaveB上生成公钥和私钥后，将公钥分发到三台机器上。</p>
+
+<h2>IP地址配置</h2>
+
+<h3>修改本机ip地址</h3>
+
+<p>vi /etc/network/interfaces</p>
+
+<h3>修改本机主机名</h3>
+
+<p>vi /etc/hostname&nbsp; &nbsp; &nbsp;（分别设置为master，slaveA，slaveB）</p>
+
+<h3>配置主机名与ip的映射</h3>
+
+<p>vi /etc/hosts</p>
+
+<p>127.0.0.1 &nbsp; localhost<br />
+127.0.1.1 &nbsp; ubuntu<br />
+127.0.0.1&nbsp; &nbsp;master</p>
+
+<p>192.168.146.211 client<br />
+192.168.146.212 portal<br />
+192.168.146.219 file<br />
+192.168.146.201 serverA<br />
+192.168.146.202 serverB</p>
+
+<p>192.168.146.132 master<br />
+192.168.146.151 slaveA<br />
+192.168.146.152 slaveB<br />
+192.168.146.153 slaveC<br />
+192.168.146.154 slaveD<br />
+192.168.146.155 slaveE<br />
+192.168.146.156 slaveF</p>
+
+<p># The following lines are desirable for IPv6 capable hosts<br />
+::1 &nbsp; &nbsp; ip6-localhost ip6-loopback<br />
+fe00::0 ip6-localnet<br />
+ff00::0 ip6-mcastprefix<br />
+ff02::1 ip6-allnodes<br />
+ff02::2 ip6-allrouters</p>
+
+<h2>master上安装hadoop</h2>
+
+<h3>1、下载hadoop</h3>
+
+<p><a href="http://hadoop.apache.org/releases.html">官网下载页</a>&nbsp;在这里选择合适的版本，然后获取镜像地址，再使用wget下载安装包</p>
+
+<p><strong>wget&nbsp;http://mirrors.hust.edu.cn/apache/hadoop/common/hadoop-3.0.3/hadoop-3.0.3.tar.gz</strong></p>
+
+<h3>2、解压Hadoop</h3>
+
+<pre>
+<code>[hadoop]$ tar -zxf /usr/all/nfs/share/hadoop-3.0.3.tar.gz -C <strong>/home/hadoop/soft</strong></code></pre>
+
+<p><strong><span style="font-family:monospace">注意，这里目标位置在主从的几个机器上最好一致。不然报错，暂时不知怎么解决。</span></strong></p>
+
+<h3>3、配置hadoop相关脚本里面的JDK</h3>
+
+<p>进入hadoop安装目录下，配置Hadoop JDK路径修改hadoop-env.sh、mapred-env.sh、yarn-env.sh文件中的JDK路径：</p>
+
+<p>[hadoop]$ vi etc/hadoop/hadoop-env.sh<br />
+[hadoop]$ vi etc/hadoop/mapred-env.sh<br />
+[hadoop]$ vi&nbsp;etc/hadoop/yarn-env.sh</p>
+
+<p>添加下面这句</p>
+
+<p><code>export JAVA_HOME=/usr/master/a_run/a_envir/java/jdk1.8</code></p>
+
+<h3>4、修改配置文件</h3>
+
+<p>配置core-site.xml</p>
+
+<pre>
+<code>[hadoop]$ vi etc/hadoop/core-site.xml
+&lt;configuration&gt;
+&nbsp;&lt;property&gt;
+&nbsp; &nbsp;&lt;name&gt;fs.defaultFS&lt;/name&gt;
+&nbsp; &nbsp;&lt;value&gt;hdfs://master:8020&lt;/value&gt;
+&nbsp;&lt;/property&gt;
+&nbsp;&lt;property&gt;
+&nbsp; &nbsp;&lt;name&gt;hadoop.tmp.dir&lt;/name&gt;
+&nbsp; &nbsp;&lt;value&gt;/home/hadoop/data/tmp&lt;/value&gt;
+&nbsp;&lt;/property&gt;
+&lt;/configuration&gt;</code>
+
+</pre>
+
+<p>fs.defaultFS为NameNode的地址。</p>
+
+<p>hadoop.tmp.dir为hadoop临时目录的地址，默认情况下，NameNode和DataNode的数据文件都会存在这个目录下的对应子目录下。应该保证此目录是存在的，如果不存在，先创建。</p>
+
+<p>配置hdfs-site.xml</p>
+
+<pre>
+<code>[hadoop]$ vi etc/hadoop/hdfs-site.xml</code></pre>
+
+<pre>
+<code>&lt;configuration&gt;
+&nbsp;&lt;property&gt;
+&nbsp; &nbsp;&lt;name&gt;dfs.namenode.secondary.http-address&lt;/name&gt;
+&nbsp; &nbsp;&lt;value&gt;slaveB:50090&lt;/value&gt;
+&nbsp;&lt;/property&gt;
+&lt;/configuration&gt;</code>
+</pre>
+
+<p>dfs.namenode.secondary.http-address是指定secondaryNameNode的http访问地址和端口号，因为在规划中，我们将slaveB规划为SecondaryNameNode服务器。</p>
+
+<p>所以这里设置为：<code>slaveB:50090</code></p>
+
+<p>10、 配置slaves</p>
+
+<pre>
+<code>[hadoop]$ vi etc/hadoop/slaves
+master
+slaveA
+slaveB</code>
+</pre>
+
+<p>slaves文件是指定HDFS上有哪些DataNode节点。</p>
+
+<p>11、 配置yarn-site.xml</p>
+
+<pre>
+<code>[hadoop]$ vi etc/hadoop/yarn-site.xml</code></pre>
+
+<pre>
+<code>&nbsp; &nbsp; &lt;property&gt;
+&nbsp; &nbsp; &nbsp; &nbsp; &lt;name&gt;yarn.nodemanager.aux-services&lt;/name&gt;
+&nbsp; &nbsp; &nbsp; &nbsp; &lt;value&gt;mapreduce_shuffle&lt;/value&gt;
+&nbsp; &nbsp; &lt;/property&gt;
+&nbsp; &nbsp; &lt;property&gt;
+&nbsp; &nbsp; &nbsp; &nbsp; &lt;name&gt;yarn.resourcemanager.hostname&lt;/name&gt;
+&nbsp; &nbsp; &nbsp; &nbsp; &lt;value&gt;slaveA&lt;/value&gt;
+&nbsp; &nbsp; &lt;/property&gt;
+&nbsp; &nbsp; &lt;property&gt;
+&nbsp; &nbsp; &nbsp; &nbsp; &lt;name&gt;yarn.log-aggregation-enable&lt;/name&gt;
+&nbsp; &nbsp; &nbsp; &nbsp; &lt;value&gt;true&lt;/value&gt;
+&nbsp; &nbsp; &lt;/property&gt;
+&nbsp; &nbsp; &lt;property&gt;
+&nbsp; &nbsp; &nbsp; &nbsp; &lt;name&gt;yarn.log-aggregation.retain-seconds&lt;/name&gt;
+&nbsp; &nbsp; &nbsp; &nbsp; &lt;value&gt;106800&lt;/value&gt;
+&nbsp; &nbsp; &lt;/property&gt;</code>
+</pre>
+
+<p>根据规划<code>yarn.resourcemanager.hostname</code>这个指定resourcemanager服务器指向<code>slaveA</code>。</p>
+
+<p><code>yarn.log-aggregation-enable</code>是配置是否启用日志聚集功能。</p>
+
+<p><code>yarn.log-aggregation.retain-seconds</code>是配置聚集的日志在HDFS上最多保存多长时间。</p>
+
+<p>12、 配置mapred-site.xml</p>
+
+<p>从mapred-site.xml.template复制一个mapred-site.xml文件。</p>
+
+<pre>
+<code>[hadoop]$ cp etc/hadoop/mapred-site.xml.template etc/hadoop/mapred-site.xml</code></pre>
+
+<pre>
+<code>&lt;configuration&gt;
+    &lt;property&gt;
+        &lt;name&gt;mapreduce.framework.name&lt;/name&gt;
+        &lt;value&gt;yarn&lt;/value&gt;
+    &lt;/property&gt;
+    &lt;property&gt;
+        &lt;name&gt;mapreduce.jobhistory.address&lt;/name&gt;
+        &lt;value&gt;master:10020&lt;/value&gt;
+    &lt;/property&gt;
+    &lt;property&gt;
+        &lt;name&gt;mapreduce.jobhistory.webapp.address&lt;/name&gt;
+        &lt;value&gt;master:19888&lt;/value&gt;
+    &lt;/property&gt;
+&lt;/configuration&gt;</code></pre>
+
+<p>mapreduce.framework.name设置mapreduce任务运行在yarn上。</p>
+
+<p>mapreduce.jobhistory.address是设置mapreduce的历史服务器安装在master机器上。</p>
+
+<p>mapreduce.jobhistory.webapp.address是设置历史服务器的web页面地址和端口号。</p>
+
+<h2>slave上安装hadoop</h2>
+
+<p>首先，在slave机器上设置好目录。</p>
+
+<p>mkdir /home/hadoop</p>
+
+<p>chown -R hadoop:hadoop /home/hadoop</p>
+
+<p>复制Master节点的hadoop文件夹到SlaveA和SlaveB上。下面的s大写，不知道为毛。</p>
+
+<p>scp -r /home/hadoop hadoop@<strong>SlaveA</strong>:/home</p>
+
+<p>scp -r /home/hadoop&nbsp;hadoop@<strong>SlaveB</strong>:/home</p>
+
+<p>如果有部分文件需传输，可参考下面</p>
+
+<p>scp -r /home/hadoop/soft/hadoop-3.0.3/etc hadoop@SlaveA:/home/hadoop/soft/hadoop-3.0.3<br />
+scp -r /home/hadoop/soft/hadoop-3.0.3/etc hadoop@SlaveB:/home/hadoop/soft/hadoop-3.0.3</p>
+
+<h2>格式NameNode</h2>
+
+<p>注意，这里几台机子都是NameNode，所有都要执行！！</p>
+
+<p>在NameNode机器上执行格式化：</p>
+
+<pre>
+<code>[hadoop]$ </code>/home/hadoop/soft/hadoop-3.0.3<code>/bin/hdfs namenode &ndash;format</code></pre>
+
+<p>注意：</p>
+
+<p>如果需要重新格式化NameNode,需要先将原来NameNode和DataNode下的文件全部删除，不然会报错，NameNode和DataNode所在目录是在<code>core-site.xml</code>中<code>hadoop.tmp.dir</code>、<code>dfs.namenode.name.dir</code>、<code>dfs.datanode.data.dir</code>属性配置的。</p>
+
+<pre>
+<code>&lt;property&gt;
+     &lt;name&gt;hadoop.tmp.dir&lt;/name&gt;
+     &lt;value&gt;/home/hadoop/data/tmp&lt;/value&gt;
+  &lt;/property&gt;
+&lt;property&gt;
+     &lt;name&gt;dfs.namenode.name.dir&lt;/name&gt;
+     &lt;value&gt;file://${hadoop.tmp.dir}/dfs/name&lt;/value&gt;
+  &lt;/property&gt;
+&lt;property&gt;
+     &lt;name&gt;dfs.datanode.data.dir&lt;/name&gt;
+     &lt;value&gt;file://${hadoop.tmp.dir}/dfs/data&lt;/value&gt;
+  &lt;/property&gt;</code></pre>
+
+<p>因为每次格式化，默认是创建一个集群ID，并写入NameNode和DataNode的VERSION文件中（VERSION文件所在目录为dfs/name/current 和 dfs/data/current），重新格式化时，默认会生成一个新的集群ID,如果不删除原来的目录，会导致namenode中的VERSION文件中是新的集群ID,而DataNode中是旧的集群ID，不一致时会报错。</p>
+
+<p>另一种方法是格式化时指定集群ID参数，指定为旧的集群ID。</p>
+
+<h2>启动集群</h2>
+
+<p>1、 启动HDFS</p>
+
+<pre>
+<code>[hadoop]$ /home/hadoop/soft/hadoop-3.0.3/sbin/start-dfs.sh</code></pre>
+
+<p><code>这里我有点不懂，为什么不是在master上启动一下，然后所以slave都启动了吗。。我一个一个启动的。不然slave上的datanode起不来，为何？</code></p>
+
+<p><img alt="enter image description here" src="http://images.gitbook.cn/7c4619c0-5cbe-11e7-8ca5-edc6aa6f5290" style="height:270px; width:800px" title="" /></p>
+
+<p>2、 启动YARN</p>
+
+<pre>
+<code>[hadoop]$ /home/hadoop/soft/hadoop-3.0.3/sbin/start-yarn.sh</code></pre>
+
+<p>在slaveA上启动ResourceManager:</p>
+
+<pre>
+<code>[hadoop@slaveA]$ /home/hadoop/soft/hadoop-3.0.3/sbin/yarn-daemon.sh start resourcemanager</code></pre>
+
+<p><img alt="enter image description here" src="http://images.gitbook.cn/98a56fd0-5cbe-11e7-8ca5-edc6aa6f5290" style="height:163px; width:800px" title="" /></p>
+
+<p>3、 启动日志服务器</p>
+
+<p>因为我们规划的是在slaveB服务器上运行MapReduce日志服务，所以要在slaveB上启动。</p>
+
+<pre>
+<code>[hadoop@slaveB]$ /home/hadoop/soft/hadoop-3.0.3/sbin/mr-jobhistory-daemon.sh start historyserver
+starting historyserver, logging to /opt/modules/app/hadoop-2.5.0/logs/mapred-hadoop-historyserver-slaveB.out</code></pre>
+
+<pre>
+<code>[hadoop@slaveB]$ jps
+3570 Jps
+3537 JobHistoryServer
+3310 SecondaryNameNode
+3213 DataNode
+3392 NodeManager</code></pre>
+
+<p>4、 查看HDFS Web页面</p>
+
+<p><a href="http://master:50070/" target="_blank">http://master:50070/</a></p>
+
+<p>5、 查看YARN Web 页面</p>
+
+<p><a href="http://slaveA:8088/cluster" target="_blank">http://slaveA:8088/cluster</a></p>
+
+<h2>测试Job</h2>
+
+<p>我们这里用hadoop自带的wordcount例子来在本地模式下测试跑mapreduce。</p>
+
+<p>1、 准备mapreduce输入文件wc.input</p>
+
+<pre>
+<code>[hadoop@bigdata-senior01 modules]$ cat /opt/data/wc.input
+hadoop mapreduce hive
+hbase spark storm
+sqoop hadoop hive
+spark hadoop</code></pre>
+
+<p>2、 在HDFS创建输入目录input</p>
+
+<pre>
+<code>[hadoop@bigdata-senior01 hadoop-2.5.0]$ bin/hdfs dfs -mkdir /input</code></pre>
+
+<p>3、 将wc.input上传到HDFS</p>
+
+<pre>
+<code>[hadoop@bigdata-senior01 hadoop-2.5.0]$ bin/hdfs dfs -put /opt/data/wc.input /input/wc.input</code></pre>
+
+<p>4、 运行hadoop自带的mapreduce Demo</p>
+
+<pre>
+<code>[hadoop@bigdata-senior01 hadoop-2.5.0]$ bin/yarn jar share/hadoop/mapreduce/hadoop-mapreduce-examples-2.5.0.jar wordcount /input/wc.input /output</code></pre>
+
+<p><img alt="enter image description here" src="http://images.gitbook.cn/a5cbfbc0-5cbe-11e7-8185-21ba04c77532" style="height:298px; width:800px" title="" /></p>
+
+<p>5、 查看输出文件</p>
+
+<pre>
+<code>[hadoop@bigdata-senior01 hadoop-2.5.0]$ bin/hdfs dfs -ls /output
+Found 2 items
+-rw-r--r--   3 hadoop supergroup          0 2016-07-14 16:36 /output/_SUCCESS
+-rw-r--r--   3 hadoop supergroup         60 2016-07-14 16:36 /output/part-r-00000</code></pre>

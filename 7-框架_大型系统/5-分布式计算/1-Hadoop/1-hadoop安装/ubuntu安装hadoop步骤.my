@@ -1,0 +1,196 @@
+<h1>Ubuntu下安装Hadoop（完全分布模式）</h1>
+
+<h2>一.前言</h2>
+
+<p><a href="http://www.linuxidc.com/topicnews.aspx?tid=13" target="_blank" title="Hadoop">Hadoop</a>的安装模式主要有三种：单机模式，伪分布模式和集群模式。单机模式和伪分布模式的安装配置请参考上文<a href="http://blog.csdn.net/shengmingqijiquan/article/details/52775161">Ubuntu下安装Hadoop（单机模式+伪分布模式）</a>，真正使用时使用的是hadoop的集群模式。&nbsp;<br />
+本文主要讲解在Linux环境下hadoop集群模式的安装和配置。</p>
+
+<h2>二.安装步骤</h2>
+
+<p><strong>1.在虚拟机中安装三个Linux虚拟机</strong></p>
+
+<blockquote>
+<p>主机名分别为Master,Slaver1.Slaver2,即一个主节点，两个从节点。上网方式均选择NAT方式。三者对应的IP地址分别为&nbsp;<br />
+【Master 192.168.209.128】，【Slaver1 192.168.209.129】，【Slaver2 192.168.209.130】。</p>
+</blockquote>
+
+<p><strong>2.为三个主机安装SSH服务，配置SSH免密码登录。</strong>【SSH是三个节点间通信的协议】</p>
+
+<p><strong>3.安装JDK并配置环境变量</strong>&nbsp;。</p>
+
+<p><strong>4.更改主机名和IP映射信息，编辑/etc/hoatname和/etc/hosts</strong></p>
+
+<p><strong>5.安装hadoop并配置环境变量</strong></p>
+
+<p><strong>6.修改hadoop的配置文件</strong></p>
+
+<p><strong>7.运行实例并测试</strong></p>
+
+<hr />
+<h2>三.开始安装和配置</h2>
+
+<h3>1.安装SSH，配置SSH免密码登录（以Master为例）</h3>
+
+<pre>
+<code>hadoop@Master：~$ sudo apt-get install openssh-server     # 安装SSH
+hadoop@Master：~$ ssh localhost                           # 用SSH登录本机测试
+hadoop@Master：~$ exit                                    # 退出刚才的 ssh localhost
+hadoop@Master：~$ cd ~/.ssh/                              # 若没有该目录，请先执行一次ssh localhost
+hadoop@Master：~$ ssh-keygen -t rsa                       # 生成公钥和私钥文件。会有提示，都按回车就可以
+hadoop@Master：~$ cat ./id_rsa.pub &gt;&gt; ./authorized_keys   # 将公钥文件追加到授权文件中，获得免密功能。
+</code></pre>
+
+<h3>2.安装JDK，配置环境变量。</h3>
+
+<pre>
+<code>hadoop@Master：~$ sudo apt-get install openjdk-8-jdk       #默认安装路径为/usr/lib/jvm/java-8-openjdk-amd64
+hadoop@Master：~$ vim ~/.bashrc                            # 加入export JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
+hadoop@Master：~$ source ~/.bashrc                         # 使环境变量设置生效
+hadoop@Master：~$ java -version                            #检查环境配置
+</code></pre>
+
+<h3>3.更改主机名和IP映射信息</h3>
+
+<pre>
+<code>hadoop@Master：~$ sudo vim /etc/hostname                   # hostname修改为Master
+hadoop@Master：~$ sudo vim /etc/hosts                      # hosts中修改为192.168.209.128 Master 192.168.209.129 Slave1 192.168.209.130 Slave2
+hadoop@Master：~$ ping Master -c 3                         # ping连接测试</code></pre>
+
+<h3>4.安装hadoop并配置环境变量</h3>
+
+<pre>
+<code>hadoop@Master：~$ vim ~/.bashrc                            #加入export PATH=$PATH:/usr/local/hadoop/bin:/usr/local/hadoop/sbin
+hadoop@Master：~$ source ~/.bashrc</code></pre>
+
+<h3>5.修改hadoop的配置文件/etc/hadoop</h3>
+
+<ul>
+	<li>slaves</li>
+</ul>
+
+<p>文件 slaves，将作为 DataNode 的主机名写入该文件，每行一个，默认为 localhost，所以在伪分布式配置时，节点即作为 NameNode 也作为 DataNode。分布式配置可以保留 localhost，也可以删掉，让 Master 节点仅作为 NameNode 使用。</p>
+
+<p>本教程让 Master 节点仅作为 NameNode 使用，因此将文件中原来的 localhost 删除，添加两行内容：Slave1 Slaver2。</p>
+
+<ul>
+	<li>core-site.xml</li>
+</ul>
+
+<pre>
+<code>&lt;configuration&gt;
+        &lt;property&gt;
+                &lt;name&gt;fs.defaultFS&lt;/name&gt;
+                &lt;value&gt;hdfs://Master:9000&lt;/value&gt;
+        &lt;/property&gt;
+        &lt;property&gt;
+                &lt;name&gt;hadoop.tmp.dir&lt;/name&gt;
+                &lt;value&gt;file:/usr/local/hadoop/tmp&lt;/value&gt;
+                &lt;description&gt;Abase for other temporary directories.&lt;/description&gt;
+        &lt;/property&gt;
+&lt;/configuration&gt;
+</code></pre>
+
+<ul>
+	<li>hdfs-site.xml</li>
+</ul>
+
+<p>dfs.replication 一般设为 3，我们有个数据节点，所以dfs.replication 的值还是设为2：</p>
+
+<pre>
+<code>&lt;configuration&gt;
+        &lt;property&gt;
+                &lt;name&gt;dfs.namenode.secondary.http-address&lt;/name&gt;
+                &lt;value&gt;Master:50090&lt;/value&gt;
+        &lt;/property&gt;
+        &lt;property&gt;
+                &lt;name&gt;dfs.replication&lt;/name&gt;
+                &lt;value&gt;1&lt;/value&gt;
+        &lt;/property&gt;
+        &lt;property&gt;
+                &lt;name&gt;dfs.namenode.name.dir&lt;/name&gt;
+                &lt;value&gt;file:/usr/local/hadoop/tmp/dfs/name&lt;/value&gt;
+        &lt;/property&gt;
+        &lt;property&gt;
+                &lt;name&gt;dfs.datanode.data.dir&lt;/name&gt;
+                &lt;value&gt;file:/usr/local/hadoop/tmp/dfs/data&lt;/value&gt;
+        &lt;/property&gt;
+&lt;/configuration&gt;
+</code></pre>
+
+<ul>
+	<li>mapred-site.xml</li>
+</ul>
+
+<p>可能需要先重命名，默认文件名为 mapred-site.xml.template</p>
+
+<pre>
+<code>&lt;configuration&gt;
+        &lt;property&gt;
+                &lt;name&gt;mapreduce.framework.name&lt;/name&gt;
+                &lt;value&gt;yarn&lt;/value&gt;
+        &lt;/property&gt;
+        &lt;property&gt;
+                &lt;name&gt;mapreduce.jobhistory.address&lt;/name&gt;
+                &lt;value&gt;Master:10020&lt;/value&gt;
+        &lt;/property&gt;
+        &lt;property&gt;
+                &lt;name&gt;mapreduce.jobhistory.webapp.address&lt;/name&gt;
+                &lt;value&gt;Master:19888&lt;/value&gt;
+        &lt;/property&gt;
+&lt;/configuration&gt;
+</code></pre>
+
+<ul>
+	<li>yarn-site.xml</li>
+</ul>
+
+<pre>
+<code>&lt;configuration&gt;
+        &lt;property&gt;
+                &lt;name&gt;yarn.resourcemanager.hostname&lt;/name&gt;
+                &lt;value&gt;Master&lt;/value&gt;
+        &lt;/property&gt;
+        &lt;property&gt;
+                &lt;name&gt;yarn.nodemanager.aux-services&lt;/name&gt;
+                &lt;value&gt;mapreduce_shuffle&lt;/value&gt;
+        &lt;/property&gt;
+&lt;/configuration&gt;
+</code></pre>
+
+<h3>6.在Master节点启动hadoop</h3>
+
+<pre>
+<code>hadoop@Master：~$ start-dfs.sh
+hadoop@Master：~$ start-yarn.sh
+hadoop@Master：~$ mr-jobhistory-daemon.sh start historyserver
+hadoop@Master：~$ jps</code></pre>
+
+<p>最终结果：</p>
+
+<p>1.HDFS的守护进程</p>
+
+<p>主节点：Namenode、SecondaryNamenode</p>
+
+<p>从节点：Datanode</p>
+
+<p>2.YARN的守护进程</p>
+
+<p>主节点：ResourceManager</p>
+
+<p>从节点：NodeManager</p>
+
+<h3>Hadoop安装配置中的权限管理</h3>
+
+<p>1.添加一个hadoop组<br />
+sudo addgroup hadoop2.将当前用户hadoop加入到Hadoop组<br />
+sudo usermod -a -G hadoop hadoop</p>
+
+<p>3.将hadoop组加入到sudoer<br />
+sudo gedit etc/sudoers<br />
+在root ALL=(ALL) ALL后 hadoop ALL=(ALL) ALL</p>
+
+<p>4.修改hadoop目录的权限<br />
+sudo chown -R hadoop:hadoop /usr/local/hadoop&lt;所有者：组 文件&gt;</p>
+
+<p>5.修改hdfs的权限<br />
+sudo chmod -R 755 /usr/local/hadoop</p>
