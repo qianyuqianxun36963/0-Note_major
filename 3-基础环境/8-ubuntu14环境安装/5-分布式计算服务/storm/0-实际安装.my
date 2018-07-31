@@ -1,0 +1,837 @@
+<h1>storm 实际安装</h1>
+
+<h1>搭建storm集群</h1>
+
+<p>搭建storm集群<br />
+系统centos7<br />
+<br />
+1、安装Java jdk &nbsp;1.7<br />
+2、安装zookeeper 3.4.8<br />
+3、安装Python2.7X<br />
+4、安装storm0.9<br />
+5、安装git<br />
+6、安装maven<br />
+<br />
+所有安装包，等会我会打包上传，地址会放到最后，大家需要可以下载<br />
+<br />
+<br />
+1、安装jdk很简单<br />
+下载jdk压缩包<br />
+解压压缩包 ，我的安装目录是/software/<br />
+在etc/profile中加入环境变量<br />
+JAVA_HOME=/software/jdk1.7.0_80<br />
+PATH=$JAVA_HOME//bin:$PATH<br />
+CLASSPATH=$JAVA_HOME/jre/lib/ext:$JAVA_HOME/lib.tools.jar<br />
+<br />
+<br />
+验证是否安装成功<br />
+[root@slave2 software]# java -version<br />
+java version &quot;1.7.0_80&quot;<br />
+Java(TM) SE Runtime Environment (build 1.7.0_80-b15)<br />
+Java HotSpot(TM) 64-Bit Server VM (build 24.80-b11, mixed mode)<br />
+[root@slave2 software]# javac -version<br />
+javac 1.7.0_80<br />
+[root@slave2 software]#<br />
+<br />
+<br />
+2、安装zookeeper集群<br />
+下载解压，同样我的安装目录是/software/<br />
+<br />
+<br />
+准备工作，准备三台机子，我的都是centos7，分别获取IP地址，然后设置主机名<br />
+在/etc/hostname中修改为你的主机名<br />
+我的分别改为了<br />
+192.168.52.142主机名为centos<br />
+192.168.52.145主机名为slave1<br />
+192.168.52.146主机名为slave2<br />
+<br />
+<br />
+分别每台机子的/etc/hosts中加入<br />
+192.168.52.142 &nbsp;centos<br />
+192.168.52.145 &nbsp;slave1<br />
+192.168.52.146 &nbsp;slave2<br />
+<br />
+<br />
+进入zookeeper安装目录的conf下<br />
+创建zoo.cfg配置文件<br />
+可以复制zoo_sample.cfg得到zoo.cfg<br />
+编辑这个文件<br />
+<br />
+<br />
+tickTime=2000<br />
+initLimit=10<br />
+syncLimit=5<br />
+dataDir=/software/zookeeper-3.4.8/data<br />
+clientPort=2181<br />
+server.1=centos:8880:7770<br />
+server.2=slave1:8881:7771<br />
+server.3=slave2:8882:7772<br />
+<br />
+<br />
+创建zookeeper存放数据的目录 &nbsp; /software/zookeeper-3.4.8/data目录<br />
+进入 /software/zookeeper-3.4.8目录，创建<br />
+mkdir data<br />
+<br />
+<br />
+把刚刚安装的zookeeper-3.4.8复制到另外两台机子的/software/下<br />
+scp -rp zookeeper-3.4.8 root@slave1:/software<br />
+scp -rp zookeeper-3.4.8 root@slave1:/software<br />
+<br />
+<br />
+分别在三台机子的/software/zookeeper-3.4.8/data下创建myid文件<br />
+其中192.168.52.142机子的myid文件内容为1&nbsp;<br />
+其中192.168.52.145机子的myid文件内容为2&nbsp;<br />
+其中192.168.52.146机子的myid文件内容为3<br />
+<br />
+<br />
+这是对应上面配置文件的server.X<br />
+server.1=centos:8880:7770<br />
+server.2=slave1:8881:7771<br />
+server.3=slave2:8882:7772</p>
+
+<p>zookeeper配置解释：</p>
+
+<ul>
+	<li>tickTime：这个时间是作为 Zookeeper 服务器之间或客户端与服务器之间维持心跳的时间间隔，也就是每个 tickTime 时间就会发送一个心跳。</li>
+	<li>dataDir：顾名思义就是 Zookeeper 保存数据的目录，默认情况下，Zookeeper 将写数据的日志文件也保存在这个目录里。</li>
+	<li>clientPort：这个端口就是客户端连接 Zookeeper 服务器的端口，Zookeeper 会监听这个端口，接受客户端的访问请求。</li>
+	<li>initLimit：这个配置项是用来配置 Zookeeper 接受客户端（这里所说的客户端不是用户连接 Zookeeper 服务器的客户端，而是 Zookeeper 服务器集群中连接到 Leader 的 Follower 服务器）初始化连接时最长能忍受多少个心跳时间间隔数。当已经超过 10 个心跳的时间（也就是 tickTime）长度后 Zookeeper 服务器还没有收到客户端的返回信息，那么表明这个客户端连接失败。总的时间长度就是 5*2000=10 秒</li>
+	<li>syncLimit：这个配置项标识 Leader 与 Follower 之间发送消息，请求和应答时间长度，最长不能超过多少个 tickTime 的时间长度，总的时间长度就是 2*2000=4 秒</li>
+	<li>server.A=B：C：D：其中 A 是一个数字，表示这个是第几号服务器；B 是这个服务器的 ip 地址；C 表示的是这个服务器与集群中的 Leader 服务器交换信息的端口；D 表示的是万一集群中的 Leader 服务器挂了，需要一个端口来重新进行选举，选出一个新的 Leader，而这个端口就是用来执行选举时服务器相互通信的端口。如果是伪集群的配置方式，由于 B 都是一样，所以不同的 Zookeeper 实例通信端口号不能一样，所以要给它们分配不同的端口号。
+	<p>除了修改 zoo.cfg 配置文件，集群模式下还要配置一个文件&nbsp;myid，这个文件在 dataDir 目录下，这个文件里面就有一个数据就是 A 的值，Zookeeper 启动时会读取这个文件，拿到里面的数据与 zoo.cfg 里面的配置信息比较从而判断到底是那个 server。</p>
+	</li>
+</ul>
+
+<p>&nbsp;</p>
+
+<p>&nbsp;</p>
+
+<p>最重要的一点，关闭防火墙，centos7比较坑，他有双重防火墙<br />
+<br />
+<br />
+entos 7版本以后默认使用firewalld后，按以前关于iptables的设置方法已经不管用了！！！妈的，用service iptqbles stop 关闭防火墙，以为关了，原来一直没关，害得我搭分布式集群折磨了我十多个小时,IP可以ping通，查看报错日志现实找不到主机路由，用上面那个命令无论怎么关防火墙都没用，以为是直接克隆的centos不行，又重新装了两个系统，装好所有软件，到头来还是同样的问题<br />
+正确的关闭和禁用命令是<br />
+运行、停止、禁用firewalld<br />
+启动：# systemctl start firewalld<br />
+查看状态：# systemctl status firewalld 或者 firewall-cmd --state<br />
+停止：# systemctl disable firewalld<br />
+禁用：# systemctl stop firewalld<br />
+<br />
+<br />
+然后分别到每台机子的zookeeper安装目录，开启服务<br />
+<br />
+[root@slave1 zookeeper-3.4.8]# bin/zkServer.sh start<br />
+ZooKeeper JMX enabled by default<br />
+Using config: /software/zookeeper-3.4.8/bin/../conf/zoo.cfg<br />
+Starting zookeeper ... STARTED<br />
+<br />
+<br />
+[root@slave2 zookeeper-3.4.8]# bin/zkServer.sh start<br />
+ZooKeeper JMX enabled by default<br />
+Using config: /software/zookeeper-3.4.8/bin/../conf/zoo.cfg<br />
+Starting zookeeper ... STARTED<br />
+<br />
+<br />
+[root@centos zookeeper-3.4.8]# bin/zkServer.sh start<br />
+ZooKeeper JMX enabled by default<br />
+Using config: /software/zookeeper-3.4.8/bin/../conf/zoo.cfg<br />
+Starting zookeeper ... STARTED<br />
+<br />
+<br />
+查看状态<br />
+[root@slave1 zookeeper-3.4.8]# bin/zkServer.sh status<br />
+ZooKeeper JMX enabled by default<br />
+Using config: /software/zookeeper-3.4.8/bin/../conf/zoo.cfg<br />
+Mode: leader<br />
+<br />
+<br />
+开启完zookeeper服务后，再来安装storm ，因为storm依赖于zookeeper，开启storm服务前，必须开启zookeeper服务<br />
+<br />
+安装Python就不讲了，因为centos7已经默认安装了Python2.7.5，所以不用安装了<br />
+<br />
+<br />
+3、storm安装<br />
+<br />
+下载安装包解压到/software/<br />
+<br />
+进入storm目录，编辑<br />
+conf/storm.yaml配置文件<br />
+加入<br />
+#zookeeper服务节点<br />
+storm.zookeeper.servers:<br />
+&nbsp; &nbsp; &nbsp; - &quot;192.168.52.142&quot;<br />
+&nbsp; &nbsp; &nbsp; - &quot;192.168.52.145&quot;<br />
+&nbsp; &nbsp; &nbsp; - &quot;192.168.52.146&quot;&nbsp;<br />
+#nimbus所在机子<br />
+nimbus.host: &quot;192.168.52.142&quot;<br />
+#supervisor工作进程端口号<br />
+supervisor.slots.ports:<br />
+&nbsp; &nbsp; - 6700<br />
+&nbsp; &nbsp; - 6701<br />
+&nbsp; &nbsp; - 6702<br />
+&nbsp; &nbsp; - 6703<br />
+#存放数据目录，要自己创建<br />
+storm.local.dir: &quot;/software/storm-0.9.1/data&quot;<br />
+<br />
+创建/software/storm-0.9.1/data目录<br />
+进入/software/storm-0.9.1/下<br />
+mkdir data<br />
+<br />
+把storm-0.9.1安装目录分发到其他机子<br />
+scp -cp storm-0.9.1 root@slave1:/software/<br />
+scp -cp storm-0.9.1 root@slave2:/software/<br />
+<br />
+分别在三台机子上，把storm加入环境变量<br />
+在/etc/profile加入<br />
+JAVA_HOME=/software/jdk1.7.0_80<br />
+STORE_HOME=/software/storm-0.9.1<br />
+PATH=$JAVA_HOME/bin:$STORE_HOME/bin:$PATH<br />
+CLASSPATH=$JAVA_HOME/jre/lib/ext:$JAVA_HOME/lib.tools.jar<br />
+<br />
+在主机centos上开启nimbus进程<br />
+storm nimbus &amp;<br />
+<br />
+在另外两台机子上开启supervisor 进程<br />
+storm supervisor &amp;<br />
+<br />
+开启完按Ctrl+c<br />
+用jps查看进程是否启动成功<br />
+<br />
+如：<br />
+[root@slave1 software]# jps<br />
+2792 supervisor<br />
+2904 Jps<br />
+2655 QuorumPeerMain<br />
+<br />
+<br />
+在centos主机上开启<br />
+storm ui &amp;<br />
+storm logviewer &amp;<br />
+<br />
+这样就可以通过web查看storm部署情况了<br />
+<br />
+访问http://192.168.52.142:8080/</p>
+
+<p>如图</p>
+
+<p><img alt="" src="https://img-blog.csdn.net/20160828225059925?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQv/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70/gravity/Center" style="height:148px; width:800px" /></p>
+
+<p><br />
+<br />
+<br />
+<br />
+4、安装git<br />
+查看是否安装git<br />
+rpm -qa |grep git<br />
+<br />
+安装命令<br />
+yum install git<br />
+<br />
+运行如下命令下载storm-starter测试storm是否安装成功<br />
+git clone git://github.com/nathanmarz/storm-starter.git<br />
+<br />
+5、下载maven<br />
+下载解压，安装目录/software/<br />
+加入环境变量到/etc/profile<br />
+JAVA_HOME=/software/jdk1.7.0_80<br />
+STORE_HOME=/software/storm-0.9.1<br />
+MAVEN_HOME=/software/apache-maven-3.3.9<br />
+PATH=$JAVA_HOME/bin:$STORE_HOME/bin:$MAVEN_HOME/bin:$PATH<br />
+CLASSPATH=$JAVA_HOME/jre/lib/ext:$JAVA_HOME/lib.tools.jar<br />
+<br />
+<br />
+进入刚刚下载的storm-starter目录下<br />
+mv m2-pom.xml pom.xml<br />
+<br />
+<br />
+修改pom.xml，把这段改为如下：<br />
+&lt;dependency&gt;<br />
+&nbsp; &nbsp; &nbsp; &lt;groupId&gt;org.apache.storm&lt;/groupId&gt;<br />
+&nbsp; &nbsp; &nbsp; &lt;artifactId&gt;storm-core&lt;/artifactId&gt;<br />
+&nbsp; &nbsp; &nbsp; &lt;version&gt;0.9.1-incubating&lt;/version&gt;<br />
+&nbsp; &nbsp; &nbsp; &lt;!-- keep storm out of the jar-with-dependencies --&gt;<br />
+&nbsp; &nbsp; &nbsp; &lt;scope&gt;provided&lt;/scope&gt;<br />
+&lt;/dependency&gt;<br />
+<br />
+<br />
+<br />
+完整如下：</p>
+
+<pre>
+
+&nbsp;</pre>
+
+<ol>
+	<li>
+	<p><code>&lt;project xmlns=&quot;http://maven.apache.org/POM/4.0.0&quot; xmlns:xsi=&quot;http://www.w3.org/2001/XMLSchema-instance&quot;</code></p>
+	</li>
+	<li>
+	<p><code>xsi:schemaLocation=&quot;http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd&quot;&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;modelVersion&gt;4.0.0&lt;/modelVersion&gt;</code></p>
+	</li>
+	<li>&nbsp;</li>
+	<li>&nbsp;</li>
+	<li>
+	<p><code>&lt;groupId&gt;storm.starter&lt;/groupId&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;artifactId&gt;storm-starter&lt;/artifactId&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;version&gt;0.0.1-SNAPSHOT&lt;/version&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;packaging&gt;jar&lt;/packaging&gt;</code></p>
+	</li>
+	<li>&nbsp;</li>
+	<li>&nbsp;</li>
+	<li>
+	<p><code>&lt;name&gt;storm-starter&lt;/name&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;url&gt;https://github.com/nathanmarz/storm-starter&lt;/url&gt;</code></p>
+	</li>
+	<li>&nbsp;</li>
+	<li>&nbsp;</li>
+	<li>
+	<p><code>&lt;properties&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;project.build.sourceEncoding&gt;UTF-8&lt;/project.build.sourceEncoding&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;/properties&gt;</code></p>
+	</li>
+	<li>&nbsp;</li>
+	<li>&nbsp;</li>
+	<li>
+	<p><code>&lt;repositories&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;repository&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;id&gt;github-releases&lt;/id&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;url&gt;http://oss.sonatype.org/content/repositories/github-releases/&lt;/url&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;/repository&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;repository&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;id&gt;clojars.org&lt;/id&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;url&gt;http://clojars.org/repo&lt;/url&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;/repository&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;/repositories&gt;</code></p>
+	</li>
+	<li>&nbsp;</li>
+	<li>&nbsp;</li>
+	<li>
+	<p><code>&lt;dependencies&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;dependency&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;groupId&gt;junit&lt;/groupId&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;artifactId&gt;junit&lt;/artifactId&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;version&gt;3.8.1&lt;/version&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;scope&gt;test&lt;/scope&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;/dependency&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;dependency&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;groupId&gt;org.testng&lt;/groupId&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;artifactId&gt;testng&lt;/artifactId&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;version&gt;6.8.5&lt;/version&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;scope&gt;test&lt;/scope&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;/dependency&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;dependency&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;groupId&gt;org.mockito&lt;/groupId&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;artifactId&gt;mockito-all&lt;/artifactId&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;version&gt;1.9.0&lt;/version&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;scope&gt;test&lt;/scope&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;/dependency&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;dependency&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;groupId&gt;org.easytesting&lt;/groupId&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;artifactId&gt;fest-assert-core&lt;/artifactId&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;version&gt;2.0M8&lt;/version&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;scope&gt;test&lt;/scope&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;/dependency&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;dependency&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;groupId&gt;org.jmock&lt;/groupId&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;artifactId&gt;jmock&lt;/artifactId&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;version&gt;2.6.0&lt;/version&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;scope&gt;test&lt;/scope&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;/dependency&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;dependency&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;groupId&gt;org.apache.storm&lt;/groupId&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;artifactId&gt;storm-core&lt;/artifactId&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;version&gt;0.9.1-incubating&lt;/version&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;!-- keep storm out of the jar-with-dependencies --&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;scope&gt;provided&lt;/scope&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;/dependency&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;dependency&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;groupId&gt;commons-collections&lt;/groupId&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;artifactId&gt;commons-collections&lt;/artifactId&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;version&gt;3.2.1&lt;/version&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;/dependency&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;dependency&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;groupId&gt;com.google.guava&lt;/groupId&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;artifactId&gt;guava&lt;/artifactId&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;version&gt;15.0&lt;/version&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;/dependency&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;/dependencies&gt;</code></p>
+	</li>
+	<li>&nbsp;</li>
+	<li>&nbsp;</li>
+	<li>
+	<p><code>&lt;build&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;sourceDirectory&gt;src/jvm&lt;/sourceDirectory&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;testSourceDirectory&gt;test/jvm&lt;/testSourceDirectory&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;resources&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;resource&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;directory&gt;${basedir}/multilang&lt;/directory&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;/resource&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;/resources&gt;</code></p>
+	</li>
+	<li>&nbsp;</li>
+	<li>&nbsp;</li>
+	<li>
+	<p><code>&lt;plugins&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;!--</code></p>
+	</li>
+	<li>
+	<p><code>Bind the maven-assembly-plugin to the package phase</code></p>
+	</li>
+	<li>
+	<p><code>this will create a jar file without the storm dependencies</code></p>
+	</li>
+	<li>
+	<p><code>suitable for deployment to a cluster.</code></p>
+	</li>
+	<li>
+	<p><code>--&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;plugin&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;artifactId&gt;maven-assembly-plugin&lt;/artifactId&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;configuration&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;descriptorRefs&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;descriptorRef&gt;jar-with-dependencies&lt;/descriptorRef&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;/descriptorRefs&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;archive&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;manifest&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;mainClass&gt;&lt;/mainClass&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;/manifest&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;/archive&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;/configuration&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;executions&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;execution&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;id&gt;make-assembly&lt;/id&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;phase&gt;package&lt;/phase&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;goals&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;goal&gt;single&lt;/goal&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;/goals&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;/execution&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;/executions&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;/plugin&gt;</code></p>
+	</li>
+	<li>&nbsp;</li>
+	<li>&nbsp;</li>
+	<li>
+	<p><code>&lt;plugin&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;groupId&gt;com.theoryinpractise&lt;/groupId&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;artifactId&gt;clojure-maven-plugin&lt;/artifactId&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;version&gt;1.3.12&lt;/version&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;extensions&gt;true&lt;/extensions&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;configuration&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;sourceDirectories&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;sourceDirectory&gt;src/clj&lt;/sourceDirectory&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;/sourceDirectories&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;/configuration&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;executions&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;execution&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;id&gt;compile&lt;/id&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;phase&gt;compile&lt;/phase&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;goals&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;goal&gt;compile&lt;/goal&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;/goals&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;/execution&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;execution&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;id&gt;test&lt;/id&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;phase&gt;test&lt;/phase&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;goals&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;goal&gt;test&lt;/goal&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;/goals&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;/execution&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;/executions&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;/plugin&gt;</code></p>
+	</li>
+	<li>&nbsp;</li>
+	<li>&nbsp;</li>
+	<li>
+	<p><code>&lt;plugin&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;groupId&gt;org.codehaus.mojo&lt;/groupId&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;artifactId&gt;exec-maven-plugin&lt;/artifactId&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;version&gt;1.2.1&lt;/version&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;executions&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;execution&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;goals&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;goal&gt;exec&lt;/goal&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;/goals&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;/execution&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;/executions&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;configuration&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;executable&gt;java&lt;/executable&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;includeProjectDependencies&gt;true&lt;/includeProjectDependencies&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;includePluginDependencies&gt;false&lt;/includePluginDependencies&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;classpathScope&gt;compile&lt;/classpathScope&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;mainClass&gt;${storm.topology}&lt;/mainClass&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;/configuration&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;/plugin&gt;</code></p>
+	</li>
+	<li>&nbsp;</li>
+	<li>&nbsp;</li>
+	<li>
+	<p><code>&lt;plugin&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;groupId&gt;org.apache.maven.plugins&lt;/groupId&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;artifactId&gt;maven-compiler-plugin&lt;/artifactId&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;configuration&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;source&gt;1.6&lt;/source&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;target&gt;1.6&lt;/target&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;/configuration&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;/plugin&gt;</code></p>
+	</li>
+	<li>&nbsp;</li>
+	<li>&nbsp;</li>
+	<li>
+	<p><code>&lt;/plugins&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;/build&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;/project&gt;</code></p>
+	</li>
+</ol>
+
+<p><br />
+<br />
+<br />
+<br />
+<br />
+<br />
+<br />
+<br />
+编译storm.starter<br />
+mvn &nbsp;compile exec:java -Dstorm.topology=storm.starter.WordCountTopology<br />
+<br />
+<br />
+<br />
+<br />
+下载jar包，要一段时间，我家里网速慢,如果显示下载有错误，一般是网址打不开，可能是网速问题，多运行几次<br />
+<br />
+<br />
+打包上传到storm集群</p>
+
+<p>打包：</p>
+
+<p>mvn package</p>
+
+<p>发现&nbsp;storm-starter目录下多了两个jar包</p>
+
+<p><img alt="" src="https://img-blog.csdn.net/20160829004043183?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQv/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70/gravity/Center" /></p>
+
+<p>再提交到集群&nbsp;</p>
+
+<p>本地模式 &nbsp;storm jar storm-starter-0.0.1-SNAPSHOT-jar-with-dependencies.jar &nbsp;storm.starter.RollingTopWords</p>
+
+<p><br />
+远程模式提交<br />
+<br />
+storm jar storm-starter-0.0.1-SNAPSHOT-jar-with-dependencies.jar &nbsp;storm.starter.ExclamationTopology &nbsp; ExclamationTopalogy</p>
+
+<p>进程一直在运行，可以在web界面看到运行情况，并且可以杀死该任务</p>
+
+<p><img alt="" src="https://img-blog.csdn.net/20160829002805900?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQv/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70/gravity/Center" style="height:400px; width:800px" /></p>
+
+<p>&nbsp;</p>
+
+<p>点击进入ExclamationTopalogy,如下图</p>
+
+<p>&nbsp;</p>
+
+<p><img alt="" src="https://img-blog.csdn.net/20160829002858944?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQv/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70/gravity/Center" style="height:394px; width:800px" /></p>
+
+<p><br />
+杀死刚刚运行的topology命令<br />
+storm kill ExclamationTopalogy</p>
+
+<p>转载请指明出处http://blog.csdn.net/tanggao1314/article/details/52348632</p>
+
+<p>&nbsp;</p>
+
+<p>下载安装包地址http://download.csdn.net/my/uploads/1</p>
