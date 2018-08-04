@@ -1,6 +1,6 @@
-SSH设置
+# SSH设置
 
-SSH安装
+## SSH安装
 
 安装软件
 SSH分客户端openssh-client和openssh-server
@@ -29,7 +29,8 @@ SSH设置需要在集群上做不同的操作，如启动，停止，分布式�
 $ ssh-keygen -t rsa 
 $ cat ~/.ssh/id_rsa.pub >> ~/.ssh/authorized_keys 
 $ chmod 0600 ~/.ssh/authorized_keys 
-设置SSH无密码登录
+
+## 设置SSH无密码登录
 Hadoop集群中的各个机器间会相互地通过SSH访问，每次访问都输入密码是不现实的，所以要配置各个机器间的
 
 SSH是无密码登录的。
@@ -41,9 +42,9 @@ hadoop# ssh-keygen -t rsa
 
 2、 分发公钥
 
-# ssh-copy-id hadoop@master
-# ssh-copy-id hadoop@slaveA
-# ssh-copy-id hadoop@slaveB
+ssh-copy-id hadoop@master
+ssh-copy-id hadoop@slaveA
+ssh-copy-id hadoop@slaveB
 这里注意：ssh-copy-id 是将当前用户的公钥分发到指定机器上的指定用户。
 
 例如在master机器上，当前用户执行ssh-copy-id hadoop@slaveA。
