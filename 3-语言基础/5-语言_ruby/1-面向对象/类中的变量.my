@@ -1,0 +1,184 @@
+<h1><a href="https://www.cnblogs.com/51kata/p/5474854.html" id="cb_post_title_url">Ruby学习： 类的定义和实例变量</a></h1>
+
+<p>ruby是完全面向对象的，所有的数据都是对象，没有独立在类外的方法，所有的方法都在类中定义的。</p>
+
+<p><strong>一、类的定义语法</strong></p>
+
+<p>类的定义以 class 关键字开头，后面跟类名，以 end标识符结尾。</p>
+
+<p>类中的方法以 def关键字开头，后面跟方法名及参数列表（如果有的话），以 end标识符结尾。</p>
+
+<p>类也有构造函数，名字必须为initialize。</p>
+
+<p>对象通过new来创建，new是类的方法。</p>
+
+<p>举例如下：</p>
+
+<pre>
+class Demo
+    def initialize
+        puts &quot;begin create object&quot;
+    end
+    
+    def test
+        puts &quot;test&quot;
+    end
+end    
+
+#创建对象，调用对象的方法
+demo1= Demo.new
+demo1.test
+</pre>
+
+<p>上面的代码先定义了一个类Demo ，类中定义了两个分方法，这两个方法均没参数。<br />
+接着通过new来创建了一个对象，赋值给变量 demo1，最后调用 类的 test方法。</p>
+
+<p>上面代码运行的输出信息是：</p>
+
+<p>begin create object<br />
+test</p>
+
+<p><strong>二、类中的成员变量</strong></p>
+
+<p>类中有三种变量</p>
+
+<p>1、一个是局部变量，在方法内 和方法的参数。这个就是普通的标识符定义即可。</p>
+
+<p>2、类的实例变量。这个定义与其它语言有差别，需要以&nbsp; @符号来标识。不能直接通过对象访问，需要通过方法来访问，相当于java中的private成员。</p>
+
+<p>3、类变量，属于类级别的，为类的所有对象所共享，需要以&nbsp; @@符号来标识</p>
+
+<p>&nbsp;</p>
+
+<p><strong>三、类的实例变量</strong></p>
+
+<p>下面我们来看一个类的实例变量的例子：</p>
+
+<pre>
+class Demo
+    def initialize(value)
+        @a = value
+    end
+    
+    def getA
+        return @a
+    end
+    
+    def setA(value)
+        @a=value
+    end
+end    
+
+#创建对象，调用对象的方法
+demo1= Demo.new(2)
+puts demo1.getA
+demo1.setA(10)
+puts demo1.getA
+</pre>
+
+<p>上面代码创建的Demo类在构造函数中定义和初始化了一个实例变量 @a，并且定义了get和set方法来访问实例变量。<br />
+在ruby中，无法直接在类的外部访问实例变量，如 puts demo1.@a&nbsp; 这样会报语法错误的。</p>
+
+<p>对于实例变量，如果每次需要定义相应的 get 和 set方法，并且给通过get和set方法才能在外部访问，这显得比较啰嗦和麻烦。</p>
+
+<p>ruby通过其元编程的特性可以简化这些操作。具体我们来看下示例代码：</p>
+
+<pre>
+class Demo
+    attr_accessor:a
+    
+    def initialize(value)
+        @a=value
+    end
+end    
+
+#创建对象，调用对象的方法
+demo1= Demo.new(2)
+puts demo1.a
+demo1.a = 10
+puts demo1.a
+</pre>
+
+<p>上面代码通过 attr_accessor :a 就定义了一个实例变量 @a ，并在构造函数中对它初始化。<br />
+与上面 的区别是，外部可以直接通过对象变量访问，但不能加 @符号，不过在类的方法内访问需要加@符号。</p>
+
+<p>可以看出，采用这种方式，省去了定义get和set方法，访问起来更加简洁。</p>
+
+<p>设置attr_accessor，会自动对实例变量（如上面例子中的 @a），创建set和get方法。</p>
+
+<p>对应的还有attr_reader只设置get方法，attr_writer只设置set方法。</p>
+
+<pre>
+class Demo
+    attr_reader:a
+    
+    def initialize(value)
+        @a=value
+    end
+    
+    def set(value)
+        @a = value
+        puts @a
+    end
+end    
+
+#创建对象，调用对象的方法
+demo1= Demo.new(2)
+demo1.set(10)
+puts demo1.a
+</pre>
+
+<p>如果定义成attr_reader，则在类的外部只能demo1.a来读取变量信息，但不能 demo1.a = 2 这种方式来赋值（因为这实际调用的是set方法，而attr_reader不会产生set方法）。注意，这只影响外部访问，类的内部方法使用没有关系。</p>
+
+<pre>
+class Demo
+    attr_writer:a
+    
+    def initialize(value)
+        @a=value
+    end
+    
+    def set(value)
+        @a = value
+        puts @a
+    end
+    
+    def print
+        puts @a
+    end
+end    
+
+#创建对象，调用对象的方法
+demo1= Demo.new(2)
+demo1.a =20
+demo1.print
+</pre>
+
+<p>从上面例子可以看出，定义成 attr_writer方式，在类的外部只能赋值，不能读取（如这里的&nbsp; puts demo1.a会报语法错误。）.<br />
+同样类的内部访问不受影响。</p>
+
+<p>需要说明的是，类的实例变量不一定先要在构造函数中定义和初始化。 可以在类的任意方法中定义和使用，使用前也不需要初始化。</p>
+
+<p>如下面代码：</p>
+
+<pre>
+class Demo
+    def set(value)
+        @a = value
+    end
+    
+    def print
+        puts @a
+    end
+end    
+
+#创建对象，调用对象的方法
+demo1= Demo.new
+demo1.print
+demo1.set(10)
+demo1.print
+</pre>
+
+<p>如果在初始化之前就引用实例变量，则值为 nil (类似java中的null)。如上面代码，创建对象后直接调用 print方法，在print方法中就引用了@a，而在这之前@a并未被定义和初始化，这不会报错，只是这时@a的值为 nil.</p>
+
+<p><strong>可以看出，相对java, c++等传统语言来说，ruby中类的实例变量的操作更加灵活和清晰。</strong></p>
