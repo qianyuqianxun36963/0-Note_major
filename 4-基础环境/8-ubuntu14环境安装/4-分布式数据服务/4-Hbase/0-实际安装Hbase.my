@@ -1,0 +1,72 @@
+<h2>HBase安装</h2>
+
+<p>HBase的安装也有三种模式：单机模式、伪分布模式和完全分布式模式，在这里只介绍完全分布模式。前提是Hadoop集群和Zookeeper已经安装完毕，并能正确运行。&nbsp;</p>
+
+<h2><strong>第一步</strong>：下载安装包，解压到合适位置</h2>
+
+<p>并将权限分配给hadoop用户（运行hadoop的账户）<br />
+这里下载的是hbase-0.94.6，Hadoop集群使用的是1.0.4，将其解压到/usr/local下并重命名为hbase</p>
+
+<p>sudo&nbsp;cp&nbsp;hbase-0.94.6.tar.gz /usr/local<br />
+sudo&nbsp;tar&nbsp;-zxf hbase-0.94.6.tar.gz<br />
+sudo&nbsp;mv&nbsp;hbase-0.94.6 hbase<br />
+sudo&nbsp;chown&nbsp;-R hadoop:hadoop hbase</p>
+
+<h2><strong>第二步</strong>：配置相关的文件</h2>
+
+<p>（1）配置hbase-env.sh，该文件在/usr/local/hbase/conf<br />
+设置以下值：</p>
+
+<p>&nbsp; &nbsp; export&nbsp;JAVA_HOME=/usr/local/java/jdk1.6.0_27&nbsp;&nbsp;&nbsp;&nbsp;#Java安装路径<br />
+&nbsp; &nbsp; export&nbsp;HBASE_CLASSPATH=/usr/local/hadoop/conf&nbsp;&nbsp;&nbsp;&nbsp;#HBase类路径<br />
+&nbsp; &nbsp; export&nbsp;HBASE_MANAGES_ZK=true&nbsp;&nbsp;&nbsp;&nbsp;#由HBase负责启动和关闭Zookeeper</p>
+
+<p>（2）配置hbase-site.xml，该文件位于/usr/local/hbase/conf</p>
+
+<p>&nbsp; &nbsp; &lt;property&gt;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &lt;name&gt;hbase.master&lt;/name&gt;<br />
+&nbsp; &nbsp; &nbsp;&nbsp;&nbsp;&nbsp;&lt;value&gt;master:6000&lt;/value&gt;<br />
+&nbsp; &nbsp; &lt;/property&gt;<br />
+&nbsp; &nbsp; &lt;property&gt;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &lt;name&gt;hbase.master.maxclockskew&lt;/name&gt;<br />
+&nbsp; &nbsp; &nbsp;&nbsp;&nbsp;&nbsp;&lt;value&gt;180000&lt;/value&gt;<br />
+&nbsp; &nbsp; &lt;/property&gt;<br />
+&nbsp; &nbsp; &lt;property&gt;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &lt;name&gt;hbase.rootdir&lt;/name&gt;<br />
+&nbsp; &nbsp; &nbsp;&nbsp;&nbsp;&nbsp;&lt;value&gt;hdfs://master:9000/hbase&lt;/value&gt;<br />
+&nbsp; &nbsp; &lt;/property&gt;<br />
+&nbsp; &nbsp; &lt;property&gt;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &lt;name&gt;hbase.cluster.distributed&lt;/name&gt;<br />
+&nbsp; &nbsp; &nbsp;&nbsp;&nbsp;&nbsp;&lt;value&gt;true&lt;/value&gt;<br />
+&nbsp; &nbsp; &lt;/property&gt;<br />
+&nbsp; &nbsp; &lt;property&gt;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &lt;name&gt;hbase.zookeeper.quorum&lt;/name&gt;<br />
+&nbsp; &nbsp; &nbsp;&nbsp;&nbsp;&nbsp;&lt;value&gt;master&lt;/value&gt;<br />
+&nbsp; &nbsp; &lt;/property&gt;<br />
+&nbsp; &nbsp; &lt;property&gt;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &lt;name&gt;hbase.zookeeper.property.dataDir&lt;/name&gt;<br />
+&nbsp; &nbsp; &nbsp;&nbsp;&nbsp;&nbsp;&lt;value&gt;/home/${user.name}/tmp/zookeeper&lt;/value&gt;<br />
+&nbsp; &nbsp; &lt;/property&gt;<br />
+&nbsp; &nbsp; &lt;property&gt;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &lt;name&gt;dfs.replication&lt;/name&gt;<br />
+&nbsp; &nbsp; &nbsp;&nbsp;&nbsp;&nbsp;&lt;value&gt;1&lt;/value&gt;<br />
+&nbsp; &nbsp; &lt;/property&gt;</p>
+
+<p>其中，hbase.master是指定运行HMaster的服务器及端口号；hbase.master.maxclockskew是用来防止HBase节点之间时间不一致造成regionserver启动失败，默认值是30000；hbase.rootdir指定HBase的存储目录；hbase.cluster.distributed设置集群处于分布式模式；hbase.zookeeper.quorum设置Zookeeper节点的主机名，它的值个数必须是奇数；hbase.zookeeper.property.dataDir设置Zookeeper的目录，默认为/tmp，dfs.replication设置数据备份数，集群节点小于3时需要修改，本次试验是一个节点，所以修改为1。</p>
+
+<p>（3）配置regionservers，该文件位于/usr/local/hbase/conf<br />
+设置所运行HBase的机器，此文件配置和hadoop中的slaves类似，一行指定一台机器，本次试验仅用一台机器，设置master即可。</p>
+
+<p>（4）设置HBase环境变量，文件位于/etc/profile<br />
+在文件末尾添加：</p>
+
+<p>&nbsp; &nbsp; #hbase Env<br />
+&nbsp; &nbsp; export&nbsp;HBASE_HOME=/home/hbase<br />
+&nbsp; &nbsp; export&nbsp;PATH=$PATH:$HBASE_HOME/bin</p>
+
+<p>使之生效：source /etc/profile</p>
+
+<h2><br />
+<strong>第三步</strong>：运行测试</h2>
+
+<p>启动hadoop后，在终端输入start-hbase.sh，查看运行的进程：</p>

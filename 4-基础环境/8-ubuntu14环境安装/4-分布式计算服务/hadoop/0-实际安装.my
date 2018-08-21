@@ -217,22 +217,22 @@ slaveA
 slaveB</code>
 </pre>
 
-<p>slaves文件是指定HDFS上有哪些DataNode节点。</p>
+<p><strong>slaves文件是指定HDFS上有哪些DataNode节点。</strong></p>
 
 <h4>配置core-site.xml</h4>
 
 <pre>
 <code>[hadoop]$ vi etc/hadoop/core-site.xml
 &lt;configuration&gt;
-&nbsp;&lt;property&gt;
-&nbsp; &nbsp;&lt;name&gt;fs.defaultFS&lt;/name&gt;
-&nbsp; &nbsp;&lt;value&gt;hdfs://master:8020&lt;/value&gt;
-&nbsp;&lt;/property&gt;
-&nbsp;&lt;property&gt;
-&nbsp; &nbsp;&lt;name&gt;hadoop.tmp.dir&lt;/name&gt;
-&nbsp; &nbsp;&lt;value&gt;/home/hadoop/data/tmp&lt;/value&gt;
-&nbsp;&lt;/property&gt;
-&lt;/configuration&gt;</code>
+&nbsp; &lt;property&gt;
+&nbsp; &nbsp; &lt;name&gt;fs.defaultFS&lt;/name&gt;
+&nbsp; &nbsp; &lt;value&gt;hdfs://master:9000&lt;/value&gt;
+&nbsp; &lt;/property&gt;
+&nbsp; &lt;property&gt;
+&nbsp; &nbsp; &lt;name&gt;hadoop.tmp.dir&lt;/name&gt;
+&nbsp; &nbsp; &lt;value&gt;file:/home/hadoop/data/tmp-277&lt;/value&gt;
+&nbsp; &lt;/property&gt;</code>
+<code>&lt;/configuration&gt;</code>
 
 </pre>
 
@@ -247,10 +247,22 @@ slaveB</code>
 
 <pre>
 <code>&lt;configuration&gt;
-&nbsp;&lt;property&gt;
-&nbsp; &nbsp;&lt;name&gt;dfs.namenode.secondary.http-address&lt;/name&gt;
-&nbsp; &nbsp;&lt;value&gt;slaveB:50090&lt;/value&gt;
-&nbsp;&lt;/property&gt;
+&nbsp; &lt;property&gt;
+&nbsp; &nbsp; &lt;name&gt;dfs.namenode.secondary.http-address&lt;/name&gt;
+&nbsp; &nbsp; &lt;value&gt;master:50090&lt;/value&gt;
+&nbsp; &lt;/property&gt;
+&nbsp; &lt;property&gt;
+&nbsp; &nbsp; &lt;name&gt;dfs.replication&lt;/name&gt;
+&nbsp; &nbsp; &lt;value&gt;3&lt;/value&gt; //这里的3是根据slaves里面的数量来定的。
+&nbsp; &lt;/property&gt;
+&nbsp; &lt;property&gt;
+&nbsp; &nbsp; &lt;name&gt;dfs.namenode.name.dir&lt;/name&gt;
+&nbsp; &nbsp; &lt;value&gt;file:/home/hadoop/data/tmp-277/dfs/name&lt;/value&gt;
+&nbsp; &lt;/property&gt;
+&nbsp; &lt;property&gt;
+&nbsp; &nbsp; &lt;name&gt;dfs.datanode.data.dir&lt;/name&gt;
+&nbsp; &nbsp; &lt;value&gt;file:/home/hadoop/data/tmp-277/dfs/data&lt;/value&gt;
+&nbsp; &lt;/property&gt;
 &lt;/configuration&gt;</code>
 </pre>
 
@@ -261,18 +273,23 @@ slaveB</code>
 <h4>配置yarn-site.xml</h4>
 
 <pre>
-<code>[hadoop]$ vi etc/hadoop/yarn-site.xml</code></pre>
+<code>[hadoop]$ vi etc/hadoop/yarn-site.xml
+</code>&lt;configuration&gt;
+&nbsp; &lt;property&gt;
+&nbsp; &nbsp; &lt;name&gt;yarn.resourcemanager.hostname&lt;/name&gt;
+&nbsp; &nbsp; &lt;value&gt;master&lt;/value&gt;
+&nbsp; &lt;/property&gt;
+&nbsp; &lt;property&gt;
+&nbsp; &nbsp; &lt;name&gt;yarn.nodemanager.aux-services&lt;/name&gt;
+&nbsp; &nbsp; &lt;value&gt;mapreduce_shuffle&lt;/value&gt;
+&nbsp; &lt;/property&gt;
+&lt;/configuration&gt;<code>
+</code></pre>
+
+<p>下面两个也可以带上：</p>
 
 <pre>
 <code>&nbsp; &nbsp; &lt;property&gt;
-&nbsp; &nbsp; &nbsp; &nbsp; &lt;name&gt;yarn.nodemanager.aux-services&lt;/name&gt;
-&nbsp; &nbsp; &nbsp; &nbsp; &lt;value&gt;mapreduce_shuffle&lt;/value&gt;
-&nbsp; &nbsp; &lt;/property&gt;
-&nbsp; &nbsp; &lt;property&gt;
-&nbsp; &nbsp; &nbsp; &nbsp; &lt;name&gt;yarn.resourcemanager.hostname&lt;/name&gt;
-&nbsp; &nbsp; &nbsp; &nbsp; &lt;value&gt;slaveA&lt;/value&gt;
-&nbsp; &nbsp; &lt;/property&gt;
-&nbsp; &nbsp; &lt;property&gt;
 &nbsp; &nbsp; &nbsp; &nbsp; &lt;name&gt;yarn.log-aggregation-enable&lt;/name&gt;
 &nbsp; &nbsp; &nbsp; &nbsp; &lt;value&gt;true&lt;/value&gt;
 &nbsp; &nbsp; &lt;/property&gt;
@@ -282,7 +299,7 @@ slaveB</code>
 &nbsp; &nbsp; &lt;/property&gt;</code>
 </pre>
 
-<p>根据规划<code>yarn.resourcemanager.hostname</code>这个指定resourcemanager服务器指向<code>slaveA</code>。</p>
+<p>根据规划<code>yarn.resourcemanager.hostname</code>这个指定resourcemanager服务器指向<code>master</code>。</p>
 
 <p><code>yarn.log-aggregation-enable</code>是配置是否启用日志聚集功能。</p>
 
@@ -297,18 +314,18 @@ slaveB</code>
 
 <pre>
 <code>&lt;configuration&gt;
-    &lt;property&gt;
-        &lt;name&gt;mapreduce.framework.name&lt;/name&gt;
-        &lt;value&gt;yarn&lt;/value&gt;
-    &lt;/property&gt;
-    &lt;property&gt;
-        &lt;name&gt;mapreduce.jobhistory.address&lt;/name&gt;
-        &lt;value&gt;master:10020&lt;/value&gt;
-    &lt;/property&gt;
-    &lt;property&gt;
-        &lt;name&gt;mapreduce.jobhistory.webapp.address&lt;/name&gt;
-        &lt;value&gt;master:19888&lt;/value&gt;
-    &lt;/property&gt;
+&nbsp; &lt;property&gt;
+&nbsp; &nbsp; &lt;name&gt;mapreduce.framework.name&lt;/name&gt;
+&nbsp; &nbsp; &lt;value&gt;yarn&lt;/value&gt;
+&nbsp; &lt;/property&gt;
+&nbsp; &lt;property&gt;
+&nbsp; &nbsp; &lt;name&gt;mapreduce.jobhistory.address&lt;/name&gt;
+&nbsp; &nbsp; &lt;value&gt;master:10020&lt;/value&gt;
+&nbsp; &lt;/property&gt;
+&nbsp; &lt;property&gt;
+&nbsp; &nbsp; &lt;name&gt;mapreduce.jobhistory.webapp.address&lt;/name&gt;
+&nbsp; &nbsp; &lt;value&gt;master:19888&lt;/value&gt;
+&nbsp; &lt;/property&gt;
 &lt;/configuration&gt;</code></pre>
 
 <p>mapreduce.framework.name设置mapreduce任务运行在yarn上。</p>
@@ -327,7 +344,7 @@ slaveB</code>
 export CLASSPATH=.:$JAVA_HOME/lib/*jar<br />
 export PATH=$JAVA_HOME/bin:$PATH</p>
 
-<p>export HADOOP_HOME=/home/hadoop/soft/hadoop-3.0.3/<br />
+<p>export HADOOP_HOME=/home/hadoop/soft/hadoop-2.7.7/<br />
 export PATH=$PATH:$HADOOP_HOME/bin<br />
 export PATH=$PATH:$HADOOP_HOME/sbin<br />
 export HADOOP_MAPRED_HOME=$HADOOP_HOME<br />

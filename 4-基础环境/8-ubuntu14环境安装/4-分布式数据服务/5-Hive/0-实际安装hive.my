@@ -1,0 +1,133 @@
+<h1>安装hive2.3.3基于hadoop2.7.7</h1>
+
+<p>前提： 已经安装好三个节点的 hadoop 集群<br />
+这里选用mySql作为元数据库，将mySql和Hive安装在master服务器上&nbsp;<br />
+统一给放到/home/nosql/hive</p>
+
+<h2>1.下载安装文件，并解压：</h2>
+
+<p>cd /home/nosql/hive<br />
+wget https://mirrors.cnnic.cn/apache/hive/hive-2.3.3/apache-hive-2.3.3-bin.tar.gz<br />
+tar -zxvf apache-hive-2.3.3-bin.tar.gz -C /home/nosql/hive</p>
+
+<p>如果 hive 有专属的用户，记得赋权<br />
+chown -R hadoop:hadoop /home/nosql/hive/apache-hive-2.3.3-bin</p>
+
+<h2>2.设置环境变量</h2>
+
+<p>sudo vim /etc/profile<br />
+在最后加上<br />
+export HIVE_HOME=/home/nosql/hive/apache-hive-2.3.3-bin<br />
+export PATH=$PATH:$HIVE_HOME/bin<br />
+source /etc/profile -&gt;使配置文件生效</p>
+
+<p>安装mysql ， 参考&nbsp;http://blog.csdn.net/zhang123456456/article/details/53608554 ，注意MySQL数据库不能设置为BINLOG_FORMAT = STATEMENT，否则报Cannot execute statement: impossible to write to binary log 。</p>
+
+<h2>3. 配置mysql用户与数据库</h2>
+
+<p>mysql -u root -p -&gt;输入之后会提示你输入之前你设置的root密码<br />
+create database hiveDB; -&gt; 建立数据库<br />
+create user &#39;hive&#39; identified by &#39;hive&#39;; -&gt;创建用户、我没有设，就用root/wang<br />
+grant all privileges on hivedb.* to &#39;hive&#39;@&#39;%&#39; identified by &#39;hive&#39;; -&gt;将允许从任意地点登陆的hive用户对hiveDB数据库的所有表执行增删查改四种操作<br />
+flush privileges; -&gt; 刷新系统权限表</p>
+
+<h2>4.拷贝JDBC驱动包</h2>
+
+<p>将mySql的JDBC驱动包复制到Hive的lib目录下&nbsp;</p>
+
+<p>下载地址：https://dev.mysql.com/get/Downloads/Connector-J/mysql-connector-java_8.0.12-1ubuntu18.04_all.deb</p>
+
+<p>本次是在win下解压拷贝到hive下的。</p>
+
+<p>cp mysql-connector-java-8.0.12.jar&nbsp;/home/nosql/hive/apache-hive-2.3.3-bin/lib</p>
+
+<h2>5.修改Hive配置文件:&nbsp;</h2>
+
+<p>cd /home/nosql/hive/apache-hive-2.3.3-bin/conf/<br />
+cp hive-default.xml.template hive-site.xml<br />
+vi hive-site.xml &nbsp;#修改相应配置</p>
+
+<p>修改hive-site.xml相关的配置</p>
+
+<h3>1&gt; 数据库配置</h3>
+
+<h5>1. javax.jdo.option.ConnectionDriverName，将该name对应的value修改为MySQL驱动类路径：</h5>
+
+<pre>
+<code>&lt;property
+  &lt;name&gt;javax.jdo.option.ConnectionDriverName&lt;/name
+  &lt;value&gt;com.mysql.jdbc.Driver&lt;/value&gt;
+&lt;/property&gt;  </code></pre>
+
+<h5>2. javax.jdo.option.ConnectionURL，将该name对应的value修改为MySQL的地址：</h5>
+
+<pre>
+<code> &lt;name&gt;javax.jdo.option.ConnectionURL&lt;/name&gt;
+ &lt;value&gt;jdbc:mysql://master:3306/hiveDB?createDatabaseIfNotExist=true&lt;/value&gt;</code></pre>
+
+<h5>3.javax.jdo.option.ConnectionUserName，将对应的value修改为MySQL数据库登录名：</h5>
+
+<pre>
+<code>&lt;name&gt;javax.jdo.option.ConnectionUserName&lt;/name&gt;
+&lt;value&gt;root&lt;/value&gt;</code></pre>
+
+<h5>4.javax.jdo.option.ConnectionPassword，将对应的value修改为MySQL数据库的登录密码：</h5>
+
+<pre>
+<code>&lt;name&gt;javax.jdo.option.ConnectionPassword&lt;/name&gt;&lt;value&gt;wang&lt;/value&gt;</code>
+</pre>
+
+<h3>2&gt; 路径配置</h3>
+
+<p>1.hive.exec.scratchdir &nbsp; &nbsp; &nbsp; ##&nbsp;所有${system:java.io.tmpdir}和@{system:user.name<em><em>} &nbsp;都替换掉</em></em></p>
+
+<p>/home/nosql/hive/tmp</p>
+
+<p>hive.exec.scratchdir-&gt;执行HIVE操作访问HDFS用于临时存储数据的目录。目录权限设置为733。我这儿用的是/tmp/hive目录。</p>
+
+<p>2.hive.metastore.warehouse.dir&nbsp;&nbsp;</p>
+
+<p>/user/hive/warehouse</p>
+
+<p>hive.metastore.warehouse.dir -&gt;设置用于存放hive元数据的目录位置，改配置有三种模式，内嵌模式，本地元数据，远程元数据。如果hive.metastore.uris是空，则是本地模式。否则则是远程模式。</p>
+
+<p>3.删除掉所有的${system:java.io.tmpdir}。改成自己的路径。</p>
+
+<h2>6.新建hive-env.sh文件并进行修改</h2>
+
+<pre>
+<code>cd $HIVE_CONF_DIR
+cp hive-env.sh.template hive-env.sh #基于模板创建hive-env.sh
+vim hive-env.sh #编辑配置文件并加入以下配置：
+-------------------------------------------------
+export JAVA_HOME=/all/java/jdk1.8
+export HADOOP_HOME=/home/hadoop/soft/hadoop-2.7.7
+export HIVE_CONF_DIR=/home/nosql/hive/apache-hive-2.3.3-bin/conf
+export HIVE_AUX_JARS_PATH=/home/nosql/hive/apache-hive-2.3.3-bin/lib</code><code>
+--------------------------------------------------</code></pre>
+
+<h2>7.分发Hive分别到slave1,slave2上&nbsp;</h2>
+
+<p>scp -r /home/nosql/hive hadoop@SlaveA:/home/nosql/</p>
+
+<p>scp -r /home/nosql/hive hadoop@SlaveB:/home/nosql/</p>
+
+<p>单独同步配置：</p>
+
+<p>scp -r /home/nosql/hive/apache-hive-2.3.3-bin/conf hadoop@SlaveB:/home/nosql/hive/apache-hive-2.3.3-bin/</p>
+
+<p>配置环境变量如同master。</p>
+
+<h2>8.测试Hive</h2>
+
+<p>进入到Hive的安装目录，命令行：&nbsp;<br />
+cd $HIVE_HOME/bin<br />
+./hive --service metastore &amp;<br />
+./hive --service hiveserver2 &amp;<br />
+./hive</p>
+
+<p>hive&gt; show tables;<br />
+OK<br />
+Time taken: 1.995 seconds</p>
+
+<p>&nbsp;</p>

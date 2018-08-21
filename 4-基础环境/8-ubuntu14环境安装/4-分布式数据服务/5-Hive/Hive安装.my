@@ -1,0 +1,132 @@
+<h2><a href="https://www.cnblogs.com/andy6/p/7536958.html" id="cb_post_title_url">Hive之 hive-1.2.1 + hadoop 2.7.4 集群安装</a></h2>
+
+<p>一、 相关概念</p>
+
+<p>Hive Metastore有三种配置方式，分别是：</p>
+
+<p>Embedded Metastore Database (Derby) 内嵌模式<br />
+Local Metastore Server 本地元存储<br />
+Remote Metastore Server 远程元存储<br />
+1.1 Metadata、Metastore作用</p>
+
+<p>metadata即元数据。元数据包含用Hive创建的database、tabel等的元信息。<br />
+元数据存储在关系型数据库中。如Derby、MySQL等。</p>
+
+<p>Metastore的作用是：客户端连接metastore服务，metastore再去连接MySQL数据库来存取元数据。有了metastore服务，就可以有多个客户端同时连接，而且这些客户端不需要知道MySQL数据库的用户名和密码，只需要连接metastore 服务即可。</p>
+
+<p>1.2三种配置方式区别</p>
+
+<p>内嵌模式使用的是内嵌的Derby数据库来存储元数据，也不需要额外起Metastore服务。这个是默认的，配置简单，但是一次只能一个客户端连接，适用于用来实验，不适用于生产环境。</p>
+
+<p>本地元存储和远程元存储都采用外部数据库来存储元数据，目前支持的数据库有：MySQL、Postgres、Oracle、MS SQL Server.在这里我们使用MySQL。</p>
+
+<p>本地元存储和远程元存储的区别是：本地元存储不需要单独起metastore服务，用的是跟hive在同一个进程里的metastore服务。远程元存储需要单独起metastore服务，然后每个客户端都在配置文件里配置连接到该metastore服务。远程元存储的metastore服务和hive运行在不同的进程里。</p>
+
+<p>在生产环境中，建议用远程元存储来配置Hive Metastore。</p>
+
+<p>&nbsp;</p>
+
+<p>前提： 已经安装好三个节点的 hadoop 集群，参考&nbsp;http://blog.csdn.net/zhang123456456/article/details/77621487<br />
+这里选用mySql作为元数据库，将mySql和Hive安装在master服务器上&nbsp;<br />
+统一给放到/usr/local/hadoop<br />
+<br />
+1.下载安装文件，并解压：&nbsp;<br />
+cd /home/nosql/hive<br />
+wget https://mirrors.cnnic.cn/apache/hive/hive-2.3.3/apache-hive-2.3.3-bin.tar.gz<br />
+tar -zxvf apache-hive-2.3.3-bin.tar.gz -C /home/nosql/hive</p>
+
+<p>如果 hive 有专属的用户，记得赋权<br />
+chown -R hadoop:hadoop /home/nosql/hive/apache-hive-2.3.3-bin</p>
+
+<p>2.设置环境变量<br />
+sudo vim /etc/profile<br />
+在最后加上<br />
+export HIVE_HOME=/home/nosql/hive/apache-hive-1.2.1-bin（这儿是你的hive的解压路径）<br />
+export PATH=$PATH:$HIVE_HOME/bin<br />
+source /etc/profile -&gt;使配置文件生效</p>
+
+<p>安装mysql ， 参考&nbsp;http://blog.csdn.net/zhang123456456/article/details/53608554 ，注意MySQL数据库不能设置为BINLOG_FORMAT = STATEMENT，否则报Cannot execute statement: impossible to write to binary log 。</p>
+
+<p>3. 在 mysql 数据库中创建 hive 专属数据库 与 用户<br />
+mysql -u root -p -&gt;输入之后会提示你输入之前你设置的root密码<br />
+create database hiveDB; -&gt; 建立数据库<br />
+create user &#39;hive&#39; identified by &#39;hive&#39;; -&gt;创建用户<br />
+grant all privileges on hivedb.* to &#39;hive&#39;@&#39;%&#39; identified by &#39;hive&#39;; -&gt;将允许从任意地点登陆的hive用户对hiveDB数据库的所有表执行增删查改四种操作<br />
+flush privileges; -&gt; 刷新系统权限表</p>
+
+<p>4.拷贝JDBC驱动包&nbsp;<br />
+将mySql的JDBC驱动包复制到Hive的lib目录下&nbsp;<br />
+cp mysql-connector-java-5.1.34-bin.jar&nbsp;&nbsp;/usr/local/hadoop/apache-hive-1.2.1-bin/lib</p>
+
+<p><br />
+5.修改Hive配置文件:&nbsp;<br />
+cd apache-hive-1.2.1-bin/conf/<br />
+cp hive-default.xml.template hive-site.xml<br />
+vi hive-site.xml &nbsp;#修改相应配置</p>
+
+<p>hive.exec.scratchdir &nbsp; &nbsp; &nbsp; ##&nbsp;所有${system:java.io.tmpdir}和@{system:user.name<em><em>} &nbsp;都替换掉</em></em></p>
+
+<p><em>/usr/local/hadoop/apache-hive-1.2.1-bin/iotmp</em></p>
+
+<p>javax.jdo.option.ConnectionURL<br />
+jdbc:mysql://HadoopMaster:3306/hivedb?useUnicode=true&amp;amp;characterEncoding=UTF-8&amp;amp;createDatabaseIfNotExist=true</p>
+
+<p>jdbc:mysql://hadp-master:3306/hivedb?useUnicode=true&amp;amp;createDatabaseIfNotExist=true</p>
+
+<p>javax.jdo.option.ConnectionDriverName<br />
+com.mysql.jdbc.Driver</p>
+
+<p>javax.jdo.option.ConnectionUserName<br />
+hive</p>
+
+<p>javax.jdo.option.ConnectionPassword<br />
+hive</p>
+
+<p>hive.metastore.warehouse.dir<br />
+/user/hive/warehouse<br />
+location of default database for the warehouse</p>
+
+<p><br />
+<img alt="" src="https://images2017.cnblogs.com/blog/824142/201709/824142-20170917191702016-298255007.png" style="height:315px; width:800px" /></p>
+
+<p><img alt="" src="https://images2017.cnblogs.com/blog/824142/201709/824142-20170917191834078-130303345.png" style="height:81px; width:800px" /></p>
+
+<p><img alt="" src="https://images2017.cnblogs.com/blog/824142/201709/824142-20170917191934641-1981497126.png" style="height:135px; width:800px" /></p>
+
+<p>&nbsp;</p>
+
+<p>说明：<br />
+hive.exec.scratchdir-&gt;执行HIVE操作访问HDFS用于临时存储数据的目录。目录权限设置为733。我这儿用的是/tmp/hive目录。<br />
+javax.jdo.option.ConnectionURL -&gt; 设置hive通过JDBC链接MYSQL数据库存储metastore存放的数据库地址<br />
+javax.jdo.option.ConnectionDriverName -&gt;设置链接mysql的驱动名称。<br />
+javax.jdo.option.ConnectionUserName -&gt; 设置存储metastore内容的数据库用户名<br />
+javax.jdo.option.ConnectionPassword -&gt; 设置存储metastore内容的数据库用户名密码<br />
+hive.metastore.warehouse.dir -&gt; 设置用于存放hive元数据的目录位置，改配置有三种模式，内嵌模式，本地元数据，远程元数据。如果hive.metastore.uris是空，则是本地模式。否则则是远程模式。</p>
+
+<p>②配置hive-env.sh，这个文件也是没有的，是hive-env.sh.template复制过来的</p>
+
+<p>sudo cp hive-env.sh.template hive-env.sh<br />
+sudo vim hive-env.sh<br />
+将jdk的路径和hadoop的家目录导入到这个文件中：<br />
+export&nbsp;JAVA_HOME=/usr/local/jdk1.8.0_131<br />
+export&nbsp;HADOOP_HOME=/usr/local/hadoop/hadoop-2.7.4/</p>
+
+<p>6.分发Hive分别到slave1,slave2上&nbsp;<br />
+scp -r /usr/local/hadoop/apache-hive-1.2.1-bin hadp-node1:/usr/local/hadoop/&nbsp;<br />
+scp -r /usr/local/hadoop/apache-hive-1.2.1-bin hadp-node2:/usr/local/hadoop/</p>
+
+<p>配置环境变量如同master。</p>
+
+<p>&nbsp;</p>
+
+<p>7.测试Hive</p>
+
+<p>进入到Hive的安装目录，命令行：&nbsp;<br />
+cd $HIVE_HOME/bin<br />
+./hive --service metastore &amp;<br />
+./hive --service hiveserver2 &amp;<br />
+./hive</p>
+
+<p>hive&gt; show tables;<br />
+OK<br />
+Time taken: 1.995 seconds</p>
