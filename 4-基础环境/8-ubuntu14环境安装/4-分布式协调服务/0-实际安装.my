@@ -1,0 +1,229 @@
+<h1>分布式Apache ZooKeeper-3.5.3集群安装</h1>
+
+<p>Apache ZooKeeper是一个为分布式应用所设计的开源协调服务，其设计目的是为了减轻分布式应用程序所承担的协调任务。它可以为用户提供同步、配置管理、分组和命名等服务。在这里，对ZooKeeper的完全分布式集群安装部署进行介绍。</p>
+
+<h2>&nbsp;一、基本环境</h2>
+
+<p>JDK　　　 ：1.8.0_11&nbsp;（要求1.6+）</p>
+
+<p>ZooKeeper：3.5.3</p>
+
+<p>主机数：3（要求3+，且必须是奇数，因为ZooKeeper的选举算法）</p>
+
+<table border="0" cellpadding="0" cellspacing="0">
+	<tbody>
+		<tr>
+			<td>主机名</td>
+			<td>ZooKeeper</td>
+			<td>myid</td>
+		</tr>
+		<tr>
+			<td>master</td>
+			<td>server.1　</td>
+			<td>1</td>
+		</tr>
+		<tr>
+			<td>slaveA</td>
+			<td>server.2　</td>
+			<td>2</td>
+		</tr>
+		<tr>
+			<td>slaveB</td>
+			<td>server.3　</td>
+			<td>3</td>
+		</tr>
+	</tbody>
+</table>
+
+<h2>二、master节点上安装配置</h2>
+
+<p>1、下载并解压ZooKeeper-3.5.3.tar.gz</p>
+
+<p>wget http://mirrors.hust.edu.cn/apache/zookeeper/zookeeper-3.5.3-beta/zookeeper-3.5.3-beta.tar.gz</p>
+
+<pre>
+tar -zxvf zookeeper-3.5.3-beta.tar.gz</pre>
+
+<p>wget 下载下来的压缩包可能解压失败，改为tar -xvf就可以了。</p>
+
+<p>这里路径为&nbsp;/all/zookeeper/soft/zookeeper-3.5.3</p>
+
+<p>2、设置the Java heap size &nbsp;（个人感觉一般不需要配置）</p>
+
+<p>保守地use a maximum heap size of 3GB for a 4GB machine</p>
+
+<p>3、$ZOOKEEPER_HOME/conf/zoo.cfg</p>
+
+<pre>
+cp zoo_sample.cfg zoo.cfg</pre>
+
+<p>&nbsp;　　新建此配置文件，并设置内容</p>
+
+<pre>
+# The number of milliseconds of each tick
+tickTime=2000
+# The number of ticks that the initial 
+# synchronization phase can take
+initLimit=10
+# The number of ticks that can pass between 
+# sending a request and getting an acknowledgement
+syncLimit=5
+# the directory where the snapshot is stored.
+# do not use /tmp for storage, /tmp here is just 
+# example sakes.
+<strong>dataDir=/all/zookeeper/data/tmp</strong>
+# the port at which the clients will connect
+clientPort=2181
+</pre>
+
+<p>　server.1=master:2888:3888<br />
+　server.2=slave1:2888:3888<br />
+　server.3=slave2:2888:3888</p>
+
+<p>4、/home/fesh/data/zookeeper/myid</p>
+
+<p>　　在节点配置的dataDir指定的目录下面，创建一个myid文件，里面内容为一个数字，用来标识当前主机，$ZOOKEEPER_HOME/conf/zoo.cfg文件中配置的server.X，则myid文件中就输入这个数字X。（即在每个节点上新建并设置文件myid，其内容与zoo.cfg中的id相对应）这里master节点为 1</p>
+
+<pre>
+mkdir -p /home/fesh/data/zookeeper
+cd /home/fesh/data/zookeeper
+touch myid
+echo &quot;1&quot; &gt; myid</pre>
+
+<p>5、设置日志</p>
+
+<p>conf/log4j.properties</p>
+
+<pre>
+# Define some default values that can be overridden by system properties
+zookeeper.root.logger=INFO, CONSOLE</pre>
+
+<p>改为</p>
+
+<pre>
+# Define some default values that can be overridden by system properties  
+zookeeper.root.logger=INFO, ROLLINGFILE</pre>
+
+<p>将</p>
+
+<pre>
+#
+# Add ROLLINGFILE to rootLogger to get log file output
+#    Log DEBUG level and above messages to a log file
+log4j.appender.ROLLINGFILE=org.apache.log4j.RollingFileAppender</pre>
+
+<p>改为---每天一个log日志文件，而不是在同一个log文件中递增日志</p>
+
+<pre>
+#
+# Add ROLLINGFILE to rootLogger to get log file output
+#    Log DEBUG level and above messages to a log file
+log4j.appender.ROLLINGFILE=org.apache.log4j.DailyRollingFileAppender</pre>
+
+<p>&nbsp;</p>
+
+<p>bin/zkEvn.sh</p>
+
+<pre>
+if [ &quot;x${ZOO_LOG_DIR}&quot; = &quot;x&quot; ]
+then
+    ZOO_LOG_DIR=&quot;.&quot;
+fi
+
+if [ &quot;x${ZOO_LOG4J_PROP}&quot; = &quot;x&quot; ]
+then
+    ZOO_LOG4J_PROP=&quot;INFO,CONSOLE&quot;
+fi
+</pre>
+
+<p>改为</p>
+
+<pre>
+if [ &quot;x${ZOO_LOG_DIR}&quot; = &quot;x&quot; ]
+then
+    ZOO_LOG_DIR=&quot;$ZOOBINDIR/../logs&quot;
+fi
+
+if [ &quot;x${ZOO_LOG4J_PROP}&quot; = &quot;x&quot; ]
+then
+    ZOO_LOG4J_PROP=&quot;INFO,ROLLINGFILE&quot;
+fi</pre>
+
+<p>&nbsp;</p>
+
+<p>&nbsp;参考：Zookeeper运维的一些经验</p>
+
+<p>&nbsp;http://mp.weixin.qq.com/s?__biz=MzAxMjQ5NDM1Mg==&amp;mid=2651024176&amp;idx=1&amp;sn=7659ea6a7bf5c37b083e30060c3e55ca&amp;chksm=8047384fb730b1591ff1ce7081822577112087fc7ec3976f020a263b503f6a8ef0856b3a3057&amp;scene=0#wechat_redirect&amp;utm_source=tuicool&amp;utm_medium=referral</p>
+
+<h2>三、从master节点分发文件到其他节点</h2>
+
+<p>1、在master节点的/home/fesh/目录下</p>
+
+<pre>
+scp -r zookeeper-3.4.6 slave1:~/
+scp -r zookeeper-3.4.6 slave2:~/
+scp -r data slave1:~/
+scp -r data slave2:~/</pre>
+
+<p>2、在slave1节点的/home/fesh/目录下</p>
+
+<pre>
+vi ./data/zookeeper/myid</pre>
+
+<p>修改为&nbsp;2</p>
+
+<p>3、在slave2节点的/home/fesh/目录下</p>
+
+<pre>
+vi ./data/zookeeper/myid</pre>
+
+<p>修改为&nbsp;3</p>
+
+<h2>四、其他配置</h2>
+
+<p>1、在每个节点配置/etc/hosts （并保证每个节点/etc/hostname中分别为master、slave1、slave2）&nbsp;主机 -IP地址映射</p>
+
+<pre>
+192.168.145.129    master
+192.168.145.130    slave1
+192.168.145.131    slave2</pre>
+
+<p>2、在每个节点配置环境变量/etc/profile</p>
+
+<pre>
+export ZOOKEEPER_HOME=/all/zookeeper/soft/zookeeper-3.5.3
+export PATH=$PATH:$ZOOKEEPER_HOME/bin</pre>
+
+<h2>五、启动</h2>
+
+<p>&nbsp;在每个节点上$ZOOKEEPER_HOME目录下，运行 （这里的启动顺序为 master &gt; &nbsp;slave1 &gt; &nbsp;slave2 ）</p>
+
+<pre>
+bin/zkServer.sh start</pre>
+
+<p>并用命令查看启动状态</p>
+
+<pre>
+bin/zkServer.sh status</pre>
+
+<p>master节点</p>
+
+<p><img alt="" src="https://images0.cnblogs.com/i/582587/201408/151352286398995.jpg" /></p>
+
+<p>slave1节点</p>
+
+<p><img alt="" src="https://images0.cnblogs.com/i/582587/201408/151352385149445.jpg" /></p>
+
+<p>slave2节点</p>
+
+<p>&nbsp;<img alt="" src="https://images0.cnblogs.com/i/582587/201408/151352469361652.jpg" /></p>
+
+<p>（注：之前我配置正确的，但是一直都是，每个节点上都启动了，但就是互相连接不上，最后发现好像是防火墙的原因，啊啊啊！一定要先把防火墙关了！ &nbsp;sudo ufw disable&nbsp;）</p>
+
+<p>&nbsp;查看$ZOOKEEPER_HOME/zookeeper.out&nbsp;日志，会发现开始会报错，但当leader选出来之后 就没有问题了。</p>
+
+<p>参考：</p>
+
+<p>1、<a href="http://zookeeper.apache.org/doc/r3.4.6/zookeeperAdmin.html" target="_blank">http://zookeeper.apache.org/doc/r3.4.6/zookeeperAdmin.html</a></p>
+
+<p>2、一个很好的博客<a href="http://www.blogjava.net/hello-yun/archive/2012/05/03/377250.html" target="_blank">http://www.blogjava.net/hello-yun/archive/2012/05/03/377250.html</a></p>
