@@ -34,7 +34,17 @@ Ubuntu刚安装后，不能在terminal中运行su命令，因为root没有默认
 
 解决Xshell无法使用root远程登录Ubuntu16服务器
 
-在ubuntu服务器安装ssh无服务。sudo apt-get install openssh-server
+在ubuntu服务器安装ssh服务
+
+更新源列表  
+sudo apt-get update  
+
+安装openssh-server  
+sudo apt-get install openssh-server  
+
+启动ssh服务  
+sudo service ssh start
+
 
 ## 问题现象2：
 
