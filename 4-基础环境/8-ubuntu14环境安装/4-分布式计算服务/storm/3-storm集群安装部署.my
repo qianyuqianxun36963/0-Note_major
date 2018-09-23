@@ -1,0 +1,112 @@
+<h1>Storm集群的安装配置</h1>
+
+<p>　　Storm集群的安装分为以下几步：</p>
+
+<p>　　1、首先保证Zookeeper集群服务的正常运行以及必要组件的正确安装</p>
+
+<p>　　2、下载安装包，释放压缩包</p>
+
+<p>　　3、修改storm.yaml添加集群配置信息</p>
+
+<p>　　4、使用storm脚本启动相应服务并查看服务状态</p>
+
+<p>　　5、通过web查看storm集群的状态</p>
+
+<h2>保证Zookeeper集群服务的正常运行</h2>
+
+<p>　　安装Storm之前首先保证之前安装的Zookeeper服务正常运行，包括配置hosts映射，主机名修改，防火墙都已经设置完好</p>
+
+<p>　　Storm是由java编写，因此必须依赖JDK运行，系统首先应正确安装JDK</p>
+
+<p>　　部分需要依赖Python，红帽系列Linux默认Python版本是2.6.6，可以满足要求；Linux可以安装多个版本Python共存，生产过程中建议Python版本为2.7.x</p>
+
+<p>　　这里测试使用的三台虚拟机主机名分别是：hadoopha，hadoop1，hadoop2</p>
+
+<h2>下载安装包，释放压缩包</h2>
+
+<p>　　首先去Apache Storm官网下载安装包，网址是：http://storm.apache.org/，进入后点击上方DOWNLOAD按钮，进入下载列表</p>
+
+<p>　　这里下载的是storm 0.9.5的版本，下载之后上传到服务器目录下，释放并且放到指定的目录：</p>
+
+<pre>
+$ tar -xvzf apache-storm-0.9.5.tar.gz
+$ mv apache-storm-0.9.5 /usr/
+$ cd /usr/apache-storm-0.9.5</pre>
+
+<h2>修改配置文件storm.yaml</h2>
+
+<p>　　接下来需要修改配置文件storm.yaml，执行vim conf/storm.yaml打开文件：</p>
+
+<p>　　去掉storm.zookeeper.servers:前面的注释，修改为集群中所有部署zookeeper的主机，当然都可以自己手动添加，具体配置如下：</p>
+
+<p>　　<img alt="" src="https://images2015.cnblogs.com/blog/734555/201602/734555-20160203114023710-2044385303.png" /></p>
+
+<p>　　增加storm.local.dir选项，指定nimbus，supervisor进程用于存储少量的状态数据，比如jar包，配置文件等</p>
+
+<p>　　<img alt="" src="https://images2015.cnblogs.com/blog/734555/201602/734555-20160203114306725-1788797743.png" style="height:77px; width:384px" /></p>
+
+<p>　　待会写好配置文件我们需要手动建立这个目录</p>
+
+<p>　　下面指定supervisor工作节点，需要配置该节点可以运行的worker数量，每个worker占用一个端口用于接收消息，最多分配5个；默认情况下每个节点可以运行4个worker，分别在6700、6701、6702、6703端口，这里定义3个端口，代表最多运行3个worker：</p>
+
+<p>　　<img alt="" src="https://images2015.cnblogs.com/blog/734555/201602/734555-20160203114753679-1994840238.png" /></p>
+
+<p>　　下面设置集群主机，让集群中所有的节点可以从主机下载拓扑以及配置文件，主机上运行的就是nimbus，而其他节点就是supervisor进程，这里hadoopha为nimbus，而hadoop1和hadoop2为supervisor，所以配置如下：</p>
+
+<p>　　<img alt="" src="https://images2015.cnblogs.com/blog/734555/201602/734555-20160203115051491-615886324.png" /></p>
+
+<p>　　下面配置storm集群的drpc地址，这里就是hadoopha，实际中可以自己定义：</p>
+
+<p>　　<img alt="" src="https://images2015.cnblogs.com/blog/734555/201602/734555-20160203115225179-1763651527.png" /></p>
+
+<p>　　最后配置storm进程的分配内存，默认情况下Storm启动worker进程时，JVM的最大内存是768M，由于在使用过程中，Bolt中加载大量数据，768M内存无法满足要求，会导致内存溢出，应该根据实际情况进行修改，这里设置为2G</p>
+
+<p>　　<img alt="" src="https://images2015.cnblogs.com/blog/734555/201602/734555-20160203115539866-25328381.png" /></p>
+
+<p>　　以上设置没问题，保存配置文件并退出</p>
+
+<p>　　然后在3台主机分别创建上面设置的数据目录，必须都要创建：</p>
+
+<pre>
+mkdir -p /usr/data/storm</pre>
+
+<p>　　上面的配置是在hadoopha上配置的，接下来要把storm目录发送到hadoop1和hadoop2：</p>
+
+<pre>
+$ scp -r apache-storm-0.9.5 hadoop1:/usr/
+$ scp -r apache-storm-0.9.5 hadoop2:/usr/</pre>
+
+<p>　　发送之后，进入storm安装目录，开始启动相应服务</p>
+
+<p>　　首先启动Nimbus服务，只在hadoopha上执行：</p>
+
+<p><strong><span style="font-size:14px">nohup bin/storm nimbus &gt;&gt; /dev/null &amp;</span></strong></p>
+
+<p>　　上面命令的意思是丢弃输出信息并且放到后台执行，稍微等一下，执行jps查看nimbus进程是否启动：</p>
+
+<p>　　<img alt="" src="https://images2015.cnblogs.com/blog/734555/201602/734555-20160203120357163-531782277.png" /></p>
+
+<p>　　然后在hadoop1，hadoop2节点都启动Supervisor服务：</p>
+
+<pre>
+nohup bin/storm supervisor &gt;&gt; /dev/null &amp;</pre>
+
+<p>　　稍等一下，也可以用jps查看到supervisor进程，</p>
+
+<p>　　然后在配置drpc的主机hadoopha，drpc是一种后台服务，用于执行和storm相同的计算，但是比较节省资源，一般和nimbus使用同一台主机即可；执行以下命令启动drpc服务：</p>
+
+<pre>
+nohup bin/storm drpc &gt;&gt; /dev/null &amp;</pre>
+
+<p>　　稍等一下可以分别通过jps命令查看到drpc进程，</p>
+
+<p>　　最后在nimbus节点也就是hadoopha执行以下命令，启动UI服务：</p>
+
+<pre>
+nohup bin/storm ui &gt;&gt; /dev/null &amp;</pre>
+
+<p>　　通过jps可以查看core进程是否启动，启动之后通过访问hadoopha的ip即可进入web管理界面：http://192.168.1.42:8080</p>
+
+<p>　　<img alt="" src="https://images2015.cnblogs.com/blog/734555/201602/734555-20160203121238741-2071770089.png" style="height:356px; width:663px" /></p>
+
+<p>　　到这里基本的storm集群就配置完毕了</p>
