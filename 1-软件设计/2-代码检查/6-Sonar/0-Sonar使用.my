@@ -1,0 +1,336 @@
+<h1>持续集成之代码质量管理-Sonar</h1>
+
+<h2>Sonar介绍</h2>
+
+<p>　　Sonar 是一个用于代码质量管理的开放平台。通过插件机制，Sonar 可以集成不同的<a href="http://lib.csdn.net/base/softwaretest" target="_blank" title="软件测试知识库">测试</a>工具，代码分析工具，以及持续集成工具。与持续集成工具（例如&nbsp;<code>Hudson/Jenkins 等</code>）不同，Sonar 并不是简单地把不同的代码检查工具结果（例如&nbsp;<code>FindBugs，PMD</code>&nbsp;等）直接显示在 Web 页面上，而是通过不同的插件对这些结果进行再加工处理，通过量化的方式度量代码质量的变化，从而可以方便地对不同规模和种类的工程进行代码质量管理。&nbsp;<br />
+　　在对其他工具的支持方面，Sonar 不仅提供了对&nbsp;<code>IDE</code>&nbsp;的支持，可以在&nbsp;<code>Eclipse</code>和&nbsp;<code>IntelliJ IDEA</code>&nbsp;这些工具里联机查看结果；同时 Sonar 还对大量的持续集成工具提供了接口支持，可以很方便地在持续集成中使用 Sonar。&nbsp;<br />
+　　此外，Sonar 的插件还可以对&nbsp;<code><a href="http://lib.csdn.net/base/javase" target="_blank" title="Java SE知识库">Java</a></code>&nbsp;以外的其他编程语言提供支持，对国际化以及报告文档化也有良好的支持。</p>
+
+<h2>Sonar部署</h2>
+
+<p>　　Sonar的相关下载和文档可以在下面的链接中找到：<a href="http://www.sonarqube.org/downloads/">http://www.sonarqube.org/downloads/</a>。需要注意最新版的Sonar需要至少<code>JDK 1.8</code>及以上版本。</p>
+
+<p>　上篇文章我们已经可以成功的使用<a href="http://lib.csdn.net/base/git" target="_blank" title="Git知识库">Git</a>进行拉去，Sonar的功能就是来检查代码是否有BUG。除了检查代码是否有bug还有其他的功能，比如说：你的代码注释率是多少，代码有一些建议，编写语法的建议。所以我们叫质量管理</p>
+
+<p>Sonar还可以给代码打分，并且引用了技术宅的功能（告诉你有很多地方没改）</p>
+
+<p><strong>Sonar部署</strong></p>
+
+<pre>
+<code>[root@linux-node1 ~]# yum install -y java-1.8.0
+[root@linux-node1 ~]# cd /usr/local/src
+软件包我们通过wget或者下载，rz上传到服务器
+#软件包下载：https://sonarsource.bintray.com/Distribution/sonarqube/sonarqube-5.6.zip
+
+[root@linux-node1 src]# unzip sonarqube-5.6.zip
+[root@linux-node1 src]# mv sonarqube-5.6 /usr/local/
+[root@linux-node1 src]# ln -s /usr/local/sonarqube-5.6/ /usr/local/sonarqube</code></pre>
+
+<p><strong>准备Sonar<a href="http://lib.csdn.net/base/mysql" target="_blank" title="MySQL知识库">数据库</a></strong>&nbsp;<br />
+如果没有数据库请执行<code>yum install -y mariadb mariadb-server</code></p>
+
+<pre>
+<code>[root@linux-node1 ~]# systemctl start mariadb
+[root@linux-node1 ~]# systemctl enable mariadb
+Created symlink from /etc/systemd/system/multi-user.target.wants/mariadb.service to /usr/lib/systemd/system/mariadb.service.
+[root@linux-node1 ~]# mysql_secure_installation
+[root@linux-node1 ~]# mysql -uroot -p123456</code></pre>
+
+<p><strong>特别提示：</strong>&nbsp;<br />
+<img alt="image_1b4i40r9q13m916p9jqke68au39.png-106.4kB" src="http://static.zybuluo.com/abcdocker/hbmts3ozghgtpkxsrrnk6o21/image_1b4i40r9q13m916p9jqke68au39.png" style="height:151px; width:800px" title="" /></p>
+
+<p>sonar好像不支持<code><a href="http://lib.csdn.net/base/mysql" target="_blank" title="MySQL知识库">MySQL</a>&nbsp;5.5</code>，所以如果看日志出现以上error 请安装<code>mysql5.6</code>&nbsp;或者更高版本&nbsp;<br />
+<a href="http://blog.csdn.net/onothing12345/article/details/49910087">http://blog.csdn.net/onothing12345/article/details/49910087</a></p>
+
+<p><strong>执行sql语句</strong></p>
+
+<pre>
+<code>mysql&gt; CREATE DATABASE sonar CHARACTER SET utf8 COLLATE utf8_general_ci;
+mysql&gt; GRANT ALL ON sonar.* TO &#39;sonar&#39;@&#39;localhost&#39; IDENTIFIED BY &#39;sonar@pw&#39;;
+mysql&gt; GRANT ALL ON sonar.* TO &#39;sonar&#39;@&#39;%&#39; IDENTIFIED BY &#39;sonar@pw&#39;;
+mysql&gt; FLUSH PRIVILEGES;</code></pre>
+
+<p><strong>配置Sonar</strong></p>
+
+<pre>
+<code>[root@linux-node1 ~]#  cd /usr/local/sonarqube/conf/
+[root@linux-node1 conf]# ls
+sonar.properties  wrapper.conf</code></pre>
+
+<p>编写配置文件，修改数据库配置</p>
+
+<pre>
+<code>[root@linux-node1 conf]# vim sonar.properties
+#我们只需要去配置文件里面修改数据库的认证即可
+
+ 14 sonar.jdbc.username=sonar            #数据库用户
+ 15 sonar.jdbc.password=sonar@pw     #数据库密码
+ 23 sonar.jdbc.url=jdbc:mysql://localhost:3306/sonar?useUnicode=true&amp;character    Encoding=utf8&amp;rewriteBatchedStatements=true&amp;useConfigs=maxPerformance</code></pre>
+
+<p><strong>配置Java访问数据库驱动(可选)</strong>&nbsp;<br />
+　　默认情况Sonar有自带的嵌入的数据库，那么你如果使用类是<a href="http://lib.csdn.net/base/oracle" target="_blank" title="Oracle知识库">Oracle</a>数据库，必须手动复制驱动类到<code>${SONAR_HOME}/extensions/jdbc-driver/oracle/</code>目录下，其它支持的数据库默认提供了驱动。其它数据库的配置可以参考官方文档：&nbsp;<br />
+<a href="http://docs.sonarqube.org/display/HOME/SonarQube+Platform">http://docs.sonarqube.org/display/HOME/SonarQube+Platform</a></p>
+
+<p><strong>启动Sonar</strong>&nbsp;<br />
+　　你可以在Sonar的配置文件来配置Sonar Web监听的IP地址和端口，默认是9000端口。</p>
+
+<pre>
+<code>[root@linux-node1 conf]# vim sonar.properties
+ 99 #sonar.web.host=0.0.0.0
+106 #sonar.web.port=9000</code></pre>
+
+<p>启动命令如下：</p>
+
+<pre>
+<code>[root@linux-node1 ~]# /usr/local/sonarqube/bin/linux-x86-64/sonar.sh start
+Starting SonarQube...
+Started SonarQube.</code></pre>
+
+<p>如果有什么问题可以看一下日志<code>[/usr/local/sonarqube/logs/sonar.log]</code></p>
+
+<p><strong>检查是否有相应的端口</strong></p>
+
+<pre>
+<code>[root@linux-node1 ~]# netstat -lntup
+Active Internet connections (only servers)
+Proto Recv-Q Send-Q Local Address           Foreign Address         State       PID/Program name
+tcp        0      0 127.0.0.1:8080          0.0.0.0:*               LISTEN      2239/unicorn master
+tcp        0      0 0.0.0.0:80              0.0.0.0:*               LISTEN      505/nginx: master p
+tcp        0      0 0.0.0.0:22              0.0.0.0:*               LISTEN      569/sshd
+tcp        0      0 127.0.0.1:25            0.0.0.0:*               LISTEN      971/master
+tcp        0      0 127.0.0.1:43163         0.0.0.0:*               LISTEN      5205/java
+tcp        0      0 0.0.0.0:8060            0.0.0.0:*               LISTEN      505/nginx: master p
+tcp        0      0 127.0.0.1:32000         0.0.0.0:*               LISTEN      4925/java
+tcp        0      0 0.0.0.0:43044           0.0.0.0:*               LISTEN      4952/java
+tcp        0      0 0.0.0.0:33350           0.0.0.0:*               LISTEN      5205/java
+tcp        0      0 0.0.0.0:9000            0.0.0.0:*               LISTEN      5011/java
+tcp        0      0 0.0.0.0:33385           0.0.0.0:*               LISTEN      5011/java
+tcp        0      0 127.0.0.1:9001          0.0.0.0:*               LISTEN      4952/java
+tcp6       0      0 :::3306                 :::*                    LISTEN      4658/mysqld
+tcp6       0      0 :::34993                :::*                    LISTEN      2348/java
+tcp6       0      0 :::8081                 :::*                    LISTEN      2348/java
+tcp6       0      0 :::22                   :::*                    LISTEN      569/sshd
+tcp6       0      0 ::1:25                  :::*                    LISTEN      971/master
+udp6       0      0 :::33848                :::*                                2348/java
+udp6       0      0 :::5353                 :::*                                2348/java</code></pre>
+
+<p>#端口是9000哦！</p>
+
+<p>Web登陆：IP:9000&nbsp;<br />
+<img alt="image_1b4i4e3gkdp51k4t1poe16ul1ec4m.png-113.5kB" src="http://static.zybuluo.com/abcdocker/c6zzx8fexijhsgn7g4hiyssh/image_1b4i4e3gkdp51k4t1poe16ul1ec4m.png" style="height:399px; width:800px" title="" /></p>
+
+<p><strong>提示：</strong>&nbsp;<br />
+sonar跟jenkins类似，也是以插件为主&nbsp;<br />
+sonar安装插件有2种方式：第一种将插件下载完存放在sonar的插件目录，第二种使用web界面来使用安装&nbsp;<br />
+存放插件路径<code>[/usr/local/sonarqube/extensions/plugins/]</code></p>
+
+<p><strong>安装中文插件</strong>&nbsp;<br />
+登陆：用户名：<code>admin</code>&nbsp;密码：<code>admin</code>&nbsp;<br />
+<img alt="image_1b4i53iocg3i1npe1kfb1u6dti413.png-85.8kB" src="http://static.zybuluo.com/abcdocker/oaitz35wmjjsgu3h1th440rf/image_1b4i53iocg3i1npe1kfb1u6dti413.png" style="height:514px; width:800px" title="" />&nbsp;<br />
+<img alt="image_1b4i53qtans06132qg1go31pmj1g.png-80.5kB" src="http://static.zybuluo.com/abcdocker/gf5vj8krbld85lue9jwnn5px/image_1b4i53qtans06132qg1go31pmj1g.png" style="height:561px; width:800px" title="" />&nbsp;<br />
+<img alt="image_1b4i540lu22s1rmr1j6jf6e1b6u1t.png-48.2kB" src="http://static.zybuluo.com/abcdocker/xbeu6kg9cd57i3zqt15a7d0e/image_1b4i540lu22s1rmr1j6jf6e1b6u1t.png" style="height:226px; width:800px" title="" />&nbsp;<br />
+<img alt="image_1b4i546qf3mjfnk1i7b1rloo642a.png-51.5kB" src="http://static.zybuluo.com/abcdocker/t8krpecgxlzugejirx38g1fb/image_1b4i546qf3mjfnk1i7b1rloo642a.png" style="height:220px; width:800px" title="" />&nbsp;<br />
+需要重启才会生效</p>
+
+<p>生效后如下图：&nbsp;<br />
+<img alt="image_1b4i56q1okim5d8l6mh2nflp34.png-109.5kB" src="http://static.zybuluo.com/abcdocker/b4lohesm71lhn9w7juqpleag/image_1b4i56q1okim5d8l6mh2nflp34.png" style="height:272px; width:800px" title="" /></p>
+
+<p><strong>我们在安装一个<a href="http://lib.csdn.net/base/php" target="_blank" title="PHP知识库">PHP</a>语言</strong>&nbsp;<br />
+<img alt="image_1b4i54ot26j61hcme15t213ue2n.png-49.9kB" src="http://static.zybuluo.com/abcdocker/44w2ovlx9dgvhd7huz4rpy18/image_1b4i54ot26j61hcme15t213ue2n.png" style="height:194px; width:800px" title="" /></p>
+
+<p><strong>温馨提示：</strong>如果下载不下来我们直接去<code>github</code>进行下载，因为我们这个插件都是使用<code>wget</code>进行下载的&nbsp;<br />
+<img alt="image_1b4i596mfft08f01nu01t1uqkv3h.png-88.9kB" src="http://static.zybuluo.com/abcdocker/h7twt9189m6vaeyi6vmwg23s/image_1b4i596mfft08f01nu01t1uqkv3h.png" style="height:444px; width:800px" title="" />&nbsp;<br />
+我们现在只能使用java的jar包和php，因为我们只安装了java和php的语言插件。如果想使用<a href="http://lib.csdn.net/base/python" target="_blank" title="Python知识库">Python</a>的程序，就需要安装Python的语言插件</p>
+
+<p><strong><code>Sonar 插件---&gt;语言插件 （分析什么语言，你就需要安装什么语言的插件）</code></strong></p>
+
+<p>Sonar通过<code>SonarQube Scanner</code>（扫描器）来对代码进行分析&nbsp;<br />
+官方文档：<a href="http://docs.sonarqube.org/display/SCAN/Analyzing+with+SonarQube+Scanner">http://docs.sonarqube.org/display/SCAN/Analyzing+with+SonarQube+Scanner</a></p>
+
+<p>下载扫描器插件</p>
+
+<pre>
+<code>[root@linux-node1 ~]# wget https://sonarsource.bintray.com/Distribution/sonar-scanner-cli/sonar-scanner-2.8.zip
+[root@linux-node1 ~]# unzip sonar-scanner-2.8.zip
+[root@linux-node1 ~]# mv sonar-scanner-2.8 /usr/local/
+[root@linux-node1 ~]# ln -s /usr/local/sonar-scanner-2.8/ /usr/local/sonar-scanner</code></pre>
+
+<p>&nbsp;</p>
+
+<p>我们要将扫描器和sonar关联起来</p>
+
+<pre>
+<code>[root@linux-node1 ~]# cd /usr/local/sonar-scanner
+[root@linux-node1 sonar-scanner]# ls
+bin  conf  lib
+[root@linux-node1 sonar-scanner]# cd conf/
+[root@linux-node1 conf]# ls
+sonar-scanner.properties
+[root@linux-node1 conf]# vim sonar-scanner.properties
+sonar.host.url=http://localhost:9000        #sonar地址
+sonar.sourceEncoding=UTF-8                  #字符集
+sonar.jdbc.username=sonar                    #数据库账号
+sonar.jdbc.password=sonar@pw              #数据库密码
+sonar.jdbc.url=jdbc:mysql://localhost:3306/sonar?useUnicode=true&amp;amp;characterEncoding=utf8    #数据库连接地址
+
+#打开注释即可</code></pre>
+
+<p>我们现在需要找一个代码进行分析。</p>
+
+<p><strong>sonar插件提供了一个代码的库</strong>&nbsp;<br />
+github:<a href="https://github.com/SonarSource/sonar-examples">https://github.com/SonarSource/sonar-examples</a>&nbsp;<br />
+我们下载软件包：<a href="https://github.com/SonarSource/sonar-examples/archive/master.zip">https://github.com/SonarSource/sonar-examples/archive/master.zip</a></p>
+
+<p><strong>解压</strong></p>
+
+<pre>
+<code>[root@linux-node1 src]# unzip sonar-examples-master.zip
+[root@linux-node1 php]# cd sonar-examples-master/projects/languages/php
+[root@linux-node1 php]# cd php-sonar-runner-unit-tests/
+[root@linux-node1 php-sonar-runner-unit-tests]# ll
+total 8
+-rw-r--r-- 1 root root 647 Dec 14 09:57 README.md
+drwxr-xr-x 2 root root  51 Dec 14 09:57 reports
+-rw-r--r-- 1 root root 346 Dec 14 09:57 sonar-project.properties
+drwxr-xr-x 3 root root  31 Dec 14 09:57 src
+drwxr-xr-x 2 root root  25 Dec 14 09:57 tests
+#这里就是PHP的目录</code></pre>
+
+<p><strong>配置文件解释：</strong>&nbsp;<br />
+如果你想让我扫描，就需要在代码路径下放一个配置文件</p>
+
+<pre>
+<code>[root@linux-node1 php-sonar-runner-unit-tests]# cat sonar-project.properties
+sonar.projectKey=org.sonarqube:php-ut-sq-scanner          #Key
+sonar.projectName=PHP :: PHPUnit :: SonarQube Scanner   #这里的名称会显示在一会的web界面上
+sonar.projectVersion=1.0                                #版本，这里的版本一会也会显示在web界面上
+
+sonar.sources=src                                      #软件包存放路径
+sonar.tests=tests
+
+sonar.language=php                                       #语言
+
+sonar.sourceEncoding=UTF-8                                 #字体
+
+# Reusing PHPUnit reports
+sonar.php.coverage.reportPath=reports/phpunit.coverage.xml
+sonar.php.tests.reportPath=reports/phpunit.xml</code></pre>
+
+<p>#也就是说在项目里面必须有这个配置文件才可以进行扫描</p>
+
+<p><strong>扫描</strong>&nbsp;<br />
+#提示：需要在项目文件里面进行执行</p>
+
+<pre>
+<code>[root@linux-node1 php-sonar-runner-unit-tests]# /usr/local/sonar-scanner/bin/sonar-scanner
+INFO: Scanner configuration file: /usr/local/sonar-scanner/conf/sonar-scanner.properties
+INFO: Project root configuration file: /usr/local/src/sonar-examples-master/projects/languages/php/php-sonar-runner-unit-tests/sonar-project.properties
+INFO: SonarQube Scanner 2.8
+INFO: Java 1.8.0_111 Oracle Corporation (64-bit)
+INFO: Linux 3.10.0-514.2.2.el7.x86_64 amd64
+INFO: User cache: /root/.sonar/cache
+INFO: Load global repositories
+INFO: Load global repositories (done) | time=211ms
+WARN: Property &#39;sonar.jdbc.url&#39; is not supported any more. It will be ignored. There is no longer any DB connection to the SQ database.
+WARN: Property &#39;sonar.jdbc.username&#39; is not supported any more. It will be ignored. There is no longer any DB connection to the SQ database.
+WARN: Property &#39;sonar.jdbc.password&#39; is not supported any more. It will be ignored. There is no longer any DB connection to the SQ database.
+INFO: User cache: /root/.sonar/cache
+INFO: Load plugins index
+INFO: Load plugins index (done) | time=3ms
+INFO: Download sonar-csharp-plugin-5.0.jar
+INFO: Download sonar-java-plugin-3.13.1.jar
+INFO: Download sonar-l10n-zh-plugin-1.11.jar
+INFO: Plugin [l10nzh] defines &#39;l10nen&#39; as base plugin. This metadata can be removed from manifest of l10n plugins since version 5.2.
+INFO: Download sonar-scm-git-plugin-1.2.jar
+INFO: Download sonar-php-plugin-2.9.1.1705.jar
+INFO: Download sonar-scm-svn-plugin-1.3.jar
+INFO: Download sonar-javascript-plugin-2.11.jar
+INFO: SonarQube server 5.6
+INFO: Default locale: &quot;en_US&quot;, source code encoding: &quot;UTF-8&quot;
+INFO: Process project properties
+INFO: Load project repositories
+.................................................
+.................................................</code></pre>
+
+<p><strong>提示：</strong>我们什么都不指定就会在当面目录下扫描<code>sonar-project.properties</code>文件，根据配置文件进行扫描工作。扫描之后我们在web界面上就可以看到代码的扫描结果</p>
+
+<p>这里的名字，版本 都是在<code>sonar-project.properties</code>文件中定义的&nbsp;<br />
+<img alt="image_1b4i615kfc791t2u2261tae11n3u.png-89.7kB" src="http://static.zybuluo.com/abcdocker/udra2um65ssm9xhmvm79691m/image_1b4i615kfc791t2u2261tae11n3u.png" style="height:325px; width:800px" title="" />&nbsp;<br />
+质量阈帮我们设定好一个阈值，超过相应的阈值就算有<code>bug</code>&nbsp;<br />
+<img alt="image_1b4i61htufea1l9n1voe1r8pgqn4b.png-75.4kB" src="http://static.zybuluo.com/abcdocker/dxe1r1jht04r4z6mkd48ge5y/image_1b4i61htufea1l9n1voe1r8pgqn4b.png" style="height:431px; width:800px" title="" /></p>
+
+<p>为了让<code>jenkins</code>可以在构建项目的时候执行<code>sonar</code>，所以我们需要在jenkins上安装插件&nbsp;<br />
+<img alt="image_1b4i6426o4sb18mp16ob4vl1evd4o.png-121.8kB" src="http://static.zybuluo.com/abcdocker/a855nbtzyis2we85afw2nj3s/image_1b4i6426o4sb18mp16ob4vl1evd4o.png" style="height:306px; width:800px" title="" /></p>
+
+<p>现在就可以进行配置，让jenkins和sonar结合在一起。这样我们构建项目的时候就会进行代码检测</p>
+
+<p><img alt="image_1b4i64e6l199910vo1u3d1tsh148k55.png-140.1kB" src="http://static.zybuluo.com/abcdocker/24l8i0t1rn9p9jh2r9fkrp0q/image_1b4i64e6l199910vo1u3d1tsh148k55.png" style="height:315px; width:800px" title="" /></p>
+
+<p><img alt="image_1b4i64kf41vglnbr4m11rl51t3r5i.png-62kB" src="http://static.zybuluo.com/abcdocker/6ag3trafkzir2ajwexkpcti5/image_1b4i64kf41vglnbr4m11rl51t3r5i.png" style="height:297px; width:800px" title="" /></p>
+
+<p>点击保存</p>
+
+<p><img alt="image_1b4i650bnnp2n7v1idt1f9o6vu5v.png-125.7kB" src="http://static.zybuluo.com/abcdocker/d6043uu8zva8psy3ch7i1cx0/image_1b4i650bnnp2n7v1idt1f9o6vu5v.png" style="height:393px; width:800px" title="" /></p>
+
+<p>配置&nbsp;<br />
+<img alt="image_1b4i65f50euu1beq19ki1bkf13ti6c.png-86.9kB" src="http://static.zybuluo.com/abcdocker/7lzycteynxzgj7tslrcv36u8/image_1b4i65f50euu1beq19ki1bkf13ti6c.png" style="height:337px; width:800px" title="" />&nbsp;<br />
+编辑我们的项目，选择最下放。找到构建&nbsp;<br />
+<img alt="image_1b4i65rj31qufmou16u417q914hn6p.png-27.2kB" src="http://static.zybuluo.com/abcdocker/ajjztdmqtir5px07ccfub06g/image_1b4i65rj31qufmou16u417q914hn6p.png" style="height:329px; width:800px" title="" />&nbsp;<br />
+对PHP文件进行复制</p>
+
+<pre>
+<code>[root@linux-node1 php-sonar-runner-unit-tests]# cat /usr/local/src/sonar-examples-master/projects/languages/php/php-sonar-runner-unit-tests/sonar-project.properties
+sonar.projectKey=org.sonarqube:php-ut-sq-scanner
+sonar.projectName=PHP :: PHPUnit :: SonarQube Scanner
+sonar.projectVersion=1.0
+
+sonar.sources=src
+sonar.tests=tests
+
+sonar.language=php
+
+sonar.sourceEncoding=UTF-8
+
+# Reusing PHPUnit reports
+sonar.php.coverage.reportPath=reports/phpunit.coverage.xml
+sonar.php.tests.reportPath=reports/phpunit.xml</code></pre>
+
+<p><img alt="image_1b4i66hd316vq1i5g11k8v0j1rcq76.png-60.6kB" src="http://static.zybuluo.com/abcdocker/stya391wvsp9lofg5433ffwk/image_1b4i66hd316vq1i5g11k8v0j1rcq76.png" style="height:276px; width:800px" title="" />&nbsp;<br />
+Analysis properties 分析的参数</p>
+
+<p>填写完毕后，我们点击保存&nbsp;<br />
+<img alt="image_1b4i66u061lhp1qkjvk6124a1k497j.png-90.1kB" src="http://static.zybuluo.com/abcdocker/g2co7bf0eqk8cib3bpjlcwma/image_1b4i66u061lhp1qkjvk6124a1k497j.png" style="height:339px; width:800px" title="" />&nbsp;<br />
+我们选择立即构建&nbsp;<br />
+<img alt="image_1b4i678mn1bl4qsf10buddqmvq80.png-93.5kB" src="http://static.zybuluo.com/abcdocker/7y5o4ens13a516brsug58vgu/image_1b4i678mn1bl4qsf10buddqmvq80.png" style="height:568px; width:800px" title="" /></p>
+
+<p><strong>提示：</strong>此时的SonarQube是无法点击的</p>
+
+<p>点击<code>Console Output</code>可以查看构建输出的内容&nbsp;<br />
+<img alt="image_1b4i67mp06ltar5im11s6thvk8d.png-171.4kB" src="http://static.zybuluo.com/abcdocker/g68ri4729sedp7e37s8u6ao5/image_1b4i67mp06ltar5im11s6thvk8d.png" style="height:387px; width:800px" title="" /></p>
+
+<p>#提示：只要没有<code>error</code>就可以</p>
+
+<p><img alt="image_1b4i6c8qj1pjf1c281billo51sgr8q.png-119.1kB" src="http://static.zybuluo.com/abcdocker/abskc2az8v1eymgsadoox6xl/image_1b4i6c8qj1pjf1c281billo51sgr8q.png" style="height:384px; width:800px" title="" />&nbsp;<br />
+构建完成后，我们发现这里的SonarQube可以点击，我们点击SonarQube就会链接到192.168.56.11:9000 就是代码查看器的地址&nbsp;<br />
+<img alt="image_1b4i6ci8r1bl9124r12ok19kq7mt97.png-86.1kB" src="http://static.zybuluo.com/abcdocker/6de4xsjsv2hvm35k11f89xp1/image_1b4i6ci8r1bl9124r12ok19kq7mt97.png" style="height:310px; width:800px" title="" /></p>
+
+<p>现在我们已经做到了可以在git上进行拉取代码。并进行检测</p>
+
+<p><strong>我们还可以配置一个构建失败发送邮箱：</strong>&nbsp;<br />
+<img alt="image_1b4i6cva0hl4l8amdq1htu9m19k.png-63.5kB" src="http://static.zybuluo.com/abcdocker/3kcy6obb88pmwsm90ir5r48k/image_1b4i6cva0hl4l8amdq1htu9m19k.png" style="height:266px; width:800px" title="" />&nbsp;<br />
+在我们项目里面设置构建后操作，选择E-mail Notification&nbsp;<br />
+<img alt="image_1b4i6d6t717evijk1oa6int195fa1.png-40kB" src="http://static.zybuluo.com/abcdocker/nwmyh992kcuzhifmfmf119tk/image_1b4i6d6t717evijk1oa6int195fa1.png" style="height:224px; width:800px" title="" />&nbsp;<br />
+<strong>温馨提示：</strong>使用163邮箱发送的通知被163服务器退回了，因此我将设置在jenkins的邮箱改成了QQ邮箱</p>
+
+<p>QQ：邮箱需要设置如下：&nbsp;<br />
+<img alt="image_1b4i6doeh28e1nukrg2l6tid8ae.png-47kB" src="http://static.zybuluo.com/abcdocker/vvb3xoxvt38wpymfa4fxxnbf/image_1b4i6doeh28e1nukrg2l6tid8ae.png" style="height:216px; width:800px" title="" /></p>
+
+<p>**1、需要开启POPE3/SMTP服务&nbsp;<br />
+2、在jenkins上配置的密码我们需要点击生成授权码进行使用**</p>
+
+<p>QQ邮件默认会收到如下提示：&nbsp;<br />
+<img alt="image_1b4i6efuj187n1ib516gs5rg1n45ar.png-80.9kB" src="http://static.zybuluo.com/abcdocker/bgd8airh60mlc8q9pqan938b/image_1b4i6efuj187n1ib516gs5rg1n45ar.png" style="height:407px; width:800px" title="" />&nbsp;<br />
+当再次构件成功时，邮件内容如下：&nbsp;<br />
+<img alt="image_1b4i6eptgcpb46a1070196t1bmnb8.png-32kB" src="http://static.zybuluo.com/abcdocker/oi6l07qwn4srr9sj2hxqc89x/image_1b4i6eptgcpb46a1070196t1bmnb8.png" style="height:226px; width:800px" title="" /></p>
+
+<p>&nbsp;</p>
