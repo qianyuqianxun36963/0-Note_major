@@ -1,0 +1,86 @@
+<h1><a href="https://www.cnblogs.com/goody9807/p/7647644.html" id="cb_post_title_url">Spring Boot @Autowired 没法自动注入的问题</a></h1>
+
+<p>Application 启动类：</p>
+
+<pre>
+@SpringBootApplication
+@EnableConfigurationProperties
+@ComponentScan(basePackages = { &quot;com.testing&quot;})
+public class Application {
+   @Bean
+   RestTemplate restTemplate() {
+      return new RestTemplate();}
+   public static void main(String[] args) {
+      SpringApplication.run(Application.class, args);
+      System.<em>out</em>.println(&quot;成功启动&quot;);
+   }</pre>
+
+<p>Dao层：</p>
+
+<p>public interface UserRepository extends JpaRepository&lt;User, String&gt;{ User findByUsername(String username); // }</p>
+
+<pre>
+Service 层：注入一个继承了JPA 的接口，理论上spring boot 会把JPA 注入repository，该接口是一定不需要实现类的.</pre>
+
+<pre>
+上述方法实现了按Username查询User实体，可以看到我们这里没有任何类SQL语句就完成了个条件查询方法。</pre>
+
+<pre>
+这就是Spring-data-jpa的一大特性：<strong>通过解析方法名创建查询</strong>
+</pre>
+
+<pre>
+
+&nbsp;</pre>
+
+<pre>
+@Service
+public class DataInit {
+
+    @Autowired
+    UserRepository userRepository;
+}
+</pre>
+
+<p>但是会提示错误：提示@Autowired 不能正常注入：</p>
+
+<p>&nbsp;</p>
+
+<p>可正常编译，没法运行，gradle bootrun 时提示错误：</p>
+
+<p>caused by: org.springframework.beans.factory.BeanCreationException: Could not autowire field: com.testing.data.UserRepository com.testing.service.DataInit.userRepository; nested exception is org.spring<br />
+framework.beans.factory.NoSuchBeanDefinitionException: No qualifying bean of type [com.testing.data.UserRepository] found for dependency: expected at least 1 bean which qualifies as autowire candidate<br />
+for this dependency. Dependency annotations: {@org.springframework.beans.factory.annotation.Autowired(required=true), @org.springframework.beans.factory.annotation.Qualifier(value=userRepository)}</p>
+
+<p>&nbsp;</p>
+
+<p>Execution failed for task &#39;:bootRun&#39;.<br />
+&gt; Process &#39;command &#39;C:\Program Files (x86)\Java\jdk1.8.0_101\bin\java.exe&#39;&#39; finished with non-zero exit value 1</p>
+
+<p>总结：</p>
+
+<p>出现该类错误时，可有一下几个问题需要去检查：</p>
+
+<p>1. 检查各类是否加了注解，包括@service,@repository 等等；（注意@Autowired放在service实现上，而不是接口类上面。）</p>
+
+<p>2. 包是否正确扫描到，这个很重要！！！（我的问题就是因为这个）</p>
+
+<p>&nbsp;</p>
+
+<p>注意：http://bbs.csdn.net/topics/391978111?page=1#post-401966615 (#5)</p>
+
+<p>SpringBoot项目的Bean装配默认规则是根据<strong><em>Application类所在的包位置</em></strong>从上往下扫描！</p>
+
+<p>&ldquo;Application类&rdquo;是指SpringBoot项目入口类。这个类的位置很关键：<br />
+如果Application类所在的包为：com.boot.app，则只会扫描com.boot.app包及其所有子包，如果service或dao所在包不在com.boot.app及其子包下，则不会被扫描！<br />
+即,&nbsp;<strong><em>把Application类放到dao、service所在包的上级</em></strong>，com.boot.Application</p>
+
+<p>知道这一点非常关键，不知道spring文档里有没有给出说明，如果不知道还真是无从解决.</p>
+
+<p>&nbsp;</p>
+
+<p>&nbsp;</p>
+
+<p><img alt="" src="http://img.blog.csdn.net/20170112102044397?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQvZHVsYWJpbmc=/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70/gravity/Center" /></p>
+
+<p>&nbsp;</p>
