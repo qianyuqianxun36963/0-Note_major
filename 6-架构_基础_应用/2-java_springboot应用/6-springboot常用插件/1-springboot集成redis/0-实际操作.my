@@ -1,0 +1,151 @@
+<h1>springboot整合redis进行数据操作</h1>
+
+<p>redis是一种常见的nosql，日常开发中，我们使用它的频率比较高，因为它的多种数据接口，很多场景中我们都可以用到，并且redis对分布式这块做的非常好。</p>
+
+<p>springboot整合redis比较简单，并且使用redistemplate可以让我们更加方便的对数据进行操作。</p>
+
+<h2>1、添加依赖</h2>
+
+<p>&lt;dependency&gt;&nbsp;<br />
+&lt;groupId&gt;org.springframework.boot&lt;/groupId&gt;&nbsp;<br />
+&lt;artifactId&gt;spring-boot-starter-data-redis&lt;/artifactId&gt;&nbsp;<br />
+&lt;/dependency&gt;</p>
+
+<p>&lt;dependency&gt;<br />
+&nbsp; &nbsp; &lt;groupId&gt;org.springframework&lt;/groupId&gt;<br />
+&nbsp; &nbsp; &lt;artifactId&gt;spring-context&lt;/artifactId&gt;<br />
+&nbsp; &nbsp; &lt;version&gt;4.3.6.RELEASE&lt;/version&gt;<br />
+&lt;/dependency&gt;</p>
+
+<h2>2、在application.properties中加入相关配置</h2>
+
+<p>spring.redis.database=0&nbsp;<br />
+spring.redis.host=127.0.0.1&nbsp;<br />
+spring.redis.port=6379&nbsp;<br />
+spring.redis.password=&nbsp;<br />
+spring.redis.pool.max-idle=8&nbsp;<br />
+spring.redis.pool.min-idle=0&nbsp;<br />
+spring.redis.pool.max-active=8&nbsp;<br />
+spring.redis.pool.max-wait=-1&nbsp;<br />
+spring.redis.timeout=5000</p>
+
+<h2>3、编写配置类</h2>
+
+<p>import org.springframework.cache.CacheManager;&nbsp;<br />
+import org.springframework.cache.annotation.EnableCaching;&nbsp;<br />
+import org.springframework.context.annotation.Bean;&nbsp;<br />
+import org.springframework.context.annotation.Configuration;&nbsp;<br />
+import org.springframework.data.redis.cache.RedisCacheManager;&nbsp;<br />
+import org.springframework.data.redis.connection.RedisConnectionFactory;&nbsp;<br />
+import org.springframework.data.redis.core.RedisTemplate;&nbsp;<br />
+import org.springframework.data.redis.core.StringRedisTemplate;&nbsp;<br />
+@Configuration&nbsp;<br />
+@EnableCaching&nbsp;<br />
+public class RedisConfig {&nbsp;<br />
+&nbsp; @Bean&nbsp;<br />
+&nbsp; public CacheManager cacheManager(RedisTemplate&lt;?,?&gt; redisTemplate) {&nbsp;<br />
+&nbsp; &nbsp;CacheManager cacheManager = new RedisCacheManager(redisTemplate);&nbsp;<br />
+&nbsp; &nbsp;return cacheManager;&nbsp;<br />
+&nbsp; }&nbsp;<br />
+&nbsp; @Bean&nbsp;<br />
+&nbsp; public RedisTemplate&lt;String, Object&gt; redisTemplate(RedisConnectionFactory factory) {&nbsp;<br />
+&nbsp; &nbsp;RedisTemplate&lt;String, Object&gt; redisTemplate = new RedisTemplate&lt;String, Object&gt;();&nbsp;<br />
+&nbsp; &nbsp;redisTemplate.setConnectionFactory(factory);&nbsp;<br />
+&nbsp; &nbsp;return redisTemplate;&nbsp;<br />
+&nbsp; }&nbsp;<br />
+&nbsp; @Bean&nbsp;<br />
+&nbsp; public StringRedisTemplate stringRedisTemplate(RedisConnectionFactory factory) {&nbsp;<br />
+&nbsp; &nbsp;StringRedisTemplate stringRedisTemplate = new StringRedisTemplate();&nbsp;<br />
+&nbsp; &nbsp;stringRedisTemplate.setConnectionFactory(factory);&nbsp;<br />
+&nbsp; &nbsp;return stringRedisTemplate;&nbsp;<br />
+&nbsp; }&nbsp;<br />
+}&nbsp;<br />
+这里定义了两个bean，一个是redisTemplate，另一个是stringRedisTemplate，它们的序列化方式不同，前者默认jdk序列方式，后者默认string的序列化方式，后者一般专门用于存储string格式，前者我们可以用来保存对象等，这里我们都配置上，根据不同业务进行不同使用。</p>
+
+<h2>4、编写实体类</h2>
+
+<p>public class User implements Serializable{&nbsp;<br />
+&nbsp;/**&nbsp;<br />
+&nbsp; *&nbsp;<br />
+&nbsp; */&nbsp;<br />
+&nbsp;private static final long serialVersionUID = 3221700752972709820L;&nbsp;<br />
+&nbsp;private int id;&nbsp;<br />
+&nbsp;private String name;&nbsp;<br />
+&nbsp;private int age;&nbsp;<br />
+&nbsp;public int getId() {&nbsp;<br />
+&nbsp; return id;&nbsp;<br />
+&nbsp;}&nbsp;<br />
+&nbsp;public void setId(int id) {&nbsp;<br />
+&nbsp; this.id = id;&nbsp;<br />
+&nbsp;}&nbsp;<br />
+&nbsp;public String getName() {&nbsp;<br />
+&nbsp; return name;&nbsp;<br />
+&nbsp;}&nbsp;<br />
+&nbsp;public void setName(String name) {&nbsp;<br />
+&nbsp; this.name = name;&nbsp;<br />
+&nbsp;}&nbsp;<br />
+&nbsp;public int getAge() {&nbsp;<br />
+&nbsp; return age;&nbsp;<br />
+&nbsp;}&nbsp;<br />
+&nbsp;public void setAge(int age) {&nbsp;<br />
+&nbsp; this.age = age;&nbsp;<br />
+&nbsp;}&nbsp;<br />
+&nbsp;public User(int id, String name, int age) {&nbsp;<br />
+&nbsp; super();&nbsp;<br />
+&nbsp; this.id = id;&nbsp;<br />
+&nbsp; this.name = name;&nbsp;<br />
+&nbsp; this.age = age;&nbsp;<br />
+&nbsp;}&nbsp;<br />
+}</p>
+
+<h2>5、编写测试service</h2>
+
+<p>@Service&nbsp;<br />
+public class UserService {&nbsp;<br />
+&nbsp;@Autowired&nbsp;<br />
+&nbsp;private StringRedisTemplate stringRedisTemplate;&nbsp;<br />
+&nbsp;@Autowired&nbsp;<br />
+&nbsp;private RedisTemplate&lt;String, Object&gt; redisTemplate;&nbsp;<br />
+&nbsp;public void set(String key, User user) {&nbsp;<br />
+&nbsp; redisTemplate.opsForValue().set(key, user);&nbsp;<br />
+&nbsp;}&nbsp;<br />
+&nbsp;public User get(String key) {&nbsp;<br />
+&nbsp; return (User) redisTemplate.boundValueOps(key).get();&nbsp;<br />
+&nbsp;}&nbsp;<br />
+&nbsp;public void setCode(String key, String code) {&nbsp;<br />
+&nbsp; stringRedisTemplate.opsForValue().set(key, code, 60, TimeUnit.SECONDS);&nbsp;<br />
+&nbsp;}&nbsp;<br />
+&nbsp;public String getCode(String key) {&nbsp;<br />
+&nbsp; return stringRedisTemplate.boundValueOps(key).get();&nbsp;<br />
+&nbsp;}&nbsp;<br />
+}&nbsp;<br />
+这里我们模拟两种操作，一种是根据key存储user对象，另一种是存储key value均为string的操作，并且赋予数据过期时间，这种操作我们可以用于验证码存储，在setcode方法中，我们存储了一个有效时长为60s的数据，当60s过后，数据会自动销毁。</p>
+
+<h2>6、编写测试controller访问</h2>
+
+<p>@RestController&nbsp;<br />
+@RequestMapping(&quot;rest_redis&quot;)&nbsp;<br />
+public class RedisController {&nbsp;<br />
+&nbsp;@Resource&nbsp;<br />
+&nbsp;private UserService userService;&nbsp;<br />
+&nbsp;@GetMapping(&quot;set&quot;)&nbsp;<br />
+&nbsp;public void set() {&nbsp;<br />
+&nbsp; userService.set(&quot;key1&quot;, new User(1, &quot;meepoguan&quot;, 26));&nbsp;<br />
+&nbsp;}&nbsp;<br />
+&nbsp;@GetMapping(&quot;get&quot;)&nbsp;<br />
+&nbsp;public String get() {&nbsp;<br />
+&nbsp; return userService.get(&quot;key1&quot;).getName();&nbsp;<br />
+&nbsp;}&nbsp;<br />
+&nbsp;@GetMapping(&quot;stringset&quot;)&nbsp;<br />
+&nbsp;public void stringset() {&nbsp;<br />
+&nbsp; userService.setCode(&quot;stringkey&quot;, &quot;meepoguan_coke&quot;);&nbsp;<br />
+&nbsp;}&nbsp;<br />
+&nbsp;@GetMapping(&quot;stringget&quot;)&nbsp;<br />
+&nbsp;public String stringget() {&nbsp;<br />
+&nbsp; return userService.getCode(&quot;stringkey&quot;);&nbsp;<br />
+&nbsp;}&nbsp;<br />
+}&nbsp;<br />
+对service中的方法进行测试。</p>
+
+<p><br />
+&nbsp;</p>
