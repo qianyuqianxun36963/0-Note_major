@@ -1,0 +1,133 @@
+<h1>FeignClient注解及参数</h1>
+
+<h2>一、FeignClient注解</h2>
+
+<p>&nbsp; FeignClient注解被@Target(ElementType.TYPE)修饰，表示FeignClient注解的作用目标在接口上</p>
+
+<p>@FeignClient(name = &quot;github-client&quot;, url = &quot;https://api.github.com&quot;, configuration = GitHubExampleConfig.class)<br />
+public interface GitHubClient {<br />
+&nbsp; &nbsp; @RequestMapping(value = &quot;/search/repositories&quot;, method = RequestMethod.GET)<br />
+&nbsp; &nbsp; String searchRepo(@RequestParam(&quot;q&quot;) String queryStr);<br />
+}<br />
+　声明接口之后，在代码中通过@Resource注入之后即可使用。@FeignClient标签的常用属性如下：</p>
+
+<p><strong>name：指定FeignClient的名称，如果项目使用了Ribbon，name属性会作为微服务的名称，用于服务发现<br />
+url: url一般用于调试，可以手动指定@FeignClient调用的地址<br />
+decode404:当发生http 404错误时，如果该字段位true，会调用decoder进行解码，否则抛出FeignException<br />
+configuration: Feign配置类，可以自定义Feign的Encoder、Decoder、LogLevel、Contract<br />
+fallback: 定义容错的处理类，当调用远程接口失败或超时时，会调用对应接口的容错逻辑，fallback指定的类必须实现@FeignClient标记的接口<br />
+fallbackFactory: 工厂类，用于生成fallback类示例，通过这个属性我们可以实现每个接口通用的容错逻辑，减少重复的代码<br />
+path: 定义当前FeignClient的统一前缀</strong></p>
+
+<p>@FeignClient(name = &quot;github-client&quot;,<br />
+&nbsp; &nbsp; &nbsp; &nbsp; url = &quot;https://api.github.com&quot;,<br />
+&nbsp; &nbsp; &nbsp; &nbsp; configuration = GitHubExampleConfig.class,<br />
+&nbsp; &nbsp; &nbsp; &nbsp; fallback = GitHubClient.DefaultFallback.class)<br />
+public interface GitHubClient {<br />
+&nbsp; &nbsp; @RequestMapping(value = &quot;/search/repositories&quot;, method = RequestMethod.GET)<br />
+&nbsp; &nbsp; String searchRepo(@RequestParam(&quot;q&quot;) String queryStr);<br />
+&nbsp;<br />
+&nbsp; &nbsp; /**<br />
+&nbsp; &nbsp; &nbsp;* 容错处理类，当调用失败时，简单返回空字符串<br />
+&nbsp; &nbsp; &nbsp;*/<br />
+&nbsp; &nbsp; @Component<br />
+&nbsp; &nbsp; public class DefaultFallback implements GitHubClient {<br />
+&nbsp; &nbsp; &nbsp; &nbsp; @Override<br />
+&nbsp; &nbsp; &nbsp; &nbsp; public String searchRepo(@RequestParam(&quot;q&quot;) String queryStr) {<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; return &quot;&quot;;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; }<br />
+&nbsp; &nbsp; }<br />
+}<br />
+　在使用fallback属性时，需要使用@Component注解，保证fallback类被Spring容器扫描到,GitHubExampleConfig内容如下：</p>
+
+<p><br />
+@Configuration<br />
+public class GitHubExampleConfig {<br />
+&nbsp; &nbsp; @Bean<br />
+&nbsp; &nbsp; Logger.Level feignLoggerLevel() {<br />
+&nbsp; &nbsp; &nbsp; &nbsp; return Logger.Level.FULL;<br />
+&nbsp; &nbsp; }<br />
+}<br />
+　　在使用FeignClient时，Spring会按name创建不同的ApplicationContext，通过不同的Context来隔离FeignClient的配置信息，在使用配置类时，不能把配置类放到Spring App Component scan的路径下，否则，配置类会对所有FeignClient生效.</p>
+
+<h2>二、Feign Client 和@RequestMapping</h2>
+
+<p>当前工程中有和Feign Client中一样的Endpoint时，Feign Client的类上不能用@RequestMapping注解否则，当前工程该endpoint http请求且使用accpet时会报404<br />
+Controller：<br />
+@RestController<br />
+@RequestMapping(&quot;/v1/card&quot;)<br />
+public class IndexApi {<br />
+&nbsp;<br />
+&nbsp; &nbsp; @PostMapping(&quot;balance&quot;)<br />
+&nbsp; &nbsp; @ResponseBody<br />
+&nbsp; &nbsp; public Info index() {<br />
+&nbsp; &nbsp; &nbsp; &nbsp; Info.Builder builder = new Info.Builder();<br />
+&nbsp; &nbsp; &nbsp; &nbsp; builder.withDetail(&quot;x&quot;, 2);<br />
+&nbsp; &nbsp; &nbsp; &nbsp; builder.withDetail(&quot;y&quot;, 2);<br />
+&nbsp; &nbsp; &nbsp; &nbsp; return builder.build();<br />
+&nbsp; &nbsp; }<br />
+}<br />
+Feign Client</p>
+
+<p>@FeignClient(<br />
+&nbsp; &nbsp; &nbsp; &nbsp; name = &quot;card&quot;,<br />
+&nbsp; &nbsp; &nbsp; &nbsp; url = &quot;http://localhost:7913&quot;,<br />
+&nbsp; &nbsp; &nbsp; &nbsp; fallback = CardFeignClientFallback.class,<br />
+&nbsp; &nbsp; &nbsp; &nbsp; configuration = FeignClientConfiguration.class<br />
+)<br />
+@RequestMapping(value = &quot;/v1/card&quot;)<br />
+public interface CardFeignClient {<br />
+&nbsp;<br />
+&nbsp; &nbsp; @RequestMapping(value = &quot;/balance&quot;, method = RequestMethod.POST, produces = MediaType.APPLICATION_JSON_VALUE)<br />
+&nbsp; &nbsp; Info info();<br />
+&nbsp;<br />
+}　　<br />
+if @RequestMapping is used on class, when invoke http /v1/card/balance, like this :</p>
+
+<p>如果 @RequestMapping注解被用在FeignClient类上，当像如下代码请求/v1/card/balance时，注意有Accept header：</p>
+
+<p><br />
+Content-Type:application/json<br />
+Accept:application/json<br />
+&nbsp;<br />
+POST http://localhost:7913/v1/card/balance<br />
+那么会返回 404。</p>
+
+<p>如果不包含Accept header时请求，则是OK：</p>
+
+<p><br />
+Content-Type:application/json<br />
+POST http://localhost:7913/v1/card/balance<br />
+或者像下面不在Feign Client上使用@RequestMapping注解,请求也是ok，无论是否包含Accept:</p>
+
+<p><br />
+@FeignClient(<br />
+&nbsp; &nbsp; &nbsp; &nbsp; name = &quot;card&quot;,<br />
+&nbsp; &nbsp; &nbsp; &nbsp; url = &quot;http://localhost:7913&quot;,<br />
+&nbsp; &nbsp; &nbsp; &nbsp; fallback = CardFeignClientFallback.class,<br />
+&nbsp; &nbsp; &nbsp; &nbsp; configuration = FeignClientConfiguration.class<br />
+)<br />
+&nbsp;<br />
+public interface CardFeignClient {<br />
+&nbsp;<br />
+&nbsp; &nbsp; @RequestMapping(value = &quot;/v1/card/balance&quot;, method = RequestMethod.POST, produces = MediaType.APPLICATION_JSON_VALUE)<br />
+&nbsp; &nbsp; Info info();<br />
+&nbsp;<br />
+}</p>
+
+<h2>三、Feign请求超时问题</h2>
+
+<p>Hystrix默认的超时时间是1秒，如果超过这个时间尚未响应，将会进入fallback代码。而首次请求往往会比较慢（因为Spring的懒加载机制，要实例化一些类），这个响应时间可能就大于1秒了<br />
+解决方案有三种，以feign为例。<br />
+方法一<br />
+hystrix.command.default.execution.isolation.thread.timeoutInMilliseconds: 5000<br />
+该配置是让Hystrix的超时时间改为5秒<br />
+方法二<br />
+hystrix.command.default.execution.timeout.enabled: false<br />
+该配置，用于禁用Hystrix的超时时间<br />
+方法三<br />
+feign.hystrix.enabled: false<br />
+该配置，用于索性禁用feign的hystrix。该做法除非一些特殊场景，不推荐使用。<br />
+参见：http://www.itmuch.com/spring-cloud-sum-feign/</p>
+
+<p>&nbsp;</p>

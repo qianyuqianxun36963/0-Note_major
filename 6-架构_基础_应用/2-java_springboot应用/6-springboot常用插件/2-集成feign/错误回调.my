@@ -1,0 +1,59 @@
+<h1>微服务 通过EnableFeignClients调用其他服务的api</h1>
+
+<p>今天在项目上遇到一个问题，通过当前service服务要调用到其他service服务的api接口时，可通过EnableFeignClients调用其他服务的api，大概的步骤如下：</p>
+
+<p>1、在springboot的main处加上注解@EnableFeignClients</p>
+
+<pre>
+ 1 @EnableDiscoveryClient
+ 2 @SpringBootApplication
+ 3 @EnableFeignClients
+ 4 public class DeploymentServiceApplication {
+ 5 
+ 6     public static void main(String[] args){
+ 7         SpringApplication.run(DeploymentServiceApplication.class, args);
+ 8     }
+ 9 
+10 }
+</pre>
+
+<p>2、在service层上实现接口，这里注意value可以用serviceId代替，但是最好用value来指定要调用的服务。</p>
+
+<p>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;fallback是当程序错误的时候来回调的方法</p>
+
+<p>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;方法中要用@PathVariable要注解参数</p>
+
+<pre>
+1 @FeignClient(value = &quot;hap-user-admin-service&quot;, fallback = OrganizationLabelFeignClientFallback.class)
+2 public interface OrganizationLabelFeignClient {
+3     @RequestMapping(value = &quot;/v1/organizations/{id}&quot;,method = RequestMethod.GET)
+4     Organization queryOrgLabel(@PathVariable(name=&quot;id&quot;) Long id);
+5 }</pre>
+
+<p><br />
+3、编写程序错误时的回调类，实现接口，在错误时回调</p>
+
+<pre>
+1 @Service
+2 public class OrganizationLabelFeignClientFallback implements OrganizationLabelFeignClient {
+3     @Override
+4     public Organization queryOrgLabel(Long id) {
+5         return null;
+6     }
+7 }
+</pre>
+
+<p><br />
+4、调用该服务</p>
+
+<pre>
+1 //声明，自动封装
+2 @Autowired
+3 private OrganizationLabelFeignClient organizationLabelFeignClient;
+4 
+5 
+6 //调用
+7 Organization organization = organizationLabelFeignClient.queryOrgLabel(organizationId);
+</pre>
+
+<p>至此，完成整个步骤</p>
