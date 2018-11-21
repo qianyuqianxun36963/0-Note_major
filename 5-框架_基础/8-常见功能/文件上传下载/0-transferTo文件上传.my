@@ -31,3 +31,96 @@
 &nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;}<br />
 &nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;return;<br />
 &nbsp;&nbsp; &nbsp;}</p>
+
+<h2>动态给form赋值进行下载：</h2>
+
+<p>//下载导入模板<br />
+function toDownloadTemplate(fileName){<br />
+&nbsp;&nbsp; &nbsp;var url = encodeURI( &quot;downloadSpecifiedImportTemplate.do?fileName=&quot;+fileName+&quot;&amp;ACCESSTOKEN=&quot;+accessTokenId);<br />
+&nbsp;&nbsp; &nbsp;$(&quot;#downloadTemplateForm&quot;).attr(&#39;action&#39;,url);<br />
+&nbsp;&nbsp; &nbsp;$(&quot;#downloadTemplateForm&quot;).attr(&#39;target&#39;,&#39;&#39;);<br />
+&nbsp;&nbsp; &nbsp;$(&quot;#downloadTemplateForm&quot;).submit();<br />
+}</p>
+
+<h2>后台对应的java代码：</h2>
+
+<h3>CommonController.java</h3>
+
+<p>CommonController extendsd BaseController&nbsp;{</p>
+
+<p>&nbsp; /**<br />
+&nbsp; &nbsp; &nbsp;* 下载导入模板<br />
+&nbsp; &nbsp; &nbsp;* @param request<br />
+&nbsp; &nbsp; &nbsp;* @param response<br />
+&nbsp; &nbsp; &nbsp;*/<br />
+&nbsp; &nbsp; @RequestMapping(value = &quot;/downloadSpecifiedImportTemplate&quot;,method = RequestMethod.POST)<br />
+&nbsp; &nbsp; public void downloadSpecifiedImportTemplate(HttpServletRequest request,HttpServletResponse response) throws Exception{<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp;downloadImportTemplate(request,response);<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp;return;<br />
+&nbsp; &nbsp; }</p>
+
+<p>}</p>
+
+<h3>BaseController.java</h3>
+
+<p>&nbsp;&nbsp; &nbsp;/**<br />
+&nbsp;&nbsp; &nbsp; * 下载导入模板<br />
+&nbsp;&nbsp; &nbsp; * @param request<br />
+&nbsp;&nbsp; &nbsp; * @param response<br />
+&nbsp;&nbsp; &nbsp; */<br />
+&nbsp;&nbsp; &nbsp;public void downloadImportTemplate(HttpServletRequest request,HttpServletResponse response) throws Exception{<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;try{<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;String fileName = URLDecoder.decode(request.getParameter(&quot;fileName&quot;), &quot;UTF-8&quot;);<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;String path = request.getSession().getServletContext().getRealPath(&quot;template/&quot;);<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;String templateFilePath = path + File.separator+fileName;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;File tpFile = new File(templateFilePath.replaceAll(&quot;\\\\&quot;, &quot;/&quot;));<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;FileUtils.downloadFile(tpFile, fileName, response);<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;} catch(Exception e){<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;logger.error(&quot;下载模板失败&quot;,e);<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;throw new Exception(&quot;下载模板失败&quot;);<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;}<br />
+&nbsp;&nbsp; &nbsp;}</p>
+
+<h3>FileUtils.java</h3>
+
+<p>&nbsp;&nbsp; &nbsp;public static void downloadFile(final File file, String fileName,<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;HttpServletResponse response) throws IOException&nbsp;<br />
+&nbsp;&nbsp; &nbsp;{<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;InputStream inputStream = null;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;OutputStream outputStream = null;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;try<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;{<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;// 设置response<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;response.reset();<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;response.setCharacterEncoding(&quot;UTF-8&quot;);&nbsp;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;response.setContentType(&quot;multipart/form-data;charset=&quot;+ &quot;UTF-8&quot;);<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;response.setHeader( &quot;Content-Disposition&quot;, &quot;attachment;filename=&quot; + new String( fileName.getBytes(System.setProperty(&quot;sun.jnu.encoding&quot;,&quot;utf-8&quot;)), &quot;ISO8859-1&quot; ) );</p>
+
+<p>&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;// 生成文件输入字节流<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;inputStream = new FileInputStream(file);<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;// 生成文件输出字节流<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;outputStream = response.getOutputStream();<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;// 字节数组<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;byte[] tmp = new byte[1024];<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;// 读取字节长度<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;int length = 0;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;while ((length = inputStream.read(tmp)) &gt; 0)&nbsp;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;{<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;outputStream.write(tmp, 0, length);<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;}<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;outputStream.flush();<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;}catch(Exception e)<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;{<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;e.printStackTrace();<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;}finally<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;{<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;if(outputStream != null)<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;{<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;outputStream.close();<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;}<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;if(inputStream != null)<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;{<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;inputStream.close();<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;}<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;}<br />
+&nbsp;&nbsp; &nbsp;}</p>

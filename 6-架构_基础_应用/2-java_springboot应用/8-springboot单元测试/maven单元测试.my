@@ -1,0 +1,89 @@
+<h1>如何使用Maven进行测试</h1>
+
+<h3>如何使用Maven进行测试</h3>
+
+<p>Maven的重要职责之一就是自动运行单元测试，它通过maven-surefire-plugin与主流的单元测试框架JUnit3、JUnit4以及TestNG集成，并且能够自动生成丰富的结果报告。</p>
+
+<p>test阶段被定义&ldquo;使用单元测试框架运行测试&rdquo;。生命周期阶段需要丙丁某个插件的目标才能完成真正的工作，test阶段正式与maven-surefire-plugin的test目标相绑定，这是一个内置的绑定。</p>
+
+<p>在默认情况下，maven-surefire-plugin的test目标会自动执行测试源码路径（默认为src/test/java/)下所有符合一组命名模式的测试类。这组模式为：</p>
+
+<ul>
+	<li><em>*/Test</em>.java</li>
+	<li>**/*Test.java</li>
+	<li>**/*TestCase.java</li>
+</ul>
+
+<p>只要将测试类按上述模式命名，Maven就能自动运行它们，用户也就不再需要定义测试集合（TestSuite）来聚合测试用例了（TestCase）。</p>
+
+<p><strong>跳过测试</strong></p>
+
+<ul>
+	<li>在命令行里加入参数 skipTests就可以跳过测试的执行</li>
+	<li>配置 POM 让项目长时间跳过单元测试</li>
+</ul>
+
+<pre>
+<code>&lt;configuration&gt;
+    &lt;skipTests&gt;true&lt;/skipTests&gt;
+&lt;/configuration&gt;</code></pre>
+
+<ul>
+	<li>maven package -Dmaven.test.skip = ture，参数maven.test.skip同时控制了maven-compiler-plugin和maven-surefire-plugin两个插件，测试代码编译跳过了，测试运行也跳过了</li>
+</ul>
+
+<p><strong>动态指定要运行的测试用例</strong></p>
+
+<ul>
+	<li>maven-surefire-plugin 提供了一个test参数</li>
+</ul>
+
+<pre>
+<code>$ mvn test -Dtest = RadomGeneratorTest</code>
+</pre>
+
+<ul>
+	<li>也支持模式匹配，多个测试用例</li>
+</ul>
+
+<p><strong>包含与排除测试用例</strong></p>
+
+<ul>
+	<li>包含 include</li>
+</ul>
+
+<pre>
+<code>&lt;configuration&gt;
+    &lt;includes&gt;
+        &lt;include&gt;**/*Test.java&lt;include&gt;
+    &lt;includes&gt;
+&lt;/configuration&gt;</code></pre>
+
+<ul>
+	<li>排除 exclude</li>
+</ul>
+
+<p><strong>测试覆盖率报告</strong></p>
+
+<ul>
+	<li>$mvn cobertura:cobertura</li>
+</ul>
+
+<p><strong>重用测试代码</strong></p>
+
+<p>牛逼程序员会想对待产品代码一样细心维护测试代码，尤其是那些具体测试类继承的抽象类，它们能够简化测试代码的编写。</p>
+
+<p>在命令行运行mven package的时候，Maven会将项目的主代码及资源文件打包，将其安装或部署仓库之后，这些代码就能为他人使用，从而实现Maven项目级别的重用。默认的打包行为是不会包含测试代码的，因此在使用外部依赖的时候，其构件一般都不会包含测试代码。</p>
+
+<p>maven-jar-plugin</p>
+
+<pre>
+<code>&lt;executions&gt;
+    &lt;execution&gt;
+        &lt;goals&gt;
+            &lt;goal&gt;test-jar&lt;goal&gt;
+        &lt;/goals&gt;
+    &lt;/execution&gt;
+&lt;/executions&gt;</code></pre>
+
+<p>maven-jar-plugin有两个目标，分别是jar和test-jar,前者通过Maven的内置绑定在default生命周期的package阶段运行，其行为就是对项目主代码进行打包，而后者并没有内置绑定，因此上述的插件配置显式声明该目标来打包测试代码。</p>

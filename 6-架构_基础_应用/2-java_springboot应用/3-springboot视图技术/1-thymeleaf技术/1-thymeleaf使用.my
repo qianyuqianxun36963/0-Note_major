@@ -1,0 +1,592 @@
+<h1>thymeleaf使用</h1>
+
+<h2>thymeleaf介绍</h2>
+
+<p>简单说， Thymeleaf 是一个跟 Velocity、FreeMarker 类似的模板引擎，它可以完全替代 JSP 。相较与其他的模板引擎，它有如下三个极吸引人的特点：</p>
+
+<ul>
+	<li>
+	<p>1.Thymeleaf 在有网络和无网络的环境下皆可运行，即它可以让美工在浏览器查看页面的静态效果，也可以让程序员在服务器查看带数据的动态页面效果。这是由于它支持 html 原型，然后在 html 标签里增加额外的属性来达到模板+数据的展示方式。浏览器解释 html 时会忽略未定义的标签属性，所以 thymeleaf 的模板可以静态地运行；当有数据返回到页面时，Thymeleaf 标签会动态地替换掉静态内容，使页面动态显示。</p>
+	</li>
+	<li>
+	<p>2.Thymeleaf 开箱即用的特性。它提供标准和spring标准两种方言，可以直接套用模板实现JSTL、 OGNL表达式效果，避免每天套模板、该jstl、改标签的困扰。同时开发人员也可以扩展和创建自定义的方言。</p>
+	</li>
+	<li>
+	<p>3.Thymeleaf 提供spring标准方言和一个与 SpringMVC 完美集成的可选模块，可以快速的实现表单绑定、属性编辑器、国际化等功能。</p>
+	</li>
+</ul>
+
+<h2>标准表达式语法</h2>
+
+<p>它们分为四类：</p>
+
+<ul>
+	<li>1.变量表达式</li>
+	<li>2.选择或星号表达式</li>
+	<li>3.文字国际化表达式</li>
+	<li>4.URL表达式</li>
+</ul>
+
+<h3>变量表达式</h3>
+
+<p>变量表达式即OGNL表达式或Spring EL表达式(在Spring术语中也叫model attributes)。如下所示：<br />
+<code>${session.user.name}</code></p>
+
+<p>它们将以HTML标签的一个属性来表示：</p>
+
+<pre>
+<code>&lt;span th:text=&quot;${book.author.name}&quot;&gt;  
+&lt;li th:each=&quot;book : ${books}&quot;&gt;  
+</code></pre>
+
+<h3>选择(星号)表达式</h3>
+
+<p>选择表达式很像变量表达式，不过它们用一个预先选择的对象来代替上下文变量容器(map)来执行，如下：<br />
+<code>&nbsp;*{customer.name}&nbsp;</code></p>
+
+<p>被指定的object由th:object属性定义：</p>
+
+<pre>
+<code>    &lt;div th:object=&quot;${book}&quot;&gt;  
+      ...  
+      &lt;span th:text=&quot;*{title}&quot;&gt;...&lt;/span&gt;  
+      ...  
+    &lt;/div&gt;  
+</code></pre>
+
+<h3>文字国际化表达式</h3>
+
+<p>文字国际化表达式允许我们从一个外部文件获取区域文字信息(.properties)，用Key索引Value，还可以提供一组参数(可选).</p>
+
+<pre>
+<code>    #{main.title}  
+    #{message.entrycreated(${entryId})}  
+</code></pre>
+
+<p>可以在模板文件中找到这样的表达式代码：</p>
+
+<pre>
+<code>    &lt;table&gt;  
+      ...  
+      &lt;th th:text=&quot;#{header.address.city}&quot;&gt;...&lt;/th&gt;  
+      &lt;th th:text=&quot;#{header.address.country}&quot;&gt;...&lt;/th&gt;  
+      ...  
+    &lt;/table&gt;  
+</code></pre>
+
+<h3>URL表达式</h3>
+
+<p>URL表达式指的是把一个有用的上下文或回话信息添加到URL，这个过程经常被叫做URL重写。<br />
+<code>&nbsp;@{/order/list}&nbsp;</code><br />
+URL还可以设置参数：<br />
+<code>&nbsp;@{/order/details(id=${orderId})}&nbsp;</code>&nbsp;<br />
+相对路径：<br />
+<code>&nbsp;@{../documents/report}&nbsp;</code></p>
+
+<p>让我们看这些表达式：</p>
+
+<pre>
+<code>    &lt;form th:action=&quot;@{/createOrder}&quot;&gt;  
+    &lt;a href=&quot;main.html&quot; th:href=&quot;@{/main}&quot;&gt;
+</code></pre>
+
+<h3>变量表达式和星号表达有什么区别吗？</h3>
+
+<p>如果不考虑上下文的情况下，两者没有区别；星号语法评估在选定对象上表达，而不是整个上下文&nbsp;<br />
+什么是选定对象？就是父标签的值，如下：</p>
+
+<pre>
+<code>  &lt;div th:object=&quot;${session.user}&quot;&gt;
+    &lt;p&gt;Name: &lt;span th:text=&quot;*{firstName}&quot;&gt;Sebastian&lt;/span&gt;.&lt;/p&gt;
+    &lt;p&gt;Surname: &lt;span th:text=&quot;*{lastName}&quot;&gt;Pepper&lt;/span&gt;.&lt;/p&gt;
+    &lt;p&gt;Nationality: &lt;span th:text=&quot;*{nationality}&quot;&gt;Saturn&lt;/span&gt;.&lt;/p&gt;
+  &lt;/div&gt;
+</code></pre>
+
+<p>这是完全等价于：</p>
+
+<pre>
+<code>  &lt;div th:object=&quot;${session.user}&quot;&gt;
+	  &lt;p&gt;Name: &lt;span th:text=&quot;${session.user.firstName}&quot;&gt;Sebastian&lt;/span&gt;.&lt;/p&gt;
+	  &lt;p&gt;Surname: &lt;span th:text=&quot;${session.user.lastName}&quot;&gt;Pepper&lt;/span&gt;.&lt;/p&gt;
+	  &lt;p&gt;Nationality: &lt;span th:text=&quot;${session.user.nationality}&quot;&gt;Saturn&lt;/span&gt;.&lt;/p&gt;
+  &lt;/div&gt;
+</code></pre>
+
+<p>当然，美元符号和星号语法可以混合使用：</p>
+
+<pre>
+<code>  &lt;div th:object=&quot;${session.user}&quot;&gt;
+	  &lt;p&gt;Name: &lt;span th:text=&quot;*{firstName}&quot;&gt;Sebastian&lt;/span&gt;.&lt;/p&gt;
+  	  &lt;p&gt;Surname: &lt;span th:text=&quot;${session.user.lastName}&quot;&gt;Pepper&lt;/span&gt;.&lt;/p&gt;
+      &lt;p&gt;Nationality: &lt;span th:text=&quot;*{nationality}&quot;&gt;Saturn&lt;/span&gt;.&lt;/p&gt;
+  &lt;/div&gt;
+</code></pre>
+
+<h3>表达式支持的语法</h3>
+
+<h4>字面（Literals）</h4>
+
+<ul>
+	<li>文本文字（Text literals）:&nbsp;<code>&#39;one text&#39;, &#39;Another one!&#39;,&hellip;</code></li>
+	<li>数字文本（Number literals）:&nbsp;<code>0, 34, 3.0, 12.3,&hellip;</code></li>
+	<li>布尔文本（Boolean literals）:&nbsp;<code>true, false</code></li>
+	<li>空（Null literal）:&nbsp;<code>null</code></li>
+	<li>文字标记（Literal tokens）:&nbsp;<code>one, sometext, main,&hellip;</code></li>
+</ul>
+
+<h4>文本操作（Text operations）</h4>
+
+<ul>
+	<li>字符串连接(String concatenation):&nbsp;<code>+</code></li>
+	<li>文本替换（Literal substitutions）:&nbsp;<code>|The name is ${name}|</code></li>
+</ul>
+
+<h4>算术运算（Arithmetic operations）</h4>
+
+<ul>
+	<li>二元运算符（Binary operators）:&nbsp;<code>+, -, *, /, %</code></li>
+	<li>减号（单目运算符）Minus sign (unary operator):&nbsp;<code>-</code></li>
+</ul>
+
+<h4>布尔操作（Boolean operations）</h4>
+
+<ul>
+	<li>二元运算符（Binary operators）:<code>and, or</code></li>
+	<li>布尔否定（一元运算符）Boolean negation (unary operator):<code>!, not</code></li>
+</ul>
+
+<h4>比较和等价(Comparisons and equality)</h4>
+
+<ul>
+	<li>比较（Comparators）:&nbsp;<code>&gt;, &lt;, &gt;=, &lt;= (gt, lt, ge, le)</code></li>
+	<li>等值运算符（Equality operators）:<code>==, != (eq, ne)</code></li>
+</ul>
+
+<h4>条件运算符（Conditional operators）</h4>
+
+<ul>
+	<li>If-then:&nbsp;<code>(if) ? (then)</code></li>
+	<li>If-then-else:&nbsp;<code>(if) ? (then) : (else)</code></li>
+	<li>Default: (value) ?:&nbsp;<code>(defaultvalue)</code></li>
+</ul>
+
+<p>所有这些特征可以被组合并嵌套：</p>
+
+<pre>
+<code>&#39;User is of type &#39; + (${user.isAdmin()} ? &#39;Administrator&#39; : (${user.type} ?: &#39;Unknown&#39;))
+</code></pre>
+
+<h2>常用th标签都有那些？</h2>
+
+<table>
+	<thead>
+		<tr>
+			<th>关键字</th>
+			<th>功能介绍</th>
+			<th>案例</th>
+		</tr>
+	</thead>
+	<tbody>
+		<tr>
+			<td>th:id</td>
+			<td>替换id</td>
+			<td><code>&nbsp;&lt;input th:id=&quot;&#39;xxx&#39; + ${collect.id}&quot;/&gt;&nbsp;</code></td>
+		</tr>
+		<tr>
+			<td>th:text</td>
+			<td>文本替换</td>
+			<td><code>&lt;p th:text=&quot;${collect.description}&quot;&gt;description&lt;/p&gt;</code></td>
+		</tr>
+		<tr>
+			<td>th:utext</td>
+			<td>支持html的文本替换</td>
+			<td><code>&lt;p th:utext=&quot;${htmlcontent}&quot;&gt;conten&lt;/p&gt;</code></td>
+		</tr>
+		<tr>
+			<td>th:object</td>
+			<td>替换对象</td>
+			<td><code>&lt;div th:object=&quot;${session.user}&quot;&gt;&nbsp;</code></td>
+		</tr>
+		<tr>
+			<td>th:value</td>
+			<td>属性赋值</td>
+			<td><code>&lt;input th:value=&quot;${user.name}&quot; /&gt;&nbsp;</code></td>
+		</tr>
+		<tr>
+			<td>th:with</td>
+			<td>变量赋值运算</td>
+			<td><code>&lt;div th:with=&quot;isEven=${prodStat.count}%2==0&quot;&gt;&lt;/div&gt;&nbsp;</code></td>
+		</tr>
+		<tr>
+			<td>th:style</td>
+			<td>设置样式</td>
+			<td><code>th:style=&quot;&#39;display:&#39; + @{(${sitrue} ? &#39;none&#39; : &#39;inline-block&#39;)} + &#39;&#39;&quot;&nbsp;</code></td>
+		</tr>
+		<tr>
+			<td>th:onclick</td>
+			<td>点击事件</td>
+			<td><code>th:onclick=&quot;&#39;getCollect()&#39;&quot;&nbsp;</code></td>
+		</tr>
+		<tr>
+			<td>th:each</td>
+			<td>属性赋值</td>
+			<td><code>tr th:each=&quot;user,userStat:${users}&quot;&gt;&nbsp;</code></td>
+		</tr>
+		<tr>
+			<td>th:if</td>
+			<td>判断条件</td>
+			<td><code>&nbsp;&lt;a th:if=&quot;${userId == collect.userId}&quot; &gt;&nbsp;</code></td>
+		</tr>
+		<tr>
+			<td>th:unless</td>
+			<td>和th:if判断相反</td>
+			<td><code>&lt;a th:href=&quot;@{/login}&quot; th:unless=${session.user != null}&gt;Login&lt;/a&gt;</code></td>
+		</tr>
+		<tr>
+			<td>th:href</td>
+			<td>链接地址</td>
+			<td><code>&lt;a th:href=&quot;@{/login}&quot; th:unless=${session.user != null}&gt;Login&lt;/a&gt; /&gt;&nbsp;</code></td>
+		</tr>
+		<tr>
+			<td>th:switch</td>
+			<td>多路选择 配合th:case 使用</td>
+			<td><code>&lt;div th:switch=&quot;${user.role}&quot;&gt;&nbsp;</code></td>
+		</tr>
+		<tr>
+			<td>th:case</td>
+			<td>th:switch的一个分支</td>
+			<td><code>&nbsp;&lt;p th:case=&quot;&#39;admin&#39;&quot;&gt;User is an administrator&lt;/p&gt;</code></td>
+		</tr>
+		<tr>
+			<td>th:fragment</td>
+			<td>布局标签，定义一个代码片段，方便其它地方引用</td>
+			<td><code>&lt;div th:fragment=&quot;alert&quot;&gt;</code></td>
+		</tr>
+		<tr>
+			<td>th:include</td>
+			<td>布局标签，替换内容到引入的文件</td>
+			<td><code>&lt;head th:include=&quot;layout :: htmlhead&quot; th:with=&quot;title=&#39;xx&#39;&quot;&gt;&lt;/head&gt; /&gt;&nbsp;</code></td>
+		</tr>
+		<tr>
+			<td>th:replace</td>
+			<td>布局标签，替换整个标签到引入的文件</td>
+			<td><code>&lt;div th:replace=&quot;fragments/header :: title&quot;&gt;&lt;/div&gt;&nbsp;</code></td>
+		</tr>
+		<tr>
+			<td>th:selected</td>
+			<td>selected选择框 选中</td>
+			<td><code>th:selected=&quot;(${xxx.id} == ${configObj.dd})&quot;</code></td>
+		</tr>
+		<tr>
+			<td>th:src</td>
+			<td>图片类地址引入</td>
+			<td><code>&lt;img class=&quot;img-responsive&quot; alt=&quot;App Logo&quot; th:src=&quot;@{/img/logo.png}&quot; /&gt;&nbsp;</code></td>
+		</tr>
+		<tr>
+			<td>th:inline</td>
+			<td>定义js脚本可以使用变量</td>
+			<td><code>&lt;script type=&quot;text/javascript&quot; th:inline=&quot;javascript&quot;&gt;</code></td>
+		</tr>
+		<tr>
+			<td>th:action</td>
+			<td>表单提交的地址</td>
+			<td><code>&lt;form action=&quot;subscribe.html&quot; th:action=&quot;@{/subscribe}&quot;&gt;</code></td>
+		</tr>
+		<tr>
+			<td>th:remove</td>
+			<td>删除某个属性</td>
+			<td><code>&lt;tr th:remove=&quot;all&quot;&gt; 1.all:删除包含标签和所有的孩子。2.body:不包含标记删除,但删除其所有的孩子。3.tag:包含标记的删除,但不删除它的孩子。4.all-but-first:删除所有包含标签的孩子,除了第一个。5.none:什么也不做。这个值是有用的动态评估。</code></td>
+		</tr>
+		<tr>
+			<td>th:attr</td>
+			<td>设置标签属性，多个属性可以用逗号分隔</td>
+			<td>比如&nbsp;<code>th:attr=&quot;src=@{/image/aa.jpg},title=#{logo}&quot;</code>，此标签不太优雅，一般用的比较少。</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>还有非常多的标签，这里只列出最常用的几个,由于一个标签内可以包含多个th:x属性，其生效的优先级顺序为:<code>include,each,if/unless/switch/case,with,attr/attrprepend/attrappend,value/href,src ,etc,text/utext,fragment,remove。&nbsp;</code></p>
+
+<h2>几种常用的使用方法</h2>
+
+<h3>1、赋值、字符串拼接</h3>
+
+<pre>
+<code> &lt;p  th:text=&quot;${collect.description}&quot;&gt;description&lt;/p&gt;
+ &lt;span th:text=&quot;&#39;Welcome to our application, &#39; + ${user.name} + &#39;!&#39;&quot;&gt;
+</code></pre>
+
+<p>字符串拼接还有另外一种简洁的写法</p>
+
+<pre>
+<code>&lt;span th:text=&quot;|Welcome to our application, ${user.name}!|&quot;&gt;
+</code></pre>
+
+<h3>2、条件判断 If/Unless</h3>
+
+<p>Thymeleaf中使用th:if和th:unless属性进行条件判断，下面的例子中，<code>&lt;a&gt;</code>标签只有在<code>th:if</code>中条件成立时才显示：</p>
+
+<pre>
+<code>&lt;a th:if=&quot;${myself==&#39;yes&#39;}&quot; &gt; &lt;/i&gt; &lt;/a&gt;
+&lt;a th:unless=${session.user != null} th:href=&quot;@{/login}&quot; &gt;Login&lt;/a&gt;
+</code></pre>
+
+<p>th:unless于th:if恰好相反，只有表达式中的条件不成立，才会显示其内容。</p>
+
+<p>也可以使用&nbsp;<code>(if) ? (then) : (else)</code>&nbsp;这种语法来判断显示的内容</p>
+
+<h3>3、for 循环</h3>
+
+<pre>
+<code>  &lt;tr  th:each=&quot;collect,iterStat : ${collects}&quot;&gt; 
+     &lt;th scope=&quot;row&quot; th:text=&quot;${collect.id}&quot;&gt;1&lt;/th&gt;
+     &lt;td &gt;
+        &lt;img th:src=&quot;${collect.webLogo}&quot;/&gt;
+     &lt;/td&gt;
+     &lt;td th:text=&quot;${collect.url}&quot;&gt;Mark&lt;/td&gt;
+     &lt;td th:text=&quot;${collect.title}&quot;&gt;Otto&lt;/td&gt;
+     &lt;td th:text=&quot;${collect.description}&quot;&gt;@mdo&lt;/td&gt;
+     &lt;td th:text=&quot;${terStat.index}&quot;&gt;index&lt;/td&gt;
+ &lt;/tr&gt;
+</code></pre>
+
+<p>iterStat称作状态变量，属性有：</p>
+
+<ul>
+	<li>index:当前迭代对象的index（从0开始计算）</li>
+	<li>count: 当前迭代对象的index(从1开始计算)</li>
+	<li>size:被迭代对象的大小</li>
+	<li>current:当前迭代变量</li>
+	<li>even/odd:布尔值，当前循环是否是偶数/奇数（从0开始计算）</li>
+	<li>first:布尔值，当前循环是否是第一个</li>
+	<li>last:布尔值，当前循环是否是最后一个</li>
+</ul>
+
+<h3>4、URL</h3>
+
+<p>URL在Web应用模板中占据着十分重要的地位，需要特别注意的是Thymeleaf对于URL的处理是通过语法@{&hellip;}来处理的。 如果需要Thymeleaf对URL进行渲染，那么务必使用th:href，th:src等属性，下面是一个例子</p>
+
+<pre>
+<code>&lt;!-- Will produce &#39;http://localhost:8080/standard/unread&#39; (plus rewriting) --&gt;
+ &lt;a  th:href=&quot;@{/standard/{type}(type=${type})}&quot;&gt;view&lt;/a&gt;
+
+&lt;!-- Will produce &#39;/gtvg/order/3/details&#39; (plus rewriting) --&gt;
+&lt;a href=&quot;details.html&quot; th:href=&quot;@{/order/{orderId}/details(orderId=${o.id})}&quot;&gt;view&lt;/a&gt;
+</code></pre>
+
+<p>设置背景</p>
+
+<pre>
+<code>&lt;div th:style=&quot;&#39;background:url(&#39; + @{/&lt;path-to-image&gt;} + &#39;);&#39;&quot;&gt;&lt;/div&gt;
+</code></pre>
+
+<p>根据属性值改变背景</p>
+
+<pre>
+<code> &lt;div class=&quot;media-object resource-card-image&quot;  th:style=&quot;&#39;background:url(&#39; + @{(${collect.webLogo}==&#39;&#39; ? &#39;img/favicon.png&#39; : ${collect.webLogo})} + &#39;)&#39;&quot; &gt;&lt;/div&gt;
+</code></pre>
+
+<p>几点说明：</p>
+
+<ul>
+	<li>上例中URL最后的<code>(orderId=${o.id})</code>&nbsp;表示将括号内的内容作为URL参数处理，该语法避免使用字符串拼接，大大提高了可读性</li>
+	<li><code>@{...}</code>表达式中可以通过<code>{orderId}</code>访问Context中的orderId变量</li>
+	<li><code>@{/order}</code>是Context相关的相对路径，在渲染时会自动添加上当前Web应用的Context名字，假设context名字为app，那么结果应该是/app/order</li>
+</ul>
+
+<h3>5、内联js</h3>
+
+<p>内联文本：[[&hellip;]]内联文本的表示方式，使用时，必须先用th:inline=&rdquo;text/javascript/none&rdquo;激活，th:inline可以在父级标签内使用，甚至作为body的标签。内联文本尽管比th:text的代码少，不利于原型显示。</p>
+
+<pre>
+<code>&lt;script th:inline=&quot;javascript&quot;&gt;
+/*&lt;![CDATA[*/
+...
+var username = /*[[${sesion.user.name}]]*/ &#39;Sebastian&#39;;
+var size = /*[[${size}]]*/ 0;
+...
+/*]]&gt;*/
+&lt;/script&gt;
+</code></pre>
+
+<p>js附加代码：</p>
+
+<pre>
+<code>/*[+
+var msg = &#39;This is a working application&#39;;
++]*/
+</code></pre>
+
+<p>js移除代码：</p>
+
+<pre>
+<code>/*[- */
+var msg = &#39;This is a non-working template&#39;;
+/* -]*/
+</code></pre>
+
+<h3>6、内嵌变量</h3>
+
+<p>为了模板更加易用，Thymeleaf还提供了一系列Utility对象（内置于Context中），可以通过#直接访问：</p>
+
+<ul>
+	<li>dates ：&nbsp;<em>java.util.Date的功能方法类。</em></li>
+	<li>calendars :&nbsp;<em>类似#dates，面向java.util.Calendar</em></li>
+	<li>numbers :&nbsp;<em>格式化数字的功能方法类</em></li>
+	<li>strings :&nbsp;<em>字符串对象的功能类，contains,startWiths,prepending/appending等等。</em></li>
+	<li>objects:&nbsp;<em>对objects的功能类操作。</em></li>
+	<li>bools:&nbsp;<em>对布尔值求值的功能方法。</em></li>
+	<li>arrays：<em>对数组的功能类方法。</em></li>
+	<li>lists:&nbsp;<em>对lists功能类方法</em></li>
+	<li>sets</li>
+	<li>maps<br />
+	&hellip;</li>
+</ul>
+
+<p>下面用一段代码来举例一些常用的方法：</p>
+
+<h4>dates</h4>
+
+<pre>
+<code>/*
+ * Format date with the specified pattern
+ * Also works with arrays, lists or sets
+ */
+${#dates.format(date, &#39;dd/MMM/yyyy HH:mm&#39;)}
+${#dates.arrayFormat(datesArray, &#39;dd/MMM/yyyy HH:mm&#39;)}
+${#dates.listFormat(datesList, &#39;dd/MMM/yyyy HH:mm&#39;)}
+${#dates.setFormat(datesSet, &#39;dd/MMM/yyyy HH:mm&#39;)}
+
+/*
+ * Create a date (java.util.Date) object for the current date and time
+ */
+${#dates.createNow()}
+
+/*
+ * Create a date (java.util.Date) object for the current date (time set to 00:00)
+ */
+${#dates.createToday()}
+</code></pre>
+
+<h4>strings</h4>
+
+<pre>
+<code>/*
+ * Check whether a String is empty (or null). Performs a trim() operation before check
+ * Also works with arrays, lists or sets
+ */
+${#strings.isEmpty(name)}
+${#strings.arrayIsEmpty(nameArr)}
+${#strings.listIsEmpty(nameList)}
+${#strings.setIsEmpty(nameSet)}
+
+/*
+ * Check whether a String starts or ends with a fragment
+ * Also works with arrays, lists or sets
+ */
+${#strings.startsWith(name,&#39;Don&#39;)}                  // also array*, list* and set*
+${#strings.endsWith(name,endingFragment)}           // also array*, list* and set*
+
+/*
+ * Compute length
+ * Also works with arrays, lists or sets
+ */
+${#strings.length(str)}
+
+/*
+ * Null-safe comparison and concatenation
+ */
+${#strings.equals(str)}
+${#strings.equalsIgnoreCase(str)}
+${#strings.concat(str)}
+${#strings.concatReplaceNulls(str)}
+
+/*
+ * Random
+ */
+${#strings.randomAlphanumeric(count)}
+
+</code></pre>
+
+<h2>使用thymeleaf布局</h2>
+
+<p>使用thymeleaf布局非常的方便</p>
+
+<p>定义代码片段</p>
+
+<pre>
+<code>&lt;footer th:fragment=&quot;copy&quot;&gt; 
+&amp;copy; 2016
+&lt;/footer&gt;
+</code></pre>
+
+<p>在页面任何地方引入：</p>
+
+<pre>
+<code>&lt;body&gt; 
+  &lt;div th:include=&quot;footer :: copy&quot;&gt;&lt;/div&gt;
+  &lt;div th:replace=&quot;footer :: copy&quot;&gt;&lt;/div&gt;
+ &lt;/body&gt;
+</code></pre>
+
+<p>th:include 和 th:replace区别，include只是加载，replace是替换</p>
+
+<p>返回的HTML如下：</p>
+
+<pre>
+<code>&lt;body&gt; 
+   &lt;div&gt; &amp;copy; 2016 &lt;/div&gt; 
+  &lt;footer&gt;&amp;copy; 2016 &lt;/footer&gt; 
+&lt;/body&gt;
+</code></pre>
+
+<p>下面是一个常用的后台页面布局，将整个页面分为头部，尾部、菜单栏、隐藏栏，点击菜单只改变content区域的页面</p>
+
+<pre>
+<code>&lt;body class=&quot;layout-fixed&quot;&gt;
+  &lt;div th:fragment=&quot;navbar&quot;  class=&quot;wrapper&quot;  role=&quot;navigation&quot;&gt;
+	&lt;div th:replace=&quot;fragments/header :: header&quot;&gt;Header&lt;/div&gt;
+	&lt;div th:replace=&quot;fragments/left :: left&quot;&gt;left&lt;/div&gt;
+	&lt;div th:replace=&quot;fragments/sidebar :: sidebar&quot;&gt;sidebar&lt;/div&gt;
+	&lt;div layout:fragment=&quot;content&quot; id=&quot;content&quot; &gt;&lt;/div&gt;
+	&lt;div th:replace=&quot;fragments/footer :: footer&quot;&gt;footer&lt;/div&gt;
+  &lt;/div&gt;
+&lt;/body&gt;
+</code></pre>
+
+<p>任何页面想使用这样的布局值只需要替换中见的 content模块即可</p>
+
+<pre>
+<code> &lt;html xmlns:th=&quot;http://www.thymeleaf.org&quot; layout:decorator=&quot;layout&quot;&gt;
+   &lt;body&gt;
+      &lt;section layout:fragment=&quot;content&quot;&gt;
+    ...
+
+</code></pre>
+
+<p>也可以在引用模版的时候传参</p>
+
+<pre>
+<code>&lt;head th:include=&quot;layout :: htmlhead&quot; th:with=&quot;title=&#39;Hello&#39;&quot;&gt;&lt;/head&gt;
+</code></pre>
+
+<p>layout 是文件地址，如果有文件夹可以这样写 fileName/layout:htmlhead<br />
+htmlhead 是指定义的代码片段 如&nbsp;<code>th:fragment=&quot;copy&quot;</code></p>
+
+<h2>源码案例</h2>
+
+<p>这里有一个开源项目几乎使用了这里介绍的所有标签和布局，大家可以参考：</p>
+
+<p><strong><a href="https://github.com/cloudfavorites/favorites-web">示例代码-github</a></strong></p>
+
+<p><strong><a href="https://gitee.com/ityouknow/favorites-web">示例代码-码云</a></strong></p>
+
+<h2>参考</h2>
+
+<p><a href="http://www.thymeleaf.org/doc/tutorials/2.1/thymeleafspring.html#integrating-thymeleaf-with-spring">thymeleaf官方指南</a><br />
+<a href="http://www.tianmaying.com/tutorial/using-thymeleaf">新一代Java模板引擎Thymeleaf</a><br />
+<a href="http://www.webinno.cn/blog/article/view/131">Thymeleaf基本知识</a>&nbsp;<br />
+<a href="http://v8en.com/news/list/47/0">thymeleaf总结文章</a><br />
+<a href="http://www.cnblogs.com/lazio10000/p/5603955.html">Thymeleaf 模板的使用</a><br />
+<a href="http://www.blogjava.net/bjwulin/archive/2013/02/07/395234.html">thymeleaf 学习笔记</a></p>
