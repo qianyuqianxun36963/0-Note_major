@@ -1,0 +1,392 @@
+<h1>java 实现websocket的两种方式</h1>
+
+<h2>简单说明</h2>
+
+<p>1.两种方式，一种使用tomcat的websocket实现，一种使用spring的websocket</p>
+
+<p>2.tomcat的方式需要tomcat 7.x，JEE7的支持。</p>
+
+<p>3.spring与websocket整合需要spring 4.x，并且使用了socketjs，对不支持websocket的浏览器可以模拟websocket使用</p>
+
+<h2>方式一：tomcat</h2>
+
+<p>使用这种方式无需别的任何配置，只需服务端一个处理类，</p>
+
+<h3>服务器端代码</h3>
+
+<ol start="1">
+	<li>package&nbsp;com.Socket;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>import&nbsp;java.io.IOException;&nbsp;&nbsp;</li>
+	<li>import&nbsp;java.util.Map;&nbsp;&nbsp;</li>
+	<li>import&nbsp;java.util.concurrent.ConcurrentHashMap;&nbsp;&nbsp;</li>
+	<li>import&nbsp;javax.websocket.*;&nbsp;&nbsp;</li>
+	<li>import&nbsp;javax.websocket.server.PathParam;&nbsp;&nbsp;</li>
+	<li>import&nbsp;javax.websocket.server.ServerEndpoint;&nbsp;&nbsp;</li>
+	<li>import&nbsp;net.sf.json.JSONObject;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>@ServerEndpoint(&quot;/websocket/{username}&quot;)&nbsp;&nbsp;</li>
+	<li>public&nbsp;class&nbsp;WebSocket&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;private&nbsp;static&nbsp;int&nbsp;onlineCount&nbsp;=&nbsp;0;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;private&nbsp;static&nbsp;Map&lt;String,&nbsp;WebSocket&gt;&nbsp;clients&nbsp;=&nbsp;new&nbsp;ConcurrentHashMap&lt;String,&nbsp;WebSocket&gt;();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;private&nbsp;Session&nbsp;session;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;private&nbsp;String&nbsp;username;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;@OnOpen&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;void&nbsp;onOpen(@PathParam(&quot;username&quot;)&nbsp;String&nbsp;username,&nbsp;Session&nbsp;session)&nbsp;throws&nbsp;IOException&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;this.username&nbsp;=&nbsp;username;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;this.session&nbsp;=&nbsp;session;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;addOnlineCount();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;clients.put(username,&nbsp;this);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;System.out.println(&quot;已连接&quot;);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;@OnClose&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;void&nbsp;onClose()&nbsp;throws&nbsp;IOException&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;clients.remove(username);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;subOnlineCount();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;@OnMessage&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;void&nbsp;onMessage(String&nbsp;message)&nbsp;throws&nbsp;IOException&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;JSONObject&nbsp;jsonTo&nbsp;=&nbsp;JSONObject.fromObject(message);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if&nbsp;(!jsonTo.get(&quot;To&quot;).equals(&quot;All&quot;)){&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;sendMessageTo(&quot;给一个人&quot;,&nbsp;jsonTo.get(&quot;To&quot;).toString());&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}else{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;sendMessageAll(&quot;给所有人&quot;);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;@OnError&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;void&nbsp;onError(Session&nbsp;session,&nbsp;Throwable&nbsp;error)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;error.printStackTrace();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;void&nbsp;sendMessageTo(String&nbsp;message,&nbsp;String&nbsp;To)&nbsp;throws&nbsp;IOException&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//&nbsp;session.getBasicRemote().sendText(message);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//session.getAsyncRemote().sendText(message);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;for&nbsp;(WebSocket&nbsp;item&nbsp;:&nbsp;clients.values())&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if&nbsp;(item.username.equals(To)&nbsp;)&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;item.session.getAsyncRemote().sendText(message);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;void&nbsp;sendMessageAll(String&nbsp;message)&nbsp;throws&nbsp;IOException&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;for&nbsp;(WebSocket&nbsp;item&nbsp;:&nbsp;clients.values())&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;item.session.getAsyncRemote().sendText(message);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;static&nbsp;synchronized&nbsp;int&nbsp;getOnlineCount()&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return&nbsp;onlineCount;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;static&nbsp;synchronized&nbsp;void&nbsp;addOnlineCount()&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;WebSocket.onlineCount++;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;static&nbsp;synchronized&nbsp;void&nbsp;subOnlineCount()&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;WebSocket.onlineCount--;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;static&nbsp;synchronized&nbsp;Map&lt;String,&nbsp;WebSocket&gt;&nbsp;getClients()&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return&nbsp;clients;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>}&nbsp;&nbsp;</li>
+</ol>
+
+<p>客户端js</p>
+
+<ol start="1">
+	<li>var&nbsp;websocket&nbsp;=&nbsp;null;&nbsp;&nbsp;</li>
+	<li>var&nbsp;username&nbsp;=&nbsp;localStorage.getItem(&quot;name&quot;);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>//判断当前浏览器是否支持WebSocket&nbsp;&nbsp;</li>
+	<li>if&nbsp;(&#39;WebSocket&#39;&nbsp;in&nbsp;window)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;websocket&nbsp;=&nbsp;new&nbsp;WebSocket(&quot;ws://&quot;&nbsp;+&nbsp;document.location.host&nbsp;+&nbsp;&quot;/WebChat/websocket/&quot;&nbsp;+&nbsp;username&nbsp;+&nbsp;&quot;/&quot;+&nbsp;_img);&nbsp;&nbsp;</li>
+	<li>}&nbsp;else&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;alert(&#39;当前浏览器&nbsp;Not&nbsp;support&nbsp;websocket&#39;)&nbsp;&nbsp;</li>
+	<li>}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>//连接发生错误的回调方法&nbsp;&nbsp;</li>
+	<li>websocket.onerror&nbsp;=&nbsp;function()&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;setMessageInnerHTML(&quot;WebSocket连接发生错误&quot;);&nbsp;&nbsp;</li>
+	<li>};&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>//连接成功建立的回调方法&nbsp;&nbsp;</li>
+	<li>websocket.onopen&nbsp;=&nbsp;function()&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;setMessageInnerHTML(&quot;WebSocket连接成功&quot;);&nbsp;&nbsp;</li>
+	<li>}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>//接收到消息的回调方法&nbsp;&nbsp;</li>
+	<li>websocket.onmessage&nbsp;=&nbsp;function(event)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;setMessageInnerHTML(event.data);&nbsp;&nbsp;</li>
+	<li>}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>//连接关闭的回调方法&nbsp;&nbsp;</li>
+	<li>websocket.onclose&nbsp;=&nbsp;function()&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;setMessageInnerHTML(&quot;WebSocket连接关闭&quot;);&nbsp;&nbsp;</li>
+	<li>}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>//监听窗口关闭事件，当窗口关闭时，主动去关闭websocket连接，防止连接还没断开就关闭窗口，server端会抛异常。&nbsp;&nbsp;</li>
+	<li>window.onbeforeunload&nbsp;=&nbsp;function()&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;closeWebSocket();&nbsp;&nbsp;</li>
+	<li>}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>//关闭WebSocket连接&nbsp;&nbsp;</li>
+	<li>function&nbsp;closeWebSocket()&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;websocket.close();&nbsp;&nbsp;</li>
+	<li>}&nbsp;&nbsp;</li>
+</ol>
+
+<p>发送消息只需要使用websocket.send(&quot;发送消息&quot;)，就可以触发服务端的onMessage()方法，当连接时，触发服务器端onOpen()方法，此时也可以调用发送消息的方法去发送消息。关闭websocket时，触发服务器端onclose()方法，此时也可以发送消息，但是不能发送给自己，因为自己的已经关闭了连接，但是可以发送给其他人。</p>
+
+<p>方法二：spring整合</p>
+
+<p>此方式基于spring&nbsp;mvc框架，相关配置可以看我的相关博客文章</p>
+
+<p>WebSocketConfig.java</p>
+
+<p>这个类是配置类，所以需要在spring&nbsp;mvc配置文件中加入对这个类的扫描，第一个addHandler是对正常连接的配置，第二个是如果浏览器不支持websocket，使用socketjs模拟websocket的连接。</p>
+
+<ol start="1">
+	<li>package&nbsp;com.websocket;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>import&nbsp;org.springframework.context.annotation.Bean;&nbsp;&nbsp;</li>
+	<li>import&nbsp;org.springframework.context.annotation.Configuration;&nbsp;&nbsp;</li>
+	<li>import&nbsp;org.springframework.web.socket.config.annotation.EnableWebSocket;&nbsp;&nbsp;</li>
+	<li>import&nbsp;org.springframework.web.socket.config.annotation.WebSocketConfigurer;&nbsp;&nbsp;</li>
+	<li>import&nbsp;org.springframework.web.socket.config.annotation.WebSocketHandlerRegistry;&nbsp;&nbsp;</li>
+	<li>import&nbsp;org.springframework.web.socket.handler.TextWebSocketHandler;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>@Configuration&nbsp;&nbsp;</li>
+	<li>@EnableWebSocket&nbsp;&nbsp;</li>
+	<li>public&nbsp;class&nbsp;WebSocketConfig&nbsp;implements&nbsp;WebSocketConfigurer&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;@Override&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;void&nbsp;registerWebSocketHandlers(WebSocketHandlerRegistry&nbsp;registry)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;registry.addHandler(chatMessageHandler(),&quot;/webSocketServer&quot;).addInterceptors(new&nbsp;ChatHandshakeInterceptor());&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;registry.addHandler(chatMessageHandler(),&nbsp;&quot;/sockjs/webSocketServer&quot;).addInterceptors(new&nbsp;ChatHandshakeInterceptor()).withSockJS();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;@Bean&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;TextWebSocketHandler&nbsp;chatMessageHandler(){&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return&nbsp;new&nbsp;ChatMessageHandler();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>}&nbsp;&nbsp;</li>
+</ol>
+
+<p>ChatHandshakeInterceptor.java</p>
+
+<p>这个类的作用就是在连接成功前和成功后增加一些额外的功能，Constants.java类是一个工具类，两个常量。</p>
+
+<ol start="1">
+	<li>package&nbsp;com.websocket;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>import&nbsp;java.util.Map;&nbsp;&nbsp;</li>
+	<li>import&nbsp;org.apache.shiro.SecurityUtils;&nbsp;&nbsp;</li>
+	<li>import&nbsp;org.springframework.http.server.ServerHttpRequest;&nbsp;&nbsp;</li>
+	<li>import&nbsp;org.springframework.http.server.ServerHttpResponse;&nbsp;&nbsp;</li>
+	<li>import&nbsp;org.springframework.web.socket.WebSocketHandler;&nbsp;&nbsp;</li>
+	<li>import&nbsp;org.springframework.web.socket.server.support.HttpSessionHandshakeInterceptor;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>public&nbsp;class&nbsp;ChatHandshakeInterceptor&nbsp;extends&nbsp;HttpSessionHandshakeInterceptor&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;@Override&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;boolean&nbsp;beforeHandshake(ServerHttpRequest&nbsp;request,&nbsp;ServerHttpResponse&nbsp;response,&nbsp;WebSocketHandler&nbsp;wsHandler,&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Map&lt;String,&nbsp;Object&gt;&nbsp;attributes)&nbsp;throws&nbsp;Exception&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;System.out.println(&quot;Before&nbsp;Handshake&quot;);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/*&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;*&nbsp;if&nbsp;(request&nbsp;instanceof&nbsp;ServletServerHttpRequest)&nbsp;{&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;*&nbsp;ServletServerHttpRequest&nbsp;servletRequest&nbsp;=&nbsp;(ServletServerHttpRequest)&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;*&nbsp;request;&nbsp;HttpSession&nbsp;session&nbsp;=&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;*&nbsp;servletRequest.getServletRequest().getSession(false);&nbsp;if&nbsp;(session&nbsp;!=&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;*&nbsp;null)&nbsp;{&nbsp;//使用userName区分WebSocketHandler，以便定向发送消息&nbsp;String&nbsp;userName&nbsp;=&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;*&nbsp;(String)&nbsp;session.getAttribute(Constants.SESSION_USERNAME);&nbsp;if&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;*&nbsp;(userName==null)&nbsp;{&nbsp;userName=&quot;default-system&quot;;&nbsp;}&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;*&nbsp;attributes.put(Constants.WEBSOCKET_USERNAME,userName);&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;*&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;*&nbsp;}&nbsp;}&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;*/&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//使用userName区分WebSocketHandler，以便定向发送消息(使用shiro获取session,或是使用上面的方式)&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;String&nbsp;userName&nbsp;=&nbsp;(String)&nbsp;SecurityUtils.getSubject().getSession().getAttribute(Constants.SESSION_USERNAME);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if&nbsp;(userName&nbsp;==&nbsp;null)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;userName&nbsp;=&nbsp;&quot;default-system&quot;;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;attributes.put(Constants.WEBSOCKET_USERNAME,&nbsp;userName);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return&nbsp;super.beforeHandshake(request,&nbsp;response,&nbsp;wsHandler,&nbsp;attributes);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;@Override&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;void&nbsp;afterHandshake(ServerHttpRequest&nbsp;request,&nbsp;ServerHttpResponse&nbsp;response,&nbsp;WebSocketHandler&nbsp;wsHandler,&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Exception&nbsp;ex)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;System.out.println(&quot;After&nbsp;Handshake&quot;);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;super.afterHandshake(request,&nbsp;response,&nbsp;wsHandler,&nbsp;ex);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>}&nbsp;&nbsp;</li>
+</ol>
+
+<p>ChatMessageHandler.java</p>
+
+<p>这个类是对消息的一些处理，比如是发给一个人，还是发给所有人，并且前端连接时触发的一些动作</p>
+
+<ol start="1">
+	<li>package&nbsp;com.websocket;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>import&nbsp;java.io.IOException;&nbsp;&nbsp;</li>
+	<li>import&nbsp;java.util.ArrayList;&nbsp;&nbsp;</li>
+	<li>import&nbsp;org.apache.log4j.Logger;&nbsp;&nbsp;</li>
+	<li>import&nbsp;org.springframework.web.socket.CloseStatus;&nbsp;&nbsp;</li>
+	<li>import&nbsp;org.springframework.web.socket.TextMessage;&nbsp;&nbsp;</li>
+	<li>import&nbsp;org.springframework.web.socket.WebSocketSession;&nbsp;&nbsp;</li>
+	<li>import&nbsp;org.springframework.web.socket.handler.TextWebSocketHandler;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>public&nbsp;class&nbsp;ChatMessageHandler&nbsp;extends&nbsp;TextWebSocketHandler&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;private&nbsp;static&nbsp;final&nbsp;ArrayList&lt;WebSocketSession&gt;&nbsp;users;//&nbsp;这个会出现性能问题，最好用Map来存储，key用userid&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;private&nbsp;static&nbsp;Logger&nbsp;logger&nbsp;=&nbsp;Logger.getLogger(ChatMessageHandler.class);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;static&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;users&nbsp;=&nbsp;new&nbsp;ArrayList&lt;WebSocketSession&gt;();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;/**&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;*&nbsp;连接成功时候，会触发UI上onopen方法&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;*/&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;@Override&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;void&nbsp;afterConnectionEstablished(WebSocketSession&nbsp;session)&nbsp;throws&nbsp;Exception&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;System.out.println(&quot;connect&nbsp;to&nbsp;the&nbsp;websocket&nbsp;success......&quot;);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;users.add(session);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//&nbsp;这块会实现自己业务，比如，当用户登录后，会把离线消息推送给用户&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//&nbsp;TextMessage&nbsp;returnMessage&nbsp;=&nbsp;new&nbsp;TextMessage(&quot;你将收到的离线&quot;);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//&nbsp;session.sendMessage(returnMessage);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;/**&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;*&nbsp;在UI在用js调用websocket.send()时候，会调用该方法&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;*/&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;@Override&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;protected&nbsp;void&nbsp;handleTextMessage(WebSocketSession&nbsp;session,&nbsp;TextMessage&nbsp;message)&nbsp;throws&nbsp;Exception&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;sendMessageToUsers(message);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//super.handleTextMessage(session,&nbsp;message);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;/**&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;*&nbsp;给某个用户发送消息&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;*&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;*&nbsp;@param&nbsp;userName&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;*&nbsp;@param&nbsp;message&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;*/&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;void&nbsp;sendMessageToUser(String&nbsp;userName,&nbsp;TextMessage&nbsp;message)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;for&nbsp;(WebSocketSession&nbsp;user&nbsp;:&nbsp;users)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if&nbsp;(user.getAttributes().get(Constants.WEBSOCKET_USERNAME).equals(userName))&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;try&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if&nbsp;(user.isOpen())&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;user.sendMessage(message);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;catch&nbsp;(IOException&nbsp;e)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;e.printStackTrace();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;break;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;/**&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;*&nbsp;给所有在线用户发送消息&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;*&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;*&nbsp;@param&nbsp;message&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;*/&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;void&nbsp;sendMessageToUsers(TextMessage&nbsp;message)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;for&nbsp;(WebSocketSession&nbsp;user&nbsp;:&nbsp;users)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;try&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if&nbsp;(user.isOpen())&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;user.sendMessage(message);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;catch&nbsp;(IOException&nbsp;e)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;e.printStackTrace();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;@Override&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;void&nbsp;handleTransportError(WebSocketSession&nbsp;session,&nbsp;Throwable&nbsp;exception)&nbsp;throws&nbsp;Exception&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if&nbsp;(session.isOpen())&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;session.close();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;logger.debug(&quot;websocket&nbsp;connection&nbsp;closed......&quot;);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;users.remove(session);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;@Override&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;void&nbsp;afterConnectionClosed(WebSocketSession&nbsp;session,&nbsp;CloseStatus&nbsp;closeStatus)&nbsp;throws&nbsp;Exception&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;logger.debug(&quot;websocket&nbsp;connection&nbsp;closed......&quot;);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;users.remove(session);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;@Override&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;boolean&nbsp;supportsPartialMessages()&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return&nbsp;false;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>}&nbsp;&nbsp;</li>
+</ol>
+
+<p>spring-mvc.xml</p>
+
+<p>正常的配置文件，同时需要增加对WebSocketConfig.java类的扫描，并且增加</p>
+
+<ol start="1">
+	<li>xmlns:websocket=&quot;http://www.springframework.org/schema/websocket&quot;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;http://www.springframework.org/schema/websocket&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;a&nbsp;target=&quot;_blank&quot;&nbsp;href=&quot;http://www.springframework.org/schema/websocket/spring-websocket-4.1.xsd&quot;&gt;http://www.springframework.org/schema/websocket/spring-websocket-4.1.xsd&lt;/a&gt;&nbsp;&nbsp;</li>
+</ol>
+
+<p>客户端</p>
+
+<ol start="1">
+	<li>&lt;script&nbsp;type=&quot;text/javascript&quot;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;src=&quot;http://localhost:8080/Bank/js/sockjs-0.3.min.js&quot;&gt;&lt;/script&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;script&gt;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;var&nbsp;websocket;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if&nbsp;(&#39;WebSocket&#39;&nbsp;in&nbsp;window)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;websocket&nbsp;=&nbsp;new&nbsp;WebSocket(&quot;ws://&quot;&nbsp;+&nbsp;document.location.host&nbsp;+&nbsp;&quot;/Bank/webSocketServer&quot;);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;else&nbsp;if&nbsp;(&#39;MozWebSocket&#39;&nbsp;in&nbsp;window)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;websocket&nbsp;=&nbsp;new&nbsp;MozWebSocket(&quot;ws://&quot;&nbsp;+&nbsp;document.location.host&nbsp;+&nbsp;&quot;/Bank/webSocketServer&quot;);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;else&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;websocket&nbsp;=&nbsp;new&nbsp;SockJS(&quot;http://&quot;&nbsp;+&nbsp;document.location.host&nbsp;+&nbsp;&quot;/Bank/sockjs/webSocketServer&quot;);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;websocket.onopen&nbsp;=&nbsp;function(evnt)&nbsp;{};&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;websocket.onmessage&nbsp;=&nbsp;function(evnt)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$(&quot;#test&quot;).html(&quot;(&lt;font&nbsp;color=&#39;red&#39;&gt;&quot;&nbsp;+&nbsp;evnt.data&nbsp;+&nbsp;&quot;&lt;/font&gt;)&quot;)&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;};&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;websocket.onerror&nbsp;=&nbsp;function(evnt)&nbsp;{};&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;websocket.onclose&nbsp;=&nbsp;function(evnt)&nbsp;{}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$(&#39;#btn&#39;).on(&#39;click&#39;,&nbsp;function()&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if&nbsp;(websocket.readyState&nbsp;==&nbsp;websocket.OPEN)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;var&nbsp;msg&nbsp;=&nbsp;$(&#39;#id&#39;).val();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//调用后台handleTextMessage方法&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;websocket.send(msg);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;else&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;alert(&quot;连接失败!&quot;);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;});&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;/script&gt;&nbsp;&nbsp;</li>
+</ol>
+
+<p><br />
+注意导入socketjs时要使用地址全称，并且连接使用的是http而不是websocket的ws</p>
