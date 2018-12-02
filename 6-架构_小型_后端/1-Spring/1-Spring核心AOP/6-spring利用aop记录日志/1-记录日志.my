@@ -1,0 +1,418 @@
+<h1>Spring AOP 实现日志记录功能</h1>
+
+<p>最近项目中需要记录日志，跟大家想的一样 ，利用spring aop去实现，之前也参考了一些代码，自己实现了一套设计，供大家参考。</p>
+
+<p>之前看到网上很多是基于切面类Aspect去实现了，在切面类中定义before after around等逻辑以及要拦截等方法。本文利用注解实现了一套可以扩展等日志记录模块。</p>
+
+<h2>1. 定义注解</h2>
+
+<p>@Target(ElementType.METHOD)<br />
+@Retention(RetentionPolicy.RUNTIME)<br />
+@Documented<br />
+public abstract @interface RequiredLogInterceptor {<br />
+&nbsp; &nbsp; boolean required() default true;<br />
+&nbsp;<br />
+&nbsp; &nbsp; String targetGenerator() default &nbsp;&quot;&quot;;<br />
+&nbsp;<br />
+&nbsp; &nbsp; OperateType &nbsp;operateType() default &nbsp;OperateType.GET;<br />
+}<br />
+requried：注解是否生效</p>
+
+<p>targetGenerator： 每个模块记录等内容不同，入口参数不同，所以需要个性化定制日志等记录内容，每个模块的日志生成有自己定义的generator类，并且重写generateContent方法。</p>
+
+<p>operateType：当前方法是增加，删除，还是修改</p>
+
+<p>public abstract class ContentGerator {<br />
+&nbsp;<br />
+&nbsp; &nbsp; public &nbsp; static String SPLIT=&quot;/&quot;;<br />
+&nbsp;<br />
+&nbsp; &nbsp; public &nbsp;static String CONTENT_SPLIT=&quot;,&quot;;<br />
+&nbsp;<br />
+&nbsp; &nbsp; public &nbsp;static String VALUE_SPLIT=&quot;:&quot;;<br />
+&nbsp;<br />
+&nbsp; &nbsp; abstract &nbsp;List&lt;UserOperateLog&gt; generateContent(Object returnValue, Object[] args, OperateType operateType);<br />
+}</p>
+
+<h2>2. 定义拦截器</h2>
+
+<p>本模块主要是后置通知，主要逻辑如下：</p>
+
+<p>1.拦截方法，判断是否有注解loginterceptor</p>
+
+<p>2. 如果有判断是否执行成功，成功则记录log，失败不记录</p>
+
+<p>3. 获取注解中配置的generator类，利用反射调用generateContent方法，生成个性化日志内容</p>
+
+<p>5.在日志中添加其他公共属性，比如用户id，创建时间等等。所有个性化定制的日志信息都是在generator类中产生。</p>
+
+<p>public class LogAfterInterceptor implements AfterReturningAdvice {<br />
+&nbsp;<br />
+&nbsp; &nbsp; @Autowired<br />
+&nbsp; &nbsp; private LogService logService;<br />
+&nbsp;<br />
+&nbsp;<br />
+&nbsp; &nbsp; @Override<br />
+&nbsp; &nbsp; public void afterReturning(Object returnValue, Method method, Object[] args, Object target) throws Throwable {<br />
+&nbsp; &nbsp; &nbsp; &nbsp; RequiredLogInterceptor requiredLogInterceptor = AnnotationUtils.findAnnotation(method, RequiredLogInterceptor.class);<br />
+&nbsp; &nbsp; &nbsp; &nbsp; if (requiredLogInterceptor != null) {<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; if(returnValue!=null&amp;&amp;returnValue instanceof &nbsp;Response){<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; Response response=(Response)returnValue;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; String code=response.getCode();<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; String code200= MegCodeEnums.ResponseCodeEnum.C200.getCode();<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; String code201= MegCodeEnums.ResponseCodeEnum.C201.getCode();<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; if (!Strings.isNullOrEmpty(code)&amp;&amp;!code.equalsIgnoreCase(code200)&amp;&amp;!code.equalsIgnoreCase(code201)){<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; return;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; }<br />
+&nbsp;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; }<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; String targetGeneratorName=requiredLogInterceptor.targetGenerator();<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; OperateType operateType=requiredLogInterceptor.operateType();<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; Class targetGeneratorclass=Class.forName(&quot;com.puhui.flowplatform.manage.log.&quot;+targetGeneratorName);<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; Method executeMethod=targetGeneratorclass.getMethod(&quot;generateContent&quot;,Object.class,Object[].class,OperateType.class);<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; ContentGerator targetGeneratorBean=(ContentGerator)SpringContextHolder.getBean(targetGeneratorclass);<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; List&lt;UserOperateLog&gt; userOperateLogList=(List&lt;UserOperateLog&gt;)executeMethod.invoke(targetGeneratorBean,returnValue,args,operateType);<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; if(CollectionUtils.isNotEmpty(userOperateLogList)){<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; userOperateLogList.forEach(userOperateLog -&gt; {<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; userOperateLog.setCreateTime(new Date());<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; //token<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; long userId=0L;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; if (args.length&gt;0&amp;&amp;args[0] instanceof String){<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; userId = CommonUtils.getManageCurUserId(args[0].toString());<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; }<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; userOperateLog.setUserId(userId);<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; });<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; logService.batchInsertLog(userOperateLogList);<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; }<br />
+&nbsp;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; }<br />
+&nbsp; &nbsp; }<br />
+&nbsp;<br />
+}</p>
+
+<h2>3 Generator类</h2>
+
+<p>继承统一的ContentGenerator类，便于共享一些常量。根据当前操作类型，生成对应的日志内容就可以了。如果需要新增模块， 先定义自己的日志generator类，然后添加注解到对应模块就可以。</p>
+
+<p>@Service<br />
+public class ContentGeneratorForRoleMgt extends &nbsp; ContentGerator {<br />
+&nbsp;<br />
+&nbsp;<br />
+&nbsp; &nbsp; @Autowired<br />
+&nbsp; &nbsp; private MenuService menuService;<br />
+&nbsp;<br />
+&nbsp; &nbsp; private &nbsp;String generateMenus(VoRole voRole){<br />
+&nbsp; &nbsp; &nbsp; &nbsp; List&lt;Menus&gt; menusList=voRole.getMenusList();<br />
+&nbsp; &nbsp; &nbsp; &nbsp; StringBuffer stringBuffer=new StringBuffer();<br />
+&nbsp; &nbsp; &nbsp; &nbsp; if (CollectionUtils.isNotEmpty(menusList)){<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; menusList.forEach(menus -&gt; {<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; Long menuId=menus.getId();<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; Menus menusTemp=menuService.queryMenuByMenuId(menuId);<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; stringBuffer.append(menusTemp.getDisplayTitle()+CONTENT_SPLIT);<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; });<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; stringBuffer.deleteCharAt(stringBuffer.length() - 1);<br />
+&nbsp; &nbsp; &nbsp; &nbsp; }<br />
+&nbsp; &nbsp; &nbsp; &nbsp; return &nbsp;stringBuffer.toString();<br />
+&nbsp;<br />
+&nbsp; &nbsp; }<br />
+&nbsp; &nbsp; @Override<br />
+&nbsp; &nbsp; public &nbsp; &nbsp;List&lt;UserOperateLog&gt; generateContent(Object returnValue, Object[] args, OperateType operateType) {<br />
+&nbsp; &nbsp; &nbsp; &nbsp; {<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; List&lt;UserOperateLog&gt; userOperateLogList=new ArrayList&lt;&gt;();<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; UserOperateLog userOperateLog=new UserOperateLog();<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; if (operateType==OperateType.ADD||operateType==OperateType.UPDATE){<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; VoRole voRole=(VoRole)args[1];<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; String menus=generateMenus(voRole);<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; userOperateLog.setOperateContent(&quot;角色名称&quot;+VALUE_SPLIT+voRole.getDisplayName()+SPLIT+&quot;权限&quot;+VALUE_SPLIT+menus);<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; userOperateLog.setOperateType(operateType==OperateType.ADD?LogOperateTypeEnum.ADD_ROLE.getCode():LogOperateTypeEnum.UPDATE_ROLE.getCode());<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; }<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; if (operateType==OperateType.DELETE){<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; if(returnValue!=null){<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; Response response=(Response) returnValue;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; String roleName=response.getData().toString();<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; userOperateLog.setOperateContent(roleName);<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; userOperateLog.setOperateType(LogOperateTypeEnum.DELETE_ROLE.getCode());<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; }<br />
+&nbsp;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; }<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; userOperateLogList.add(userOperateLog);<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; return &nbsp;userOperateLogList;<br />
+&nbsp;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; }<br />
+&nbsp;<br />
+&nbsp; &nbsp; }<br />
+}</p>
+
+<h2>4. 注解应用</h2>
+
+<p>&nbsp;@PutMapping(value = &quot;roles/{roleId}&quot;)<br />
+&nbsp; &nbsp; @RequiredLogInterceptor(targetGenerator = &quot;ContentGeneratorForRoleMgt&quot;,operateType= OperateType.UPDATE)<br />
+&nbsp; &nbsp; @ApiOperation(value = &quot;修改角色&quot;, httpMethod = &quot;PUT&quot;, response = Response.class, notes = &quot;修改角色&quot;)<br />
+&nbsp; &nbsp; public Response&lt;Object&gt; updateRole(@RequestHeader String token,@RequestBody VoRole voRole, @PathVariable(&quot;roleId&quot;) String roleId) {<br />
+&nbsp; &nbsp; &nbsp; &nbsp; LOGGER.info(&quot;updateRole入参:{}&quot;, JSONObject.toJSONString(voRole));</p>
+
+<h2>5. Configuration</h2>
+
+<p>public class SpringMvcConfig extends WebMvcConfigurerAdapter {<br />
+&nbsp;<br />
+&nbsp; &nbsp; @Override<br />
+&nbsp; &nbsp; public void configureMessageConverters(List&lt;HttpMessageConverter&lt;?&gt;&gt; converters) {<br />
+&nbsp; &nbsp; &nbsp; &nbsp; super.configureMessageConverters(converters);<br />
+&nbsp; &nbsp; &nbsp; &nbsp; // 初始化转换器<br />
+&nbsp; &nbsp; &nbsp; &nbsp; FastJsonHttpMessageConverter fastConvert = new FastJsonHttpMessageConverter();<br />
+&nbsp; &nbsp; &nbsp; &nbsp; // 初始化一个转换器配置<br />
+&nbsp; &nbsp; &nbsp; &nbsp; FastJsonConfig fastJsonConfig = new FastJsonConfig();<br />
+&nbsp; &nbsp; &nbsp; &nbsp; fastJsonConfig.setSerializerFeatures(SerializerFeature.PrettyFormat);<br />
+&nbsp; &nbsp; &nbsp; &nbsp; // 将配置设置给转换器并添加到HttpMessageConverter转换器列表中<br />
+&nbsp; &nbsp; &nbsp; &nbsp; fastConvert.setFastJsonConfig(fastJsonConfig);<br />
+&nbsp; &nbsp; &nbsp; &nbsp; converters.add(fastConvert);<br />
+&nbsp; &nbsp; }<br />
+&nbsp;<br />
+&nbsp; &nbsp; @Override<br />
+&nbsp; &nbsp; public void addResourceHandlers(ResourceHandlerRegistry registry) {<br />
+&nbsp; &nbsp; &nbsp; &nbsp; registry.addResourceHandler(&quot;/swagger-ui.html&quot;).addResourceLocations(<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; ResourceUtils.CLASSPATH_URL_PREFIX + &quot;/META-INF/resources/&quot;);<br />
+&nbsp; &nbsp; &nbsp; &nbsp; registry.addResourceHandler(&quot;/static/**&quot;).addResourceLocations(ResourceUtils.CLASSPATH_URL_PREFIX + &quot;/static/&quot;,<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; ResourceUtils.CLASSPATH_URL_PREFIX + &quot;/dist/static/&quot;);<br />
+&nbsp; &nbsp; &nbsp; &nbsp; registry.addResourceHandler(&quot;/page/**&quot;).addResourceLocations(ResourceUtils.CLASSPATH_URL_PREFIX + &quot;/dist/&quot;);<br />
+&nbsp; &nbsp; &nbsp; &nbsp; super.addResourceHandlers(registry);<br />
+&nbsp; &nbsp; }<br />
+&nbsp;<br />
+&nbsp; &nbsp; @Bean<br />
+&nbsp; &nbsp; public ViewResolver viewResolver() {<br />
+&nbsp; &nbsp; &nbsp; &nbsp; FreeMarkerViewResolver resolver = new FreeMarkerViewResolver();<br />
+&nbsp; &nbsp; &nbsp; &nbsp; resolver.setCache(true);<br />
+&nbsp; &nbsp; &nbsp; &nbsp; resolver.setPrefix(ResourceUtils.CLASSPATH_URL_PREFIX + &quot;templates/&quot;);<br />
+&nbsp; &nbsp; &nbsp; &nbsp; resolver.setSuffix(&quot;.ftl&quot;);<br />
+&nbsp; &nbsp; &nbsp; &nbsp; resolver.setContentType(&quot;text/html; charset=UTF-8&quot;);<br />
+&nbsp; &nbsp; &nbsp; &nbsp; return resolver;<br />
+&nbsp; &nbsp; }<br />
+&nbsp;<br />
+&nbsp; &nbsp; // 创建Advice或Advisor<br />
+&nbsp; &nbsp; @Bean<br />
+&nbsp; &nbsp; public BeforeAdvice beforeControllerInterceptor() {<br />
+&nbsp; &nbsp; &nbsp; &nbsp; return new BeforeControllerInterceptor();<br />
+&nbsp; &nbsp; }<br />
+&nbsp; &nbsp; @Bean<br />
+&nbsp; &nbsp; public AfterAdvice logAfterInterceptor() {<br />
+&nbsp; &nbsp; &nbsp; &nbsp; return new LogAfterInterceptor();<br />
+&nbsp; &nbsp; }<br />
+&nbsp; &nbsp; // 创建Advice或Advisor<br />
+&nbsp; &nbsp; @Bean<br />
+&nbsp; &nbsp; public BeforeAdvice logBeforeInterceptor() {<br />
+&nbsp; &nbsp; &nbsp; &nbsp; return new LogBeforeInterceptor();<br />
+&nbsp; &nbsp; }<br />
+&nbsp;<br />
+&nbsp; &nbsp; // 使用BeanNameAutoProxyCreator来创建代理<br />
+&nbsp;<br />
+&nbsp; &nbsp; @Bean<br />
+&nbsp; &nbsp; public BeanNameAutoProxyCreator beanAutoProxyCreator() {<br />
+&nbsp; &nbsp; &nbsp; &nbsp; BeanNameAutoProxyCreator beanNameAutoProxyCreator = new BeanNameAutoProxyCreator();<br />
+&nbsp; &nbsp; &nbsp; &nbsp; beanNameAutoProxyCreator.setProxyTargetClass(true); // 设置要创建代理的那些Bean的名字<br />
+&nbsp; &nbsp; &nbsp; &nbsp; beanNameAutoProxyCreator.setBeanNames(&quot;*Controller&quot;); //<br />
+&nbsp; &nbsp; &nbsp; &nbsp; // 设置拦截链名字(这些拦截器是有先后顺序的)<br />
+&nbsp; &nbsp; &nbsp; &nbsp; beanNameAutoProxyCreator.setInterceptorNames(&quot;logAfterInterceptor&quot;);<br />
+&nbsp; &nbsp; &nbsp; &nbsp; return beanNameAutoProxyCreator;<br />
+&nbsp; &nbsp; }<br />
+&nbsp;<br />
+&nbsp; &nbsp; @Bean<br />
+&nbsp; &nbsp; public BeanNameAutoProxyCreator beanBeforeAutoProxyCreator() {<br />
+&nbsp; &nbsp; &nbsp; &nbsp; BeanNameAutoProxyCreator beanNameAutoProxyCreator = new BeanNameAutoProxyCreator();<br />
+&nbsp; &nbsp; &nbsp; &nbsp; beanNameAutoProxyCreator.setProxyTargetClass(true);<br />
+&nbsp; &nbsp; &nbsp; &nbsp; // 设置要创建代理的那些Bean的名字<br />
+&nbsp; &nbsp; &nbsp; &nbsp; beanNameAutoProxyCreator.setBeanNames(&quot;*Controller&quot;);<br />
+&nbsp; &nbsp; &nbsp; &nbsp; // 设置拦截链名字(这些拦截器是有先后顺序的)<br />
+&nbsp; &nbsp; &nbsp; &nbsp; beanNameAutoProxyCreator.setInterceptorNames(&quot;beforeControllerInterceptor&quot;);<br />
+&nbsp; &nbsp; &nbsp; &nbsp; beanNameAutoProxyCreator.setInterceptorNames(&quot;logBeforeInterceptor&quot;);</p>
+
+<h2>6.写在结尾</h2>
+
+<p>本来实现都代码版本中，所有都日志生成代码都在后置拦截器中，并且根据当前执行都方法都classname和methodname去判断当前都方法，出现很多if 判断，且method name都不一样，有的是addXXX，有的是createXXX，显然设计不合理。后来重新进行了设计，有什么不足，希望大家可以指出。</p>
+
+<h2>7.非自定义注解实现方式</h2>
+
+<p>package com.puhui.flowplatform.manage.interceptor;<br />
+&nbsp;<br />
+import com.puhui.flowplatform.common.model.manage.UserOperateLog;<br />
+import com.puhui.flowplatform.manage.service.LogService;<br />
+import org.aspectj.lang.JoinPoint;<br />
+import org.aspectj.lang.annotation.AfterReturning;<br />
+import org.aspectj.lang.annotation.Aspect;<br />
+import org.aspectj.lang.annotation.Pointcut;<br />
+import org.springframework.beans.factory.annotation.Autowired;<br />
+&nbsp;<br />
+import java.lang.reflect.Method;<br />
+import java.util.Date;<br />
+&nbsp;<br />
+@Aspect<br />
+public class LogAspect {<br />
+&nbsp;<br />
+&nbsp;&nbsp; &nbsp;public Long id=null;<br />
+&nbsp;<br />
+&nbsp;&nbsp; &nbsp;@Autowired<br />
+&nbsp;&nbsp; &nbsp;LogService logService;<br />
+&nbsp;<br />
+&nbsp;&nbsp; &nbsp;/**<br />
+&nbsp;&nbsp; &nbsp; * 添加业务逻辑方法切入点<br />
+&nbsp;&nbsp; &nbsp; */<br />
+&nbsp;&nbsp; &nbsp;@Pointcut(&quot;execution(* &nbsp;com.puhui.flowplatform.manage.service.*.add*(..))&quot;)<br />
+&nbsp;&nbsp; &nbsp;public void insertCell() {<br />
+&nbsp;&nbsp; &nbsp;}<br />
+&nbsp;<br />
+&nbsp;&nbsp; &nbsp;/**<br />
+&nbsp;&nbsp; &nbsp; * 修改业务逻辑方法切入点<br />
+&nbsp;&nbsp; &nbsp; */<br />
+&nbsp;&nbsp; &nbsp;@Pointcut(&quot;execution(* &nbsp;com.puhui.flowplatform.manage.service.*.update*(..))&quot;)<br />
+&nbsp;&nbsp; &nbsp;public void updateCell() {<br />
+&nbsp;&nbsp; &nbsp;}<br />
+&nbsp;<br />
+&nbsp;&nbsp; &nbsp;/**<br />
+&nbsp;&nbsp; &nbsp; * 删除业务逻辑方法切入点<br />
+&nbsp;&nbsp; &nbsp; */<br />
+&nbsp;&nbsp; &nbsp;@Pointcut(&quot;execution(* &nbsp;com.puhui.flowplatform.manage.service.*.delete*(..))&quot;)<br />
+&nbsp;&nbsp; &nbsp;public void deleteCell() {<br />
+&nbsp;&nbsp; &nbsp;}<br />
+&nbsp;<br />
+&nbsp;<br />
+&nbsp;&nbsp; &nbsp;/**<br />
+&nbsp;&nbsp; &nbsp; * 添加操作日志(后置通知)<br />
+&nbsp;&nbsp; &nbsp; *<br />
+&nbsp;&nbsp; &nbsp; * @param joinPoint<br />
+&nbsp;&nbsp; &nbsp; * @param object<br />
+&nbsp;&nbsp; &nbsp; */<br />
+&nbsp;&nbsp; &nbsp;@AfterReturning(value = &quot;insertCell()&quot;, argNames = &quot;object&quot;, returning = &quot;object&quot;)<br />
+&nbsp;&nbsp; &nbsp;public void insertLog(JoinPoint joinPoint, Object object) throws Throwable {<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;// Admin admin=(Admin)<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;// request.getSession().getAttribute(&quot;businessAdmin&quot;);<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;// 判断参数<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;if (joinPoint.getArgs() == null) {// 没有参数<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;return;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;}<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;// 获取方法名<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;String methodName = joinPoint.getSignature().getName();<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;// 获取操作内容<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;String opContent = optionContent(joinPoint.getArgs(), methodName);<br />
+&nbsp;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;UserOperateLog log = new UserOperateLog();<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;log.setOperateContent(opContent);<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;log.setUserId(id);;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;log.setOperateType(1);//enum 增加<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;log.setCreateTime(new Date());<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;logService.insertLog(log);<br />
+&nbsp;&nbsp; &nbsp;}<br />
+&nbsp;<br />
+&nbsp;&nbsp; &nbsp;/**<br />
+&nbsp;&nbsp; &nbsp; * 管理员修改操作日志(后置通知)<br />
+&nbsp;&nbsp; &nbsp; *<br />
+&nbsp;&nbsp; &nbsp; * @param joinPoint<br />
+&nbsp;&nbsp; &nbsp; * @param object<br />
+&nbsp;&nbsp; &nbsp; * @throws Throwable<br />
+&nbsp;&nbsp; &nbsp; */<br />
+&nbsp;&nbsp; &nbsp;@AfterReturning(value = &quot;updateCell()&quot;, argNames = &quot;object&quot;, returning = &quot;object&quot;)<br />
+&nbsp;&nbsp; &nbsp;public void updateLog(JoinPoint joinPoint, Object object) throws Throwable {<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;// Admin admin=(Admin)<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;// request.getSession().getAttribute(&quot;businessAdmin&quot;);<br />
+&nbsp;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;// 判断参数<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;if (joinPoint.getArgs() == null) {// 没有参数<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;return;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;}<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;// 获取方法名<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;String methodName = joinPoint.getSignature().getName();<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;// 获取操作内容<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;String opContent = optionContent(joinPoint.getArgs(), methodName);<br />
+&nbsp;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;// 创建日志对象<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;UserOperateLog log = new UserOperateLog();<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;log.setOperateContent(opContent);<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;log.setUserId(id);;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;log.setOperateType(2);//enum 修改<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;log.setCreateTime(new Date());<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;logService.insertLog(log);<br />
+&nbsp;&nbsp; &nbsp;}<br />
+&nbsp;<br />
+&nbsp;&nbsp; &nbsp;/**<br />
+&nbsp;&nbsp; &nbsp; * 删除操作<br />
+&nbsp;&nbsp; &nbsp; *<br />
+&nbsp;&nbsp; &nbsp; * @param joinPoint<br />
+&nbsp;&nbsp; &nbsp; * @param object<br />
+&nbsp;&nbsp; &nbsp; */<br />
+&nbsp;&nbsp; &nbsp;@AfterReturning(value = &quot;deleteCell()&quot;, argNames = &quot;object&quot;, returning = &quot;object&quot;)<br />
+&nbsp;&nbsp; &nbsp;public void deleteLog(JoinPoint joinPoint, Object object) throws Throwable {<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;// Admin admin=(Admin)<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;// request.getSession().getAttribute(&quot;businessAdmin&quot;);<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;// 判断参数<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;if (joinPoint.getArgs() == null) {// 没有参数<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;return;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;}<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;// 获取方法名<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;String methodName = joinPoint.getSignature().getName();<br />
+&nbsp;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;StringBuffer rs = new StringBuffer();<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;rs.append(methodName);<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;String className = null;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;for (Object info : joinPoint.getArgs()) {<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;// 获取对象类型<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;className = info.getClass().getName();<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;className = className.substring(className.lastIndexOf(&quot;.&quot;) + 1);<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;rs.append(&quot;[参数，类型:&quot; + className + &quot;，值:(id:&quot;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;+ joinPoint.getArgs()[0] + &quot;)&quot;);<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;}<br />
+&nbsp;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;// 创建日志对象<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;UserOperateLog log = new UserOperateLog();<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;log.setOperateContent(rs.toString());<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;log.setUserId(id);;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;log.setOperateType(3);//删除<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;log.setCreateTime(new Date());<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;logService.insertLog(log);<br />
+&nbsp;&nbsp; &nbsp;}<br />
+&nbsp;<br />
+&nbsp;&nbsp; &nbsp;/**<br />
+&nbsp;&nbsp; &nbsp; * 使用Java反射来获取被拦截方法(insert、update)的参数值， 将参数值拼接为操作内容<br />
+&nbsp;&nbsp; &nbsp; *<br />
+&nbsp;&nbsp; &nbsp; * @param args<br />
+&nbsp;&nbsp; &nbsp; * @param mName<br />
+&nbsp;&nbsp; &nbsp; * @return<br />
+&nbsp;&nbsp; &nbsp; */<br />
+&nbsp;&nbsp; &nbsp;public String optionContent(Object[] args, String mName) {<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;if (args == null) {<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;return null;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;}<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;StringBuffer rs = new StringBuffer();<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;rs.append(mName);<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;String className = null;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;int index = 1;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;// 遍历参数对象<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;for (Object info : args) {<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;// 获取对象类型<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;className = info.getClass().getName();<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;className = className.substring(className.lastIndexOf(&quot;.&quot;) + 1);<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;rs.append(&quot;[参数&quot; + index + &quot;，类型:&quot; + className + &quot;，值:&quot;);<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;// 获取对象的所有方法<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;Method[] methods = info.getClass().getDeclaredMethods();<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;// 遍历方法，判断get方法<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;for (Method method : methods) {<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;String methodName = method.getName();<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;// 判断是不是get方法<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;if (methodName.indexOf(&quot;get&quot;) == -1) {// 不是get方法<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;continue;// 不处理<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;}<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;Object rsValue = null;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;try {<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;// 调用get方法，获取返回值<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;rsValue = method.invoke(info);<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;} catch (Exception e) {<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;continue;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;}<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;// 将值加入内容中<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;rs.append(&quot;(&quot; + methodName + &quot;:&quot; + rsValue + &quot;)&quot;);<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;}<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;rs.append(&quot;]&quot;);<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;index++;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;}<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;return rs.toString();<br />
+&nbsp;&nbsp; &nbsp;}<br />
+&nbsp;<br />
+}</p>
+
+<p>&nbsp;</p>
