@@ -1,0 +1,65 @@
+<h1>SpringBoot如何添加拦截器</h1>
+
+<p>在web开发的过程中，为了实现登录权限验证，我们往往需要添加一个拦截器在用户的的请求到达controller层的时候实现登录验证，那么SpringBoot如何添加拦截器呢？</p>
+
+<p>步骤如下：</p>
+
+<h2>1.继承WebMvcConfigureAdapter类，覆盖其addInterceptors接口,注册我们自定义的拦截器：</h2>
+
+<p>/**&nbsp;<br />
+&nbsp;*&nbsp;<br />
+&nbsp;* 注册拦截器&nbsp;<br />
+&nbsp;* Created by SYSTEM on 2017/8/16.&nbsp;<br />
+&nbsp;*/ &nbsp;<br />
+public class WebAppConfig extends WebMvcConfigurerAdapter { &nbsp;<br />
+&nbsp;&nbsp;<br />
+&nbsp; &nbsp; @Override &nbsp;<br />
+&nbsp; &nbsp; public void addInterceptors(InterceptorRegistry registry) { &nbsp;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; //注册自定义拦截器，添加拦截路径和排除拦截路径 &nbsp;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; registry.addInterceptor(new InterceptorConfig()).addPathPatterns(&quot;api/path/**&quot;).excludePathPatterns(&quot;api/path/login&quot;); &nbsp;<br />
+&nbsp; &nbsp; } &nbsp;<br />
+}&nbsp;</p>
+
+<h2>2.实现HandlerInterceptor接口，重写接口中的三个方法：</h2>
+
+<p>public class InterceptorConfig &nbsp;implements HandlerInterceptor{ &nbsp;<br />
+&nbsp;&nbsp;<br />
+&nbsp; &nbsp; private static final Logger log = LoggerFactory.getLogger(InterceptorConfig.class); &nbsp;<br />
+&nbsp;&nbsp;<br />
+&nbsp; &nbsp; /**&nbsp;<br />
+&nbsp; &nbsp; &nbsp;* 进入controller层之前拦截请求&nbsp;<br />
+&nbsp; &nbsp; &nbsp;* @param httpServletRequest&nbsp;<br />
+&nbsp; &nbsp; &nbsp;* @param httpServletResponse&nbsp;<br />
+&nbsp; &nbsp; &nbsp;* @param o&nbsp;<br />
+&nbsp; &nbsp; &nbsp;* @return&nbsp;<br />
+&nbsp; &nbsp; &nbsp;* @throws Exception&nbsp;<br />
+&nbsp; &nbsp; &nbsp;*/ &nbsp;<br />
+&nbsp; &nbsp; @Override &nbsp;<br />
+&nbsp; &nbsp; public boolean preHandle(HttpServletRequest httpServletRequest, HttpServletResponse httpServletResponse, Object o) throws Exception { &nbsp;<br />
+&nbsp;&nbsp;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; log.info(&quot;---------------------开始进入请求地址拦截----------------------------&quot;); &nbsp;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; HttpSession session = httpServletRequest.getSession(); &nbsp;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; if(!StringUtils.isEmpty(session.getAttribute(&quot;userName&quot;))){ &nbsp;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; return true; &nbsp;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; } &nbsp;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; else{ &nbsp;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; PrintWriter printWriter = httpServletResponse.getWriter(); &nbsp;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; printWriter.write(&quot;{code:0,message:\&quot;session is invalid,please login again!\&quot;}&quot;); &nbsp;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; return false; &nbsp;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; } &nbsp;<br />
+&nbsp;&nbsp;<br />
+&nbsp; &nbsp; } &nbsp;<br />
+&nbsp;&nbsp;<br />
+&nbsp; &nbsp; @Override &nbsp;<br />
+&nbsp; &nbsp; public void postHandle(HttpServletRequest httpServletRequest, HttpServletResponse httpServletResponse, Object o, ModelAndView modelAndView) throws Exception { &nbsp;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; log.info(&quot;--------------处理请求完成后视图渲染之前的处理操作---------------&quot;); &nbsp;<br />
+&nbsp; &nbsp; } &nbsp;<br />
+&nbsp;&nbsp;<br />
+&nbsp; &nbsp; @Override &nbsp;<br />
+&nbsp; &nbsp; public void afterCompletion(HttpServletRequest httpServletRequest, HttpServletResponse httpServletResponse, Object o, Exception e) throws Exception { &nbsp;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; log.info(&quot;---------------视图渲染之后的操作-------------------------0&quot;); &nbsp;<br />
+&nbsp; &nbsp; } &nbsp;<br />
+} &nbsp;</p>
+
+<p>这样我们就可以在用户请求到达controller层实现登录拦截了，所有用户请求都会被拦截，在prehandle方法进行登录判断，返回true则验证通过，否则失败<br />
+&nbsp;</p>
