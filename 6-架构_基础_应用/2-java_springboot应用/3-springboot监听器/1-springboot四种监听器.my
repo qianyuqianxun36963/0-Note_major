@@ -1,0 +1,208 @@
+<h1>spring boot实战 事件监听</h1>
+
+<p>前言<br />
+spring boot在启动过程中增加事件监听机制，为用户功能拓展提供极大的便利。</p>
+
+<h2>支持的事件类型四种</h2>
+
+<p>ApplicationStartedEvent</p>
+
+<p>ApplicationEnvironmentPreparedEvent</p>
+
+<p>ApplicationPreparedEvent</p>
+
+<p>ApplicationFailedEvent</p>
+
+<p>实现监听步骤：<br />
+1.监听类实现ApplicationListener接口&nbsp;<br />
+2.将监听类添加到SpringApplication实例</p>
+
+<p>ApplicationStartedEvent<br />
+ApplicationStartedEvent：spring boot启动开始时执行的事件</p>
+
+<p>创建对应的监听类 MyApplicationStartedEventListener.java</p>
+
+<p>package com.lkl.springboot.listener;</p>
+
+<p>import org.slf4j.Logger;<br />
+import org.slf4j.LoggerFactory;<br />
+import org.springframework.boot.SpringApplication;<br />
+import org.springframework.boot.context.event.ApplicationStartedEvent;<br />
+import org.springframework.context.ApplicationListener;</p>
+
+<p>/**<br />
+&nbsp;* spring boot 启动监听类<br />
+&nbsp;*&nbsp;<br />
+&nbsp;* @author liaokailin<br />
+&nbsp;* @version $Id: MyApplicationStartedEventListener.java, v 0.1 2015年9月2日 下午11:06:04 liaokailin Exp $<br />
+&nbsp;*/<br />
+public class MyApplicationStartedEventListener implements ApplicationListener&lt;ApplicationStartedEvent&gt; {</p>
+
+<p>&nbsp; &nbsp; private Logger logger = LoggerFactory.getLogger(MyApplicationStartedEventListener.class);</p>
+
+<p>&nbsp; &nbsp; @Override<br />
+&nbsp; &nbsp; public void onApplicationEvent(ApplicationStartedEvent event) {<br />
+&nbsp; &nbsp; &nbsp; &nbsp; SpringApplication app = event.getSpringApplication();<br />
+&nbsp; &nbsp; &nbsp; &nbsp; app.setShowBanner(false);// 不显示banner信息<br />
+&nbsp; &nbsp; &nbsp; &nbsp; logger.info(&quot;==MyApplicationStartedEventListener==&quot;);<br />
+&nbsp; &nbsp; }<br />
+}<br />
+<br />
+在该事件中可以获取到SpringApplication对象，可做一些执行前的设置.</p>
+
+<p>Application.java类</p>
+
+<p>package com.lkl.springboot;</p>
+
+<p>import org.springframework.boot.SpringApplication;<br />
+import org.springframework.boot.autoconfigure.SpringBootApplication;</p>
+
+<p>import com.lkl.springboot.listener.MyApplicationStartedEventListener;</p>
+
+<p>@SpringBootApplication<br />
+public class Application {<br />
+&nbsp; &nbsp; public static void main(String[] args) {<br />
+&nbsp; &nbsp; &nbsp; &nbsp; SpringApplication app = new SpringApplication(Application.class);&nbsp;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; app.addListeners(new MyApplicationStartedEventListener());<br />
+&nbsp; &nbsp; &nbsp; &nbsp; app.run(args);<br />
+&nbsp; &nbsp; }<br />
+}<br />
+<br />
+ApplicationEnvironmentPreparedEvent<br />
+ApplicationEnvironmentPreparedEvent：spring boot 对应Enviroment已经准备完毕，但此时上下文context还没有创建。</p>
+
+<p>MyApplicationEnvironmentPreparedEventListener.java</p>
+
+<p>package com.lkl.springboot.listener;</p>
+
+<p>import java.util.Iterator;</p>
+
+<p>import org.slf4j.Logger;<br />
+import org.slf4j.LoggerFactory;<br />
+import org.springframework.boot.context.event.ApplicationEnvironmentPreparedEvent;<br />
+import org.springframework.context.ApplicationListener;<br />
+import org.springframework.core.env.ConfigurableEnvironment;<br />
+import org.springframework.core.env.MutablePropertySources;<br />
+import org.springframework.core.env.PropertySource;</p>
+
+<p>/**<br />
+&nbsp;* spring boot 配置环境事件监听<br />
+&nbsp;* @author liaokailin<br />
+&nbsp;* @version $Id: MyApplicationEnvironmentPreparedEventListener.java, v 0.1 2015年9月2日 下午11:21:15 liaokailin Exp $<br />
+&nbsp;*/<br />
+public class MyApplicationEnvironmentPreparedEventListener implements<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; ApplicationListener&lt;ApplicationEnvironmentPreparedEvent&gt; {<br />
+&nbsp; &nbsp; private Logger logger = LoggerFactory.getLogger(MyApplicationEnvironmentPreparedEventListener.class);</p>
+
+<p>&nbsp; &nbsp; @Override<br />
+&nbsp; &nbsp; public void onApplicationEvent(ApplicationEnvironmentPreparedEvent event) {</p>
+
+<p>&nbsp; &nbsp; &nbsp; &nbsp; ConfigurableEnvironment envi = event.getEnvironment();<br />
+&nbsp; &nbsp; &nbsp; &nbsp; MutablePropertySources mps = envi.getPropertySources();<br />
+&nbsp; &nbsp; &nbsp; &nbsp; if (mps != null) {<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; Iterator&lt;PropertySource&lt;?&gt;&gt; iter = mps.iterator();<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; while (iter.hasNext()) {<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; PropertySource&lt;?&gt; ps = iter.next();<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; logger<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; .info(&quot;ps.getName:{};ps.getSource:{};ps.getClass:{}&quot;, ps.getName(), ps.getSource(), ps.getClass());<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; }<br />
+&nbsp; &nbsp; &nbsp; &nbsp; }<br />
+&nbsp; &nbsp; }</p>
+
+<p>}</p>
+
+<p><br />
+在该监听中获取到ConfigurableEnvironment后可以对配置信息做操作，例如：修改默认的配置信息，增加额外的配置信息等等~~~</p>
+
+<p>ApplicationPreparedEvent<br />
+ApplicationPreparedEvent:spring boot上下文context创建完成，但此时spring中的bean是没有完全加载完成的。</p>
+
+<p>MyApplicationPreparedEventListener.java</p>
+
+<p>package com.lkl.springboot.listener;</p>
+
+<p>import org.slf4j.Logger;<br />
+import org.slf4j.LoggerFactory;<br />
+import org.springframework.boot.context.event.ApplicationPreparedEvent;<br />
+import org.springframework.context.ApplicationContext;<br />
+import org.springframework.context.ApplicationListener;<br />
+import org.springframework.context.ConfigurableApplicationContext;</p>
+
+<p>/**<br />
+&nbsp;* 上下文创建完成后执行的事件监听器<br />
+&nbsp;*&nbsp;<br />
+&nbsp;* @author liaokailin<br />
+&nbsp;* @version $Id: MyApplicationPreparedEventListener.java, v 0.1 2015年9月2日 下午11:29:38 liaokailin Exp $<br />
+&nbsp;*/<br />
+public class MyApplicationPreparedEventListener implements ApplicationListener&lt;ApplicationPreparedEvent&gt; {<br />
+&nbsp; &nbsp; private Logger logger = LoggerFactory.getLogger(MyApplicationPreparedEventListener.class);</p>
+
+<p>&nbsp; &nbsp; @Override<br />
+&nbsp; &nbsp; public void onApplicationEvent(ApplicationPreparedEvent event) {<br />
+&nbsp; &nbsp; &nbsp; &nbsp; ConfigurableApplicationContext cac = event.getApplicationContext();<br />
+&nbsp; &nbsp; &nbsp; &nbsp; passContextInfo(cac);<br />
+&nbsp; &nbsp; }</p>
+
+<p>&nbsp; &nbsp; /**<br />
+&nbsp; &nbsp; &nbsp;* 传递上下文<br />
+&nbsp; &nbsp; &nbsp;* @param cac<br />
+&nbsp; &nbsp; &nbsp;*/<br />
+&nbsp; &nbsp; private void passContextInfo(ApplicationContext cac) {<br />
+&nbsp; &nbsp; &nbsp; &nbsp; //dosomething()<br />
+&nbsp; &nbsp; }</p>
+
+<p>}<br />
+<br />
+在获取完上下文后，可以将上下文传递出去做一些额外的操作。</p>
+
+<p>在该监听器中是无法获取自定义bean并进行操作的。</p>
+
+<p>ApplicationFailedEvent<br />
+ApplicationFailedEvent:spring boot启动异常时执行事件&nbsp;<br />
+MyApplicationFailedEventListener.java</p>
+
+<p>package com.lkl.springboot.listener;</p>
+
+<p>import org.springframework.boot.context.event.ApplicationFailedEvent;<br />
+import org.springframework.context.ApplicationListener;</p>
+
+<p>public class MyApplicationFailedEventListener implements ApplicationListener&lt;ApplicationFailedEvent&gt; {</p>
+
+<p>&nbsp; &nbsp; @Override<br />
+&nbsp; &nbsp; public void onApplicationEvent(ApplicationFailedEvent event) {<br />
+&nbsp; &nbsp; &nbsp; &nbsp; Throwable throwable = event.getException();<br />
+&nbsp; &nbsp; &nbsp; &nbsp; handleThrowable(throwable);<br />
+&nbsp; &nbsp; }</p>
+
+<p>&nbsp; &nbsp; /*处理异常*/<br />
+&nbsp; &nbsp; private void handleThrowable(Throwable throwable) {<br />
+&nbsp; &nbsp; }</p>
+
+<p>}<br />
+<br />
+在异常发生时，最好是添加虚拟机对应的钩子进行资源的回收与释放，能友善的处理异常信息。</p>
+
+<p>在spring boot中已经为大家考虑了这一点，默认情况开启了对应的功能：</p>
+
+<p>public void registerShutdownHook() {<br />
+&nbsp; &nbsp; &nbsp; &nbsp; if (this.shutdownHook == null) {<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; // No shutdown hook registered yet.<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; this.shutdownHook = new Thread() {<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; @Override<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; public void run() {<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; doClose();<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; }<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; };<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; Runtime.getRuntime().addShutdownHook(this.shutdownHook);<br />
+&nbsp; &nbsp; &nbsp; &nbsp; }<br />
+&nbsp; &nbsp; }<br />
+<br />
+在doClose()方法中进行资源的回收与释放。</p>
+
+<p>结束语<br />
+spring boot提供的四种监听事件到这里就结束了，针对实际业务可添加自定义的监听器，下一节当中将会对spring boot中的监听源码进行分析，理解为什么是这样的。<br />
+---------------------&nbsp;<br />
+作者：liaokailin&nbsp;<br />
+来源：CSDN&nbsp;<br />
+原文：https://blog.csdn.net/liaokailin/article/details/48186331&nbsp;<br />
+版权声明：本文为博主原创文章，转载请附上博文链接！</p>

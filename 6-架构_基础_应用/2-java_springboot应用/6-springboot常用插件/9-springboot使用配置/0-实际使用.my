@@ -1,0 +1,157 @@
+<h1>springboot 配置信息加载</h1>
+
+<h2>app-config.properties</h2>
+
+<pre>
+<code>#### 通过注册监听器(`Listeners`) + `PropertiesLoaderUtils`的方式
+com.zyd.type=Springboot - Listeners
+com.zyd.title=使用Listeners + PropertiesLoaderUtils获取配置文件
+com.zyd.name=zyd
+com.zyd.address=Beijing
+com.zyd.company=in</code></pre>
+
+<h2>PropertiesListener.java 用来初始化加载配置文件</h2>
+
+<pre>
+<code>package com.zyd.property.listener;
+
+import org.springframework.boot.context.event.ApplicationStartedEvent;
+import org.springframework.context.ApplicationListener;
+
+import com.zyd.property.config.PropertiesListenerConfig;
+
+/**
+ * 配置文件监听器，用来加载自定义配置文件
+ * 
+ * @author &lt;a href=&quot;mailto:yadong.zhang0415@gmail.com&quot;&gt;yadong.zhang&lt;/a&gt;
+ * @date 2017年6月1日 下午3:38:25 
+ * @version V1.0
+ * @since JDK ： 1.7
+ */
+public class PropertiesListener implements ApplicationListener&lt;ApplicationStartedEvent&gt; {
+
+    private String propertyFileName;
+
+    public PropertiesListener(String propertyFileName) {
+        this.propertyFileName = propertyFileName;
+    }
+
+    @Override
+    public void onApplicationEvent(ApplicationStartedEvent event) {
+        PropertiesListenerConfig.loadAllProperties(propertyFileName);
+    }
+}</code></pre>
+
+<p>&nbsp;</p>
+
+<h2>PropertiesListenerConfig.java 加载配置文件内容</h2>
+
+<pre>
+<code>package com.zyd.property.config;
+
+import java.io.IOException;
+import java.io.UnsupportedEncodingException;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Properties;
+
+import org.springframework.beans.BeansException;
+import org.springframework.core.io.support.PropertiesLoaderUtils;
+
+/**
+ * 第四种方式：PropertiesLoaderUtils
+ * 
+ * @author &lt;a href=&quot;mailto:yadong.zhang0415@gmail.com&quot;&gt;yadong.zhang&lt;/a&gt;
+ * @date 2017年6月1日 下午3:32:37
+ * @version V1.0
+ * @since JDK ： 1.7
+ */
+public class PropertiesListenerConfig {
+    public static Map&lt;String, String&gt; propertiesMap = new HashMap&lt;&gt;();
+
+    private static void processProperties(Properties props) throws BeansException {
+        propertiesMap = new HashMap&lt;String, String&gt;();
+        for (Object key : props.keySet()) {
+            String keyStr = key.toString();
+            try {
+                // PropertiesLoaderUtils的默认编码是ISO-8859-1,在这里转码一下
+                propertiesMap.put(keyStr, new String(props.getProperty(keyStr).getBytes(&quot;ISO-8859-1&quot;), &quot;utf-8&quot;));
+            } catch (UnsupportedEncodingException e) {
+                e.printStackTrace();
+            } catch (java.lang.Exception e) {
+                e.printStackTrace();
+            }
+        }
+    }
+
+    public static void loadAllProperties(String propertyFileName) {
+        try {
+            Properties properties = PropertiesLoaderUtils.loadAllProperties(propertyFileName);
+            processProperties(properties);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public static String getProperty(String name) {
+        return propertiesMap.get(name).toString();
+    }
+
+    public static Map&lt;String, String&gt; getAllProperty() {
+        return propertiesMap;
+    }
+}</code></pre>
+
+<h2>Applaction.java 启动类</h2>
+
+<pre>
+<code>package com.zyd.property;
+
+import java.io.UnsupportedEncodingException;
+import java.util.HashMap;
+import java.util.Map;
+
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+import com.zyd.property.config.PropertiesListenerConfig;
+import com.zyd.property.listener.PropertiesListener;
+
+/**
+ * @author &lt;a href=&quot;mailto:yadong.zhang0415@gmail.com&quot;&gt;yadong.zhang&lt;/a&gt;
+ * @date 2017年6月1日 下午3:49:30 
+ * @version V1.0
+ * @since JDK ： 1.7
+ */
+@SpringBootApplication
+@RestController
+public class Applaction {
+    /**
+     * 
+     * 第四种方式：通过注册监听器(`Listeners`) + `PropertiesLoaderUtils`的方式
+     * 
+     * @author zyd
+     * @throws UnsupportedEncodingException
+     * @since JDK 1.7
+     */
+    @RequestMapping(&quot;/listener&quot;)
+    public Map&lt;String, Object&gt; listener() {
+        Map&lt;String, Object&gt; map = new HashMap&lt;String, Object&gt;();
+        map.putAll(PropertiesListenerConfig.getAllProperty());
+        return map;
+    }
+
+    public static void main(String[] args) throws Exception {
+        SpringApplication application = new SpringApplication(Applaction.class);
+        // 第四种方式：注册监听器
+        application.addListeners(new PropertiesListener(&quot;app-config.properties&quot;));
+        application.run(args);
+    }
+}</code>访问结果：</pre>
+
+<pre>
+<code>{&quot;com.zyd.name&quot;:&quot;zyd&quot;,&quot;com.zyd.address&quot;:&quot;Beijing&quot;,&quot;com.zyd.title&quot;:&quot;使用Listeners + PropertiesLoaderUtils获取配置文件&quot;,&quot;com.zyd.type&quot;:&quot;Springboot - Listeners&quot;,&quot;com.zyd.company&quot;:&quot;in&quot;}</code></pre>
+
+<p>&nbsp;</p>
