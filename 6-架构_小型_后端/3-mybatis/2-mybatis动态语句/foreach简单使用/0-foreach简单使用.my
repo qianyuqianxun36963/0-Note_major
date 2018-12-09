@@ -1,0 +1,135 @@
+<h1>MyBatis学习&mdash;&mdash;foreach标签的使用</h1>
+
+<h2><strong>一、foreach标签属性解读</strong></h2>
+
+<p>MyBatis的foreach标签应用于多参数的交互如：多参数（相同参数）查询、循环插入数据等，foreach标签包含collection、item、open、close、index、separator，MyBatis的foreach标签与jstl标签的使用非常相似，以下为几个属性的意思解释：</p>
+
+<p>collection：参数名称，根据Mapper接口的参数名确定，也可以使用@Param注解指定参数名</p>
+
+<p>item：参数调用名称，通过此属性来获取集合单项的值</p>
+
+<p>open：相当于prefix，即在循环前添加前缀</p>
+
+<p>close：相当于suffix，即在循环后添加后缀</p>
+
+<p>index：索引、下标</p>
+
+<p>separator：分隔符，每次循环完成后添加此分隔符</p>
+
+<h2><strong>二、foreach标签应用</strong></h2>
+
+<h2><strong>1.多参数查询</strong></h2>
+
+<p>场景描述：传入多个用户ID，获取用户的结果集</p>
+
+<h3>Junit业务方法调用</h3>
+
+<p>/**<br />
+&nbsp;&nbsp; &nbsp; * 动态sql学习---foreach标签使用（查询）<br />
+&nbsp;&nbsp; &nbsp; * @throws IOException&nbsp;<br />
+&nbsp;&nbsp; &nbsp; *&nbsp;<br />
+&nbsp;&nbsp; &nbsp; */<br />
+&nbsp;&nbsp; &nbsp;@Test<br />
+&nbsp;&nbsp; &nbsp;public void dynamicSQLToForeach() throws IOException {<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;SqlSessionFactory sessionFactory = getSessionFactory();<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;SqlSession sqlSession = sessionFactory.openSession();<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;try {<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;UserMapper mapper = sqlSession.getMapper(UserMapper.class);<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;List&lt;User&gt; users = mapper.getUsersByListParam(Arrays.asList(1,2,3,4));<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;for(User user:users) {<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;System.out.println(user);<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;}<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;} catch (Exception e) {<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;e.printStackTrace();<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;} finally {<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;sqlSession.close();<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;}<br />
+&nbsp;&nbsp; &nbsp;}</p>
+
+<h3>mapper接口（指定参数名称）</h3>
+
+<p>/**<br />
+&nbsp;&nbsp; &nbsp; * 多个参数查询user集合<br />
+&nbsp;&nbsp; &nbsp; *&nbsp;<br />
+&nbsp;&nbsp; &nbsp; * @param list<br />
+&nbsp;&nbsp; &nbsp; * @return<br />
+&nbsp;&nbsp; &nbsp; */<br />
+&nbsp;&nbsp; &nbsp;@SuppressWarnings(&quot;unchecked&quot;)<br />
+&nbsp;&nbsp; &nbsp;List&lt;User&gt; getUsersByListParam(@Param(&quot;list&quot;) List list);</p>
+
+<h3>XML实现：</h3>
+
+<p>&lt;!-- 使用foreach接收list参数 --&gt;<br />
+&nbsp; &nbsp; &nbsp;&nbsp; &nbsp;&lt;select id=&quot;getUsersByListParam&quot; resultType=&quot;com.xuyong.entity.User&quot;&gt;<br />
+&nbsp; &nbsp; &nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;select * from user<br />
+&nbsp; &nbsp; &nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&lt;foreach collection=&quot;list&quot; item=&quot;item&quot; open=&quot;where user_id in(&quot; close=&quot;)&quot; separator=&quot;,&quot;&gt;<br />
+&nbsp; &nbsp; &nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;#{item}<br />
+&nbsp; &nbsp; &nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&lt;/foreach&gt;<br />
+&nbsp; &nbsp; &nbsp;&nbsp; &nbsp;&lt;/select&gt;</p>
+
+<h3>SQL打印：</h3>
+
+<p>[com.xuyong.dao.UserMapper.getUsersByListParam]-==&gt; &nbsp;Preparing: select * from user where user_id in( ? , ? , ? , ? )&nbsp;<br />
+&nbsp; [com.xuyong.dao.UserMapper.getUsersByListParam]-==&gt; Parameters: 1(Integer), 2(Integer), 3(Integer), 4(Integer)<br />
+&nbsp; [com.xuyong.dao.UserMapper.getUsersByListParam]-&lt;== &nbsp; &nbsp;Columns: user_id, user_name, gender, email, address, dept_id<br />
+&nbsp; [com.xuyong.dao.UserMapper.getUsersByListParam]-&lt;== &nbsp; &nbsp; &nbsp; &nbsp;Row: 1, t1heluosh1, 0, t1heluosh1@163.com, 安徽省合肥市, 1<br />
+&nbsp; [com.xuyong.dao.UserMapper.getUsersByListParam]-&lt;== &nbsp; &nbsp; &nbsp; &nbsp;Row: 2, 王亚飞, 0, wangyafei@163.com, 安徽省合肥市, 1<br />
+&nbsp; [com.xuyong.dao.UserMapper.getUsersByListParam]-&lt;== &nbsp; &nbsp; &nbsp; &nbsp;Row: 3, 张杰, 1, zhangjie@163.com, 安徽省黄山市, 3<br />
+&nbsp; [com.xuyong.dao.UserMapper.getUsersByListParam]-&lt;== &nbsp; &nbsp; &nbsp; &nbsp;Row: 4, Lucy, 1, lucy@126.com, 美利坚合众国旧金山, 2<br />
+&nbsp; [com.xuyong.dao.UserMapper.getUsersByListParam]-&lt;== &nbsp; &nbsp; &nbsp;Total: 4</p>
+
+<h2><strong>2.循环插入数据</strong></h2>
+
+<h3>Junit业务方法调用</h3>
+
+<p>/**<br />
+&nbsp;&nbsp; &nbsp; * 动态sql学习---foreach标签使用（新增）<br />
+&nbsp;&nbsp; &nbsp; * @throws IOException&nbsp;<br />
+&nbsp;&nbsp; &nbsp; *&nbsp;<br />
+&nbsp;&nbsp; &nbsp; */<br />
+&nbsp;&nbsp; &nbsp;@Test<br />
+&nbsp;&nbsp; &nbsp;public void insertMultiUsers() throws IOException {<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;SqlSessionFactory sessionFactory = getSessionFactory();<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;SqlSession sqlSession = sessionFactory.openSession();<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;try {<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;UserMapper mapper = sqlSession.getMapper(UserMapper.class);<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;List&lt;User&gt; users = new ArrayList&lt;User&gt;();<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;users.add(new User(&quot;HanMeimei&quot;,1,&quot;HanMeimei@163.com&quot;,&quot;江苏省南京市&quot;,2));<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;users.add(new User(&quot;李雷&quot;,0,&quot;LiLei@163.com&quot;,&quot;北京市&quot;,1));<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;users.add(new User(&quot;QQ小冰&quot;,1,&quot;xiaobing@163.com&quot;,&quot;深圳市&quot;,2));<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;int count = mapper.insertMultiUsers(users);<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;sqlSession.commit();<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;System.out.println(count);<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;} catch (Exception e) {<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;e.printStackTrace();<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;} finally {<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;sqlSession.close();<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;}<br />
+&nbsp;&nbsp; &nbsp;}</p>
+
+<h3>Mapper接口</h3>
+
+<p>/**<br />
+&nbsp;&nbsp; &nbsp; * 使用foreach批量插入<br />
+&nbsp;&nbsp; &nbsp; *&nbsp;<br />
+&nbsp;&nbsp; &nbsp; * @param users<br />
+&nbsp;&nbsp; &nbsp; * @return<br />
+&nbsp;&nbsp; &nbsp; */<br />
+&nbsp;&nbsp; &nbsp;int insertMultiUsers(@Param(&quot;users&quot;) List&lt;User&gt; users);</p>
+
+<h3>XML实现</h3>
+
+<p>&lt;!-- 使用foreach批量插入用户--&gt;<br />
+&nbsp; &nbsp; &nbsp;&nbsp; &nbsp;&lt;insert id=&quot;insertMultiUsers&quot;&gt;<br />
+&nbsp; &nbsp; &nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;insert into user(user_name,gender,email,address,dept_id)<br />
+&nbsp; &nbsp; &nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;values<br />
+&nbsp; &nbsp; &nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&lt;foreach collection=&quot;users&quot; item=&quot;user&quot; separator=&quot;,&quot;&gt;<br />
+&nbsp; &nbsp; &nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;(#{user.userName},#{user.gender},#{user.email},#{user.address},#{user.deptId})<br />
+&nbsp; &nbsp; &nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&lt;/foreach&gt;<br />
+&nbsp; &nbsp; &nbsp;&nbsp; &nbsp;&lt;/insert&gt;</p>
+
+<h3>SQL打印</h3>
+
+<p>[com.xuyong.dao.UserMapper.insertMultiUsers]-==&gt; &nbsp;Preparing: insert into user(user_name,gender,email,address,dept_id) values (?,?,?,?,?) , (?,?,?,?,?) , (?,?,?,?,?)&nbsp;<br />
+&nbsp; [com.xuyong.dao.UserMapper.insertMultiUsers]-==&gt; Parameters: HanMeimei(String), 1(Integer), HanMeimei@163.com(String), 江苏省南京市(String), 2(Integer), 李雷(String), 0(Integer), LiLei@163.com(String), 北京市(String), 1(Integer), QQ小冰(String), 1(Integer), xiaobing@163.com(String), 深圳市(String), 2(Integer)<br />
+&nbsp; [com.xuyong.dao.UserMapper.insertMultiUsers]-&lt;== &nbsp; &nbsp;Updates: 3</p>

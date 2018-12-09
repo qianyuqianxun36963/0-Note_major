@@ -1,0 +1,278 @@
+<h1><a href="https://www.cnblogs.com/mingforyou/p/4259113.html" id="cb_post_title_url">response.setHeader()的用法</a></h1>
+
+<h2>1. HTTP消息头</h2>
+
+<h3>（1）通用信息头</h3>
+
+<p>即能用于请求消息中,也能用于响应信息中,但与被传输的实体内容没有关系的信息头,如Data,Pragma</p>
+
+<p>主要: Cache-Control , Connection , Data , Pragma , Trailer , Transfer-Encoding , Upgrade</p>
+
+<h3>（2）请求头</h3>
+
+<p>用于在请求消息中向服务器传递附加信息,主要包括客户机可以接受的数据类型,压缩方法,语言,以及客户计算机上保留的信息和发出该请求的超链接源地址等.</p>
+
+<p>主要: Accept , Accept-Encoding , Accept-Language , Host ,</p>
+
+<h3>（3）响应头</h3>
+
+<p>用于在响应消息中向客户端传递附加信息,包括服务程序的名称,要求客户端进行认证的方式,请求的资源已移动到新地址等.</p>
+
+<p>主要: Location , Server , WWW-Authenticate(认证头)</p>
+
+<h3>（4）实体头</h3>
+
+<p>用做实体内容的元信息,描述了实体内容的属性,包括实体信息的类型,长度,压缩方法,最后一次修改的时间和数据的有效期等.</p>
+
+<p>主要: Content-Encoding , Content-Language , Content-Length , Content-Location , Content-Type</p>
+
+<h3>（5）扩展头</h3>
+
+<p>主要：Refresh, Content-Disposition</p>
+
+<h2>2. 几个主要头的作用</h2>
+
+<h3>（1）Content-Type的作用</h3>
+
+<p>该实体头的作用是让服务器告诉浏览器它发送的数据属于什么文件类型。</p>
+
+<p>例如：当Content-Type 的值设置为text/html和text/plain时,前者会让浏览器把接收到的实体内容以HTML格式解析,后者会让浏览器以普通文本解析.</p>
+
+<h3>（2）Content-Disposition 的作用</h3>
+
+<p>当Content-Type 的类型为要下载的类型时 , 这个信息头会告诉浏览器这个文件的名字和类型。</p>
+
+<p>在讲解这个内容时,张老师同时讲出了解决中文文件名乱码的解决方法,平常想的是使用getBytes() , 实际上应使用email的附件名编码方法对文件名进行编码,但IE不支持这种作法(其它浏览器支持) , 使用javax.mail.internet.*包的MimeUtility.encodeWord(&quot;中文.txt&quot;)的方法进行编码。</p>
+
+<p>Content-Disposition扩展头的例子：</p>
+
+<pre>
+&lt;%@ page pageEncoding=&quot;GBK&quot; contentType=&quot;text/html;charset=utf-8&quot; import=&quot;java.util.*,java.text.*&quot; %&gt;
+
+&lt;%=DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT, Locale.CHINA).format(new Date())
+
+%&gt;
+
+&lt;%
+               response.setHeader(&quot;Content-Type&quot;,&quot;video/x-msvideo&quot;);
+               response.setHeader(&quot;Content-Disposition&quot;, &quot;attachment;filename=aaa.doc&quot;);
+%&gt;</pre>
+
+<p>&nbsp;</p>
+
+<p>Content-Disposition中指定的类型是文件的扩展名，并且弹出的下载对话框中的文件类型图片是按照文件的扩展名显示的，点保存后，文件以filename的值命名，保存类型以Content中设置的为准。</p>
+
+<p>注意：在设置Content-Disposition头字段之前，一定要设置Content-Type头字段。</p>
+
+<h3>（3）Authorization头的作用</h3>
+
+<p>Authorization的作用是当客户端访问受口令保护时，服务器端会发送401状态码和WWW-Authenticate响应头，要求客户机使用Authorization来应答。</p>
+
+<p>例如：</p>
+
+<p>&nbsp;</p>
+
+<pre>
+&lt;%@ page pageEncoding=&quot;GBK&quot; contentType=&quot;text/html;charset=utf-8&quot; import=&quot;java.util.*,java.text.*&quot; %&gt;
+
+&lt;%=DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT, Locale.CHINA).format(new Date())
+
+%&gt;
+
+&lt;%
+
+response.setStatus(401);
+
+response.setHeader(&quot;WWW-Authenticate&quot;, &quot;Basic realm=\&quot;Tomcat Manager Application\&quot;&quot;);
+
+%&gt;</pre>
+
+<h2>3．如何实现文件下载</h2>
+
+<p>要实现文件下载，我们只需要设置两个特殊的相应头，它们是什么头？如果文件名带中文，该如何解决？</p>
+
+<p>两个特殊的相应头：</p>
+
+<p>----Content-Type:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; application/octet-stream</p>
+
+<p>----Content-Disposition: attachment;filename=aaa.zip</p>
+
+<p>例如：</p>
+
+<pre>
+response.setContentType(&quot;image/jpeg&quot;);response.setHeader(&quot;Content- Disposition&quot;,&quot;attachment;filename=Bluehills.jpg&quot;);</pre>
+
+<p>如果文件中filename参数中有中文，则就会出现乱码。</p>
+
+<p>解决办法：</p>
+
+<p>（1）MimeUtility.encodeWord(&quot;中文.txt&quot;);//现在版本的IE还不行</p>
+
+<p>（2）new String(&quot;中文&quot;.getBytes(&quot;GB2312&quot;),&quot;ISO8859- 1&quot;);//实际上这个是错误的</p>
+
+<h2>4. 测试并分析文件名乱码问题</h2>
+
+<p>response.setHeader()下载中文文件名乱码问题</p>
+
+<pre>
+response.setHeader(&quot;Content-Disposition&quot;, &quot;attachment; filename=&quot; + java.net.URLEncoder.encode(fileName, &quot;UTF-8&quot;));</pre>
+
+<p>下载的程序里有了上面一句，一般在IE6的下载提示框上将正确显示文件的名字，无论是简体中文，还是日文。不过当时确实没有仔细测试文件名为很长的中文文件名的情况。现如今经过仔细测试，发现文字只要超过17个字，就不能下载了。分析如下：</p>
+
+<p>一. 通过原来的方式，也就是先用URLEncoder编码，当中文文字超过17个时，IE6 无法下载文件。这是IE的bug，参见微软的知识库文章 KB816868 。原因可能是IE在处理 Response Header 的时候，对header的长度限制在150字节左右。而一个汉字编码成UTF-8是9个字节，那么17个字便是153个字节，所以会报错。而且不跟后缀也 不对.</p>
+
+<p>二. 解决方案：将文件名编码成ISO8859-1是有效的解决方案，代码如下：</p>
+
+<pre>
+response.setHeader( &quot;Content-Disposition&quot;, &quot;attachment;filename=&quot; + new String( fileName.getBytes(&quot;gb2312&quot;), &quot;ISO8859-1&quot; ) );</pre>
+
+<p>在确保附件文件名都是简体中文字的情况下，那么这个办法确实是最有效的，不用让客户逐个的升级IE。如果台湾同胞用，把gb2312改成big5就 行。但现在的系统通常都加入了 国际化的支持，普遍使用UTF-8。如果文件名中又有简体中文字，又有繁体中文，还有日文。那么乱码便产生了。另外，在上Firefox (v1.0-en)下载也是乱码。</p>
+
+<p>三. 参看邮件中的中文附件名的形式，用outlook新建一个带有中文附件的邮件，然后看这个邮件的源代码，找到：</p>
+
+<p>Content-Disposition: attachment;</p>
+
+<p>filename=&quot;=?gb2312?B?0MK9qCDOxLG+zsS1tS50eHQ=?=&quot;</p>
+
+<p>用这个filename原理上就可以显示中文名附件，但是现在IE并不支持，Firefox是支持的。尝试使用 javamail 的MimeUtility.encode()方法来编码文件名，也就是编码成 =?gb2312?B?xxxxxxxx?= 这样的形式，并从 RFC1522 中找到对应的标准支持。</p>
+
+<p>折中考虑，结合了一、二的方式，代码片断如下：</p>
+
+<pre>
+String fileName = URLEncoder.encode(atta.getFileName(), &quot;UTF-8&quot;);
+
+/*
+* see http://support.microsoft.com/default.aspx?kbid=816868
+*/
+
+if (fileName.length() &gt; 150) {
+
+String guessCharset = xxxx
+
+//根据request的locale 得出可能的编码，中文操作系统通常是gb2312
+
+fileName = new String(atta.getFileName().getBytes(guessCharset), &quot;ISO8859-1&quot;);
+
+}
+
+response.setHeader(&quot;Content-Disposition&quot;, &quot;attachment; filename=&quot; + fileName);</pre>
+
+<p>&nbsp;</p>
+
+<p><strong>编码转换的原理：</strong></p>
+
+<p><strong>首先在源程序中将编码设置成GB2312字符编码,然后将源程序按Unicode编码转换成字节码加载到内存中（java加载到内存中的字节码都是 Unicode编码），然后按GB2312编码获得中文字符串的字节数组，然后生成按ISO8859-1编码形式的Unicode字符串（这时的4个字节 就变成了8个字节，高位字节补零）,</strong></p>
+
+<p><strong>当在网络中传输时，因为setHeader方法中的字符只能按ISO8859-1传输，所以这时候就又把Unicode字符转换成了 ISO8859-1的编码传到浏览器（就是把刚才高位补的零全去掉），这时浏览器接收到的ISO8859-1码的字符因为符合GB2312编码，所以就可 以显示中文了。</strong></p>
+
+<h2>5. jsp翻译成class时的编码问题</h2>
+
+<p>记事本中代码块1：</p>
+
+<pre>
+&lt;%=
+       &quot;a中文&quot;.length()
+%&gt;</pre>
+
+<p>代码块2：</p>
+
+<pre>
+&lt;%@ page pageEncoding=&quot;gbk&quot;%&gt;
+&lt;%=
+       &quot;a中文&quot;.length()
+%&gt;</pre>
+
+<p>为什么上面的输出值为5，改成下面的则输出3？</p>
+
+<p>因为上面的代码没有添加该文件的编码说明 , WEB应用程序在将jsp翻译成class文件时 , 把该字符串的内容按默认的保存方式指定的编码ASCII码来算的，在UTF-8中，原ASCII字符占一个字节，汉字占两个字节，对应两个字符，长度就变 成了5 , 而下面的是GBK编码, 一个汉字和一个英文都对应一个字符,得到结果就为3.</p>
+
+<p><br />
+response.setHeader(...)文件名中有空格的时候</p>
+
+<pre>
+String fileName = StringUtils.trim(file.getName());
+
+String formatFileName = encodingFileName(name);//在后面定义方法encodingFileName(String fileName);
+response.setHeader(&quot;Content-Disposition&quot;, &quot;attachment; filename=&quot; + formatFileName );
+
+//处理文件名中出现的空格 
+
+//其中%20是空格在UTF-8下的编码
+
+public static String encodingFileName(String fileName) {
+        String returnFileName = &quot;&quot;;
+        try {
+            returnFileName = URLEncoder.encode(fileName, &quot;UTF-8&quot;);
+            returnFileName = StringUtils.replace(returnFileName, &quot;+&quot;, &quot;%20&quot;);
+            if (returnFileName.length() &gt; 150) {
+                returnFileName = new String(fileName.getBytes(&quot;GB2312&quot;), &quot;ISO8859-1&quot;);
+                returnFileName = StringUtils.replace(returnFileName, &quot; &quot;, &quot;%20&quot;);
+            }
+        } catch (UnsupportedEncodingException e) {
+            e.printStackTrace();
+            if (log.isWarnEnabled()) {
+                log.info(&quot;Don&#39;t support this encoding ...&quot;);
+            }
+        }
+        return returnFileName;
+    }</pre>
+
+<p>一秒刷新页面一次</p>
+
+<pre>
+response.setHeader(&quot;refresh&quot;,&quot;1&quot;);</pre>
+
+<p>&nbsp;二秒跳到其他页面</p>
+
+<pre>
+response.setHeader(&quot;refresh&quot;,&quot;2;URL=otherPagename&quot;);</pre>
+
+<p>没有缓存：</p>
+
+<pre>
+response.setHeader(&quot;Pragma&quot;, &quot;No-cache&quot;);
+response.setHeader(&quot;Cache-Control&quot;, &quot;no-cache&quot;);</pre>
+
+<p>设置过期的时间期限 &nbsp;<br />
+&nbsp;&nbsp;response.setDateHeader(&quot;Expires&quot;, System.currentTimeMillis()+自己设置的时间期限);</p>
+
+<p>访问别的页面：</p>
+
+<pre>
+response.setStatus（302）; response.setHeader(&quot;location&quot;,&quot;url&quot;); </pre>
+
+<p>通知浏览器数据采用的压缩格式：</p>
+
+<pre>
+response.setHeader(&quot;Content-Encoding&quot;,&quot;压缩后的数据&quot;); </pre>
+
+<p>告诉浏览器压缩数据的长度：</p>
+
+<p>response.setHeader(&quot;Content-Length&quot;,压缩后的数据.length+&quot;&quot;);</p>
+
+<p>告诉浏览器图片或视频：</p>
+
+<p>response.setHeader(&quot;Content-type&quot;,&quot;这个参数在tomcat里conf下的web.xml里面找&quot;); inputstream in= this.getServletContext.getResourceAsStream(&quot;/2.jpg&quot;); int len=0; byte buffer[]= new byte[1024] outputStream out = response.getOutputStream(); while(len=in.read(buffer)&gt;0){ out.write(buffer,0,len) }</p>
+
+<p>告诉浏览器已下载的形式：</p>
+
+<pre>
+response.setHeader(&quot;Content-disposition&quot;,&quot;attachment;filename=2.jpg&quot;);
+
+inputstream in= this.getServletContext.getResourceAsStream(&quot;/2.jpg&quot;);
+int len=0;
+byte buffer[]= new byte[1024]
+
+outputStream out = response.getOutputStream();
+
+while(len=in.read(buffer)&gt;0){
+  out.write(buffer,0,len)
+}</pre>
+
+<p>&nbsp;</p>
+
+<h2>常见的Content-Type</h2>
+
+<p>文件扩展名</p>
+
+<p>&nbsp;</p>

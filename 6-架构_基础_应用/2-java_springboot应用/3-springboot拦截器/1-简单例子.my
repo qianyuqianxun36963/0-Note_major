@@ -63,3 +63,57 @@ public class WebAppConfig extends WebMvcConfigurerAdapter { &nbsp;<br />
 
 <p>这样我们就可以在用户请求到达controller层实现登录拦截了，所有用户请求都会被拦截，在prehandle方法进行登录判断，返回true则验证通过，否则失败<br />
 &nbsp;</p>
+
+<h2>二、拦截器</h2>
+
+<h3>首先创建拦截器实现HandlerInterceptor</h3>
+
+<p>import javax.servlet.http.HttpServletRequest;<br />
+import javax.servlet.http.HttpServletResponse;<br />
+&nbsp;<br />
+import org.springframework.web.servlet.HandlerInterceptor;<br />
+import org.springframework.web.servlet.ModelAndView;<br />
+&nbsp;<br />
+/**<br />
+&nbsp;* 拦截器<br />
+&nbsp;*/<br />
+public class MyInterceptor implements HandlerInterceptor{<br />
+&nbsp;&nbsp; &nbsp; //在请求处理之前进行调用（Controller方法调用之前<br />
+&nbsp; &nbsp; @Override<br />
+&nbsp; &nbsp; public boolean preHandle(HttpServletRequest httpServletRequest, HttpServletResponse httpServletResponse, Object o) throws Exception {<br />
+&nbsp; &nbsp; &nbsp; &nbsp; System.out.printf(&quot;preHandle被调用\n&quot;);<br />
+&nbsp; &nbsp; &nbsp; &nbsp; return true; &nbsp;&nbsp;<br />
+&nbsp; &nbsp; }<br />
+&nbsp;<br />
+&nbsp; &nbsp; //请求处理之后进行调用，但是在视图被渲染之前（Controller方法调用之后）<br />
+&nbsp; &nbsp; @Override<br />
+&nbsp; &nbsp; public void postHandle(HttpServletRequest httpServletRequest, HttpServletResponse httpServletResponse, Object o, ModelAndView modelAndView) throws Exception {<br />
+&nbsp; &nbsp; &nbsp; &nbsp; System.out.println(&quot;postHandle被调用\n&quot;);<br />
+&nbsp; &nbsp; }<br />
+&nbsp;<br />
+&nbsp; &nbsp; //在整个请求结束之后被调用，也就是在DispatcherServlet 渲染了对应的视图之后执行（主要是用于进行资源清理工作）<br />
+&nbsp; &nbsp; @Override<br />
+&nbsp; &nbsp; public void afterCompletion(HttpServletRequest httpServletRequest, HttpServletResponse httpServletResponse, Object o, Exception e) throws Exception {<br />
+&nbsp; &nbsp; &nbsp; &nbsp; System.out.println(&quot;afterCompletion被调用\n&quot;);<br />
+&nbsp; &nbsp; }<br />
+}</p>
+
+<h3>然后创建一个配置类，用于注册拦截器</h3>
+
+<p>@Configuration<br />
+public class WebMvcConfig implements WebMvcConfigurer {<br />
+&nbsp;<br />
+&nbsp;&nbsp; &nbsp;/**<br />
+&nbsp;&nbsp; &nbsp; * 注册拦截器<br />
+&nbsp;&nbsp; &nbsp; */<br />
+&nbsp;&nbsp; &nbsp;@Override<br />
+&nbsp;&nbsp; &nbsp;public void addInterceptors(InterceptorRegistry registry) {<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;registry.addInterceptor(new MyInterceptor()).addPathPatterns(&quot;/**&quot;).excludePathPatterns(&quot;/a.do&quot;);<br />
+&nbsp;&nbsp; &nbsp;}<br />
+}<br />
+addPathPatterns和excludePathPatterns可以分别指定要拦截的请求和排除的请求，参数也可以是一个List&lt;String&gt;</p>
+
+<p>好了，访问一下</p>
+
+<p>需要注意的是，拦截器是基于spring的，且只有通过DispatcherServlet的请求才能被拦截。<br />
+&nbsp;</p>
