@@ -1,0 +1,178 @@
+<h1>Quartz的Simple Triggers和Cron Triggers使用</h1>
+
+<h2>实现Job接口创建Job</h2>
+
+<p>import java.util.Date;<br />
+&nbsp;<br />
+import org.slf4j.Logger;<br />
+import org.slf4j.LoggerFactory;<br />
+import org.quartz.Job;<br />
+import org.quartz.JobExecutionContext;<br />
+import org.quartz.JobExecutionException;<br />
+import org.quartz.JobKey;<br />
+&nbsp;<br />
+/**<br />
+&nbsp;* &lt;p&gt;<br />
+&nbsp;* This is just a simple job that gets fired off many times by example 1<br />
+&nbsp;* &lt;/p&gt;<br />
+&nbsp;*&nbsp;<br />
+&nbsp;* @author Bill Kratzer<br />
+&nbsp;*/<br />
+public class SimpleJob implements Job {<br />
+&nbsp;<br />
+&nbsp; &nbsp; private static Logger _log = LoggerFactory.getLogger(SimpleJob.class);<br />
+&nbsp;<br />
+&nbsp; &nbsp; /**<br />
+&nbsp; &nbsp; &nbsp;* Empty constructor for job initialization<br />
+&nbsp; &nbsp; &nbsp;*/<br />
+&nbsp; &nbsp; public SimpleJob() {<br />
+&nbsp; &nbsp; }<br />
+&nbsp; &nbsp; /**<br />
+&nbsp; &nbsp; &nbsp;* &lt;p&gt;<br />
+&nbsp; &nbsp; &nbsp;* Called by the &lt;code&gt;{@link org.quartz.Scheduler}&lt;/code&gt; when a<br />
+&nbsp; &nbsp; &nbsp;* &lt;code&gt;{@link org.quartz.Trigger}&lt;/code&gt; fires that is associated with<br />
+&nbsp; &nbsp; &nbsp;* the &lt;code&gt;Job&lt;/code&gt;.<br />
+&nbsp; &nbsp; &nbsp;* &lt;/p&gt;<br />
+&nbsp; &nbsp; &nbsp;*&nbsp;<br />
+&nbsp; &nbsp; &nbsp;* @throws JobExecutionException<br />
+&nbsp; &nbsp; &nbsp;* &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; if there is an exception while executing the job.<br />
+&nbsp; &nbsp; &nbsp;*/<br />
+&nbsp; &nbsp; public void execute(JobExecutionContext context)<br />
+&nbsp; &nbsp; &nbsp; &nbsp; throws JobExecutionException {<br />
+&nbsp; &nbsp; &nbsp; &nbsp; // This job simply prints out its job name and the<br />
+&nbsp; &nbsp; &nbsp; &nbsp; // date and time that it is running<br />
+&nbsp; &nbsp; &nbsp; &nbsp; JobKey jobKey = context.getJobDetail().getKey();<br />
+&nbsp; &nbsp; &nbsp; &nbsp; _log.info(&quot;SimpleJob says: &quot; + jobKey + &quot; executing at &quot; + new Date());<br />
+&nbsp; &nbsp; }<br />
+}</p>
+
+<h2>Simple Triggers 的使用简介</h2>
+
+<p>Job在15秒后执行<br />
+&nbsp; &nbsp; // get a &quot;nice round&quot; time a few seconds in the future...<br />
+&nbsp; &nbsp; Date startTime = DateBuilder.nextGivenSecondDate(null, 15);<br />
+&nbsp;<br />
+&nbsp; &nbsp; // job1 will only fire once at date/time &quot;ts&quot;<br />
+&nbsp; &nbsp; JobDetail job = newJob(SimpleJob.class).withIdentity(&quot;job1&quot;, &quot;group1&quot;).build();<br />
+&nbsp;<br />
+&nbsp; &nbsp; SimpleTrigger trigger = (SimpleTrigger) newTrigger().withIdentity(&quot;trigger1&quot;, &quot;group1&quot;).startAt(startTime).build();<br />
+&nbsp;<br />
+&nbsp; &nbsp; // schedule it to run!<br />
+&nbsp; &nbsp; Date ft = sched.scheduleJob(job, trigger);<br />
+&nbsp; &nbsp; log.info(job.getKey() + &quot; will run at: &quot; + ft + &quot; and repeat: &quot; + trigger.getRepeatCount() + &quot; times, every &quot;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;+ trigger.getRepeatInterval() / 1000 + &quot; seconds&quot;);</p>
+
+<p>Job在重复执行11次<br />
+&nbsp;// job3 will run 11 times (run once and repeat 10 more times)<br />
+&nbsp; &nbsp; // job3 will repeat every 10 seconds<br />
+&nbsp; &nbsp; job = newJob(SimpleJob.class).withIdentity(&quot;job3&quot;, &quot;group1&quot;).build();<br />
+&nbsp;<br />
+&nbsp; &nbsp; trigger = newTrigger().withIdentity(&quot;trigger3&quot;, &quot;group1&quot;).startAt(startTime)<br />
+&nbsp; &nbsp; &nbsp; &nbsp; .withSchedule(simpleSchedule().withIntervalInSeconds(10).withRepeatCount(10)).build();<br />
+&nbsp;<br />
+&nbsp; &nbsp; ft = sched.scheduleJob(job, trigger);<br />
+&nbsp; &nbsp; log.info(job.getKey() + &quot; will run at: &quot; + ft + &quot; and repeat: &quot; + trigger.getRepeatCount() + &quot; times, every &quot;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;+ trigger.getRepeatInterval() / 1000 + &quot; seconds&quot;);</p>
+
+<p>Job在五分钟后执行<br />
+&nbsp; &nbsp; // job5 will run once, five minutes in the future<br />
+&nbsp; &nbsp; job = newJob(SimpleJob.class).withIdentity(&quot;job5&quot;, &quot;group1&quot;).build();<br />
+&nbsp;<br />
+&nbsp; &nbsp; trigger = (SimpleTrigger) newTrigger().withIdentity(&quot;trigger5&quot;, &quot;group1&quot;)<br />
+&nbsp; &nbsp; &nbsp; &nbsp; .startAt(futureDate(5, IntervalUnit.MINUTE)).build();<br />
+&nbsp;<br />
+&nbsp; &nbsp; ft = sched.scheduleJob(job, trigger);<br />
+&nbsp; &nbsp; log.info(job.getKey() + &quot; will run at: &quot; + ft + &quot; and repeat: &quot; + trigger.getRepeatCount() + &quot; times, every &quot;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;+ trigger.getRepeatInterval() / 1000 + &quot; seconds&quot;);</p>
+
+<p>Job每40秒执行一次，无限执行<br />
+&nbsp; &nbsp;// job6 will run indefinitely, every 40 seconds<br />
+&nbsp; &nbsp; job = newJob(SimpleJob.class).withIdentity(&quot;job6&quot;, &quot;group1&quot;).build();<br />
+&nbsp;<br />
+&nbsp; &nbsp; trigger = newTrigger().withIdentity(&quot;trigger6&quot;, &quot;group1&quot;).startAt(startTime)<br />
+&nbsp; &nbsp; &nbsp; &nbsp; .withSchedule(simpleSchedule().withIntervalInSeconds(40).repeatForever()).build();<br />
+&nbsp;<br />
+&nbsp; &nbsp; ft = sched.scheduleJob(job, trigger);<br />
+&nbsp; &nbsp; log.info(job.getKey() + &quot; will run at: &quot; + ft + &quot; and repeat: &quot; + trigger.getRepeatCount() + &quot; times, every &quot;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;+ trigger.getRepeatInterval() / 1000 + &quot; seconds&quot;);</p>
+
+<p><br />
+当所有的Job和Trigger添加到scheduler里面去后调用&nbsp;&nbsp;&nbsp;&nbsp;sched.start(); 便可启动触发器，开始检测任务，随时触发Job执行，</p>
+
+<p>当然，当调用完&nbsp;&nbsp;&nbsp;&nbsp;sched.start(); 之后还可以往scheduler里面添加Job和Trigger。</p>
+
+<p>Job也可以不需要触发器触发，直接执行<br />
+// jobs can be fired directly... (rather than waiting for a trigger)<br />
+&nbsp; &nbsp; job = newJob(SimpleJob.class).withIdentity(&quot;job8&quot;, &quot;group1&quot;).storeDurably().build();<br />
+&nbsp;<br />
+&nbsp; &nbsp; sched.addJob(job, true);</p>
+
+<p>关闭Scheduler调用&nbsp;sched.shutdown(true);方法</p>
+
+<h2>CronTrigger的简单使用</h2>
+
+<p>Job每20秒执行一次<br />
+// job 1 will run every 20 seconds<br />
+&nbsp; &nbsp; JobDetail job = newJob(SimpleJob.class).withIdentity(&quot;job1&quot;, &quot;group1&quot;).build();<br />
+&nbsp;<br />
+&nbsp; &nbsp; CronTrigger trigger = newTrigger().withIdentity(&quot;trigger1&quot;, &quot;group1&quot;).withSchedule(cronSchedule(&quot;0/20 * * * * ?&quot;))<br />
+&nbsp; &nbsp; &nbsp; &nbsp; .build();<br />
+&nbsp;<br />
+&nbsp; &nbsp; Date ft = sched.scheduleJob(job, trigger);<br />
+&nbsp; &nbsp; log.info(job.getKey() + &quot; has been scheduled to run at: &quot; + ft + &quot; and repeat based on expression: &quot;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;+ trigger.getCronExpression());</p>
+
+<p>Job每两分钟的第15秒执行<br />
+&nbsp; &nbsp; // job 2 will run every other minute (at 15 seconds past the minute)<br />
+&nbsp; &nbsp; job = newJob(SimpleJob.class).withIdentity(&quot;job2&quot;, &quot;group1&quot;).build();<br />
+&nbsp;<br />
+&nbsp; &nbsp; trigger = newTrigger().withIdentity(&quot;trigger2&quot;, &quot;group1&quot;).withSchedule(cronSchedule(&quot;15 0/2 * * * ?&quot;)).build();<br />
+&nbsp;<br />
+&nbsp; &nbsp; ft = sched.scheduleJob(job, trigger);<br />
+&nbsp; &nbsp; log.info(job.getKey() + &quot; has been scheduled to run at: &quot; + ft + &quot; and repeat based on expression: &quot;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;+ trigger.getCronExpression());</p>
+
+<p>Job每两分钟执行一次，在每天8点到17点<br />
+&nbsp; &nbsp; // job 3 will run every other minute but only between 8am and 5pm<br />
+&nbsp; &nbsp; job = newJob(SimpleJob.class).withIdentity(&quot;job3&quot;, &quot;group1&quot;).build();<br />
+&nbsp;<br />
+&nbsp; &nbsp; trigger = newTrigger().withIdentity(&quot;trigger3&quot;, &quot;group1&quot;).withSchedule(cronSchedule(&quot;0 0/2 8-17 * * ?&quot;)).build();<br />
+&nbsp;<br />
+&nbsp; &nbsp; ft = sched.scheduleJob(job, trigger);<br />
+&nbsp; &nbsp; log.info(job.getKey() + &quot; has been scheduled to run at: &quot; + ft + &quot; and repeat based on expression: &quot;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;+ trigger.getCronExpression());</p>
+
+<p><br />
+Job每个月的1号到15号每天早上十点执行<br />
+&nbsp; &nbsp; // job 5 will run at 10am on the 1st and 15th days of the month<br />
+&nbsp; &nbsp; job = newJob(SimpleJob.class).withIdentity(&quot;job5&quot;, &quot;group1&quot;).build();<br />
+&nbsp;<br />
+&nbsp; &nbsp; trigger = newTrigger().withIdentity(&quot;trigger5&quot;, &quot;group1&quot;).withSchedule(cronSchedule(&quot;0 0 10am 1,15 * ?&quot;)).build();<br />
+&nbsp;<br />
+&nbsp; &nbsp; ft = sched.scheduleJob(job, trigger);<br />
+&nbsp; &nbsp; log.info(job.getKey() + &quot; has been scheduled to run at: &quot; + ft + &quot; and repeat based on expression: &quot;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;+ trigger.getCronExpression());</p>
+
+<p>更多表达式例子</p>
+
+<p>cron表达式&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;含义<br />
+0 0 12 * * ?&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;每天12点整触发一次<br />
+0 15 10 ? * *&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;每天10点15分触发一次<br />
+0 15 10 * * ?&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;每天10点15分触发一次<br />
+0 15 10 * * ? *&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;每天10点15分触发一次<br />
+0 15 10 * * ? 2005&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;2005年内每天10点15分触发一次<br />
+0 * 14 * * ?&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;每天的2点整至2点59分，每分钟触发一次<br />
+0 0/5 14 * * ?&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;每天的2点整至2点55分，每5分钟触发一次<br />
+0 0/5 14,18 * * ?&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;每天的2点整至2点55分以及18点整至18点55分，每5分钟触发一次<br />
+0 0-5 14 * * ?&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;每天的2点整至2点5分，每分钟触发一次<br />
+0 10,44 14 ? 3 WED&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;每年3月的每个星期三的2点10分以及2点44分触发一次<br />
+0 15 10 ? * MON-FRI&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;每月周一、周二、周三、周四、周五的10点15分触发一次<br />
+0 15 10 15 * ?&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;每月15的10点15分触发一次<br />
+0 15 10 L * ?&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;每月最后一天的10点15分触发一次<br />
+0 15 10 ? * 6L&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;每月最后一个周五的10点15分触发一次<br />
+0 15 10 ? * 6L&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;每月最后一个周五的10点15分触发一次<br />
+0 15 10 ? * 6L 2002-2005&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;2002年至2005年间，每月最后一个周五的10点15分触发一次<br />
+0 15 10 ? * 6#3&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;每月第三个周五的10点15触发一次<br />
+0 0 12 1/5 * ?&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;每月1号开始，每5天的12点整触发一次<br />
+0 11 11 11 11 ?&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;每年11月11日11点11分触发一次<br />
+&nbsp;</p>

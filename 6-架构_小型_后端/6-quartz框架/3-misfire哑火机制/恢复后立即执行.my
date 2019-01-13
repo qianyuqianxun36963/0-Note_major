@@ -1,0 +1,102 @@
+<h1>任务框架quartz的misfire的理解</h1>
+
+<p>quartz，java世界里面的任务管理容器。</p>
+
+<p>至于为什么会有misfire这个概念，我想可以重这三个方面来进行说明：</p>
+
+<p>1 所有的线程都在忙于更高优先级的任务</p>
+
+<p>2 任务本身CRASH了</p>
+
+<p>3 代码的BUG，导置错误的设置了JOB</p>
+
+<p>基于这3种原因，其实也是现实世界中的常理。没有任何事情，都能保证100%运行OK。quartz提出了misfire的理论，让任务在错过之后，还能正常的运行。</p>
+
+<p>以下分别对几种类型的JOB进行说明：</p>
+
+<h2>without repeating（不重复的JOB）</h2>
+
+<p>这里只列出有代表的属性进行说明,这个JOB执行的时间为过去10秒之前，所以肯定会触发misfire</p>
+
+<p><img src="https://upload-images.jianshu.io/upload_images/1455720-baee1c390f2ce8cb.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/847/format/webp" /></p>
+
+<p>withMisfireHandlingInstructionFireNow（失效之后再恢复并马上执行）</p>
+
+<p>就是当某个任务在理论执行的时间点没有执行，当任务正常起来之后，马上就去执行刚才未执行的任务。</p>
+
+<p>withMisfireHandlingInstructionNextWithRemainingCount（失效之后不处理）</p>
+
+<p>错过之后，不用管。</p>
+
+<p>其它详细说明</p>
+
+<p><img src="https://upload-images.jianshu.io/upload_images/1455720-9608a6851f7e92a6.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1000/format/webp" /></p>
+
+<p>这个其实比较简单。来看第二种</p>
+
+<h2>repeating fixed number of times（多次执行）</h2>
+
+<p><img src="https://upload-images.jianshu.io/upload_images/1455720-c2bcc18690b81243.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/850/format/webp" /></p>
+
+<p>这个任务是说从9点开始，每隔一个小时，会执行一次，直到下午4点.</p>
+
+<h3>withMisfireHandlingInstructionFireNow（失效之后，再启动马上执行，总次数还是7次）</h3>
+
+<p>如果任务在10点的时候没有触发，但是在10：15分的时候执行了misfire,以后每次正点执行的时间就会较初始值晚15分钟，直到<strong><em>16：15</em></strong></p>
+
+<h3>withMisfireHandlingInstructionNowWithExistingCount(失效之后，再启动之后马上执行，但是起始次数清零，总次数=7+当前misfire执行次数-1)</h3>
+
+<p>如果任务在10点没有触发，10：15分执行了misfire,以后执行时间都会较初始值晚15分钟，但是执行次数还是原来的7次，就会到<strong>17：15</strong>了。</p>
+
+<h3>withMisfireHandlingInstructionNextWithRemainingCount（失效之后，不管donothing，总次数还是7次）</h3>
+
+<p>withMisfireHandlingInstructionNextWithExistingCount（失效之后，donothgin,总次数=misfire的次数+7）</p>
+
+<p>详情如图：</p>
+
+<p><img src="https://upload-images.jianshu.io/upload_images/1455720-ef712276746d95f7.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/837/format/webp" /></p>
+
+<h2>repeating infinitely（不停的执行）</h2>
+
+<p><img src="https://upload-images.jianshu.io/upload_images/1455720-120fb8c689ea7293.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/558/format/webp" /></p>
+
+<p>这个任务是说从9点开始，每隔一个小时就会执行。</p>
+
+<h3>withMisfireHandlingInstructionFireNow（每次失效之后，在下个失效节点再执行）</h3>
+
+<p>这个模式下，withMisfireHandlingInstructionNowWithRemainingCount<br />
+，withMisfireHandlingInstructionNowWithExistingCount都是 一个意思。</p>
+
+<h3>withMisfireHandlingInstructionNextWithRemainingCount（每次失效之后，在下个定义的时间点再执行）</h3>
+
+<p>这个同withMisfireHandlingInstructionNextWithExistingCount的配置</p>
+
+<h2>CRON triggers（表达式，最复杂的）</h2>
+
+<p><img src="https://upload-images.jianshu.io/upload_images/1455720-845523775fa98aee.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/513/format/webp" /></p>
+
+<p>在每个星期的周一至周五的上午9点到下午17点，每隔一个小时执行一次。</p>
+
+<h3>withMisfireHandlingInstructionIgnoreMisfires（所有misfire的任务会马上执行）</h3>
+
+<p>打个比方，如果9点misfire了，在10：15系统恢复之后，9点，10点的misfire会马上执行</p>
+
+<h3>withMisfireHandlingInstructionDoNothing(所有的misfire不管，执行下一个周期的任务)</h3>
+
+<p>withMisfireHandlingInstructionFireAndProceed（会合并部分的misfire,正常执行下一个周期的任务）</p>
+
+<p>假设9，10的任务都misfire了，系统在10：15分起来了。只会执行一次misfire，下次正点执行。</p>
+
+<p>现在，你了解到，不同模式的相同配置，misfire的行为其实是不一样的。大的方向其实就三个</p>
+
+<p>1 忽略</p>
+
+<p>2 立即执行</p>
+
+<p>3 继续</p>
+
+<p>4 放弃</p>
+
+<p>5 等待下一个周期</p>
+
+<p>最终就是根据合适的策略，选择合适的misfire.</p>
