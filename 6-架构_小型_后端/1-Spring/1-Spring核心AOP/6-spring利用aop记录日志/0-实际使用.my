@@ -1,0 +1,407 @@
+<h1>使用spring aop 记录日志</h1>
+
+<p>&nbsp;</p>
+
+<h2>注解类</h2>
+
+<p>import java.lang.annotation.*;</p>
+
+<p>/**<br />
+&nbsp;* 系统日志注解<br />
+&nbsp;*/<br />
+@Target(ElementType.METHOD)<br />
+@Retention(RetentionPolicy.RUNTIME)<br />
+@Documented<br />
+public @interface SysLog {</p>
+
+<p>&nbsp;&nbsp; &nbsp;String value() default &quot;&quot;;<br />
+}<br />
+&nbsp;</p>
+
+<h2>切面类</h2>
+
+<p>import com.exam.core.annotation.SysLog;<br />
+import com.shinfo.exam.core.log.LogManager;<br />
+import com.exam.modules.log.model.SysLogEntity;<br />
+import com.google.gson.Gson;<br />
+import org.aspectj.lang.ProceedingJoinPoint;<br />
+import org.aspectj.lang.annotation.Around;<br />
+import org.aspectj.lang.annotation.Aspect;<br />
+import org.aspectj.lang.annotation.Pointcut;<br />
+import org.aspectj.lang.reflect.MethodSignature;<br />
+import org.springframework.stereotype.Component;</p>
+
+<p>import java.lang.reflect.Method;</p>
+
+<p>/**<br />
+&nbsp;* 系统日志，切面处理类<br />
+&nbsp;*/<br />
+@Aspect<br />
+@Component<br />
+public class SysLogAspect {</p>
+
+<p>&nbsp;&nbsp; &nbsp;@Pointcut(&quot;@annotation(com.bshinfo.exam.core.annotation.SysLog)&quot;)<br />
+&nbsp;&nbsp; &nbsp;public void logPointCut() {&nbsp;<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;<br />
+&nbsp;&nbsp; &nbsp;}</p>
+
+<p>&nbsp;&nbsp; &nbsp;@Around(&quot;logPointCut()&quot;)<br />
+&nbsp;&nbsp; &nbsp;public Object around(ProceedingJoinPoint point) throws Throwable {<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;long beginTime = System.currentTimeMillis();<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;//执行方法<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;Object result = point.proceed();<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;//执行时长(毫秒)<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;long time = System.currentTimeMillis() - beginTime;</p>
+
+<p>&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;//保存日志<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;saveSysLog(point, time);</p>
+
+<p>&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;return result;<br />
+&nbsp;&nbsp; &nbsp;}</p>
+
+<p>&nbsp;&nbsp; &nbsp;private void saveSysLog(ProceedingJoinPoint joinPoint, long time) {<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;MethodSignature signature = (MethodSignature) joinPoint.getSignature();<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;Method method = signature.getMethod();</p>
+
+<p>&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;SysLogEntity sysLog = new SysLogEntity();<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;SysLog syslog = method.getAnnotation(SysLog.class);<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;if(syslog != null){<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;//注解上的描述<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;sysLog.setOperation(syslog.value());<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;}</p>
+
+<p>&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;//请求的方法名<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;String className = joinPoint.getTarget().getClass().getName();<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;String methodName = signature.getName();<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;sysLog.setMethod(className + &quot;.&quot; + methodName + &quot;()&quot;);</p>
+
+<p>&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;//请求的参数<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;Object[] args = joinPoint.getArgs();<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;try{<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;String params = new Gson().toJson(args[0]);<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;sysLog.setParams(params);<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;}catch (Exception e){<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;}<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;sysLog.setTime(time);<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;// 保存业务日志<br />
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;LogManager.me().bussinessLog(sysLog.getOperation(),sysLog.getMethod(),sysLog.getParams(),sysLog.getMessage(),sysLog.getTime());<br />
+&nbsp;&nbsp; &nbsp;}<br />
+}<br />
+&nbsp;</p>
+
+<h2>日志管理类</h2>
+
+<p>import com.exam.common.utils.SpringContextUtils;<br />
+import com.exam.core.log.factory.LogFactory;</p>
+
+<p>public class LogManager {<br />
+&nbsp; &nbsp; private static LogFactory logFactory= SpringContextUtils.getBean(LogFactory.class);</p>
+
+<p>&nbsp; &nbsp; public static LogFactory me() {<br />
+&nbsp; &nbsp; &nbsp; &nbsp; return logFactory;<br />
+&nbsp; &nbsp; }<br />
+}</p>
+
+<p>&nbsp;</p>
+
+<h2>日志工厂类</h2>
+
+<p>package com.exam.core.log.factory;</p>
+
+<p>import com.exam.common.constant.state.LogSucceed;<br />
+import com.exam.common.constant.state.LogType;<br />
+import com.exam.common.utils.HttpContextUtils;<br />
+import com.exam.common.utils.IPUtils;<br />
+import com.exam.common.utils.exception.ExceptionUtil;<br />
+import com.exam.core.util.LoginUserUtil;<br />
+import com.exam.modules.log.model.SysLogEntity;<br />
+import com.exam.modules.log.service.SysLogService;<br />
+import com.exam.modules.user.model.document.ExamUser;<br />
+import org.slf4j.Logger;<br />
+import org.slf4j.LoggerFactory;<br />
+import org.springframework.beans.factory.annotation.Autowired;<br />
+import org.springframework.beans.factory.annotation.Value;<br />
+import org.springframework.scheduling.annotation.Async;<br />
+import org.springframework.stereotype.Component;</p>
+
+<p>import javax.servlet.http.HttpServletRequest;<br />
+import java.util.Date;</p>
+
+<p>/**<br />
+&nbsp;* 日志操作任务创建工厂<br />
+&nbsp;*<br />
+&nbsp;* @author liuyazi<br />
+&nbsp;* @email lyzpoq@gmail.com<br />
+&nbsp;* @date 2018年1月24日 上午11:07:35<br />
+&nbsp;*/<br />
+@Component(&quot;logFactory&quot;)<br />
+public class LogFactory {</p>
+
+<p>&nbsp; &nbsp; @Value(&quot;${exam.web.session.key}&quot;)<br />
+&nbsp; &nbsp; private String sessionKey;</p>
+
+<p>&nbsp; &nbsp; private static Logger logger = LoggerFactory.getLogger(LogFactory.class);<br />
+&nbsp; &nbsp; @Autowired<br />
+&nbsp; &nbsp; private SysLogService sysLogService;</p>
+
+<p>&nbsp; &nbsp; //是否开启登录日志 &nbsp;true开启 &nbsp; false关闭<br />
+&nbsp; &nbsp; @Value(&quot;${exam.log.login.open}&quot;)<br />
+&nbsp; &nbsp; private boolean examLogLoginOpen;</p>
+
+<p>&nbsp; &nbsp; //是否开启业务日志 &nbsp;true开启 &nbsp; false关闭<br />
+&nbsp; &nbsp; @Value(&quot;${exam.log.bussiness.open}&quot;)<br />
+&nbsp; &nbsp; private boolean examLogBussinessOpen;</p>
+
+<p>&nbsp; &nbsp; //是否开启异常日志 &nbsp;true开启 &nbsp; false关闭<br />
+&nbsp; &nbsp; @Value(&quot;${exam.log.exception.open}&quot;)<br />
+&nbsp; &nbsp; private boolean examLogExceptionOpen;</p>
+
+<p>&nbsp; &nbsp; @Async<br />
+&nbsp; &nbsp; public &nbsp;void loginLog(final String username) {<br />
+&nbsp; &nbsp; &nbsp; &nbsp; if(examLogLoginOpen){<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; SysLogEntity sysLog=createSysLog(null);<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; sysLog.setUsername(username);<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; sysLog.setLogType(LogType.LOGIN.getMessage());<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; sysLog.setSucceed(LogSucceed.SUCCESS.getMessage());<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; sysLog.setTime(-1L);<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; try {<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; sysLogService.insert(sysLog);<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; } catch (Exception e) {<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; logger.error(&quot;创建登录日志异常!&quot;, e);<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; }<br />
+&nbsp; &nbsp; &nbsp; &nbsp; }</p>
+
+<p>&nbsp; &nbsp; }</p>
+
+<p>&nbsp; &nbsp; @Async<br />
+&nbsp; &nbsp; public void loginLog(final String username,final String msg) {<br />
+&nbsp; &nbsp; &nbsp; &nbsp; if(examLogLoginOpen){<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; SysLogEntity sysLog=createSysLog(null);<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; sysLog.setUsername(username);<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; sysLog.setLogType(LogType.LOGIN_FAIL.getMessage());<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; sysLog.setSucceed(LogSucceed.FAIL.getMessage());<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; sysLog.setMessage(msg);<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; sysLog.setTime(-1L);<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; try {<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; sysLogService.insert(sysLog);<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; } catch (Exception e) {<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; logger.error(&quot;创建登录失败日志异常!&quot;, e);<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; }<br />
+&nbsp; &nbsp; &nbsp; &nbsp; }<br />
+&nbsp; &nbsp; }</p>
+
+<p>&nbsp; &nbsp; @Async<br />
+&nbsp; &nbsp; public void exitLog(final String username) {<br />
+&nbsp; &nbsp; &nbsp; &nbsp; if(examLogLoginOpen){<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; SysLogEntity sysLog=createSysLog(null);<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; sysLog.setUsername(username);<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; sysLog.setLogType(LogType.EXIT.getMessage());<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; sysLog.setSucceed(LogSucceed.SUCCESS.getMessage());<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; sysLog.setTime(-1L);<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; try {<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; sysLogService.insert(sysLog);<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; } catch (Exception e) {<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; logger.error(&quot;创建退出日志异常!&quot;, e);<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; }<br />
+&nbsp; &nbsp; &nbsp; &nbsp; }<br />
+&nbsp; &nbsp; }</p>
+
+<p>&nbsp; &nbsp; @Async<br />
+&nbsp; &nbsp; public void bussinessLog(final String operarion, final String methodName, final String params, final String msg, final long time) {<br />
+&nbsp; &nbsp; &nbsp; &nbsp; if(examLogBussinessOpen){<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; SysLogEntity sysLog=createSysLog(null);<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; sysLog.setOperation(operarion);<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; sysLog.setMethod(methodName);<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; sysLog.setParams(params);<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; sysLog.setLogType(LogType.BUSSINESS.getMessage());<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; sysLog.setSucceed(LogSucceed.SUCCESS.getMessage());<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; sysLog.setMessage(msg);<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; sysLog.setTime(time);<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; try {<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; sysLogService.insert(sysLog);<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; } catch (Exception e) {<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; logger.error(&quot;创建业务日志异常!&quot;, e);<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; }<br />
+&nbsp; &nbsp; &nbsp; &nbsp; }<br />
+&nbsp; &nbsp; }</p>
+
+<p>&nbsp; &nbsp; @Async<br />
+&nbsp; &nbsp; public void openApiLog(SysLogEntity sysLog) {<br />
+&nbsp; &nbsp; &nbsp; &nbsp; //获取request<br />
+&nbsp; &nbsp; &nbsp; &nbsp; HttpServletRequest request = HttpContextUtils.getHttpServletRequest();<br />
+&nbsp; &nbsp; &nbsp; &nbsp; //设置IP地址<br />
+&nbsp; &nbsp; &nbsp; &nbsp; sysLog.setIp(IPUtils.getIpAddr(request));<br />
+&nbsp; &nbsp; &nbsp; &nbsp; if(examLogBussinessOpen){<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; sysLog.setLogType(LogType.OPENAPI.getMessage());<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; sysLog.setSucceed(LogSucceed.SUCCESS.getMessage());<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; try {<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; sysLogService.insert(sysLog);<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; } catch (Exception e) {<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; logger.error(&quot;创建业务日志异常!&quot;, e);<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; }<br />
+&nbsp; &nbsp; &nbsp; &nbsp; }<br />
+&nbsp; &nbsp; }</p>
+
+<p>&nbsp; &nbsp; @Async<br />
+&nbsp; &nbsp; public void exceptionLog(final Exception exception) {<br />
+&nbsp; &nbsp; &nbsp; &nbsp; if(examLogExceptionOpen){<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; SysLogEntity sysLog=createSysLog(null);<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; sysLog.setLogType(LogType.EXCEPTION.getMessage());<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; sysLog.setOperation(LogType.EXCEPTION.getMessage());<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; sysLog.setMessage(ExceptionUtil.getExceptionMsg(exception));<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; sysLog.setSucceed(LogSucceed.FAIL.getMessage());<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; sysLog.setTime(-1L);<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; try {<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; sysLogService.insert(sysLog);<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; } catch (Exception e) {<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; logger.error(&quot;创建异常日志异常!&quot;, e);<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; }<br />
+&nbsp; &nbsp; &nbsp; &nbsp; }<br />
+&nbsp; &nbsp; }</p>
+
+<p>&nbsp; &nbsp; /**<br />
+&nbsp; &nbsp; &nbsp;* 构造日志对象<br />
+&nbsp; &nbsp; &nbsp;* @param sysLog<br />
+&nbsp; &nbsp; &nbsp;* @return<br />
+&nbsp; &nbsp; &nbsp;*/<br />
+&nbsp; &nbsp; private SysLogEntity createSysLog(SysLogEntity sysLog){<br />
+&nbsp; &nbsp; &nbsp; &nbsp; if(sysLog ==null){<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; sysLog=new SysLogEntity();<br />
+&nbsp; &nbsp; &nbsp; &nbsp; }<br />
+&nbsp; &nbsp; &nbsp; &nbsp; //获取request<br />
+&nbsp; &nbsp; &nbsp; &nbsp; HttpServletRequest request = HttpContextUtils.getHttpServletRequest();<br />
+&nbsp; &nbsp; &nbsp; &nbsp; //设置IP地址<br />
+&nbsp; &nbsp; &nbsp; &nbsp; sysLog.setIp(IPUtils.getIpAddr(request));</p>
+
+<p>&nbsp; &nbsp; &nbsp; &nbsp; //用户名<br />
+&nbsp; &nbsp; &nbsp; &nbsp; ExamUser user = LoginUserUtil.getUser(sessionKey);<br />
+&nbsp; &nbsp; &nbsp; &nbsp;if(user!=null){<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;sysLog.setUsername(user.getUserName());<br />
+&nbsp; &nbsp; &nbsp; &nbsp;}<br />
+&nbsp; &nbsp; &nbsp; &nbsp; sysLog.setCreateTime(new Date());<br />
+&nbsp; &nbsp; &nbsp; &nbsp; return sysLog;<br />
+&nbsp; &nbsp; }<br />
+}<br />
+&nbsp;</p>
+
+<h2>日志实体类</h2>
+
+<p>package com.exam.modules.log.model;</p>
+
+<p>import lombok.AllArgsConstructor;<br />
+import lombok.Data;<br />
+import lombok.NoArgsConstructor;<br />
+import lombok.ToString;<br />
+import org.springframework.data.annotation.Id;<br />
+import org.springframework.data.mongodb.core.index.Indexed;<br />
+import org.springframework.data.mongodb.core.mapping.Document;<br />
+import org.springframework.data.mongodb.core.mapping.Field;</p>
+
+<p>import java.io.Serializable;<br />
+import java.util.Date;</p>
+
+<p>/**<br />
+&nbsp;* 系统日志<br />
+&nbsp;*&nbsp;<br />
+&nbsp;* @author liuyazi<br />
+&nbsp;* @email lyzpoq@gmail.com<br />
+&nbsp;* @date 2018-02-24 13:57:13<br />
+&nbsp;*/<br />
+@Data<br />
+@ToString(callSuper = true)<br />
+@NoArgsConstructor<br />
+@AllArgsConstructor<br />
+@Document(collection=&quot;SysLog&quot;)<br />
+public class SysLogEntity implements Serializable {<br />
+&nbsp;&nbsp; &nbsp;private static final long serialVersionUID = 1L;</p>
+
+<p>&nbsp;&nbsp; &nbsp;@Id<br />
+&nbsp;&nbsp; &nbsp;@Indexed<br />
+&nbsp;&nbsp; &nbsp;@Field(&quot;id&quot;)<br />
+&nbsp;&nbsp; &nbsp;private String id;</p>
+
+<p>&nbsp;&nbsp; &nbsp;/**<br />
+&nbsp;&nbsp; &nbsp; * 日志类型: 登录日志,登录失败日志,退出日志,异常日志,业务日志<br />
+&nbsp;&nbsp; &nbsp; */<br />
+&nbsp;&nbsp; &nbsp;@Field(&quot;logType&quot;)<br />
+&nbsp;&nbsp; &nbsp;private String logType;<br />
+&nbsp;&nbsp; &nbsp;/**<br />
+&nbsp;&nbsp; &nbsp; * 用户名<br />
+&nbsp;&nbsp; &nbsp; */<br />
+&nbsp;&nbsp; &nbsp;@Indexed<br />
+&nbsp;&nbsp; &nbsp;@Field(&quot;username&quot;)<br />
+&nbsp;&nbsp; &nbsp;private String username;<br />
+&nbsp;&nbsp; &nbsp;/**<br />
+&nbsp;&nbsp; &nbsp; * 用户操作<br />
+&nbsp;&nbsp; &nbsp; */<br />
+&nbsp;&nbsp; &nbsp;@Field(&quot;operation&quot;)<br />
+&nbsp;&nbsp; &nbsp;private String operation;<br />
+&nbsp;&nbsp; &nbsp;/**<br />
+&nbsp;&nbsp; &nbsp; * 请求方法<br />
+&nbsp;&nbsp; &nbsp; */<br />
+&nbsp;&nbsp; &nbsp;@Field(&quot;method&quot;)<br />
+&nbsp;&nbsp; &nbsp;private String method;<br />
+&nbsp;&nbsp; &nbsp;/**<br />
+&nbsp;&nbsp; &nbsp; * 请求参数<br />
+&nbsp;&nbsp; &nbsp; */<br />
+&nbsp;&nbsp; &nbsp;@Field(&quot;params&quot;)<br />
+&nbsp;&nbsp; &nbsp;private String params;<br />
+&nbsp;&nbsp; &nbsp;/**<br />
+&nbsp;&nbsp; &nbsp; * 是否成功<br />
+&nbsp;&nbsp; &nbsp; */<br />
+&nbsp;&nbsp; &nbsp;@Field(&quot;succeed&quot;)<br />
+&nbsp;&nbsp; &nbsp;private String succeed;<br />
+&nbsp;&nbsp; &nbsp;/**<br />
+&nbsp;&nbsp; &nbsp; * 备注<br />
+&nbsp;&nbsp; &nbsp; */<br />
+&nbsp;&nbsp; &nbsp;@Field(&quot;message&quot;)<br />
+&nbsp;&nbsp; &nbsp;private String message;<br />
+&nbsp;&nbsp; &nbsp;/**<br />
+&nbsp;&nbsp; &nbsp; * 执行时长(毫秒)<br />
+&nbsp;&nbsp; &nbsp; */<br />
+&nbsp;&nbsp; &nbsp;@Field(&quot;time&quot;)<br />
+&nbsp;&nbsp; &nbsp;private Long time;<br />
+&nbsp;&nbsp; &nbsp;/**<br />
+&nbsp;&nbsp; &nbsp; * IP地址<br />
+&nbsp;&nbsp; &nbsp; */<br />
+&nbsp;&nbsp; &nbsp;@Field(&quot;ip&quot;)<br />
+&nbsp;&nbsp; &nbsp;private String ip;<br />
+&nbsp;&nbsp; &nbsp;/**<br />
+&nbsp;&nbsp; &nbsp; * 禁用状态：1：启用 0：禁用<br />
+&nbsp;&nbsp; &nbsp; */<br />
+&nbsp;&nbsp; &nbsp;@Field(&quot;useFlag&quot;)<br />
+&nbsp;&nbsp; &nbsp;private Integer useFlag;<br />
+&nbsp;&nbsp; &nbsp;/**<br />
+&nbsp;&nbsp; &nbsp; * 删除标记：0：未删除 1：已删除<br />
+&nbsp;&nbsp; &nbsp; */<br />
+&nbsp;&nbsp; &nbsp;@Field(&quot;delFlag&quot;)<br />
+&nbsp;&nbsp; &nbsp;private Integer delFlag;<br />
+&nbsp;&nbsp; &nbsp;/**<br />
+&nbsp;&nbsp; &nbsp; * 创建者ID<br />
+&nbsp;&nbsp; &nbsp; */<br />
+&nbsp;&nbsp; &nbsp;@Field(&quot;creatorId&quot;)<br />
+&nbsp;&nbsp; &nbsp;private Long creatorId;</p>
+
+<p>&nbsp;&nbsp; &nbsp;/**<br />
+&nbsp;&nbsp; &nbsp; * 创建者姓名<br />
+&nbsp;&nbsp; &nbsp; */<br />
+&nbsp;&nbsp; &nbsp;@Field(&quot;creatorName&quot;)<br />
+&nbsp;&nbsp; &nbsp;private Long creatorName;</p>
+
+<p>&nbsp;&nbsp; &nbsp;/**<br />
+&nbsp;&nbsp; &nbsp; * 企业ID<br />
+&nbsp;&nbsp; &nbsp; */<br />
+&nbsp;&nbsp; &nbsp;@Field(&quot;corpId&quot;)<br />
+&nbsp;&nbsp; &nbsp;private Long corpId;<br />
+&nbsp;&nbsp; &nbsp;/**<br />
+&nbsp;&nbsp; &nbsp; * 创建时间<br />
+&nbsp;&nbsp; &nbsp; */<br />
+&nbsp;&nbsp; &nbsp;@Field(&quot;createTime&quot;)<br />
+&nbsp;&nbsp; &nbsp;private Date createTime;<br />
+&nbsp;&nbsp; &nbsp;/**<br />
+&nbsp;&nbsp; &nbsp; * 更新时间<br />
+&nbsp;&nbsp; &nbsp; */<br />
+&nbsp;&nbsp; &nbsp;@Field(&quot;updateTime&quot;)<br />
+&nbsp;&nbsp; &nbsp;private Date updateTime;<br />
+}<br />
+&nbsp;</p>

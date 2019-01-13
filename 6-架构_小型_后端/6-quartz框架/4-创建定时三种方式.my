@@ -1,0 +1,227 @@
+<h1>Quartz 定时任务（Scheduler）的 3 种实现方式</h1>
+
+<p>原文地址 ：&nbsp;<a href="https://blog.csdn.net/jiangyu1013/article/details/81111898">https://blog.csdn.net/jiangyu1013/article/details/81111898</a></p>
+
+<p>PS：第 3 种最简单。</p>
+
+<h2><strong>一、引入 jar</strong></h2>
+
+<pre>
+&lt;?xml version=&quot;1.0&quot;?&gt;
+&lt;!-- quartz 定时任务调度 --&gt;
+&lt;dependency&gt;
+&nbsp; &nbsp; &lt;groupId&gt;org.springframework&lt;/groupId&gt;
+&nbsp; &nbsp; &lt;artifactId&gt;spring-context-support&lt;/artifactId&gt;
+&lt;/dependency&gt;
+&lt;dependency&gt;
+&nbsp; &nbsp; &lt;groupId&gt;org.quartz-scheduler&lt;/groupId&gt;
+&nbsp; &nbsp; &lt;artifactId&gt;quartz&lt;/artifactId&gt;
+&nbsp; &nbsp; &lt;version&gt;2.2.1&lt;/version&gt;
+&lt;/dependency&gt;
+&lt;dependency&gt;
+&nbsp; &nbsp; &lt;groupId&gt;org.quartz-scheduler&lt;/groupId&gt;
+&nbsp; &nbsp; &lt;artifactId&gt;quartz-jobs&lt;/artifactId&gt;
+&nbsp; &nbsp; &lt;version&gt;2.2.1&lt;/version&gt;
+&lt;/dependency&gt;
+</pre>
+
+<h2><strong>二、实现</strong></h2>
+
+<h2><strong>实现方式 一&nbsp;</strong></h2>
+
+<p>1. 定义好定时任务的业务内容：</p>
+
+<pre>
+package gentle.test;
+
+import org.quartz.Job;
+import org.quartz.JobExecutionContext;
+import org.quartz.JobExecutionException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Service;
+
+import java.util.Date;
+
+@Service( &quot;show&quot; )
+public class Show implements Job {
+&nbsp;&nbsp; &nbsp;private static Logger log = LoggerFactory.getLogger( Show.class );
+
+&nbsp;&nbsp; &nbsp;@Override
+&nbsp;&nbsp; &nbsp;public void execute( JobExecutionContext arg0 ) throws JobExecutionException
+&nbsp;&nbsp; &nbsp;{
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;log.info( &quot;\n\n-------------------------------\n &quot; +
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp; &nbsp; &quot;It is running and the time is : &quot; + new Date() +
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp; &nbsp; &quot;\n-------------------------------\n&quot; );
+&nbsp;&nbsp; &nbsp;}
+}
+</pre>
+
+<p>2. 声明定时任务，并关联业务实现类 。在&nbsp;JobDetail jb = JobBuilder.newJob(Show.class) 中关联业务类 。</p>
+
+<pre>
+package gentle.test;
+
+import org.quartz.*;
+import org.quartz.impl.StdSchedulerFactory;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Service;
+import java.util.Date;
+
+@Service( &quot;schedulerTest&quot; )
+
+public class SchedulerTest {
+&nbsp;&nbsp; &nbsp;private static Logger log = LoggerFactory.getLogger( Scheduler.class );
+
+&nbsp;&nbsp; &nbsp;public static void main( String[] args )
+&nbsp;&nbsp; &nbsp;{
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;try {
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;/* 1.创建Scheduler的工厂 */
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;SchedulerFactory sf = new StdSchedulerFactory();
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;/* 2.从工厂中获取调度器实例 */
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;Scheduler scheduler = sf.getScheduler();
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;/* 3.创建JobDetail */
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;JobDetail jb = JobBuilder.newJob( Show.class ) &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;/* Show 为一个job,是要执行的一个任务。 */
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; .withDescription( &quot;这是我的测试定时任务。&quot; ) &nbsp; &nbsp; &nbsp; &nbsp;/* job的描述 */
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; .withIdentity( &quot;jy2Job&quot;, &quot;jy2Group&quot; ) &nbsp; &nbsp;/* job 的name和group */
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; .build();
+
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;/* 任务运行的时间，SimpleSchedle类型触发器有效 */
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;long time = System.currentTimeMillis() + 3 * 1000L; &nbsp; &nbsp; /* 3秒后启动任务 */
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;Date statTime = new Date( time );
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;/* 4.创建Trigger 使用SimpleScheduleBuilder或者CronScheduleBuilder */
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;Trigger t = TriggerBuilder.newTrigger()
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp; &nbsp; &nbsp;.withDescription( &quot;&quot; )
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp; &nbsp; &nbsp;.withIdentity( &quot;jyTrigger&quot;, &quot;jyTriggerGroup&quot; )
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp; &nbsp; &nbsp;.startAt( statTime ) &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;/* 默认当前时间启动 ,也可以写为：.startNow(); */
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp; &nbsp; &nbsp;.withSchedule( CronScheduleBuilder.cronSchedule( &quot;0/2 * * * * ?&quot; ) ) &nbsp; &nbsp; &nbsp; &nbsp;/* 两秒执行一次 */
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp; &nbsp; &nbsp;.build();
+
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;/* 5.注册任务和定时器 */
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;<strong>scheduler.scheduleJob( jb, t );</strong>
+
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;/* 6.启动 调度器 */
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;<strong>scheduler.start();</strong>
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;log.info( &quot;启动时间 ： &quot; + new Date() );
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;} catch ( Exception e ) {
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;log.info( &quot;定时任务出现异常 ： &quot; + e );
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;}
+&nbsp;&nbsp; &nbsp;}
+}&nbsp;</pre>
+
+<h2><strong>实现方式 二&nbsp;</strong></h2>
+
+<p>1.&nbsp;定义好定时任务的业务内容：</p>
+
+<pre>
+package gentle.test;
+
+import org.quartz.Job;
+import org.quartz.JobExecutionContext;
+import org.quartz.JobExecutionException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Service;
+import java.util.Date;
+
+@Service( &quot;show&quot; )
+public class Show implements Job {
+&nbsp;&nbsp; &nbsp;private static Logger _log = LoggerFactory.getLogger( Show.class );
+
+&nbsp;&nbsp; &nbsp;@Override
+&nbsp;&nbsp; &nbsp;public void execute( JobExecutionContext arg0 ) throws JobExecutionException
+&nbsp;&nbsp; &nbsp;{
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;_log.info( &quot;\n\n-------------------------------\n &quot; +
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp; &nbsp; &quot;It is running and the time is : &quot; + new Date() +
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp; &nbsp; &quot;\n-------------------------------\n&quot; );
+&nbsp;&nbsp; &nbsp;}
+}
+</pre>
+
+<p>2. 定义好定时任务的触发类，调用业务类中的实现 。</p>
+
+<pre>
+package gentle.test;
+
+import org.quartz.JobExecutionException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import javax.annotation.Resource;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+
+public class UserSyncTask {
+&nbsp;&nbsp; &nbsp;private final Logger logger = LoggerFactory.getLogger( this.getClass() );
+
+&nbsp;&nbsp; &nbsp;@Resource
+&nbsp;&nbsp; &nbsp;Show show;
+
+&nbsp;&nbsp; &nbsp;public void cronDepartmentsAndUsersJob()
+&nbsp;&nbsp; &nbsp;{
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;logger.info( &quot;\n\n 定时--开始，当前时间： &quot; + dateFormat().format( new Date() ) );
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;try {
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;show.execute( null );
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;} catch ( JobExecutionException e ) {
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;e.printStackTrace();
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;}
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;logger.info( &quot;\n\n 定时--结束，当前时间：&quot; + dateFormat().format( new Date() ) );
+&nbsp;&nbsp; &nbsp;}
+
+&nbsp;&nbsp; &nbsp;private SimpleDateFormat dateFormat()
+&nbsp;&nbsp; &nbsp;{
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;return(new SimpleDateFormat( &quot;HH:mm:ss&quot; ) );
+&nbsp;&nbsp; &nbsp;}
+}
+</pre>
+
+<p>3. 配置文件中 配置触发类和任务执行频率 。</p>
+
+<pre>
+&lt;?xml version=&quot;1.0&quot; encoding=&quot;utf-8&quot;?&gt;
+&lt;beans xmlns=&quot;http://www.springframework.org/schema/beans&quot; xmlns:xsi=&quot;http://www.w3.org/2001/XMLSchema-instance&quot; xmlns:util=&quot;http://www.springframework.org/schema/util&quot; xmlns:task=&quot;http://www.springframework.org/schema/task&quot; xsi:schemaLocation=&quot;http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd http://www.springframework.org/schema/util http://www.springframework.org/schema/util/spring-util.xsd http://www.springframework.org/schema/task http://www.springframework.org/schema/task/spring-task.xsd&quot;&gt;
+&nbsp; &nbsp; &lt;!--定时任务触发类--&gt;
+&nbsp; &nbsp; &lt;bean id=&quot;userSyncTask&quot; class=&quot;gentle.test.UserSyncTask&quot;&gt;&lt;/bean&gt;
+&nbsp; &nbsp; &lt;!--执行频率--&gt;
+&nbsp; &nbsp; &lt;task:scheduled-tasks&gt;
+&nbsp; &nbsp; &nbsp; &nbsp; &lt;!--每 2 秒执行一次--&gt;
+&nbsp; &nbsp; &nbsp; &nbsp; &lt;task:scheduled ref=&quot;userSyncTask&quot; method=&quot;cronDepartmentsAndUsersJob&quot; cron=&quot;0/2 * * * * ?&quot; /&gt;
+&nbsp; &nbsp; &lt;/task:scheduled-tasks&gt;
+&lt;/beans&gt;</pre>
+
+<h2><strong>实现方式 三&nbsp;</strong></h2>
+
+<p>1.&nbsp;引入 jar , 同上。</p>
+
+<p>2. 运行类 代码中只要给 2 个注解就可以了：</p>
+
+<p>@EnableScheduling&nbsp; // 开启定时器、</p>
+
+<p>@Scheduled(fixedDelay = 2000)&nbsp; 或者 @Scheduled(cron = &quot;* * 2 * * ?&quot;)&nbsp;&nbsp; // 每 2s 执行 1 次 。</p>
+
+<p>代码：</p>
+
+<p>package gentle.test;</p>
+
+<pre>
+import gentle.util.DateUtil;
+import org.slf4j.LoggerFactory;
+import org.springframework.scheduling.annotation.EnableScheduling;
+import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.stereotype.Component;
+import java.util.Date;
+
+@Component         /* 注册为一个bean */
+@EnableScheduling  /* 开启定时器 */
+public class Sender {
+&nbsp;&nbsp; &nbsp;private final org.slf4j.Logger logger = LoggerFactory.getLogger( this.getClass() );
+&nbsp;&nbsp; &nbsp;@Scheduled( fixedDelay = 2000 ) /* 每 2s 执行1次。 */
+&nbsp;&nbsp; &nbsp;public void send()
+&nbsp;&nbsp; &nbsp;{
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;logger.info( &quot; \n------------------------\n &quot; +
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp; &nbsp; &nbsp; &quot;定时任务内容 ：&quot; + DateUtil.dateFormat().format( new Date() ) +
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp; &nbsp; &nbsp; &quot;\n------------------------\n&quot; );
+&nbsp;&nbsp; &nbsp;}
+}</pre>
+
+<p>源码地址：<a href="https://gitee.com/FJ_WoMenDeShiJie/gentle/tree/master/src/main/java/gentle/Scheduler" rel="nofollow" target="_blank">定时任务demo</a></p>

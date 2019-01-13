@@ -1,0 +1,306 @@
+<h1>AOP的基本概念</h1>
+
+<ol>
+	<li>Advice(通知、切面)： 某个连接点所采用的处理逻辑，也就是向连接点注入的代码， AOP在特定的切入点上执行的增强处理。
+	<ol>
+		<li><a href="https://my.oschina.net/u/3870904" rel="nofollow" target="_blank">@Before</a>：&nbsp;标识一个前置增强方法，相当于BeforeAdvice的功能.</li>
+		<li>@After：<strong>&nbsp;final增强</strong>，不管是抛出异常或者正常退出都会执行.</li>
+		<li>@AfterReturning：&nbsp; 后置增强，似于AfterReturningAdvice, 方法正常退出时执行.</li>
+		<li>@AfterThrowing：&nbsp; 异常抛出增强，相当于ThrowsAdvice.</li>
+		<li><a href="https://my.oschina.net/u/1782876" rel="nofollow" target="_blank">@Around</a>： 环绕增强，相当于MethodInterceptor.</li>
+	</ol>
+	</li>
+	<li>JointPoint(连接点)：程序运行中的某个阶段点，比如方法的调用、异常的抛出等。</li>
+	<li>Pointcut(切入点)：&nbsp; <strong>&nbsp;JoinPoint的集合</strong>，是程序中需要注入Advice的位置的集合，指明Advice要在什么样的条件下才能被触发，在程序中主要体现为书写切入点表达式。</li>
+	<li>Advisor（增强）：&nbsp;是PointCut和Advice的综合体，完整描述了一个advice将会在pointcut所定义的位置被触发。</li>
+	<li><a href="https://my.oschina.net/aspect" rel="nofollow" target="_blank">@Aspect</a>(切面):&nbsp; <strong>通常是一个类的注解，里面可以定义切入点和通知 使用aop时，主要就是定义一个aspect类！！</strong></li>
+	<li>AOP Proxy：AOP框架创建的对象，代理就是目标对象的加强。Spring中的AOP代理可以使JDK动态代理，也可以是CGLIB代理，前者基于接口，后者基于子类。</li>
+</ol>
+
+<pre>
+<code>&lt;aop:aspectj-autoproxy/&gt;
+   &lt;aop:config proxy-target-class=&quot;true&quot;&gt;
+       &lt;aop:pointcut id=&quot;servicePointcut&quot;
+                     expression=&quot;execution(* com.cpic..*Service.*(..))&quot; /&gt;
+       &lt;aop:advisor pointcut-ref=&quot;servicePointcut&quot; advice-ref=&quot;txAdvice&quot;
+                    order=&quot;3&quot; /&gt;
+   &lt;/aop:config&gt;
+   &lt;tx:advice id=&quot;txAdvice&quot; transaction-manager=&quot;transactionManager&quot;&gt;
+       &lt;tx:attributes&gt;
+           &lt;tx:method name=&quot;list*&quot; read-only=&quot;true&quot; /&gt;
+           &lt;!-- log方法会启动一个新事务 --&gt;
+           &lt;tx:method name=&quot;log*&quot; propagation=&quot;REQUIRES_NEW&quot;
+                      isolation=&quot;READ_COMMITTED&quot; /&gt;
+       &lt;/tx:attributes&gt;
+   &lt;/tx:advice&gt;
+
+//OK所以一个Spring增强（advisor）=切面(advice)+切入点(PointCut)</code></pre>
+
+<h1>Pointcut</h1>
+
+<p>表示式(expression)和签名(signature)</p>
+
+<pre>
+<code>//Pointcut表示式
+@Pointcut(&quot;execution(* com.savage.aop.MessageSender.*(..))&quot;)
+//Point签名
+private void log(){} </code></pre>
+
+<p>由下列方式来定义或者通过 &amp;&amp;、&nbsp;||、&nbsp;!、&nbsp;的方式进行组合：</p>
+
+<ul>
+	<li>
+	<p>execution：用于匹配方法执行的连接点；</p>
+	</li>
+	<li>
+	<p>within：用于匹配指定类型内的方法执行；</p>
+	</li>
+	<li>
+	<p>this：用于匹配当前AOP代理对象类型的执行方法；注意是AOP代理对象的类型匹配，这样就可能包括引入接口也类型匹配；&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</p>
+	</li>
+	<li>
+	<p>target：用于匹配当前目标对象类型的执行方法；注意是目标对象的类型匹配，这样就不包括引入接口也类型匹配；</p>
+	</li>
+	<li>
+	<p>args：用于匹配当前执行的方法传入的参数为指定类型的执行方法；</p>
+	</li>
+	<li>
+	<p>@within：用于匹配所以持有指定注解类型内的方法；</p>
+	</li>
+	<li>
+	<p>@target：用于匹配当前目标对象类型的执行方法，其中目标对象持有指定的注解；</p>
+	</li>
+	<li>
+	<p>@args：用于匹配当前执行的方法传入的参数持有指定注解的执行；</p>
+	</li>
+	<li>
+	<p>@annotation：用于匹配当前执行方法持有指定注解的方法；</p>
+	</li>
+</ul>
+
+<h2>格式</h2>
+
+<pre>
+<code>execution(modifiers-pattern? ret-type-pattern declaring-type-pattern? name-pattern(param-pattern)throws-pattern?) 
+</code></pre>
+
+<p>其中后面跟着&ldquo;?&rdquo;的是可选项</p>
+
+<p>括号中各个pattern分别表示：</p>
+
+<ul>
+	<li>修饰符匹配（modifier-pattern?）</li>
+	<li>返回值匹配（ret-type-pattern）：&nbsp; &nbsp;可以为*表示任何返回值, 全路径的类名等</li>
+	<li>类路径匹配（declaring-type-pattern?）</li>
+	<li>方法名匹配（name-pattern）：可以指定方法名 或者 *代表所有,&nbsp;set* 代表以set开头的所有方法</li>
+	<li>参数匹配（(param-pattern)）：可以指定具体的参数类型，<strong>多个参数间用&ldquo;,&rdquo;隔开，各个参数也可以用&quot;*&quot;&nbsp;来表示匹配任意类型的参数，&quot;..&quot;表示零个或多个任意参数。</strong><br />
+	如(String)表示匹配一个String参数的方法；(*,String) 表示匹配有两个参数的方法，第一个参数可以是任意类型，而第二个参数是String类型。</li>
+	<li>异常类型匹配（throws-pattern?）</li>
+</ul>
+
+<h3>eg.</h3>
+
+<ul>
+	<li>任意公共方法的执行：execution(public * *(..))</li>
+	<li>任何一个以&ldquo;set&rdquo;开始的方法的执行：execution(* set*(..))</li>
+	<li>AccountService 接口的任意方法的执行：execution(* com.xyz.service.AccountService.*(..))</li>
+	<li>定义在service包里的任意方法的执行：&nbsp;execution(* com.xyz.service.*.*(..))</li>
+	<li>定义在service包和所有子包里的任意类的任意方法的执行：execution(* com.xyz.service..*.*(..))<br />
+	第一个*表示匹配任意的方法返回值， ..(两个点)表示零个或多个，第一个..表示service包及其子包,第二个*表示所有类, 第三个*表示所有方法，第二个..表示方法的任意参数个数</li>
+	<li>定义在pointcutexp包和所有子包里的JoinPointObjP2类的任意方法的执行：execution(* com.test.spring.aop.pointcutexp..JoinPointObjP2.*(..))&quot;)</li>
+	<li>pointcutexp包里的任意类：&nbsp;within(com.test.spring.aop.pointcutexp.*)</li>
+	<li>pointcutexp包和所有子包里的任意类：within(com.test.spring.aop.pointcutexp..*)</li>
+	<li>实现了Intf接口的所有类,如果Intf不是接口,限定Intf单个类：this(com.test.spring.aop.pointcutexp.Intf)<br />
+	当一个实现了接口的类被AOP的时候,用getBean方法必须cast为接口类型,不能为该类的类型</li>
+	<li>带有@Transactional标注的所有类的任意方法：&nbsp;
+	<ul>
+		<li>@within(org.springframework.transaction.annotation.Transactional)</li>
+		<li>@target(org.springframework.transaction.annotation.Transactional)</li>
+	</ul>
+	</li>
+	<li>带有@Transactional标注的任意方法：@annotation(org.springframework.transaction.annotation.Transactional)<br />
+	@within和@target针对类的注解,@annotation是针对方法的注解</li>
+	<li>参数带有@Transactional标注的方法：@args(org.springframework.transaction.annotation.Transactional)</li>
+	<li>参数为String类型(运行是决定)的方法：&nbsp;args(String)</li>
+</ul>
+
+<h2>JoinPoint</h2>
+
+<p>常用的方法：</p>
+
+<ul>
+	<li>Object[] getArgs：返回目标方法的参数</li>
+	<li>Signature getSignature：返回目标方法的签名</li>
+	<li>Object getTarget：返回被织入增强处理的目标对象</li>
+	<li>Object getThis：返回AOP框架为目标对象生成的代理对象</li>
+</ul>
+
+<p>当使用@Around处理时，需要将第一个参数定义为ProceedingJoinPoint类型，该类是JoinPoint的子类。</p>
+
+<h2>织入</h2>
+
+<pre>
+<code>     @AfterReturning(
+            pointcut=&quot;execution(* com.abc.service.*.access*(..)) &amp;&amp; args(time, name)&quot;,
+            returning=&quot;returnValue&quot;)
+    public void access(Date time, Object returnValue, String name) {
+        System.out.println(&quot;目标方法中的参数String = &quot; + name);
+        System.out.println(&quot;目标方法中的参数Date = &quot; + time);
+        System.out.println(&quot;目标方法的返回结果returnValue = &quot; + returnValue);
+    }
+</code></pre>
+
+<p>&nbsp; &nbsp; &nbsp;表达式中增加了args(time, name)部分，意味着可以在增强处理的签名方法（access方法）中定义&quot;time&quot;和&quot;name&quot;两个属性。这两个形参的类型可以随意指定(access方法中指定)，但一旦指定了这两个参数的类型，则这两个形参类型将用于限制该切入点只匹配第一个参数类型为Date，第二个参数类型为String的方法（方法参数个数和类型若有不同均不匹配）；access方法只需要满足&quot;time&quot;, &quot;name&quot;参数的顺序和pointcut中args(param1, param2)的顺序相同即可，&quot;returnValue&quot;位置顺序无所谓。&nbsp;</p>
+
+<pre>
+<code>//将被access方法匹配
+public String accessAdvice(Date d, String n) {
+    System.out.println(&quot;方法：accessAdvice&quot;);
+    return &quot;aa&quot;;
+}</code></pre>
+
+<p><img src="http://static.oschina.net/uploads/space/2014/0323/174904_iHXq_1434710.jpg" /></p>
+
+<h2>切面执行顺序</h2>
+
+<h3>一个方法只被一个Aspect类拦截</h3>
+
+<p>正常：</p>
+
+<p><img alt="one-ok" src="https://static.oschina.net/uploads/img/201806/04170857_Aoog.jpg" /></p>
+
+<p>异常：<br />
+<img alt="one-exception" src="https://static.oschina.net/uploads/img/201806/04170857_eto5.jpg" /></p>
+
+<h3>同一个方法被多个Aspect类拦截</h3>
+
+<p>优先级高的切面类里的增强处理的优先级总是比优先级低的切面类中的增强处理的优先级高。&nbsp; &nbsp; &nbsp; &nbsp;<br />
+在&ldquo;进入&rdquo;连接点时，最高优先级的增强处理将先被织入（eg.给定的两个不同切面类Before增强处理中，优先级高的那个会先执行）；在&ldquo;退出&rdquo;连接点时，最高优先级的增强处理会最后被织入（eg.给定的两个不同切面类After增强处理中，优先级高的那个会后执行）。eg.优先级为1的切面类Bean1包含了@Before，优先级为2的切面类Bean2包含了@Around，虽然@Around优先级高于@Before，但由于Bean1的优先级高于Bean2的优先级，因此Bean1中的@Before先被织入。<br />
+Spring提供了如下两种解决方案指定不同切面类里的增强处理的优先级：</p>
+
+<ol>
+	<li>让切面类实现org.springframework.core.Ordered接口：实现该接口的int getOrder()方法，该方法返回值越小，优先级越高</li>
+	<li>直接使用@Order注解来修饰一个切面类：使用这个注解时可以配置一个int类型的value属性，该属性值越小，优先级越高</li>
+</ol>
+
+<p>同一个切面类里的两个相同类型的增强处理在同一个连接点被织入时，Spring AOP将以<strong>随机</strong>的顺序来织入这两个增强处理，没有办法指定它们的织入顺序。即使给这两个 advice 添加了 @Order 这个注解，也不行！</p>
+
+<p><img alt="" src="https://oscimg.oschina.net/oscnet/c39bc366deef29b29ebda481538fa5942a1.jpg" style="height:321px; width:1233px" /></p>
+
+<h1>eg.</h1>
+
+<p>spring的xml开启AOP配置：&nbsp;</p>
+
+<pre>
+<code>&lt;aop:config proxy-target-class=&quot;false&quot; /&gt;
+&lt;aop:aspectj-autoproxy /&gt;
+&lt;bean id=&quot;opLogAspectj&quot; class=&quot;com.noob.aspectj.OpLogAspectj&quot;&gt;&lt;/bean&gt;</code></pre>
+
+<p>&nbsp;</p>
+
+<pre>
+<code>package com.noob.aspectj;
+
+import lombok.extern.slf4j.Slf4j;
+
+import org.aspectj.lang.ProceedingJoinPoint;
+import org.aspectj.lang.annotation.Around;
+import org.aspectj.lang.annotation.Aspect;
+import org.aspectj.lang.annotation.Pointcut;
+import org.aspectj.lang.reflect.MethodSignature;
+
+import com.noob.annotation.OpLog;
+
+
+@Target(ElementType.METHOD)
+@Retention(RetentionPolicy.RUNTIME)
+public @interface OpLog {
+
+	/**
+	 * 
+	 * 操作类型
+	 */
+	int opModule();
+
+	/**
+	 * 
+	 * 是否批量 
+	 */
+	String batch();
+
+	/**
+	 * 
+	 * 操作来源(页面+操作)
+	 */
+	String source();
+
+}
+
+@Aspect
+@Slf4j
+public class OpLogAspectj {
+	
+	@Pointcut(value = &quot;@annotation(com.noob.annotation.OpLog)&quot;)  
+    public void methodPointcut(){}
+
+	
+    /**
+     * 对带注解@OpLog的方法进行切面，并获取到注解的属性值
+     */
+    @Around(value= &quot;methodPointcut() &amp;&amp; @annotation(opLog)&quot; , argNames=&quot;opLog&quot;)
+    public Object around(ProceedingJoinPoint point, OpLog opLog) throws Throwable{
+        Object obj = null;
+        Object[] args = point.getArgs();
+        
+        try {
+            obj = point.proceed(args);
+        } catch (Throwable e) {
+            log.error(&quot;方法执行异常&quot;, e);
+        }
+        long endTime = System.currentTimeMillis();
+        MethodSignature signature = (MethodSignature) point.getSignature();
+        String methodName = signature.getDeclaringTypeName() + &quot;.&quot; + signature.getName();
+        return obj;
+    }
+
+
+    @Pointcut(value = &quot;@annotation(org.apache.shiro.authz.annotation.RequiresPermissions)&quot;)  
+    public void methodPointcut2(){}
+
+    /**
+     * 配置指定位置指定类型的参数
+     */
+    @Around(value= &quot;methodPointcut2() &amp;&amp; (args(request, ..) || args(.., request))&quot;)
+    public Object around2(ProceedingJoinPoint point, HttpServletRequest request) throws Throwable{
+        Object obj = null;
+        Object[] args = point.getArgs();
+        
+        try {
+            SsoUser ssoUser = SsoSession.getCurrentUser(request);
+            obj = point.proceed(args);
+        } catch (Throwable e) {
+            log.error(&quot;方法执行异常&quot;, e);
+        }
+        
+        return obj;
+    }    
+}
+</code></pre>
+
+<p>进入切面的方法：</p>
+
+<pre>
+<code>@OpLog(batch = YesOrNo.NO, source = FuncPointEnum.GROUP_ADD)
+public Response&lt;Integer&gt; add(RuleGroupModifyReq addModel) {
+   		// do somethings
+}
+
+@RequestMapping(value = &quot;/delete&quot;)
+@ResponseBody
+@RequiresPermissions(&quot;rule:delete&quot;)
+public Response&lt;Integer&gt; delete(
+		@RequestBody Map&lt;String, String&gt; params,
+		HttpServletRequest request) {
+	// do somethings
+}</code>
+</pre>

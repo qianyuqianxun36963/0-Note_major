@@ -1,0 +1,623 @@
+<h1>基于注解@Aspect的AOP实现</h1>
+
+<pre>
+<code>Spring只支持XML方式而没有实现注解的方式（也叫AspectJ方式）的AOP，所以要使用@Aspect注解，只能引入AspectJ相关的 jar 包 aopalliance-1.0.jar 和 aspectjweaver.jar，这个坑把我给坑惨了。</code>
+</pre>
+
+<h2>使用步骤如下：</h2>
+
+<p>1、引入相关jar包</p>
+
+<p><img alt="这里写图片描述" src="https://img-blog.csdn.net/20170303173513179?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQvcWdmamVhaG4=/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70/gravity/SouthEast" title="" /></p>
+
+<p>2、Spring的配置文件 applicationContext.xml 中引入context、aop对应的命名空间；配置自动扫描的包，同时使切面类中相关方法中的注解生效，需自动地为匹配到的方法所在的类生成代理对象。</p>
+
+<pre>
+
+&nbsp;</pre>
+
+<ol>
+	<li>
+	<p><code>&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot;?&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;beans xmlns=&quot;http://www.springframework.org/schema/beans&quot;</code></p>
+	</li>
+	<li>
+	<p><code>xmlns:xsi=&quot;http://www.w3.org/2001/XMLSchema-instance&quot;</code></p>
+	</li>
+	<li>
+	<p><code>xmlns:aop=&quot;http://www.springframework.org/schema/aop&quot;</code></p>
+	</li>
+	<li>
+	<p><code>xmlns:context=&quot;http://www.springframework.org/schema/context&quot;</code></p>
+	</li>
+	<li>
+	<p><code>xsi:schemaLocation=&quot;http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd</code></p>
+	</li>
+	<li>
+	<p><code>http://www.springframework.org/schema/aop http://www.springframework.org/schema/aop/spring-aop-4.0.xsd</code></p>
+	</li>
+	<li>
+	<p><code>http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context-4.0.xsd&quot;&gt;</code></p>
+	</li>
+	<li>&nbsp;</li>
+	<li>
+	<p><code>&lt;!-- 配置自动扫描的包 --&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;context:component-scan base-package=&quot;com.qcc.beans.aop&quot;&gt;&lt;/context:component-scan&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;!-- 自动为切面方法中匹配的方法所在的类生成代理对象。 --&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;aop:aspectj-autoproxy&gt;&lt;/aop:aspectj-autoproxy&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;/beans&gt;</code></p>
+	</li>
+</ol>
+
+<p>3、创建简单计算器的接口ArithmeticCalculator.java及实现类ArithmeticCalculatorImpl.java</p>
+
+<pre>
+
+&nbsp;</pre>
+
+<ol>
+	<li>
+	<p><code>package com.qcc.beans.aop;</code></p>
+	</li>
+	<li>&nbsp;</li>
+	<li>
+	<p><code>public interface ArithmeticCalculator {</code></p>
+	</li>
+	<li>&nbsp;</li>
+	<li>
+	<p><code>int add(int i, int j);</code></p>
+	</li>
+	<li>&nbsp;</li>
+	<li>
+	<p><code>int sub(int i, int j);</code></p>
+	</li>
+	<li>&nbsp;</li>
+	<li>
+	<p><code>int mul(int i, int j);</code></p>
+	</li>
+	<li>&nbsp;</li>
+	<li>
+	<p><code>int div(int i, int j);</code></p>
+	</li>
+	<li>
+	<p><code>}</code></p>
+	</li>
+</ol>
+
+<pre>
+
+&nbsp;</pre>
+
+<ol>
+	<li>
+	<p><code>package com.qcc.beans.aop;</code></p>
+	</li>
+	<li>&nbsp;</li>
+	<li>
+	<p><code>import org.springframework.stereotype.Component;</code></p>
+	</li>
+	<li>&nbsp;</li>
+	<li>
+	<p><code>//将实现类加入Spring的IOC容器进行管理</code></p>
+	</li>
+	<li>
+	<p><code>@Component(&quot;arithmeticCalculator&quot;)</code></p>
+	</li>
+	<li>
+	<p><code>public class ArithmeticCalculatorImpl implements ArithmeticCalculator {</code></p>
+	</li>
+	<li>&nbsp;</li>
+	<li>
+	<p><code>@Override</code></p>
+	</li>
+	<li>
+	<p><code>public int add(int i, int j) {</code></p>
+	</li>
+	<li>
+	<p><code>int result = i + j;</code></p>
+	</li>
+	<li>
+	<p><code>return result;</code></p>
+	</li>
+	<li>
+	<p><code>}</code></p>
+	</li>
+	<li>&nbsp;</li>
+	<li>
+	<p><code>@Override</code></p>
+	</li>
+	<li>
+	<p><code>public int sub(int i, int j) {</code></p>
+	</li>
+	<li>
+	<p><code>int result = i - j;</code></p>
+	</li>
+	<li>
+	<p><code>return result;</code></p>
+	</li>
+	<li>
+	<p><code>}</code></p>
+	</li>
+	<li>&nbsp;</li>
+	<li>
+	<p><code>@Override</code></p>
+	</li>
+	<li>
+	<p><code>public int mul(int i, int j) {</code></p>
+	</li>
+	<li>
+	<p><code>int result = i * j;</code></p>
+	</li>
+	<li>
+	<p><code>return result;</code></p>
+	</li>
+	<li>
+	<p><code>}</code></p>
+	</li>
+	<li>&nbsp;</li>
+	<li>
+	<p><code>@Override</code></p>
+	</li>
+	<li>
+	<p><code>public int div(int i, int j) {</code></p>
+	</li>
+	<li>
+	<p><code>int result = i / j;</code></p>
+	</li>
+	<li>
+	<p><code>return result;</code></p>
+	</li>
+	<li>
+	<p><code>}</code></p>
+	</li>
+	<li>&nbsp;</li>
+	<li>
+	<p><code>}</code></p>
+	</li>
+</ol>
+
+<p>4、现在想在实现类中的每个方法执行前、后、以及是否发生异常等信息打印出来，需要把日志信息抽取出来，写到对应的切面的类中 LoggingAspect.java 中&nbsp;<br />
+要想把一个类变成切面类，需要两步，&nbsp;<br />
+① 在类上使用 @Component 注解 把切面类加入到IOC容器中&nbsp;<br />
+② 在类上使用 @Aspect 注解 使之成为切面类</p>
+
+<p>下面直接上完整代码，用@Aspect注解方式来实现前置通知、返回通知、后置通知、异常通知、环绕通知。</p>
+
+<ol>
+	<li>
+	<p><code>package com.qcc.beans.aop;</code></p>
+	</li>
+	<li>&nbsp;</li>
+	<li>
+	<p><code>import java.util.Arrays;</code></p>
+	</li>
+	<li>&nbsp;</li>
+	<li>
+	<p><code>import org.aspectj.lang.JoinPoint;</code></p>
+	</li>
+	<li>
+	<p><code>import org.aspectj.lang.ProceedingJoinPoint;</code></p>
+	</li>
+	<li>
+	<p><code>import org.aspectj.lang.annotation.After;</code></p>
+	</li>
+	<li>
+	<p><code>import org.aspectj.lang.annotation.AfterReturning;</code></p>
+	</li>
+	<li>
+	<p><code>import org.aspectj.lang.annotation.AfterThrowing;</code></p>
+	</li>
+	<li>
+	<p><code>import org.aspectj.lang.annotation.Around;</code></p>
+	</li>
+	<li>
+	<p><code>import org.aspectj.lang.annotation.Aspect;</code></p>
+	</li>
+	<li>
+	<p><code>import org.aspectj.lang.annotation.Before;</code></p>
+	</li>
+	<li>
+	<p><code>import org.springframework.stereotype.Component;</code></p>
+	</li>
+	<li>&nbsp;</li>
+	<li>
+	<p><code>/**</code></p>
+	</li>
+	<li>
+	<p><code>* 日志切面</code></p>
+	</li>
+	<li>
+	<p><code>* </code></p>
+	</li>
+	<li>
+	<p><code>* @author XiaoYe </code></p>
+	</li>
+	<li>
+	<p><code>* @date 2017年1月1日 下午4:14:34</code></p>
+	</li>
+	<li>
+	<p><code>*/</code></p>
+	</li>
+	<li>
+	<p><code>@Component</code></p>
+	</li>
+	<li>
+	<p><code>@Aspect</code></p>
+	</li>
+	<li>
+	<p><code>public class LoggingAspect {</code></p>
+	</li>
+	<li>&nbsp;</li>
+	<li>
+	<p><code>/**</code></p>
+	</li>
+	<li>
+	<p><code>* 前置通知：目标方法执行之前执行以下方法体的内容 </code></p>
+	</li>
+	<li>
+	<p><code>* @param jp</code></p>
+	</li>
+	<li>
+	<p><code>*/</code></p>
+	</li>
+	<li>
+	<p><code>@Before(&quot;execution(* com.qcc.beans.aop.*.*(..))&quot;)</code></p>
+	</li>
+	<li>
+	<p><code>public void beforeMethod(JoinPoint jp){</code></p>
+	</li>
+	<li>
+	<p><code>String methodName = jp.getSignature().getName();</code></p>
+	</li>
+	<li>
+	<p><code>System.out.println(&quot;【前置通知】the method 【&quot; + methodName + &quot;】 begins with &quot; + Arrays.asList(jp.getArgs()));</code></p>
+	</li>
+	<li>
+	<p><code>}</code></p>
+	</li>
+	<li>&nbsp;</li>
+	<li>
+	<p><code>/**</code></p>
+	</li>
+	<li>
+	<p><code>* 返回通知：目标方法正常执行完毕时执行以下代码</code></p>
+	</li>
+	<li>
+	<p><code>* @param jp</code></p>
+	</li>
+	<li>
+	<p><code>* @param result</code></p>
+	</li>
+	<li>
+	<p><code>*/</code></p>
+	</li>
+	<li>
+	<p><code>@AfterReturning(value=&quot;execution(* com.qcc.beans.aop.*.*(..))&quot;,returning=&quot;result&quot;)</code></p>
+	</li>
+	<li>
+	<p><code>public void afterReturningMethod(JoinPoint jp, Object result){</code></p>
+	</li>
+	<li>
+	<p><code>String methodName = jp.getSignature().getName();</code></p>
+	</li>
+	<li>
+	<p><code>System.out.println(&quot;【返回通知】the method 【&quot; + methodName + &quot;】 ends with 【&quot; + result + &quot;】&quot;);</code></p>
+	</li>
+	<li>
+	<p><code>}</code></p>
+	</li>
+	<li>&nbsp;</li>
+	<li>
+	<p><code>/**</code></p>
+	</li>
+	<li>
+	<p><code>* 后置通知：目标方法执行之后执行以下方法体的内容，不管是否发生异常。</code></p>
+	</li>
+	<li>
+	<p><code>* @param jp</code></p>
+	</li>
+	<li>
+	<p><code>*/</code></p>
+	</li>
+	<li>
+	<p><code>@After(&quot;execution(* com.qcc.beans.aop.*.*(..))&quot;)</code></p>
+	</li>
+	<li>
+	<p><code>public void afterMethod(JoinPoint jp){</code></p>
+	</li>
+	<li>
+	<p><code>System.out.println(&quot;【后置通知】this is a afterMethod advice...&quot;);</code></p>
+	</li>
+	<li>
+	<p><code>}</code></p>
+	</li>
+	<li>&nbsp;</li>
+	<li>
+	<p><code>/**</code></p>
+	</li>
+	<li>
+	<p><code>* 异常通知：目标方法发生异常的时候执行以下代码</code></p>
+	</li>
+	<li>
+	<p><code>*/</code></p>
+	</li>
+	<li>
+	<p><code>@AfterThrowing(value=&quot;execution(* com.qcc.beans.aop.*.*(..))&quot;,throwing=&quot;e&quot;)</code></p>
+	</li>
+	<li>
+	<p><code>public void afterThorwingMethod(JoinPoint jp, NullPointerException e){</code></p>
+	</li>
+	<li>
+	<p><code>String methodName = jp.getSignature().getName();</code></p>
+	</li>
+	<li>
+	<p><code>System.out.println(&quot;【异常通知】the method 【&quot; + methodName + &quot;】 occurs exception: &quot; + e);</code></p>
+	</li>
+	<li>
+	<p><code>}</code></p>
+	</li>
+	<li>&nbsp;</li>
+	<li>
+	<p><code>// /**</code></p>
+	</li>
+	<li>
+	<p><code>// * 环绕通知：目标方法执行前后分别执行一些代码，发生异常的时候执行另外一些代码</code></p>
+	</li>
+	<li>
+	<p><code>// * @return </code></p>
+	</li>
+	<li>
+	<p><code>// */</code></p>
+	</li>
+	<li>
+	<p><code>// @Around(value=&quot;execution(* com.qcc.beans.aop.*.*(..))&quot;)</code></p>
+	</li>
+	<li>
+	<p><code>// public Object aroundMethod(ProceedingJoinPoint jp){</code></p>
+	</li>
+	<li>
+	<p><code>// String methodName = jp.getSignature().getName();</code></p>
+	</li>
+	<li>
+	<p><code>// Object result = null;</code></p>
+	</li>
+	<li>
+	<p><code>// try {</code></p>
+	</li>
+	<li>
+	<p><code>// System.out.println(&quot;【环绕通知中的---&gt;前置通知】：the method 【&quot; + methodName + &quot;】 begins with &quot; + Arrays.asList(jp.getArgs()));</code></p>
+	</li>
+	<li>
+	<p><code>// //执行目标方法</code></p>
+	</li>
+	<li>
+	<p><code>// result = jp.proceed();</code></p>
+	</li>
+	<li>
+	<p><code>// System.out.println(&quot;【环绕通知中的---&gt;返回通知】：the method 【&quot; + methodName + &quot;】 ends with &quot; + result);</code></p>
+	</li>
+	<li>
+	<p><code>// } catch (Throwable e) {</code></p>
+	</li>
+	<li>
+	<p><code>// System.out.println(&quot;【环绕通知中的---&gt;异常通知】：the method 【&quot; + methodName + &quot;】 occurs exception &quot; + e);</code></p>
+	</li>
+	<li>
+	<p><code>// }</code></p>
+	</li>
+	<li>
+	<p><code>// </code></p>
+	</li>
+	<li>
+	<p><code>// System.out.println(&quot;【环绕通知中的---&gt;后置通知】：-----------------end.----------------------&quot;);</code></p>
+	</li>
+	<li>
+	<p><code>// return result;</code></p>
+	</li>
+	<li>
+	<p><code>// }</code></p>
+	</li>
+	<li>&nbsp;</li>
+	<li>
+	<p><code>}</code></p>
+	</li>
+</ol>
+
+<p>5、编写Main方法进行测试</p>
+
+<ol>
+	<li>
+	<p><code>package com.qcc.beans.aop;</code></p>
+	</li>
+	<li>&nbsp;</li>
+	<li>
+	<p><code>import org.springframework.context.ApplicationContext;</code></p>
+	</li>
+	<li>
+	<p><code>import org.springframework.context.support.ClassPathXmlApplicationContext;</code></p>
+	</li>
+	<li>&nbsp;</li>
+	<li>
+	<p><code>public class Main {</code></p>
+	</li>
+	<li>&nbsp;</li>
+	<li>
+	<p><code>public static void main(String[] args) {</code></p>
+	</li>
+	<li>
+	<p><code>ApplicationContext ctx = new ClassPathXmlApplicationContext(&quot;applicationContext.xml&quot;);</code></p>
+	</li>
+	<li>
+	<p><code>ArithmeticCalculator arithmeticCalculator = (ArithmeticCalculator) ctx.getBean(&quot;arithmeticCalculator&quot;);</code></p>
+	</li>
+	<li>
+	<p><code>System.out.println(arithmeticCalculator.getClass());</code></p>
+	</li>
+	<li>
+	<p><code>int result = arithmeticCalculator.add(3, 5);</code></p>
+	</li>
+	<li>
+	<p><code>System.out.println(&quot;result: &quot; + result);</code></p>
+	</li>
+	<li>&nbsp;</li>
+	<li>
+	<p><code>result = arithmeticCalculator.div(5, 0);</code></p>
+	</li>
+	<li>
+	<p><code>System.out.println(&quot;result: &quot; + result);</code></p>
+	</li>
+	<li>&nbsp;</li>
+	<li>
+	<p><code>}</code></p>
+	</li>
+	<li>
+	<p><code>}</code></p>
+	</li>
+</ol>
+
+<p>运行结果：</p>
+
+<ol>
+	<li>
+	<p><code>class com.sun.proxy.$Proxy10</code></p>
+	</li>
+	<li>
+	<p><code>【前置通知】the method 【add】 begins with [3, 5]</code></p>
+	</li>
+	<li>
+	<p><code>【后置通知】this is a afterMethod advice...</code></p>
+	</li>
+	<li>
+	<p><code>【返回通知】the method 【add】 ends with 【8】</code></p>
+	</li>
+	<li>
+	<p><code>result: 8</code></p>
+	</li>
+	<li>
+	<p><code>【前置通知】the method 【div】 begins with [5, 0]</code></p>
+	</li>
+	<li>
+	<p><code>【后置通知】this is a afterMethod advice...</code></p>
+	</li>
+	<li>
+	<p><code>Exception in thread &quot;main&quot; java.lang.ArithmeticException: / by zero</code></p>
+	</li>
+	<li>
+	<p><code>at com.qcc.beans.aop.ArithmeticCalculatorImpl.div(ArithmeticCalculatorImpl.java:28)</code></p>
+	</li>
+	<li>
+	<p><code>at sun.reflect.NativeMethodAccessorImpl.invoke0(Native Method)</code></p>
+	</li>
+	<li>
+	<p><code>at sun.reflect.NativeMethodAccessorImpl.invoke(NativeMethodAccessorImpl.java:57)</code></p>
+	</li>
+	<li>
+	<p><code>at sun.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43)</code></p>
+	</li>
+	<li>
+	<p><code>at java.lang.reflect.Method.invoke(Method.java:606)</code></p>
+	</li>
+	<li>
+	<p><code>at org.springframework.aop.support.AopUtils.invokeJoinpointUsingReflection(AopUtils.java:317)</code></p>
+	</li>
+	<li>
+	<p><code>at org.springframework.aop.framework.ReflectiveMethodInvocation.invokeJoinpoint(ReflectiveMethodInvocation.java:190)</code></p>
+	</li>
+	<li>
+	<p><code>at org.springframework.aop.framework.ReflectiveMethodInvocation.proceed(ReflectiveMethodInvocation.java:157)</code></p>
+	</li>
+	<li>
+	<p><code>at org.springframework.aop.framework.adapter.MethodBeforeAdviceInterceptor.invoke(MethodBeforeAdviceInterceptor.java:52)</code></p>
+	</li>
+	<li>
+	<p><code>at org.springframework.aop.framework.ReflectiveMethodInvocation.proceed(ReflectiveMethodInvocation.java:179)</code></p>
+	</li>
+	<li>
+	<p><code>at org.springframework.aop.aspectj.AspectJAfterAdvice.invoke(AspectJAfterAdvice.java:43)</code></p>
+	</li>
+	<li>
+	<p><code>at org.springframework.aop.framework.ReflectiveMethodInvocation.proceed(ReflectiveMethodInvocation.java:179)</code></p>
+	</li>
+	<li>
+	<p><code>at org.springframework.aop.framework.adapter.AfterReturningAdviceInterceptor.invoke(AfterReturningAdviceInterceptor.java:52)</code></p>
+	</li>
+	<li>
+	<p><code>at org.springframework.aop.framework.ReflectiveMethodInvocation.proceed(ReflectiveMethodInvocation.java:179)</code></p>
+	</li>
+	<li>
+	<p><code>at org.springframework.aop.aspectj.AspectJAfterThrowingAdvice.invoke(AspectJAfterThrowingAdvice.java:58)</code></p>
+	</li>
+	<li>
+	<p><code>at org.springframework.aop.framework.ReflectiveMethodInvocation.proceed(ReflectiveMethodInvocation.java:179)</code></p>
+	</li>
+	<li>
+	<p><code>at org.springframework.aop.interceptor.ExposeInvocationInterceptor.invoke(ExposeInvocationInterceptor.java:92)</code></p>
+	</li>
+	<li>
+	<p><code>at org.springframework.aop.framework.ReflectiveMethodInvocation.proceed(ReflectiveMethodInvocation.java:179)</code></p>
+	</li>
+	<li>
+	<p><code>at org.springframework.aop.framework.JdkDynamicAopProxy.invoke(JdkDynamicAopProxy.java:207)</code></p>
+	</li>
+	<li>
+	<p><code>at com.sun.proxy.$Proxy10.div(Unknown Source)</code></p>
+	</li>
+	<li>
+	<p><code>at com.qcc.beans.aop.Main.main(Main.java:15)</code></p>
+	</li>
+</ol>
+
+<hr />
+<p>把其它代码都注释掉，把环绕通知的方法释放出来，测试结果如下：</p>
+
+<pre>
+
+&nbsp;</pre>
+
+<ol>
+	<li>
+	<p><code>【环绕通知中的---&gt;前置通知】：the method 【add】 begins with [3, 5]</code></p>
+	</li>
+	<li>
+	<p><code>【环绕通知中的---&gt;返回通知】：the method 【add】 ends with 8</code></p>
+	</li>
+	<li>
+	<p><code>【环绕通知中的---&gt;后置通知】：-----------------end.----------------------</code></p>
+	</li>
+	<li>
+	<p><code>result: 8</code></p>
+	</li>
+	<li>
+	<p><code>【环绕通知中的---&gt;前置通知】：the method 【div】 begins with [5, 0]</code></p>
+	</li>
+	<li>
+	<p><code>【环绕通知中的---&gt;异常通知】：the method 【div】 occurs exception java.lang.ArithmeticException: / by zero</code></p>
+	</li>
+	<li>
+	<p><code>【环绕通知中的---&gt;后置通知】：-----------------end.----------------------</code></p>
+	</li>
+	<li>
+	<p><code>Exception in thread &quot;main&quot; org.springframework.aop.AopInvocationException: Null return value from advice does not match primitive return type for: public abstract int com.qcc.beans.aop.ArithmeticCalculator.div(int,int)</code></p>
+	</li>
+	<li>
+	<p><code>at org.springframework.aop.framework.JdkDynamicAopProxy.invoke(JdkDynamicAopProxy.java:219)</code></p>
+	</li>
+	<li>
+	<p><code>at com.sun.proxy.$Proxy7.div(Unknown Source)</code></p>
+	</li>
+	<li>
+	<p><code>at com.qcc.beans.aop.Main.main(Main.java:15)</code></p>
+	</li>
+</ol>
+
+<p>从以上发现，返回通知和异常通知不会同时出现；不管是否发生异常，后置通知都会正常打印。</p>
