@@ -1,0 +1,107 @@
+<h1>quartz触发器 JobDataMap</h1>
+
+<p>JobDataMap可以用来保存任何需要传递给任务实例的对象（这些对象要求是可序列化的）</p>
+
+<h2>作业类</h2>
+
+<p>public class ColorJob implements Job{<br />
+&nbsp; &nbsp; private static final String FAVORITE_COLOR = &quot;favorite color&quot;;<br />
+&nbsp; &nbsp; public static final String EXECUTION_COUNT = &quot;count&quot;;<br />
+&nbsp; &nbsp; private int _counter = 1;<br />
+&nbsp; &nbsp; private JobDataMap jobDataMap;<br />
+&nbsp;<br />
+&nbsp; &nbsp; public void execute(JobExecutionContext context)<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; throws JobExecutionException {<br />
+&nbsp; &nbsp; &nbsp; &nbsp; // TODO Auto-generated method stub<br />
+&nbsp; &nbsp; &nbsp; &nbsp; SimpleDateFormat sdf=new SimpleDateFormat(&quot;yyyy年MM月dd日 HH时mm分ss秒&quot;);<br />
+&nbsp; &nbsp; &nbsp; &nbsp; JobKey jobKey=context.getJobDetail().getKey();<br />
+&nbsp; &nbsp; &nbsp; &nbsp;&nbsp;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; this.jobDataMap=context.getJobDetail().getJobDataMap();<br />
+&nbsp; &nbsp; &nbsp; &nbsp; String favoriteColor=jobDataMap.getString(&quot;color&quot;);<br />
+&nbsp; &nbsp; &nbsp; &nbsp; int count=jobDataMap.getInt(&quot;count&quot;);<br />
+&nbsp; &nbsp; &nbsp; &nbsp; System.out.println(&quot;ColorJob:在&quot;+sdf.format(new Date())+&quot;执行&quot;+jobKey+&quot;\n&quot;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; +&quot;color:&quot;+favoriteColor+&quot;\n&quot;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; +&quot;第&quot;+count+&quot;次执行\n&quot;+&quot;成员变量_counter是第&quot;+this._counter+&quot;次 执行&quot;);<br />
+&nbsp; &nbsp; &nbsp; &nbsp; ++count;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; jobDataMap.put(&quot;count&quot;, count);<br />
+&nbsp; &nbsp; &nbsp; &nbsp; System.out.println(count);<br />
+&nbsp; &nbsp; &nbsp; &nbsp; this._counter+=1;<br />
+&nbsp; &nbsp; }<br />
+&nbsp;<br />
+}</p>
+
+<h2>示例类</h2>
+
+<p>public class JobStateExample {<br />
+&nbsp;<br />
+&nbsp; &nbsp; public static void main(String[] args) {<br />
+&nbsp; &nbsp; &nbsp; &nbsp; // TODO Auto-generated method stub<br />
+&nbsp; &nbsp; &nbsp; &nbsp; System.out.println(&quot;------- 初始化 -------------------&quot;);<br />
+&nbsp; &nbsp; &nbsp; &nbsp; SchedulerFactory sf=new StdSchedulerFactory();<br />
+&nbsp; &nbsp; &nbsp; &nbsp; try {<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; Scheduler scheduler=sf.getScheduler();<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; System.out.println(&quot;------- 初始化完成 --------&quot;); &nbsp;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;&nbsp;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; System.out.println(&quot;------- 向Scheduler加入Job ----------------&quot;); &nbsp;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; SimpleDateFormat dateFormat = new SimpleDateFormat(&quot;yyyy年MM月dd日 HH时mm分ss秒&quot;);<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; //把一个小时按15分钟（参数多少就是多少）划分,在当前时间的下一个划分时间点执行<br />
+// &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;Date triggerStartTime=DateBuilder.nextGivenMinuteDate(null, 10);<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; //当前时间指定多长时间之后运行<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; Date triggerStartTime=DateBuilder.futureDate(5,DateBuilder.IntervalUnit.SECOND);<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; //指定作业，即工作类<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; JobDetail job1=JobBuilder.newJob(ColorJob.class).withIdentity(&quot;job1&quot;, &quot;group1&quot;).build();<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; //设置触发器<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; SimpleTrigger simpleTrigger1=TriggerBuilder.newTrigger().withIdentity(&quot;trigger&quot;, &quot;group&quot;)<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; .startAt(triggerStartTime)//开始时间<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; .withSchedule(SimpleScheduleBuilder.simpleSchedule()<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; .withIntervalInSeconds(5)//间隔5秒<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; .withRepeatCount(4)).build();//重复4次<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; //向 JobDataMap 中存入键/值对，那些数据对可在你的 Job 类中传递和进行访问<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; job1.getJobDataMap().put(&quot;color&quot;, &quot;green&quot;);<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; job1.getJobDataMap().put(&quot;count&quot;, 1);<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; //调度器关联作业和触发器<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; Date schedulerTime1=scheduler.scheduleJob(job1, simpleTrigger1);<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; System.out.println(job1.getKey()+&quot; &nbsp;将在: &quot;+dateFormat.format(schedulerTime1)+&quot; 运行，重复 &quot;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; +simpleTrigger1.getRepeatCount()+&quot; 次,每 &quot;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; +simpleTrigger1.getRepeatInterval()/ 1000L+&quot; 秒执行一次&quot;);<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;&nbsp;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; //设置第二个作业<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; JobDetail job2 = JobBuilder.newJob(ColorJob.class).withIdentity(&quot;job2&quot;, &quot;group1&quot;).build(); &nbsp;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;&nbsp;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; SimpleTrigger trigger2 = (SimpleTrigger)TriggerBuilder.newTrigger() &nbsp;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; .withIdentity(&quot;trigger2&quot;, &quot;group1&quot;) &nbsp;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; .startAt(triggerStartTime) &nbsp;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; .withSchedule(SimpleScheduleBuilder.simpleSchedule() &nbsp;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; .withIntervalInSeconds(5) &nbsp;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; .withRepeatCount(4)) &nbsp;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; .build(); &nbsp;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp;&nbsp;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; job2.getJobDataMap().put(&quot;color&quot;, &quot;Red&quot;); &nbsp;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; job2.getJobDataMap().put(&quot;count&quot;, 1); &nbsp;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp;&nbsp;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; Date scheduleTime2 = scheduler.scheduleJob(job2, trigger2); &nbsp;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; System.out.println(job2.getKey().toString() + &quot; &nbsp;将在: &nbsp;&quot;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; + dateFormat.format(scheduleTime2) + &quot; 运行，重复 &quot; + trigger2.getRepeatCount()<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; + &quot; 次,每 &quot; + trigger2.getRepeatInterval() / 1000L + &quot; 秒执行一次&quot;);<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; System.out.println(&quot;------- 开始Scheduler ----------------&quot;);<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; scheduler.start();<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; System.out.println(&quot;------- Scheduler调用job结束 -----------------&quot;);<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; try {<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; Thread.sleep(60000L);//睡眠一分钟<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; } catch (InterruptedException e) {<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; // TODO Auto-generated catch block<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; e.printStackTrace();<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; }<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; System.out.println(&quot;------- 关闭Scheduler ---------------------&quot;);<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; scheduler.shutdown(true); &nbsp;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; System.out.println(&quot;------- 关闭完成 -----------------&quot;); &nbsp;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; SchedulerMetaData metaData = scheduler.getMetaData(); &nbsp;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; System.out.println(&quot;Executed &quot; + metaData.getNumberOfJobsExecuted() + &quot; jobs.&quot;);<br />
+&nbsp; &nbsp; &nbsp; &nbsp; } catch (SchedulerException e) {<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; // TODO Auto-generated catch block<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; e.printStackTrace();<br />
+&nbsp; &nbsp; &nbsp; &nbsp; }<br />
+&nbsp; &nbsp; }<br />
+&nbsp;<br />
+}<br />
+&nbsp;</p>

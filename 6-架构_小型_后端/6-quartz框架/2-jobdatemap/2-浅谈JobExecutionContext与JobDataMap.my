@@ -1,0 +1,374 @@
+<h1><a href="https://www.cnblogs.com/qlqwjy/p/8721890.html" id="cb_post_title_url">浅谈JobExecutionContext与JobDataMap</a></h1>
+
+<h2>1.JobExecutionContext简介</h2>
+
+<p>(1)当Scheduler调用一个Job，就会将JobExecutionContext传递给job的execute方法</p>
+
+<p>　　quartz无法调用job的有参构造函数，所以创建job的实例的时候是运用反射机制，通过newInstance创建实例，并且通过JobDetail描述的name与group属性然后给Job设置一些属性。</p>
+
+<p>(2)Job能通过JobExecutionContext对象访问到Quartz运行时候的环境以及Job本身的明细数据。</p>
+
+<h2>&nbsp;2.JobDataMap简介:</h2>
+
+<p><strong>1.JobDataMap是什么?</strong></p>
+
+<p>(1)在进行任务调度时JobDataMap存储在JobExecutionContext中，非常方便获取</p>
+
+<p>(2)JobDataMap可以用来装载任何可以序列化的数据对象，当job实例对象被执行时这些参数对象会传递给它</p>
+
+<p>(3)JobDataMap实现了JDK的Map接口，并且添加了一些非常方便的方法用来存取数据基本数据类型。</p>
+
+<p><strong>2.获取JobDataMap的两种方式:</strong></p>
+
+<ul>
+	<li><strong>第一种方式:从JobExecutionContext实例中获取</strong></li>
+</ul>
+
+<p><strong>(1)从实例中获取JobDetail与Trigger单独的JobDataMap的方法</strong></p>
+
+<p>例如:</p>
+
+<pre>
+HelloJob.java(JobExecutionContext获取JobDataMap以及获取JobDetail和Trigger的标识信息)
+</pre>
+
+<pre>
+package cn.qlq.quartz;
+
+import java.text.SimpleDateFormat;
+import java.util.Date;
+
+import org.quartz.Job;
+import org.quartz.JobDataMap;
+import org.quartz.JobExecutionContext;
+import org.quartz.JobExecutionException;
+import org.quartz.JobKey;
+import org.quartz.TriggerKey;
+
+public class HelloJob implements Job {
+    public void execute(JobExecutionContext context) throws JobExecutionException {
+        //打印当前的时间
+        Date date = new Date();
+        SimpleDateFormat sf = new SimpleDateFormat(&quot;yyyy-MM-dd hh:mm:ss&quot;);
+        System.out.println(&quot;current time is:&quot;+sf.format(date));
+        // 编写具体的业务逻辑
+        JobKey key = context.getJobDetail().getKey();//获取JobDetail的标识信息
+        System.out.println(&quot;JobDetail&#39;s name and group are &quot;+key.getName()+&quot;:&quot;+key.getGroup());
+        TriggerKey triggerKey = context.getTrigger().getKey();//获取Trigger的标识信息
+        System.out.println(&quot;Trigger&#39;s name and group are &quot;+triggerKey.getName()+&quot;:&quot;+triggerKey.getGroup());
+        //获取JobDetail通过JobDataMap传递的参数信息
+        JobDataMap jobDataMap = context.getJobDetail().getJobDataMap();
+        String jobMessage = jobDataMap.getString(&quot;message&quot;);
+        Float floatValue = jobDataMap.getFloat(&quot;floatValue&quot;);
+        System.out.println(jobMessage+&quot;\t&quot;+floatValue);
+        //获取Trigger通过JobDataMap传递的信息
+        JobDataMap triggerDataMap = context.getTrigger().getJobDataMap();
+        String triggerMessage = triggerDataMap.getString(&quot;message&quot;);
+        Double DoubleValue = triggerDataMap.getDouble(&quot;DoubleValue&quot;);
+        System.out.println(triggerMessage+&quot;\t&quot;+DoubleValue);
+        
+    }
+}
+</pre>
+
+<p>&nbsp;HelloScheduler.java&nbsp; 通过usingJobData传递一些参数(JobDetail和Trigger都能使用此方法传递参数)</p>
+
+<pre>
+package cn.qlq.quartz;
+
+import static org.quartz.DateBuilder.newDate;
+import static org.quartz.JobBuilder.newJob;
+import static org.quartz.SimpleScheduleBuilder.simpleSchedule;
+import static org.quartz.TriggerBuilder.newTrigger;
+
+import java.util.GregorianCalendar;
+
+import org.quartz.JobDetail;
+import org.quartz.Scheduler;
+import org.quartz.SimpleScheduleBuilder;
+import org.quartz.Trigger;
+import org.quartz.TriggerBuilder;
+import org.quartz.impl.StdSchedulerFactory;
+import org.quartz.impl.calendar.AnnualCalendar;
+
+public class HelloScheduler {
+
+    public static void main(String[] args) {
+        try {
+            //1. 创建一个JodDetail实例 将该实例与Hello job class绑定    (链式写法)
+            JobDetail jobDetail = newJob(HelloJob.class) // 定义Job类为HelloQuartz类，这是真正的执行逻辑所在
+                    .withIdentity(&quot;myJob&quot;) // 定义name/group
+                    .usingJobData(&quot;message&quot;,&quot;Hello myjob1&quot;)//使用JobDataMap传递参数给Job，传递一个string类型参数
+                    .usingJobData(&quot;floatValue&quot;,8.5f)//使用JobDataMap传递参数给Job，传递一个float类型
+                    .build();
+
+            //2. 定义一个Trigger，定义该job立即执行，并且每两秒钟执行一次，直到永远
+            Trigger trigger = TriggerBuilder.newTrigger().withIdentity(&quot;myTrigger&quot;, &quot;group1&quot;)// 定义名字和组
+                    .startNow()//现在开始
+                    .withSchedule(SimpleScheduleBuilder.simpleSchedule().withIntervalInSeconds(2).repeatForever())
+                    .usingJobData(&quot;message&quot;,&quot;Hello trigger1&quot;)
+                    .usingJobData(&quot;DoubleValue&quot;,2.5D)
+                    .build();
+            
+            //3. 创建scheduler
+            Scheduler scheduler = StdSchedulerFactory.getDefaultScheduler();
+
+            //4. 将trigger和jobdetail加入这个调度
+            scheduler.scheduleJob(jobDetail, trigger);
+
+            //5. 启动scheduler
+            scheduler.start();
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+}</pre>
+
+<p>&nbsp;</p>
+
+<p>结果:</p>
+
+<p>current time is:2018-04-04 09:53:15<br />
+JobDetail&#39;s name and group are myJob:DEFAULT<br />
+Trigger&#39;s name and group are myTrigger:group1<br />
+Hello myjob1 8.5<br />
+Hello trigger1 2.5</p>
+
+<p>&nbsp;<strong>(2)从实例中获取JobDetail与Trigger合并的JobDataMap的方法</strong></p>
+
+<p>&nbsp;　　理论上是将JobDatail的JobDataMap和Trigger的JobDataMap合并，当我们获取两者有相同的key值的时候，优先获取的是Trigger的值，也就是JobDatail的会被覆盖</p>
+
+<p>例如:</p>
+
+<p><strong>HelloJob.java(获取两者合并后的JobDataMap)</strong></p>
+
+<pre>
+package cn.qlq.quartz;
+
+import java.text.SimpleDateFormat;
+import java.util.Date;
+
+import org.quartz.Job;
+import org.quartz.JobDataMap;
+import org.quartz.JobExecutionContext;
+import org.quartz.JobExecutionException;
+import org.quartz.JobKey;
+import org.quartz.TriggerKey;
+
+public class HelloJob implements Job {
+    public void execute(JobExecutionContext context) throws JobExecutionException {
+        //打印当前的时间
+        Date date = new Date();
+        SimpleDateFormat sf = new SimpleDateFormat(&quot;yyyy-MM-dd hh:mm:ss&quot;);
+        System.out.println(&quot;current time is:&quot;+sf.format(date));
+        // 编写具体的业务逻辑
+        JobKey key = context.getJobDetail().getKey();//获取JobDetail的标识信息
+        System.out.println(&quot;JobDetail&#39;s name and group are &quot;+key.getName()+&quot;:&quot;+key.getGroup());
+        TriggerKey triggerKey = context.getTrigger().getKey();//获取Trigger的标识信息
+        System.out.println(&quot;Trigger&#39;s name and group are &quot;+triggerKey.getName()+&quot;:&quot;+triggerKey.getGroup());
+        //获取JobDetail通过JobDataMap传递的参数信息(获取两者合并后的JobDataMap)
+        JobDataMap jobDataMap = context.getMergedJobDataMap();
+        String message = jobDataMap.getString(&quot;message&quot;);
+        Float floatValue = jobDataMap.getFloat(&quot;floatValue&quot;);
+        System.out.println(&quot;message is :&quot;+message);
+        System.out.println(&quot;floatValue is :&quot;+floatValue);
+        Double DoubleValue = jobDataMap.getDouble(&quot;DoubleValue&quot;);
+        System.out.println(&quot;DoubleValue is :&quot;+DoubleValue);
+        
+    }
+}
+</pre>
+
+<p>HelloScheduler.java</p>
+
+<pre>
+package cn.qlq.quartz;
+
+import static org.quartz.DateBuilder.newDate;
+import static org.quartz.JobBuilder.newJob;
+import static org.quartz.SimpleScheduleBuilder.simpleSchedule;
+import static org.quartz.TriggerBuilder.newTrigger;
+
+import java.util.GregorianCalendar;
+
+import org.quartz.JobDetail;
+import org.quartz.Scheduler;
+import org.quartz.SimpleScheduleBuilder;
+import org.quartz.Trigger;
+import org.quartz.TriggerBuilder;
+import org.quartz.impl.StdSchedulerFactory;
+import org.quartz.impl.calendar.AnnualCalendar;
+
+public class HelloScheduler {
+
+    public static void main(String[] args) {
+        try {
+            //1. 创建一个JodDetail实例 将该实例与Hello job class绑定    (链式写法)
+            JobDetail jobDetail = newJob(HelloJob.class) // 定义Job类为HelloQuartz类，这是真正的执行逻辑所在
+                    .withIdentity(&quot;myJob&quot;) // 定义name/group
+                    .usingJobData(&quot;message&quot;,&quot;Hello myjob1&quot;)//使用JobDataMap传递参数给Job，传递一个string类型参数
+                    .usingJobData(&quot;floatValue&quot;,8.5f)//使用JobDataMap传递参数给Job，传递一个float类型
+                    .build();
+
+            //2. 定义一个Trigger，定义该job立即执行，并且每两秒钟执行一次，直到永远
+            Trigger trigger = TriggerBuilder.newTrigger().withIdentity(&quot;myTrigger&quot;, &quot;group1&quot;)// 定义名字和组
+                    .startNow()//现在开始
+                    .withSchedule(SimpleScheduleBuilder.simpleSchedule().withIntervalInSeconds(2).repeatForever())
+                    .usingJobData(&quot;message&quot;,&quot;Hello trigger1&quot;)
+                    .usingJobData(&quot;DoubleValue&quot;,2.5D)
+                    .build();
+            
+            //3. 创建scheduler
+            Scheduler scheduler = StdSchedulerFactory.getDefaultScheduler();
+
+            //4. 将trigger和jobdetail加入这个调度
+            scheduler.scheduleJob(jobDetail, trigger);
+
+            //5. 启动scheduler
+            scheduler.start();
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+}
+</pre>
+
+<p>运行结果:(如果JobDetail和Trigger的传递参数相同，使用合并后的JobDataMap获取的时候优先获取Trigger的参数)</p>
+
+<p><img alt="" src="https://images2018.cnblogs.com/blog/1196212/201804/1196212-20180404220556763-1880289110.png" /></p>
+
+<p>&nbsp;</p>
+
+<ul>
+	<li><strong>第二种方式:Job实现类添加setter方法对应JobDataMap的键值(Quartz框架默认的JobFactory实现类在初始化job实例对象时会自动调用这些setter方法)</strong></li>
+</ul>
+
+<p>&nbsp;例如:</p>
+
+<p>HelloJob.java(添加成员属性，并且添加对应的get，set方法，类似于struts的属性注入，当我们在使用JobDataMap添加数据的时候会自动映射到这个类的成员实现方法中，需要注意的是成员属性的名字要和jobDataMap添加时候的key值相同)</p>
+
+<pre>
+package cn.qlq.quartz;
+
+import java.text.SimpleDateFormat;
+import java.util.Date;
+
+import org.quartz.Job;
+import org.quartz.JobDataMap;
+import org.quartz.JobExecutionContext;
+import org.quartz.JobExecutionException;
+import org.quartz.JobKey;
+import org.quartz.TriggerKey;
+
+public class HelloJob implements Job {
+    
+    private String message;
+    private Float floatValue;
+    private Double DoubleValue;
+
+    public void execute(JobExecutionContext context) throws JobExecutionException {
+        //打印当前的时间
+        Date date = new Date();
+        SimpleDateFormat sf = new SimpleDateFormat(&quot;yyyy-MM-dd hh:mm:ss&quot;);
+        System.out.println(&quot;current time is:&quot;+sf.format(date));
+        // 编写具体的业务逻辑
+        JobKey key = context.getJobDetail().getKey();//获取JobDetail的标识信息
+        System.out.println(&quot;JobDetail&#39;s name and group are &quot;+key.getName()+&quot;:&quot;+key.getGroup());
+        TriggerKey triggerKey = context.getTrigger().getKey();//获取Trigger的标识信息
+        System.out.println(&quot;Trigger&#39;s name and group are &quot;+triggerKey.getName()+&quot;:&quot;+triggerKey.getGroup());
+        System.out.println(&quot;message is :&quot;+message);
+        System.out.println(&quot;floatValue is :&quot;+floatValue);
+        System.out.println(&quot;DoubleValue is :&quot;+DoubleValue);
+    }
+
+    public String getMessage() {
+        return message;
+    }
+
+    public void setMessage(String message) {
+        this.message = message;
+    }
+
+    public Float getFloatValue() {
+        return floatValue;
+    }
+
+    public void setFloatValue(Float floatValue) {
+        this.floatValue = floatValue;
+    }
+
+    public Double getDoubleValue() {
+        return DoubleValue;
+    }
+
+    public void setDoubleValue(Double doubleValue) {
+        DoubleValue = doubleValue;
+    }
+    
+}
+</pre>
+
+<p>HelloScheduler.java</p>
+
+<pre>
+package cn.qlq.quartz;
+
+import static org.quartz.DateBuilder.newDate;
+import static org.quartz.JobBuilder.newJob;
+import static org.quartz.SimpleScheduleBuilder.simpleSchedule;
+import static org.quartz.TriggerBuilder.newTrigger;
+
+import java.util.GregorianCalendar;
+
+import org.quartz.JobDetail;
+import org.quartz.Scheduler;
+import org.quartz.SimpleScheduleBuilder;
+import org.quartz.Trigger;
+import org.quartz.TriggerBuilder;
+import org.quartz.impl.StdSchedulerFactory;
+import org.quartz.impl.calendar.AnnualCalendar;
+
+public class HelloScheduler {
+    public static void main(String[] args) {
+        try {
+            //1. 创建一个JodDetail实例 将该实例与Hello job class绑定    (链式写法)
+            JobDetail jobDetail = newJob(HelloJob.class) // 定义Job类为HelloQuartz类，这是真正的执行逻辑所在
+                    .withIdentity(&quot;myJob&quot;) // 定义name/group
+                    .usingJobData(&quot;message&quot;,&quot;Hello myjob1&quot;)//使用JobDataMap传递参数给Job，传递一个string类型参数
+                    .usingJobData(&quot;floatValue&quot;,8.5f)//使用JobDataMap传递参数给Job，传递一个float类型
+                    .build();
+
+            //2. 定义一个Trigger，定义该job立即执行，并且每两秒钟执行一次，直到永远
+            Trigger trigger = TriggerBuilder.newTrigger().withIdentity(&quot;myTrigger&quot;, &quot;group1&quot;)// 定义名字和组
+                    .startNow()//现在开始
+                    .withSchedule(SimpleScheduleBuilder.simpleSchedule().withIntervalInSeconds(2).repeatForever())
+                    .usingJobData(&quot;message&quot;,&quot;Hello trigger1&quot;)
+                    .usingJobData(&quot;DoubleValue&quot;,2.5D)
+                    .build();
+            
+            //3. 创建scheduler
+            Scheduler scheduler = StdSchedulerFactory.getDefaultScheduler();
+
+            //4. 将trigger和jobdetail加入这个调度
+            scheduler.scheduleJob(jobDetail, trigger);
+
+            //5. 启动scheduler
+            scheduler.start();
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+}
+</pre>
+
+<p>结果：</p>
+
+<p>current time is:2018-04-04 10:11:29<br />
+JobDetail&#39;s name and group are myJob:DEFAULT<br />
+Trigger&#39;s name and group are myTrigger:group1<br />
+message is :Hello trigger1<br />
+floatValue is :8.5<br />
+DoubleValue is :2.5</p>
