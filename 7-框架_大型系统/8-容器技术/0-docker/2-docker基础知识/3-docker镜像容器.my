@@ -1,0 +1,360 @@
+<h1><a href="https://www.cnblogs.com/jsonhc/p/7754982.html" id="cb_post_title_url">docker镜像、容器以及命令操作</a></h1>
+
+<h2>docker image：</h2>
+
+<p>docker image是一个极度精简版的Linux程序运行环境，官网的java镜像包括的东西更少，除非是镜像叠加方式的如centos+java7</p>
+
+<p>docker image是需要定制化build的一个安装包，包括基础镜像+应用的二进制部署包</p>
+
+<p>docker image内不建议有运行期需要修改的配置文件</p>
+
+<p>Dockerfile用来创建一个自定义的image，包含了用户指定的软件依赖等。当前目录下包含Dockerfile，使用命令build来创建新的image</p>
+
+<p>docker image的最佳实践之一是尽量重用和使用网上公开的基础镜像</p>
+
+<p>为docker添加国内镜像，加速下载镜像：</p>
+
+<p>修改配置文件/etc/docker/daemon.json，如果该文件没有则进行创建：</p>
+
+<pre>
+[root@docker ~]# cat /etc/docker/daemon.json 
+{
+    &quot;dns&quot;: [&quot;192.168.101.2&quot;,&quot;8.8.8.8&quot;],
+    &quot;registry-mirrors&quot;: [&quot;https://docker.mirrors.ustc.edu.cn&quot;]
+}</pre>
+
+<p>然后重启docker：</p>
+
+<pre>
+# systemctl restart docker
+</pre>
+
+<p>关于image的一些命令：</p>
+
+<p>搜索镜像：</p>
+
+<pre>
+# docker search nginx</pre>
+
+<p>nginx为镜像名称（镜像名称如：centos、nginx、redis）</p>
+
+<p>拉取镜像：</p>
+
+<pre>
+# docker pull nginx </pre>
+
+<p>列出本地镜像：</p>
+
+<pre>
+# docker images（docker images --help）</pre>
+
+<p>&nbsp; # docker image ls -a 同样是列出镜像（docker image ls --help查看）</p>
+
+<p>删除镜像：</p>
+
+<pre>
+# docker  rmi nginx    （docker rmi image_name/image_id）</pre>
+
+<p>&nbsp; # docker image rm nginx同样是删除镜像（docker image rm image_name/image_id）</p>
+
+<p>　　-f：force强制删除</p>
+
+<p>　　note：如果镜像被容器占用了，需要先删除容器，才能删除镜像</p>
+
+<p><code>docker image ls -q</code></p>
+
+<p>将镜像导出：</p>
+
+<pre>
+# docker save -o centos.tar centos</pre>
+
+<p>&nbsp; [root@docker ~]# ll</p>
+
+<p>&nbsp; total 200420</p>
+
+<p>&nbsp; -rw-------. 1 root root 1249 Oct 27 04:52 anaconda-ks.cfg</p>
+
+<p>&nbsp; -rw-------. 1 root root 205225472 Oct 27 15:22 centos.tar</p>
+
+<p>将本地包导入到镜像中：</p>
+
+<pre>
+# docker load --input centos.tar
+</pre>
+
+<h2>Docker container：</h2>
+
+<p>Docker container是image的实例，共享内核</p>
+
+<p>Docker&nbsp; container里可以运行不同os的image，比如Ubuntu的或者centos</p>
+
+<p>Docker container不建议内部开启一个sshd服务，1.3版本后新增了docker exec命令进入容器进行排查问题</p>
+
+<p>Docker container没有ip地址，通常不会有服务端口暴露，是一个封闭的沙盒</p>
+
+<h2>Docker daemon：</h2>
+
+<p>Docker daemon是创建和运行container的Linux守护进程，也是Docker 最主要的核心组件</p>
+
+<p>Docker daemon可以理解为Docker container的container</p>
+
+<p>Docker daemon可以绑定本地端口并提供REST API服务，用来远程访问和控制</p>
+
+<p><img alt="" src="https://images2017.cnblogs.com/blog/1168897/201710/1168897-20171030165156199-911110088.png" style="height:313px; width:800px" /></p>
+
+<p>Docker container的一些命令操作：</p>
+
+<p>&nbsp;查看容器：</p>
+
+<pre>
+# docker ps</pre>
+
+<p>查看所有的容器：</p>
+
+<pre>
+# docker ps -a</pre>
+
+<p>启动一个容器：</p>
+
+<pre>
+# docker run --help
+Usage:  docker run [OPTIONS] IMAGE [COMMAND] [ARG...]
+Run a command in a new container
+# docker run    启动一个容器并执行命令（容器是本机host的一个进程，如果进程没有后续操作，那么状态将是exited）</pre>
+
+<p>创建一个名称为mycentos的container，并执行/bin/bash：</p>
+
+<pre>
+# docker run --name mycentos centos /bin/bash</pre>
+
+<p>　　--name：表示容器的name，后面的centos表示使用的哪个镜像（镜像name）</p>
+
+<p>&nbsp;　　/bin/bash：表示执行的command</p>
+
+<p><img alt="" src="https://images2017.cnblogs.com/blog/1168897/201710/1168897-20171030165551558-1280946421.png" /></p>
+
+<p>容器可以使用容器id和容器name来识别（与镜像类似）</p>
+
+<p>容器有状态（exited表示已经退出了）</p>
+
+<p>启动容器：</p>
+
+<pre>
+# docker start mycentos</pre>
+
+<p>关闭容器：</p>
+
+<pre>
+# docker stop mycentos </pre>
+
+<p>删除容器：</p>
+
+<pre>
+# docker rm mycentos </pre>
+
+<p>上面的操作都可以使用容器的唯一标识（容器名称或者容器id）</p>
+
+<p>-f：force强制删除</p>
+
+<p>创建一个具有tty伪终端的容器：</p>
+
+<pre>
+# docker run -t --name mycentos centos /bin/bash  
+[root@92f0af59184d /]#     </pre>
+
+<p>可以看见直接进入到了容器的终端，但是由于没有使用-i（交互功能，所以使用命令会卡住）</p>
+
+<p>此时查看该容器状态：</p>
+
+<p><img alt="" src="https://images2017.cnblogs.com/blog/1168897/201710/1168897-20171030171719371-872567496.png" style="height:45px; width:800px" /></p>
+
+<p>查看本机host进程：</p>
+
+<p><img alt="" src="https://images2017.cnblogs.com/blog/1168897/201710/1168897-20171030171802027-414321539.png" style="height:87px; width:800px" /></p>
+
+<p>可以看出进程中包含的一长串字符就是该容器的uuid，由于进程没有关闭所以容器状态就是up</p>
+
+<p>现在将容器关闭掉：</p>
+
+<p><img alt="" src="https://images2017.cnblogs.com/blog/1168897/201710/1168897-20171030171911058-1667355251.png" style="height:68px; width:800px" /></p>
+
+<p>可以看见容器状态已经exited了</p>
+
+<p><img alt="" src="https://images2017.cnblogs.com/blog/1168897/201710/1168897-20171030172003652-1153604013.png" style="height:63px; width:800px" /></p>
+
+<p>而相应的本机host的进程已经结束了</p>
+
+<p>note：docker的容器就是本机host的某一个包含容器uuid的进程，进程关闭了那么容器也就是停止了</p>
+
+<p>删除所有的exited容器：</p>
+
+<pre>
+# docker ps -a -q|xargs docker rm</pre>
+
+<p>创建一个以后台模式运行的容器：</p>
+
+<pre>
+[root@docker ~]# docker run -d --name mycentos centos /bin/bash
+f61a3e75ebb5f78d1f593e7c92bf2a997077abc38287991818749550367b8150</pre>
+
+<p>　　-d：以后台模式创建，返回容器的uuid</p>
+
+<p><img alt="" src="https://images2017.cnblogs.com/blog/1168897/201710/1168897-20171030172243730-760337159.png" style="height:54px; width:1000px" /></p>
+
+<p>因为创建的只是一个后台运行的容器，容器并没有被安排操作其他的命令（/bin/bash），所以容器的状态还是exited，本机host的进程是没有这个容器的</p>
+
+<p>创建一个以后台模式运行不间断的容器：</p>
+
+<pre>
+[root@docker ~]# docker run -d --name mycentos centos sh -c &quot;while true;do echo hello world;sleep 2;done&quot; 
+5ef7fa20faa1071ad1a6eff2241368b113cbf45e1b89c6a292907a4f1a3e4269</pre>
+
+<p><img alt="" src="https://images2017.cnblogs.com/blog/1168897/201710/1168897-20171030172404152-280455801.png" style="height:61px; width:1000px" /></p>
+
+<p>为什么这里的容器状态一直是up，那是因为执行的命令：sh -c &quot;while true;do echo hello world;sleep 2;done&quot; 是在容器中每隔2s打印一次hello world，并一直循环下去</p>
+
+<p><img alt="" src="https://images2017.cnblogs.com/blog/1168897/201710/1168897-20171030172433511-2079381067.png" style="height:111px; width:1000px" /></p>
+
+<p>查看本机host的进程也能看见，进程一直处于运行状态</p>
+
+<p>将运行的容器stop就可以停止掉容器</p>
+
+<pre>
+# docker stop mycentos</pre>
+
+<p><img alt="" src="https://images2017.cnblogs.com/blog/1168897/201710/1168897-20171030172519558-700935753.png" style="height:55px; width:1000px" /></p>
+
+<p>可以将停止的状态处于运行状态（当然前提是容器的命令必须有运行的执行）</p>
+
+<pre>
+# docker start mycentos</pre>
+
+<p>&nbsp;-t与命令/bin/bash结合进入到了终端，但是却不能操作：</p>
+
+<pre>
+[root@docker ~]# docker run -t --name test saltstack/ubuntu-14.04 /bin/bash
+root@b588c6131109:/# ls</pre>
+
+<p>上述在终端不具有交互功能，于是加上-i：</p>
+
+<pre>
+[root@docker ~]# docker run -it --name mycentos centos /bin/bash
+[root@176f5440f328 /]# ls
+anaconda-post.log  bin  dev  etc  home  lib  lib64  lost+found  media  mnt  opt  proc  root  run  sbin  srv  sys  tmp  usr  var</pre>
+
+<p>　　创建一个进入到了容器终端，并能执行交互命令的容器</p>
+
+<p>　　-i：interactive具有交互功能</p>
+
+<p>　　/bin/bash：进入到bash环境</p>
+
+<p>　　-t：提供伪终端</p>
+
+<pre>
+[root@176f5440f328 /]# exit
+exit</pre>
+
+<p>　　exit：表示退出了容器的终端</p>
+
+<p><img alt="" src="https://images2017.cnblogs.com/blog/1168897/201710/1168897-20171031090728543-96155115.png" style="height:54px; width:1000px" /></p>
+
+<p>　　退出容器终端后，容器状态也是退出了，本机host进程也停止运行了</p>
+
+<p>　　容器的状态会随着command的命令执行而改变</p>
+
+<p>　　如果需要将容器持续不断的运行，那么将command变为持续不断的运行就可以</p>
+
+<pre>
+[root@docker ~]# docker run -dt --name mycentos centos sh -c &quot;while true;do echo hello world;sleep 2;done&quot; 
+8179b8e95e31675986ccda57bb95650d6ea460105e23a67a4e692b7966354250</pre>
+
+<p>创建的一个持续不断运行的container（命令是隔两秒打印一次的不中断的）</p>
+
+<p>可以用docker stop container_id 进行停止（停止后就可以删掉了）</p>
+
+<p><img alt="" src="https://images2017.cnblogs.com/blog/1168897/201710/1168897-20171031090829652-1282941910.png" style="height:54px; width:1000px" /></p>
+
+<p>停止全部container，并删除：</p>
+
+<p><img alt="" src="https://images2017.cnblogs.com/blog/1168897/201710/1168897-20171031090859871-1858509630.png" style="height:194px; width:1000px" /></p>
+
+<p>docker exec和nsenter的区别：</p>
+
+<pre>
+[root@docker ~]# docker exec --help
+    Usage:  docker exec [OPTIONS] CONTAINER COMMAND [ARG...]
+    Run a command in a running container</pre>
+
+<p>现在创建一个一直运行的container：</p>
+
+<pre>
+[root@docker ~]# docker run -d --name mycentos centos sh -c &quot;while true;do echo hello world;sleep 2;done&quot; 
+292cf95a7853e70978657d7c05f7abd4bff27f1c4e73d97a32b4639d1c0165fc
+
+[root@docker ~]# docker ps -a
+CONTAINER ID        IMAGE               COMMAND                  CREATED             STATUS              PORTS               NAMES
+292cf95a7853        centos              &quot;sh -c &#39;while true...&quot;   3 seconds ago       Up 3 seconds                            mycentos
+</pre>
+
+<p>docker exec表示在一个运行的container中执行命令</p>
+
+<pre>
+Options:
+  -d, --detach               Detached mode: run command in the background
+      --detach-keys string   Override the key sequence for detaching a container
+  -e, --env list             Set environment variables
+      --help                 Print usage
+  -i, --interactive          Keep STDIN open even if not attached
+      --privileged           Give extended privileges to the command
+  -t, --tty                  Allocate a pseudo-TTY
+  -u, --user string          Username or UID (format: &lt;name|uid&gt;[:&lt;group|gid&gt;])
+</pre>
+
+<p>执行某一个命令ls /</p>
+
+<pre>
+[root@docker ~]# docker exec -it 292cf95a7853 ls /
+anaconda-post.log  bin  dev  etc  home  lib  lib64  lost+found  media  mnt  opt  proc  root  run  sbin  srv  sys  tmp  usr  var</pre>
+
+<p>还可以标准输入命令：</p>
+
+<pre>
+[root@docker ~]# docker exec  292cf95a7853 echo hello
+hello</pre>
+
+<p>当docker exec执行如下可以进入到container中：</p>
+
+<p><img alt="" src="https://images2017.cnblogs.com/blog/1168897/201710/1168897-20171031223057966-383885992.png" style="height:246px; width:1000px" /></p>
+
+<p>同等的nsenter命令也可以完全进入到container中：</p>
+
+<p>如果没有这个命令需要进行安装：yum install&nbsp;util-linux</p>
+
+<p>1、确定该container的pid：</p>
+
+<pre>
+[root@docker ~]# docker inspect -f {{.State.Pid}} 292cf95a7853
+27515</pre>
+
+<p>2、使用nsenter连接：</p>
+
+<pre>
+[root@docker ~]# nsenter --target `docker inspect -f {{.State.Pid}} 292cf95a7853` --net --ipc --pid --mount --uts
+[root@292cf95a7853 /]# ls
+anaconda-post.log  bin  dev  etc  home  lib  lib64  lost+found  media  mnt  opt  proc  root  run  sbin  srv  sys  tmp  usr  var</pre>
+
+<p>nsenter是关于namespace命名空间的命令，能够是一些资源能够进行隔离</p>
+
+<p>　　PID：进程隔离（process id）</p>
+
+<p>　　NET：网络接口（network）</p>
+
+<p>　　IPC：管理跨进程通信的访问（interprocess communication）</p>
+
+<p>　　MNT：管理挂载点（mount）</p>
+
+<p>　　UTS：隔离内核和版本标识（unix timesharing system）</p>
+
+<p>　　USER：隔离用户</p>
+
+<p>标签:&nbsp;<a href="https://www.cnblogs.com/jsonhc/tag/docker/">docker</a></p>

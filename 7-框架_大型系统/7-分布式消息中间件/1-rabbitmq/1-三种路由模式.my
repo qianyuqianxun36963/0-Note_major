@@ -1,0 +1,726 @@
+<h1>三种Exchange模式&mdash;&mdash;订阅、路由、通配符模式</h1>
+
+<p>&nbsp;版权声明：本文为博主原创文章，转载请注明出处。 https://blog.csdn.net/u013046597/article/details/72842234</p>
+
+<p>&nbsp; &nbsp;前两篇博客介绍了两种队列模式，这篇博客介绍订阅、路由和通配符模式，之所以放在一起介绍，是因为这三种模式都是用了<a href="https://www.baidu.com/s?wd=Exchange&amp;tn=24004469_oem_dg&amp;rsv_dl=gh_pl_sl_csd" target="_blank">Exchange</a>交换机，消息没有直接发送到队列，而是发送到了交换机，经过队列绑定交换机到达队列。</p>
+
+<h1>一、订阅模式(Fanout Exchange)：</h1>
+
+<p>&nbsp; &nbsp;一个生产者，多个消费者，每一个消费者都有自己的一个队列，生产者没有将消息直接发送到队列，而是发送到了交换机，每个队列绑定交换机，生产者发送的消息经过交换机，到达队列，实现一个消息被多个消费者获取的目的。需要注意的是，如果将消息发送到一个没有队列绑定的exchange上面，那么该消息将会丢失，这是因为在rabbitMQ中exchange不具备存储消息的能力，只有队列具备存储消息的能力。</p>
+
+<p>&nbsp; &nbsp; &nbsp;&nbsp;<img alt="" src="https://img-blog.csdn.net/20170602105712620" /></p>
+
+<p>&nbsp; &nbsp; &nbsp;&nbsp;<img alt="" src="https://img-blog.csdn.net/20170602110240570" />&nbsp; &nbsp;</p>
+
+<p>&nbsp;</p>
+
+<h2>示例代码：</h2>
+
+<p>生产者：</p>
+
+<ol>
+	<li>
+	<p><code>public class Send {</code></p>
+	</li>
+	<li>&nbsp;</li>
+	<li>
+	<p><code>private final static String EXCHANGE_NAME = &quot;test_exchange_fanout&quot;;</code></p>
+	</li>
+	<li>&nbsp;</li>
+	<li>
+	<p><code>public static void main(String[] argv) throws Exception {</code></p>
+	</li>
+	<li>
+	<p><code>// 获取到连接以及mq通道</code></p>
+	</li>
+	<li>
+	<p><code>Connection connection = ConnectionUtil.getConnection();</code></p>
+	</li>
+	<li>
+	<p><code>//从连接中创建通道</code></p>
+	</li>
+	<li>
+	<p><code>Channel channel = connection.createChannel();</code></p>
+	</li>
+	<li>&nbsp;</li>
+	<li>
+	<p><code>// 声明exchange</code></p>
+	</li>
+	<li>
+	<p><code>channel.exchangeDeclare(EXCHANGE_NAME, &quot;fanout&quot;);</code></p>
+	</li>
+	<li>&nbsp;</li>
+	<li>
+	<p><code>// 消息内容</code></p>
+	</li>
+	<li>
+	<p><code>String message = &quot;商品已经新增，id = 1000&quot;;</code></p>
+	</li>
+	<li>
+	<p><code>channel.basicPublish(EXCHANGE_NAME, &quot;&quot;, null, message.getBytes());</code></p>
+	</li>
+	<li>&nbsp;</li>
+	<li>
+	<p><code>System.out.println(&quot; [x] Sent &#39;&quot; + message + &quot;&#39;&quot;);</code></p>
+	</li>
+	<li>&nbsp;</li>
+	<li>
+	<p><code>channel.close();</code></p>
+	</li>
+	<li>
+	<p><code>connection.close();</code></p>
+	</li>
+	<li>
+	<p><code>}</code></p>
+	</li>
+	<li>
+	<p><code>}</code></p>
+	</li>
+</ol>
+
+<p>消费者1：</p>
+
+<ol>
+	<li>
+	<p><code>public class Recv {</code></p>
+	</li>
+	<li>&nbsp;</li>
+	<li>
+	<p><code>private final static String QUEUE_NAME = &quot;test_queue_fanout_1&quot;;</code></p>
+	</li>
+	<li>&nbsp;</li>
+	<li>
+	<p><code>private final static String EXCHANGE_NAME = &quot;test_exchange_fanout&quot;;</code></p>
+	</li>
+	<li>&nbsp;</li>
+	<li>
+	<p><code>public static void main(String[] argv) throws Exception {</code></p>
+	</li>
+	<li>&nbsp;</li>
+	<li>
+	<p><code>// 获取到连接以及mq通道</code></p>
+	</li>
+	<li>
+	<p><code>Connection connection = ConnectionUtil.getConnection();</code></p>
+	</li>
+	<li>
+	<p><code>Channel channel = connection.createChannel();</code></p>
+	</li>
+	<li>&nbsp;</li>
+	<li>
+	<p><code>// 声明队列</code></p>
+	</li>
+	<li>
+	<p><code>channel.queueDeclare(QUEUE_NAME, false, false, false, null);</code></p>
+	</li>
+	<li>&nbsp;</li>
+	<li>
+	<p><code>// 绑定队列到交换机</code></p>
+	</li>
+	<li>
+	<p><code>channel.queueBind(QUEUE_NAME, EXCHANGE_NAME, &quot;&quot;);</code></p>
+	</li>
+	<li>&nbsp;</li>
+	<li>
+	<p><code>// 同一时刻<a href="https://www.baidu.com/s?wd=%E6%9C%8D%E5%8A%A1%E5%99%A8&amp;tn=24004469_oem_dg&amp;rsv_dl=gh_pl_sl_csd" target="_blank">服务器</a>只会发一条消息给消费者</code></p>
+	</li>
+	<li>
+	<p><code>channel.basicQos(1);</code></p>
+	</li>
+	<li>&nbsp;</li>
+	<li>
+	<p><code>// 定义队列的消费者</code></p>
+	</li>
+	<li>
+	<p><code>QueueingConsumer consumer = new QueueingConsumer(channel);</code></p>
+	</li>
+	<li>
+	<p><code>// 监听队列，手动返回完成</code></p>
+	</li>
+	<li>
+	<p><code>channel.basicConsume(QUEUE_NAME, true, consumer);</code></p>
+	</li>
+	<li>&nbsp;</li>
+	<li>
+	<p><code>// 获取消息</code></p>
+	</li>
+	<li>
+	<p><code>while (true) {</code></p>
+	</li>
+	<li>
+	<p><code>QueueingConsumer.Delivery delivery = consumer.nextDelivery();</code></p>
+	</li>
+	<li>
+	<p><code>String message = new String(delivery.getBody());</code></p>
+	</li>
+	<li>
+	<p><code>System.out.println(&quot; 前台系统： &#39;&quot; + message + &quot;&#39;&quot;);</code></p>
+	</li>
+	<li>
+	<p><code>Thread.sleep(10);</code></p>
+	</li>
+	<li>&nbsp;</li>
+	<li>
+	<p><code>channel.basicAck(delivery.getEnvelope().getDeliveryTag(), false);</code></p>
+	</li>
+	<li>
+	<p><code>}</code></p>
+	</li>
+	<li>
+	<p><code>}</code></p>
+	</li>
+	<li>
+	<p><code>}</code></p>
+	</li>
+</ol>
+
+<p><br />
+&nbsp; 消费者2的代码和消费者1的代码大致相同，只是队列的名称不一样，这样两个消费者有自己的队列，都可以接收到生产者发送的消息</p>
+
+<p><br />
+&nbsp; 但是如果生产者有新增商品，修改商品，删除商品的消息，消费者包快前台系统和搜索系统，要求前台系统接收修改和删除商品的消息，搜索系统接收新增商品、修改商品和删除商品的消息。所以使用这种订阅模式实现商品数据的同步并不合理。因此我们介绍下一种模式：路由模式。</p>
+
+<h1>二、路由模式(Direct&nbsp;Exchange)</h1>
+
+<p>&nbsp; 这种模式添加了一个路由键，生产者发布消息的时候添加路由键，消费者绑定队列到交换机时添加键值，这样就可以接收到需要接收的消息。</p>
+
+<p>&nbsp; &nbsp; &nbsp; &nbsp;<img alt="" src="https://img-blog.csdn.net/20170602113451922" /></p>
+
+<p><img alt="" src="https://img-blog.csdn.net/20170602113529572" /></p>
+
+<h2>示例代码：</h2>
+
+<p>生产者：</p>
+
+<ol>
+	<li>
+	<p><code>public class Send {</code></p>
+	</li>
+	<li>&nbsp;</li>
+	<li>
+	<p><code>private final static String EXCHANGE_NAME = &quot;test_exchange_direct&quot;;</code></p>
+	</li>
+	<li>&nbsp;</li>
+	<li>
+	<p><code>public static void main(String[] argv) throws Exception {</code></p>
+	</li>
+	<li>
+	<p><code>// 获取到连接以及mq通道</code></p>
+	</li>
+	<li>
+	<p><code>Connection connection = ConnectionUtil.getConnection();</code></p>
+	</li>
+	<li>
+	<p><code>Channel channel = connection.createChannel();</code></p>
+	</li>
+	<li>&nbsp;</li>
+	<li>
+	<p><code>// 声明exchange</code></p>
+	</li>
+	<li>
+	<p><code>channel.exchangeDeclare(EXCHANGE_NAME, &quot;direct&quot;);</code></p>
+	</li>
+	<li>&nbsp;</li>
+	<li>
+	<p><code>// 消息内容</code></p>
+	</li>
+	<li>
+	<p><code>String message = &quot;删除商品， id = 1001&quot;;</code></p>
+	</li>
+	<li>
+	<p><code>channel.basicPublish(EXCHANGE_NAME, &quot;delete&quot;, null, message.getBytes());</code></p>
+	</li>
+	<li>
+	<p><code>System.out.println(&quot; [x] Sent &#39;&quot; + message + &quot;&#39;&quot;);</code></p>
+	</li>
+	<li>&nbsp;</li>
+	<li>
+	<p><code>channel.close();</code></p>
+	</li>
+	<li>
+	<p><code>connection.close();</code></p>
+	</li>
+	<li>
+	<p><code>}</code></p>
+	</li>
+	<li>
+	<p><code>}</code></p>
+	</li>
+</ol>
+
+<p>消费者1：接收更新和删除消息</p>
+
+<ol>
+	<li>
+	<p><code>public class Recv {</code></p>
+	</li>
+	<li>&nbsp;</li>
+	<li>
+	<p><code>private final static String QUEUE_NAME = &quot;test_queue_direct_1&quot;;</code></p>
+	</li>
+	<li>&nbsp;</li>
+	<li>
+	<p><code>private final static String EXCHANGE_NAME = &quot;test_exchange_direct&quot;;</code></p>
+	</li>
+	<li>&nbsp;</li>
+	<li>
+	<p><code>public static void main(String[] argv) throws Exception {</code></p>
+	</li>
+	<li>&nbsp;</li>
+	<li>
+	<p><code>// 获取到连接以及mq通道</code></p>
+	</li>
+	<li>
+	<p><code>Connection connection = ConnectionUtil.getConnection();</code></p>
+	</li>
+	<li>
+	<p><code>Channel channel = connection.createChannel();</code></p>
+	</li>
+	<li>&nbsp;</li>
+	<li>
+	<p><code>// 声明队列</code></p>
+	</li>
+	<li>
+	<p><code>channel.queueDeclare(QUEUE_NAME, false, false, false, null);</code></p>
+	</li>
+	<li>&nbsp;</li>
+	<li>
+	<p><code>// 绑定队列到交换机</code></p>
+	</li>
+	<li>
+	<p><code>channel.queueBind(QUEUE_NAME, EXCHANGE_NAME, &quot;update&quot;);</code></p>
+	</li>
+	<li>
+	<p><code>channel.queueBind(QUEUE_NAME, EXCHANGE_NAME, &quot;delete&quot;);</code></p>
+	</li>
+	<li>&nbsp;</li>
+	<li>
+	<p><code>// 同一时刻服务器只会发一条消息给消费者</code></p>
+	</li>
+	<li>
+	<p><code>channel.basicQos(1);</code></p>
+	</li>
+	<li>&nbsp;</li>
+	<li>
+	<p><code>// 定义队列的消费者</code></p>
+	</li>
+	<li>
+	<p><code>QueueingConsumer consumer = new QueueingConsumer(channel);</code></p>
+	</li>
+	<li>
+	<p><code>// 监听队列，手动返回完成</code></p>
+	</li>
+	<li>
+	<p><code>channel.basicConsume(QUEUE_NAME, false, consumer);</code></p>
+	</li>
+	<li>&nbsp;</li>
+	<li>
+	<p><code>// 获取消息</code></p>
+	</li>
+	<li>
+	<p><code>while (true) {</code></p>
+	</li>
+	<li>
+	<p><code>QueueingConsumer.Delivery delivery = consumer.nextDelivery();</code></p>
+	</li>
+	<li>
+	<p><code>String message = new String(delivery.getBody());</code></p>
+	</li>
+	<li>
+	<p><code>System.out.println(&quot; 前台系统： &#39;&quot; + message + &quot;&#39;&quot;);</code></p>
+	</li>
+	<li>
+	<p><code>Thread.sleep(10);</code></p>
+	</li>
+	<li>&nbsp;</li>
+	<li>
+	<p><code>channel.basicAck(delivery.getEnvelope().getDeliveryTag(), false);</code></p>
+	</li>
+	<li>
+	<p><code>}</code></p>
+	</li>
+	<li>
+	<p><code>}</code></p>
+	</li>
+	<li>
+	<p><code>}</code></p>
+	</li>
+</ol>
+
+<p>&nbsp;</p>
+
+<p>消费者2：接收insert，update，delete的消息</p>
+
+<ol>
+	<li>
+	<p><code>public class Recv2 {</code></p>
+	</li>
+	<li>&nbsp;</li>
+	<li>
+	<p><code>private final static String QUEUE_NAME = &quot;test_queue_direct_2&quot;;</code></p>
+	</li>
+	<li>&nbsp;</li>
+	<li>
+	<p><code>private final static String EXCHANGE_NAME = &quot;test_exchange_direct&quot;;</code></p>
+	</li>
+	<li>&nbsp;</li>
+	<li>
+	<p><code>public static void main(String[] argv) throws Exception {</code></p>
+	</li>
+	<li>&nbsp;</li>
+	<li>
+	<p><code>// 获取到连接以及mq通道</code></p>
+	</li>
+	<li>
+	<p><code>Connection connection = ConnectionUtil.getConnection();</code></p>
+	</li>
+	<li>
+	<p><code>Channel channel = connection.createChannel();</code></p>
+	</li>
+	<li>&nbsp;</li>
+	<li>
+	<p><code>// 声明队列</code></p>
+	</li>
+	<li>
+	<p><code>channel.queueDeclare(QUEUE_NAME, false, false, false, null);</code></p>
+	</li>
+	<li>&nbsp;</li>
+	<li>
+	<p><code>// 绑定队列到交换机</code></p>
+	</li>
+	<li>
+	<p><code>channel.queueBind(QUEUE_NAME, EXCHANGE_NAME, &quot;insert&quot;);</code></p>
+	</li>
+	<li>
+	<p><code>channel.queueBind(QUEUE_NAME, EXCHANGE_NAME, &quot;update&quot;);</code></p>
+	</li>
+	<li>
+	<p><code>channel.queueBind(QUEUE_NAME, EXCHANGE_NAME, &quot;delete&quot;);</code></p>
+	</li>
+	<li>&nbsp;</li>
+	<li>
+	<p><code>// 同一时刻服务器只会发一条消息给消费者</code></p>
+	</li>
+	<li>
+	<p><code>channel.basicQos(1);</code></p>
+	</li>
+	<li>&nbsp;</li>
+	<li>
+	<p><code>// 定义队列的消费者</code></p>
+	</li>
+	<li>
+	<p><code>QueueingConsumer consumer = new QueueingConsumer(channel);</code></p>
+	</li>
+	<li>
+	<p><code>// 监听队列，手动返回完成</code></p>
+	</li>
+	<li>
+	<p><code>channel.basicConsume(QUEUE_NAME, false, consumer);</code></p>
+	</li>
+	<li>&nbsp;</li>
+	<li>
+	<p><code>// 获取消息</code></p>
+	</li>
+	<li>
+	<p><code>while (true) {</code></p>
+	</li>
+	<li>
+	<p><code>QueueingConsumer.Delivery delivery = consumer.nextDelivery();</code></p>
+	</li>
+	<li>
+	<p><code>String message = new String(delivery.getBody());</code></p>
+	</li>
+	<li>
+	<p><code>System.out.println(&quot; 搜索系统： &#39;&quot; + message + &quot;&#39;&quot;);</code></p>
+	</li>
+	<li>
+	<p><code>Thread.sleep(10);</code></p>
+	</li>
+	<li>&nbsp;</li>
+	<li>
+	<p><code>channel.basicAck(delivery.getEnvelope().getDeliveryTag(), false);</code></p>
+	</li>
+	<li>
+	<p><code>}</code></p>
+	</li>
+	<li>
+	<p><code>}</code></p>
+	</li>
+	<li>
+	<p><code>}</code></p>
+	</li>
+</ol>
+
+<p>&nbsp; 如果生产者发布了insert消息，那么消费者2可以收到，消费者 1收不到，如果发布了update或者delete消息，两个消费者都可以收到。如果发布ABC消息两个消费者都收不到，因为没有绑定这个键值。这种模式基本满足了我们的需求，但是还不够灵活，下面介绍另外一个模式。</p>
+
+<h1>三、通配符模式（Topic Exchange）</h1>
+
+<p>&nbsp; &nbsp;基本思想和路由模式是一样的，只不过路由键支持模糊匹配，符号&ldquo;#&rdquo;匹配一个或多个词，符号&ldquo;*&rdquo;匹配不多不少一个词</p>
+
+<p>&nbsp; &nbsp; &nbsp; &nbsp;<img alt="" src="https://img-blog.csdn.net/20170602114755893" /><br />
+<br />
+<img alt="" src="https://img-blog.csdn.net/20170602114805987" /></p>
+
+<h2>示例代码：</h2>
+
+<p>生产者：</p>
+
+<ol>
+	<li>
+	<p><code>public class Send {</code></p>
+	</li>
+	<li>&nbsp;</li>
+	<li>
+	<p><code>private final static String EXCHANGE_NAME = &quot;test_exchange_topic&quot;;</code></p>
+	</li>
+	<li>&nbsp;</li>
+	<li>
+	<p><code>public static void main(String[] argv) throws Exception {</code></p>
+	</li>
+	<li>
+	<p><code>// 获取到连接以及mq通道</code></p>
+	</li>
+	<li>
+	<p><code>Connection connection = ConnectionUtil.getConnection();</code></p>
+	</li>
+	<li>
+	<p><code>Channel channel = connection.createChannel();</code></p>
+	</li>
+	<li>&nbsp;</li>
+	<li>
+	<p><code>// 声明exchange</code></p>
+	</li>
+	<li>
+	<p><code>channel.exchangeDeclare(EXCHANGE_NAME, &quot;topic&quot;);</code></p>
+	</li>
+	<li>&nbsp;</li>
+	<li>
+	<p><code>// 消息内容</code></p>
+	</li>
+	<li>
+	<p><code>String message = &quot;删除商品，id = 1001&quot;;</code></p>
+	</li>
+	<li>
+	<p><code>channel.basicPublish(EXCHANGE_NAME, &quot;item.delete&quot;, null, message.getBytes());</code></p>
+	</li>
+	<li>
+	<p><code>System.out.println(&quot; [x] Sent &#39;&quot; + message + &quot;&#39;&quot;);</code></p>
+	</li>
+	<li>&nbsp;</li>
+	<li>
+	<p><code>channel.close();</code></p>
+	</li>
+	<li>
+	<p><code>connection.close();</code></p>
+	</li>
+	<li>
+	<p><code>}</code></p>
+	</li>
+	<li>
+	<p><code>}</code></p>
+	</li>
+</ol>
+
+<p><br />
+消费者1：</p>
+
+<ol>
+	<li>
+	<p><code>public class Recv {</code></p>
+	</li>
+	<li>&nbsp;</li>
+	<li>
+	<p><code>private final static String QUEUE_NAME = &quot;test_queue_topic_1&quot;;</code></p>
+	</li>
+	<li>&nbsp;</li>
+	<li>
+	<p><code>private final static String EXCHANGE_NAME = &quot;test_exchange_topic&quot;;</code></p>
+	</li>
+	<li>&nbsp;</li>
+	<li>
+	<p><code>public static void main(String[] argv) throws Exception {</code></p>
+	</li>
+	<li>&nbsp;</li>
+	<li>
+	<p><code>// 获取到连接以及mq通道</code></p>
+	</li>
+	<li>
+	<p><code>Connection connection = ConnectionUtil.getConnection();</code></p>
+	</li>
+	<li>
+	<p><code>Channel channel = connection.createChannel();</code></p>
+	</li>
+	<li>&nbsp;</li>
+	<li>
+	<p><code>// 声明队列</code></p>
+	</li>
+	<li>
+	<p><code>channel.queueDeclare(QUEUE_NAME, false, false, false, null);</code></p>
+	</li>
+	<li>&nbsp;</li>
+	<li>
+	<p><code>// 绑定队列到交换机</code></p>
+	</li>
+	<li>
+	<p><code>channel.queueBind(QUEUE_NAME, EXCHANGE_NAME, &quot;item.update&quot;);</code></p>
+	</li>
+	<li>
+	<p><code>channel.queueBind(QUEUE_NAME, EXCHANGE_NAME, &quot;item.delete&quot;);</code></p>
+	</li>
+	<li>&nbsp;</li>
+	<li>
+	<p><code>// 同一时刻服务器只会发一条消息给消费者</code></p>
+	</li>
+	<li>
+	<p><code>channel.basicQos(1);</code></p>
+	</li>
+	<li>&nbsp;</li>
+	<li>
+	<p><code>// 定义队列的消费者</code></p>
+	</li>
+	<li>
+	<p><code>QueueingConsumer consumer = new QueueingConsumer(channel);</code></p>
+	</li>
+	<li>
+	<p><code>// 监听队列，手动返回完成</code></p>
+	</li>
+	<li>
+	<p><code>channel.basicConsume(QUEUE_NAME, false, consumer);</code></p>
+	</li>
+	<li>&nbsp;</li>
+	<li>
+	<p><code>// 获取消息</code></p>
+	</li>
+	<li>
+	<p><code>while (true) {</code></p>
+	</li>
+	<li>
+	<p><code>QueueingConsumer.Delivery delivery = consumer.nextDelivery();</code></p>
+	</li>
+	<li>
+	<p><code>String message = new String(delivery.getBody());</code></p>
+	</li>
+	<li>
+	<p><code>System.out.println(&quot; 前台系统： &#39;&quot; + message + &quot;&#39;&quot;);</code></p>
+	</li>
+	<li>
+	<p><code>Thread.sleep(10);</code></p>
+	</li>
+	<li>&nbsp;</li>
+	<li>
+	<p><code>channel.basicAck(delivery.getEnvelope().getDeliveryTag(), false);</code></p>
+	</li>
+	<li>
+	<p><code>}</code></p>
+	</li>
+	<li>
+	<p><code>}</code></p>
+	</li>
+	<li>
+	<p><code>}</code></p>
+	</li>
+</ol>
+
+<p>消费者2：</p>
+
+<ol>
+	<li>
+	<p><code>public class Recv2 {</code></p>
+	</li>
+	<li>&nbsp;</li>
+	<li>
+	<p><code>private final static String QUEUE_NAME = &quot;test_queue_topic_2&quot;;</code></p>
+	</li>
+	<li>&nbsp;</li>
+	<li>
+	<p><code>private final static String EXCHANGE_NAME = &quot;test_exchange_topic&quot;;</code></p>
+	</li>
+	<li>&nbsp;</li>
+	<li>
+	<p><code>public static void main(String[] argv) throws Exception {</code></p>
+	</li>
+	<li>&nbsp;</li>
+	<li>
+	<p><code>// 获取到连接以及mq通道</code></p>
+	</li>
+	<li>
+	<p><code>Connection connection = ConnectionUtil.getConnection();</code></p>
+	</li>
+	<li>
+	<p><code>Channel channel = connection.createChannel();</code></p>
+	</li>
+	<li>&nbsp;</li>
+	<li>
+	<p><code>// 声明队列</code></p>
+	</li>
+	<li>
+	<p><code>channel.queueDeclare(QUEUE_NAME, false, false, false, null);</code></p>
+	</li>
+	<li>&nbsp;</li>
+	<li>
+	<p><code>// 绑定队列到交换机</code></p>
+	</li>
+	<li>
+	<p><code>channel.queueBind(QUEUE_NAME, EXCHANGE_NAME, &quot;item.#&quot;);</code></p>
+	</li>
+	<li>&nbsp;</li>
+	<li>
+	<p><code>// 同一时刻服务器只会发一条消息给消费者</code></p>
+	</li>
+	<li>
+	<p><code>channel.basicQos(1);</code></p>
+	</li>
+	<li>&nbsp;</li>
+	<li>
+	<p><code>// 定义队列的消费者</code></p>
+	</li>
+	<li>
+	<p><code>QueueingConsumer consumer = new QueueingConsumer(channel);</code></p>
+	</li>
+	<li>
+	<p><code>// 监听队列，手动返回完成</code></p>
+	</li>
+	<li>
+	<p><code>channel.basicConsume(QUEUE_NAME, false, consumer);</code></p>
+	</li>
+	<li>&nbsp;</li>
+	<li>
+	<p><code>// 获取消息</code></p>
+	</li>
+	<li>
+	<p><code>while (true) {</code></p>
+	</li>
+	<li>
+	<p><code>QueueingConsumer.Delivery delivery = consumer.nextDelivery();</code></p>
+	</li>
+	<li>
+	<p><code>String message = new String(delivery.getBody());</code></p>
+	</li>
+	<li>
+	<p><code>System.out.println(&quot; 搜索系统： &#39;&quot; + message + &quot;&#39;&quot;);</code></p>
+	</li>
+	<li>
+	<p><code>Thread.sleep(10);</code></p>
+	</li>
+	<li>&nbsp;</li>
+	<li>
+	<p><code>channel.basicAck(delivery.getEnvelope().getDeliveryTag(), false);</code></p>
+	</li>
+	<li>
+	<p><code>}</code></p>
+	</li>
+	<li>
+	<p><code>}</code></p>
+	</li>
+	<li>
+	<p><code>}</code></p>
+	</li>
+</ol>
+
+<p>&nbsp; 消费者1是按需索取，并没有使用通配符模式，而是用的完全匹配，消费者2使用通配符模式，这样以item.开头的消息都会全部接收。</p>
+
+<h1>小结：</h1>
+
+<p>&nbsp; 1.与简单模式和work模式对比，前面两种同一个消息只能被一个消费者获取，而今天的这三种模式，可以实现一个消息被多个消费者 获取。</p>
+
+<p>&nbsp; 2.fanout这种模式没有加入路由器，队列与exchange绑定后，就会接收到所有的消息，其余两种增加了路由键，并且第三种增加通配符，更加便利。</p>

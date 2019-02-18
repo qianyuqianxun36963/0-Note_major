@@ -1,0 +1,151 @@
+<h1><a href="https://www.cnblogs.com/jsonhc/p/7766841.html" id="cb_post_title_url">docker之Dockerfile指令介绍</a></h1>
+
+<p>Docker通过对于在Dockerfile中的一系列指令的顺序解析实现自动的image的构建</p>
+
+<p>　　通过使用build命令，根据Dockerfiel的描述来构建镜像</p>
+
+<p>　　通过源代码路径的方式</p>
+
+<p>　　通过标准输入流的方式</p>
+
+<h2>通过源代码路径：</h2>
+
+<p>　　Dockerfile需要放置在项目的根目录位置</p>
+
+<p>　　在构建的时候，Dockerfile client会把整个context打包发送到Docker Server端，然后由server端负责build镜像，在构建成功后，会删除context目录</p>
+
+<p>　　docker build -t {镜像名字} {项目路径可以是相对路径}</p>
+
+<p>　　docker利用Dockerfile来构建新镜像之前，先来了解一下Dockerfile创建中使用到的指令</p>
+
+<h2>通过标准输入流：</h2>
+
+<p>　　通过标准输入流的方式获取Dockerfile的内容</p>
+
+<p>　　client不会打包上传context目录，因此对于一些ADD、COPY等涉及host本地文件复制的操作不能够支持</p>
+
+<p>　　docker build -t {镜像名字} - &lt; Dockerfile路径</p>
+
+<h2>build cache：</h2>
+
+<p>　　Dockerfile中的每一个指令执行完毕后，都会提交为一个image，这样保证了指令之间不会有影响</p>
+
+<p>　　Dockerfile会尽可能尝试重用之前已经构建的镜像</p>
+
+<p>　　可以通过在build命令中增加--no-cache的方式来禁用这个cache</p>
+
+<h2>Dockerfile指令：</h2>
+
+<p>　　只支持Docker自己定义的一套指令，不支持自定义</p>
+
+<p>　　大小写不敏感，但是建议全部使用大写</p>
+
+<p>　　根据Dockerfile的内容顺序执行</p>
+
+<h2>FROM：</h2>
+
+<p>　　FROM {base镜像}</p>
+
+<p>　　必须放在DOckerfile的第一行，表示从哪个baseimage开始构建</p>
+
+<h2>MAINTAINER：</h2>
+
+<p>　　可选的，用来标识image作者的地方</p>
+
+<h2>RUN：</h2>
+
+<p>　　每一个RUN指令都会是在一个新的container里面运行，并提交为一个image作为下一个RUN的base</p>
+
+<p>　　一个Dockerfile中可以包含多个RUN，按定义顺序执行</p>
+
+<p>　　RUN支持两种运行方式：</p>
+
+<p>　　　　RUN &lt;cmd&gt; 这个会当作/bin/sh -c &ldquo;cmd&rdquo; 运行</p>
+
+<p>　　　　RUN [&ldquo;executable&rdquo;，&ldquo;arg1&rdquo;，。。]，Docker把他当作json的顺序来解析，因此必须使用双引号，而且executable需要是完整路径</p>
+
+<p><code>　　RUN</code>&nbsp;都是启动一个容器、执行命令、然后提交存储层文件变更。第一层&nbsp;<code>RUN command1</code>&nbsp;的执行仅仅是当前进程，一个内存上的变化而已，其结果不会造成任何文件。而到第二层的时候，启动的是一个全新的容器，跟第一层的容器更完全没关系，自然不可能继承前一层构建过程中的内存变化。而如果需要将两条命令或者多条命令联合起来执行需要加上&amp;&amp;。如：cd /usr/local/src &amp;&amp; wget xxxxxxx</p>
+
+<h2>CMD：</h2>
+
+<p>　　CMD的作用是作为执行container时候的默认行为（容器默认的启动命令）</p>
+
+<p>　　当运行container的时候声明了command，则不再用image中的CMD默认所定义的命令</p>
+
+<p>　　一个Dockerfile中只能有一个有效的CMD，当定义多个CMD的时候，只有最后一个才会起作用</p>
+
+<h2>CMD定义的三种方式：</h2>
+
+<p>　　CMD &lt;cmd&gt; 这个会当作/bin/sh -c &quot;cmd&quot;来执行</p>
+
+<p>　　CMD [&quot;executable&quot;,&quot;arg1&quot;,....]</p>
+
+<p>　　CMD [&quot;arg1&quot;,&quot;arg2&quot;]，这个时候CMD作为ENTRYPOINT的参数</p>
+
+<h2>EXPOSE 声明端口</h2>
+
+<p>　　格式为&nbsp;<code>EXPOSE &lt;端口1&gt; [&lt;端口2&gt;...]</code>。</p>
+
+<p><code>　　EXPOSE</code>&nbsp;指令是声明运行时容器提供服务端口，这只是一个声明，在运行时并不会因为这个声明应用就会开启这个端口的服务。在 Dockerfile 中写入这样的声明有两个好处，一个是帮助镜像使用者理解这个镜像服务的守护端口，以方便配置映射；另一个用处则是在运行时使用随机端口映射时，也就是&nbsp;<code>docker run -P</code>&nbsp;时，会自动随机映射&nbsp;<code>EXPOSE</code>&nbsp;的端口。</p>
+
+<h2>entrypoint：</h2>
+
+<p>　　entrypoint的作用是，把整个container变成了一个可执行的文件，这样不能够通过替换CMD的方法来改变创建container的方式。但是可以通过参数传递的方法影响到container内部</p>
+
+<p>　　每个Dockerfile只能够包含一个entrypoint，多个entrypoint只有最后一个有效</p>
+
+<p>　　当定义了entrypoint以后，CMD只能够作为参数进行传递</p>
+
+<h2>entrypoint定义方式：</h2>
+
+<p>　　entrypoint [&quot;executable&quot;,&quot;arg1&quot;,&quot;arg2&quot;]，这种定义方式下，CMD可以通过json的方式来定义entrypoint的参数，可以通过在运行container的时候通过指定command的方式传递参数</p>
+
+<p>　　entrypoint &lt;cmd&gt;，当作/bin/bash -c &quot;cmd&quot;运行命令</p>
+
+<h2>ADD &amp; COPY：</h2>
+
+<p>　　当在源代码构建的方式下，可以通过ADD和COPY的方式，把host上的文件或者目录复制到image中</p>
+
+<p>　　ADD和COPY的源必须在context路径下</p>
+
+<p>　　当src为网络URL的情况下，ADD指令可以把它下载到dest的指定位置，这个在任何build的方式下都可以work</p>
+
+<p>　　ADD相对COPY还有一个多的功能，能够进行自动解压压缩包</p>
+
+<h2>ENV：</h2>
+
+<p>　　ENV key value</p>
+
+<p>　　用来设置环境变量，后续的RUN可以使用它所创建的环境变量</p>
+
+<p>　　当创建基于该镜像的container的时候，会自动拥有设置的环境变量</p>
+
+<h2>WORKDIR：</h2>
+
+<p>　　用来指定当前工作目录（或者称为当前目录）</p>
+
+<p>　　当使用相对目录的情况下，采用上一个WORKDIR指定的目录作为基准</p>
+
+<h2>USER：</h2>
+
+<p>　　指定UID或者username，来决定运行RUN指令的用户</p>
+
+<h2>ONBUILD：</h2>
+
+<p>　　ONBUILD作为一个trigger的标记，可以用来trigger任何Dockerfile中的指令</p>
+
+<p>　　可以定义多个ONBUILD指令</p>
+
+<p>　　当下一个镜像B使用镜像A作为base的时候，在FROM A指令前，会先按照顺序执行在构建A时候定义的ONBUILD指令</p>
+
+<p>　　ONBUILD &lt;DOCKERFILE 指令&gt; &lt;content&gt;</p>
+
+<h2>VOLUME：</h2>
+
+<p>　　用来创建一个在image之外的mount point，用来在多个container之间实现数据共享</p>
+
+<p>　　运行使用json array的方式定义多个volume</p>
+
+<p>　　VOLUME [&quot;/var/data1&quot;,&quot;/var/data2&quot;]</p>
+
+<p>　　或者plain text的情况下定义多个VOLUME指令</p>
