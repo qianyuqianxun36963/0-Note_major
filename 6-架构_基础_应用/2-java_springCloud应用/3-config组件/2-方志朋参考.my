@@ -1,0 +1,317 @@
+<h1>史上最简单的SpringCloud教程 | 第六篇: 分布式配置中心(Spring Cloud Config)(Finchley版本)</h1>
+
+<p>在上一篇文章讲述zuul的时候，已经提到过，使用配置服务来保存各个服务的配置文件。它就是Spring Cloud Config。</p>
+
+<h3>一、简介</h3>
+
+<p>在分布式系统中，由于服务数量巨多，为了方便服务配置文件统一管理，实时更新，所以需要分布式配置中心组件。在Spring Cloud中，有分布式配置中心组件spring cloud config ，它支持配置服务放在配置服务的内存中（即本地），也支持放在远程Git仓库中。在spring cloud config 组件中，分两个角色，一是config server，二是config client。</p>
+
+<h3>二、构建Config Server</h3>
+
+<p>父maven工程省略，父pom文件：</p>
+
+<pre>
+<code>&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot;?&gt;
+&lt;project xmlns=&quot;http://maven.apache.org/POM/4.0.0&quot;
+         xmlns:xsi=&quot;http://www.w3.org/2001/XMLSchema-instance&quot;
+         xsi:schemaLocation=&quot;http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd&quot;&gt;
+    &lt;modelVersion&gt;4.0.0&lt;/modelVersion&gt;
+
+    &lt;groupId&gt;com.forezp&lt;/groupId&gt;
+    &lt;artifactId&gt;sc-f-chapter6&lt;/artifactId&gt;
+    &lt;version&gt;0.0.1-SNAPSHOT&lt;/version&gt;
+    &lt;packaging&gt;pom&lt;/packaging&gt;
+
+    &lt;modules&gt;
+        &lt;module&gt;config-server&lt;/module&gt;
+        &lt;module&gt;config-client&lt;/module&gt;
+    &lt;/modules&gt;
+
+    &lt;name&gt;sc-f-chapter6&lt;/name&gt;
+    &lt;description&gt;Demo project for Spring Boot&lt;/description&gt;
+
+    &lt;parent&gt;
+        &lt;groupId&gt;org.springframework.boot&lt;/groupId&gt;
+        &lt;artifactId&gt;spring-boot-starter-parent&lt;/artifactId&gt;
+        &lt;version&gt;2.0.3.RELEASE&lt;/version&gt;
+        &lt;relativePath/&gt;
+    &lt;/parent&gt;
+
+   
+    &lt;properties&gt;
+        &lt;project.build.sourceEncoding&gt;UTF-8&lt;/project.build.sourceEncoding&gt;
+        &lt;project.reporting.outputEncoding&gt;UTF-8&lt;/project.reporting.outputEncoding&gt;
+        &lt;java.version&gt;1.8&lt;/java.version&gt;
+        &lt;spring-cloud.version&gt;Finchley.RELEASE&lt;/spring-cloud.version&gt;
+    &lt;/properties&gt;
+
+    &lt;dependencies&gt;
+        &lt;dependency&gt;
+            &lt;groupId&gt;org.springframework.boot&lt;/groupId&gt;
+            &lt;artifactId&gt;spring-boot-starter-test&lt;/artifactId&gt;
+            &lt;scope&gt;test&lt;/scope&gt;
+        &lt;/dependency&gt;
+    &lt;/dependencies&gt;
+
+    &lt;dependencyManagement&gt;
+        &lt;dependencies&gt;
+            &lt;dependency&gt;
+                &lt;groupId&gt;org.springframework.cloud&lt;/groupId&gt;
+                &lt;artifactId&gt;spring-cloud-dependencies&lt;/artifactId&gt;
+                &lt;version&gt;${spring-cloud.version}&lt;/version&gt;
+                &lt;type&gt;pom&lt;/type&gt;
+                &lt;scope&gt;import&lt;/scope&gt;
+            &lt;/dependency&gt;
+        &lt;/dependencies&gt;
+    &lt;/dependencyManagement&gt;
+
+    &lt;build&gt;
+        &lt;plugins&gt;
+            &lt;plugin&gt;
+                &lt;groupId&gt;org.springframework.boot&lt;/groupId&gt;
+                &lt;artifactId&gt;spring-boot-maven-plugin&lt;/artifactId&gt;
+            &lt;/plugin&gt;
+        &lt;/plugins&gt;
+    &lt;/build&gt;
+
+
+&lt;/project&gt;
+</code></pre>
+
+<p>创建一个spring-boot项目，取名为config-server,其pom.xml如下：</p>
+
+<pre>
+<code>&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot;?&gt;
+&lt;project xmlns=&quot;http://maven.apache.org/POM/4.0.0&quot; xmlns:xsi=&quot;http://www.w3.org/2001/XMLSchema-instance&quot;
+	xsi:schemaLocation=&quot;http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd&quot;&gt;
+	&lt;modelVersion&gt;4.0.0&lt;/modelVersion&gt;
+
+	&lt;groupId&gt;com.forezp&lt;/groupId&gt;
+	&lt;artifactId&gt;config-server&lt;/artifactId&gt;
+	&lt;version&gt;0.0.1-SNAPSHOT&lt;/version&gt;
+	&lt;packaging&gt;jar&lt;/packaging&gt;
+
+	&lt;name&gt;config-server&lt;/name&gt;
+	&lt;description&gt;Demo project for Spring Boot&lt;/description&gt;
+
+	&lt;parent&gt;
+		&lt;groupId&gt;com.forezp&lt;/groupId&gt;
+		&lt;artifactId&gt;sc-f-chapter6&lt;/artifactId&gt;
+		&lt;version&gt;0.0.1-SNAPSHOT&lt;/version&gt;
+	&lt;/parent&gt;
+
+	&lt;dependencies&gt;
+		&lt;dependency&gt;
+			&lt;groupId&gt;org.springframework.boot&lt;/groupId&gt;
+			&lt;artifactId&gt;spring-boot-starter-web&lt;/artifactId&gt;
+		&lt;/dependency&gt;
+		&lt;dependency&gt;
+			&lt;groupId&gt;org.springframework.cloud&lt;/groupId&gt;
+			&lt;artifactId&gt;spring-cloud-config-server&lt;/artifactId&gt;
+		&lt;/dependency&gt;
+	&lt;/dependencies&gt;
+	&lt;build&gt;
+		&lt;plugins&gt;
+			&lt;plugin&gt;
+				&lt;groupId&gt;org.springframework.boot&lt;/groupId&gt;
+				&lt;artifactId&gt;spring-boot-maven-plugin&lt;/artifactId&gt;
+			&lt;/plugin&gt;
+		&lt;/plugins&gt;
+	&lt;/build&gt;
+
+
+&lt;/project&gt;
+</code></pre>
+
+<p>在程序的入口Application类加上@EnableConfigServer注解开启配置服务器的功能，代码如下：</p>
+
+<pre>
+<code>
+@SpringBootApplication
+@EnableConfigServer
+public class ConfigServerApplication {
+
+	public static void main(String[] args) {
+		SpringApplication.run(ConfigServerApplication.class, args);
+	}
+}
+
+</code></pre>
+
+<p>需要在程序的配置文件application.properties文件配置以下：</p>
+
+<pre>
+<code>spring.application.name=config-server
+server.port=8888
+
+spring.cloud.config.server.git.uri=https://github.com/forezp/SpringcloudConfig/
+spring.cloud.config.server.git.searchPaths=respo
+spring.cloud.config.label=master
+spring.cloud.config.server.git.username=
+spring.cloud.config.server.git.password=
+
+
+</code></pre>
+
+<ul>
+	<li>spring.cloud.config.server.git.uri：配置git仓库地址</li>
+	<li>spring.cloud.config.server.git.searchPaths：配置仓库路径</li>
+	<li>spring.cloud.config.label：配置仓库的分支</li>
+	<li>spring.cloud.config.server.git.username：访问git仓库的用户名</li>
+	<li>spring.cloud.config.server.git.password：访问git仓库的用户密码</li>
+</ul>
+
+<p>如果Git仓库为公开仓库，可以不填写用户名和密码，如果是私有仓库需要填写，本例子是公开仓库，放心使用。</p>
+
+<p>远程仓库https://github.com/forezp/SpringcloudConfig/ 中有个文件config-client-dev.properties文件中有一个属性：</p>
+
+<blockquote>
+<p>foo = foo version 3</p>
+</blockquote>
+
+<p>启动程序：访问http://localhost:8888/foo/dev</p>
+
+<pre>
+<code>{&quot;name&quot;:&quot;foo&quot;,&quot;profiles&quot;:[&quot;dev&quot;],&quot;label&quot;:&quot;master&quot;,
+&quot;version&quot;:&quot;792ffc77c03f4b138d28e89b576900ac5e01a44b&quot;,&quot;state&quot;:null,&quot;propertySources&quot;:[]}
+
+</code></pre>
+
+<p>证明配置服务中心可以从远程程序获取配置信息。</p>
+
+<p>http请求地址和资源文件映射如下:</p>
+
+<ul>
+	<li>/{application}/{profile}[/{label}]</li>
+	<li>/{application}-{profile}.yml</li>
+	<li>/{label}/{application}-{profile}.yml</li>
+	<li>/{application}-{profile}.properties</li>
+	<li>/{label}/{application}-{profile}.properties</li>
+</ul>
+
+<h3>三、构建一个config client</h3>
+
+<p>重新创建一个springboot项目，取名为config-client,其pom文件：</p>
+
+<pre>
+<code>&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot;?&gt;
+&lt;project xmlns=&quot;http://maven.apache.org/POM/4.0.0&quot; xmlns:xsi=&quot;http://www.w3.org/2001/XMLSchema-instance&quot;
+	xsi:schemaLocation=&quot;http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd&quot;&gt;
+	&lt;modelVersion&gt;4.0.0&lt;/modelVersion&gt;
+
+	&lt;groupId&gt;com.forezp&lt;/groupId&gt;
+	&lt;artifactId&gt;config-client&lt;/artifactId&gt;
+	&lt;version&gt;0.0.1-SNAPSHOT&lt;/version&gt;
+	&lt;packaging&gt;jar&lt;/packaging&gt;
+
+	&lt;name&gt;config-client&lt;/name&gt;
+	&lt;description&gt;Demo project for Spring Boot&lt;/description&gt;
+
+	&lt;parent&gt;
+		&lt;groupId&gt;com.forezp&lt;/groupId&gt;
+		&lt;artifactId&gt;sc-f-chapter6&lt;/artifactId&gt;
+		&lt;version&gt;0.0.1-SNAPSHOT&lt;/version&gt;
+	&lt;/parent&gt;
+
+	&lt;dependencies&gt;
+		&lt;dependency&gt;
+			&lt;groupId&gt;org.springframework.boot&lt;/groupId&gt;
+			&lt;artifactId&gt;spring-boot-starter-web&lt;/artifactId&gt;
+		&lt;/dependency&gt;
+		&lt;dependency&gt;
+			&lt;groupId&gt;org.springframework.cloud&lt;/groupId&gt;
+			&lt;artifactId&gt;spring-cloud-starter-config&lt;/artifactId&gt;
+		&lt;/dependency&gt;
+	&lt;/dependencies&gt;
+
+	&lt;build&gt;
+		&lt;plugins&gt;
+			&lt;plugin&gt;
+				&lt;groupId&gt;org.springframework.boot&lt;/groupId&gt;
+				&lt;artifactId&gt;spring-boot-maven-plugin&lt;/artifactId&gt;
+			&lt;/plugin&gt;
+		&lt;/plugins&gt;
+	&lt;/build&gt;
+
+
+&lt;/project&gt;
+
+</code></pre>
+
+<p>其配置文件<strong>bootstrap.properties</strong>：</p>
+
+<pre>
+<code>spring.application.name=config-client
+spring.cloud.config.label=master
+spring.cloud.config.profile=dev
+spring.cloud.config.uri= http://localhost:8888/
+server.port=8881
+
+</code></pre>
+
+<ul>
+	<li>
+	<p>spring.cloud.config.label 指明远程仓库的分支</p>
+	</li>
+	<li>
+	<p>spring.cloud.config.profile</p>
+
+	<ul>
+		<li>dev开发环境配置文件</li>
+		<li>test测试环境</li>
+		<li>pro正式环境</li>
+	</ul>
+	</li>
+	<li>
+	<p>spring.cloud.config.uri=&nbsp;<a href="http://localhost:8888/" rel="nofollow" target="_blank">http://localhost:8888/</a>&nbsp;指明配置服务中心的网址。</p>
+	</li>
+</ul>
+
+<p>程序的入口类，写一个API接口&ldquo;／hi&rdquo;，返回从配置中心读取的foo变量的值，代码如下：</p>
+
+<pre>
+<code>@SpringBootApplication
+@RestController
+public class ConfigClientApplication {
+
+	public static void main(String[] args) {
+		SpringApplication.run(ConfigClientApplication.class, args);
+	}
+
+	@Value(&quot;${foo}&quot;)
+	String foo;
+	@RequestMapping(value = &quot;/hi&quot;)
+	public String hi(){
+		return foo;
+	}
+}
+
+
+</code></pre>
+
+<p>打开网址访问：<a href="http://localhost:8881/hi%EF%BC%8C%E7%BD%91%E9%A1%B5%E6%98%BE%E7%A4%BA%EF%BC%9A" rel="nofollow" target="_blank">http://localhost:8881/hi，网页显示：</a></p>
+
+<blockquote>
+<p>foo version 3</p>
+</blockquote>
+
+<p>这就说明，config-client从config-server获取了foo的属性，而config-server是从git仓库读取的,如图：</p>
+
+<p><img alt="Azure (2).png" src="http://upload-images.jianshu.io/upload_images/2279594-40ecbed6d38573d9.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/600" /></p>
+
+<p>本文源码下载：<br />
+<a href="https://github.com/forezp/SpringCloudLearning/tree/master/sc-f-chapter6" rel="nofollow" target="_blank">https://github.com/forezp/SpringCloudLearning/tree/master/sc-f-chapter6</a></p>
+
+<h3>更多阅读</h3>
+
+<p><a href="https://blog.csdn.net/forezp/article/details/70148833" rel="nofollow" target="_blank">史上最简单的 SpringCloud 教程汇总</a></p>
+
+<p><a href="https://blog.csdn.net/forezp/article/details/70341818" rel="nofollow" target="_blank">SpringBoot教程汇总</a></p>
+
+<p><a href="https://blog.csdn.net/forezp/article/details/85163411" rel="nofollow" target="_blank">Java面试题系列汇总</a></p>
+
+<h3>四、参考资料</h3>
+
+<p><a href="http://blog.csdn.net/forezp/article/details/70037291" rel="nofollow" target="_blank">http://blog.csdn.net/forezp/article/details/70037291</a></p>
+
+<p><a href="http://cloud.spring.io/spring-cloud-static/Finchley.RELEASE/single/spring-cloud.html" rel="nofollow" target="_blank">http://cloud.spring.io/spring-cloud-static/Finchley.RELEASE/single/spring-cloud.html</a></p>

@@ -1,0 +1,189 @@
+<h1>使用SVN命令行解决树冲突(tree conflict)</h1>
+
+<h1>前言</h1>
+
+<hr />
+<p>很多人因为不知道处理冲突就很久很久都不愿意更新代码, 另一些人就是不管三七二十一就选了&quot;theirs conflict&quot;或&quot;mine conflict&quot;, 有时候树冲突根本这两个选项, 他们就强制resolve了, 到最后新代码一提交就把别人代码给覆盖了. 这样给团队合作造成极大的不便, 甚至导致版本故障.<br />
+本文总结最厌恶最难处理的树冲突, 让你从此不再恐惧代码冲突.</p>
+
+<h1>树冲突的产生</h1>
+
+<hr />
+<p>如果一个文件在不同的端都做了修改, 就产生了分歧, svn在�update�或merge时会尝试自动合并, 大部分情况会成功, 但是也有时候会失败, 这个时候就会提示冲突.从局部来看冲突是因为两个端对同一对象进行了修改, 树冲突则是因为两路修改导致了目录结够不一致, <strong>树冲突的现象都是一端modified, 另一端missing</strong>. 树冲突不仅要解决目录结构冲突, 同时可能需要解决普通的文件内容冲突.</p>
+
+<p>在冲突发生时, 先可以用这些命令查看一下状态:</p>
+
+<p>用svn status(st)查看哪些文件冲突了:</p>
+
+<pre>
+<code>$ svn st
+M       code/foo.c
+A  +  C code/bar.c
+      &gt;   local edit, incoming delete upon update
+Summary of conflicts:
+  Tree conflicts: 1
+</code></pre>
+
+<p>用svn info查看冲突信息:</p>
+
+<pre>
+<code>$ svn info code/bar.c
+Path: code/bar.c
+Name: bar.c
+URL: http://svn.example.com/svn/repo/trunk/code/bar.c
+&hellip;
+Tree conflict: local edit, incoming delete upon update
+  Source  left: (file) ^/trunk/code/bar.c@4
+  Source right: (none) ^/trunk/code/bar.c@5
+</code></pre>
+
+<p>也可以用svn log看下何时改的:</p>
+
+<pre>
+<code>$ svn log -r14 ^/trunk
+------------------------------------------------------------------------
+r14 | harry | 2011-09-06 10:38:17 -0400 (Tue, 06 Sep 2011) | 1 line
+Changed paths:
+   M /Makefile
+   D /code/bar.c
+   A /code/baz.c (from /code/bar.c:13)
+
+Rename bar.c to baz.c, and adjust Makefile accordingly.
+</code></pre>
+
+<h1>冲突处理</h1>
+
+<hr />
+<p>我们按文件missing原因和需不需要分类处理</p>
+
+<h2>1. 文件被删除了, 不再需要了</h2>
+
+<p>这种情况就很好处理, 使用相关SVN命令将其删了就可以了.</p>
+
+<ol>
+	<li>服务端modified, 本地missing, 该文件不要了. 这种情况本地不会存在该文件, 直接调用resolve就可以了.</li>
+</ol>
+
+<pre>
+<code>#标记冲突已解决(使用本地的状态, 本地该文件的状态是Delete, 提交后服务端对应的文件就会被删除)
+$ svn resolve --accept=working file_old.c
+</code></pre>
+
+<ol start="2">
+	<li>本地modified, 服务端missing, 该文件不要了. 这种情况本地存在改文件, 所以强制删掉本地的, 再调用resolve</li>
+</ol>
+
+<pre>
+<code>#强制删除本地的文件(发生的文件不加--force是删不掉的)
+$ svn delete --force file_old.c
+#标记冲突已解决(使用服务器状态)
+$ svn resolve --accept=theirs-conflict file_old.c
+#或者使用本地状态也可以, 应该本地的状态跟服务一致了(都是Delete)
+$ svn resolve --accept=working file_old.c
+</code></pre>
+
+<h2>2. 文件被删除了, 但是还需要</h2>
+
+<p>这种情况可能是由于文件被不小心删除了, 重新加回svn就可以了.</p>
+
+<ol>
+	<li>服务端modified, 本地missing, 选择their conflict就可以了</li>
+</ol>
+
+<pre>
+<code>svn resolve --accept=theirs-conflict file.c
+</code></pre>
+
+<ol start="2">
+	<li>本地modified, 服务端missing</li>
+</ol>
+
+<pre>
+<code>svn resolve --accept=working file.c
+</code></pre>
+
+<h2>3. 文件被移走或重命名了</h2>
+
+<p>这种情况的具体场景是A端修改了某文件, B端移动或重命名(简称改路径)了该文件. 这种情况需要分两步处理, 分别是文件内容冲突处理和目录结构冲突处理.<br />
+为了方便描述, 我们把A端修改的文件成为旧文件, B端改路径的文件称为新文件. 我们最终要的是新文件还是旧文件, 在处理时只有细微的区别, 所以我们这里假定我们要的时新文件.<br />
+由于B端改路径之后还可能又做了修改, 下面我们就有无修改分成两种情况来处理.</p>
+
+<ol>
+	<li><strong>文件改路径后无修改</strong>. 这个情况很好处理, 只要把A端的修改重做一遍就可以, 具体做法是, 将A端的修改做成一个补丁, 再将补丁应用于新文件上.</li>
+</ol>
+
+<ul>
+	<li>假设本地是A端(修改了文件--bar.c), 服务端是B端(转移了文件-&gt;baz.c).<br />
+	内容处理:</li>
+</ul>
+
+<pre>
+<code>$ svn diff bar.c &gt; PATCHFILE  #创建补丁文件
+$ vi PATCHFILE  #编辑补丁文件
+...
+---bar.c    (working copy)  #将这行的bar.c改成baz.c
++++bar.c    (working copy)  #将这行的bar.c也改成baz.c
+...
+svn patch PATCHFILE .    #应用补丁到当前目录(补丁只能应用到目录)
+</code></pre>
+
+<p>结构处理:</p>
+
+<pre>
+<code>svn delete --force bar.c    #将已经missing的文件状态改为D
+svn resolve --accept=working bar.c    #标记已解决(此处也可用theirs-conflict)
+</code></pre>
+
+<ul>
+	<li>假如服务端是A端修改了文件, 本地是B端转移了文件, 创建补丁的方法有细微的区别<br />
+	内容处理:</li>
+</ul>
+
+<pre>
+<code>$ svn info bar.c #先使用svn info查看详情
+Tree conflict: local file moved away, incoming file edit upon update
+  Source  left: (file) bar.c@1485
+  Source right: (file) bar.c@1486
+$ svn diff -r1485:1486 bar.c &gt; PATCHFILE  #根据详情创建补丁文件
+$ vi PATCHFILE  #编辑补丁文件
+...
+---bar.c    (working copy)  #将这行的bar.c改成baz.c
++++bar.c    (working copy)  #将这行的bar.c也改成baz.c
+...
+svn patch PATCHFILE .    #应用补丁到当前目录(补丁只能应用到目录)
+</code></pre>
+
+<p>结构处理:</p>
+
+<pre>
+<code>svn resolve --accept=working bar.c   #标记已解决
+</code></pre>
+
+<ol start="2">
+	<li><strong>文件改路径后有修改</strong>. 这种情况目录结构冲突处理跟上面类似, 这里就不再累述了, 但是的文件内容冲突处理比较麻烦, 目前还没有找到自动合并的方法, 需要手动合并, 这里只能是给点建议, 建议是先用svn diff 查看就旧文件的改动作为索引:</li>
+</ol>
+
+<pre>
+<code>$ svn info bar.c #找到旧文件变化的版本
+Tree conflict: local file moved away, incoming file edit upon update
+  Source  left: (file) bar.c@1485
+  Source right: (file) bar.c@1486
+$ svn diff -r1485:1486 bar.c #查看变化的内容
+Index: bar.c
+===================================================================
+--- bar.c   (revision 1485)
++++ bar.c   (revision 1486)
+@@ -3,4 +3,5 @@
+void main()
+{
+printf(&quot;hello&quot;)
++printf(&quot;world&quot;)
+}
+</code></pre>
+
+<p>之后, 在用图形界面工具(如beyond compare)比对旧文件与新文件, 将svn diff里的变更点一个一个手动应用到新文件.</p>
+
+<h1>其他说明</h1>
+
+<hr />
+<p>*由于merge产生的冲突和update产生的冲突现象和处理方法都是一样的, 所以我们这里处理只针对了update, merge产生冲突时, 只要把源分支当成服务端按一致的方法处理就可以了.</p>

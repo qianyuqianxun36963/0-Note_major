@@ -1,0 +1,431 @@
+<h1>SpringCloud之分布式配置中心Spring Cloud Config实例</h1>
+
+<h1>一、简介</h1>
+
+<blockquote>
+<p>Spring Cloud Config是Spring Cloud团队创建的一个全新项目，用来为分布式系统中的基础设施和微服务应用提供集中化的外部配置支持，它分为服务端与客户端两个部分。其中服务端也称为分布式配置中心，它是一个独立的微服务应用，用来连接配置仓库并为客户端提供获取配置信息、加密／解密信息等访问接口；而客户端则是微服务架构中的各个微服务应用或基础设施，它们通过指定的配置中心来管理应用资源与业务相关的配置内容，并在启动的时候从配置中心获取和加载配置信息。Spring Cloud Config实现了对服务端和客户端中环境变量和属性配置的抽象映射，所以它除了适用于Spring构建的应用程序之外，也可以在任何其他语言运行的应用程序中使用。由于Spring Cloud Config实现的配置中心默认采用Git来存储配置信息，所以使用Spring Cloud Config构建的<a href="https://www.baidu.com/s?wd=%E9%85%8D%E7%BD%AE%E6%9C%8D%E5%8A%A1%E5%99%A8&amp;tn=24004469_oem_dg&amp;rsv_dl=gh_pl_sl_csd" target="_blank">配置服务器</a>，天然就支持对微服务应用配置信息的版本管理，并且可以通过Git客户端工具来方便地管理和访问配置内容。</p>
+</blockquote>
+
+<ul>
+	<li>在spring cloud config组件中，分两个角色，一是config server，二是config client。</li>
+</ul>
+
+<h1>二、构建配置中心config-server</h1>
+
+<p><strong>（1）新建一个SpringBoot项目</strong>，命令无要求，需要添加config-server的依赖。</p>
+
+<p><strong>（2）pom.xml</strong></p>
+
+<ol>
+	<li>
+	<p><code>&lt;dependencies&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;dependency&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;groupId&gt;org.springframework.cloud&lt;/groupId&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;artifactId&gt;spring-cloud-config-server&lt;/artifactId&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;/dependency&gt;</code></p>
+	</li>
+	<li>&nbsp;</li>
+	<li>
+	<p><code>&lt;dependency&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;groupId&gt;org.springframework.boot&lt;/groupId&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;artifactId&gt;spring-boot-starter-test&lt;/artifactId&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;scope&gt;test&lt;/scope&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;/dependency&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;/dependencies&gt;</code></p>
+	</li>
+</ol>
+
+<p><strong>（3）入口类</strong></p>
+
+<ol>
+	<li>
+	<p><code>@EnableConfigServer</code></p>
+	</li>
+	<li>
+	<p><code>@SpringBootApplication</code></p>
+	</li>
+	<li>
+	<p><code>public class SpringcloudconfigserverApplication {</code></p>
+	</li>
+	<li>&nbsp;</li>
+	<li>
+	<p><code>public static void main(String[] args) {</code></p>
+	</li>
+	<li>
+	<p><code>SpringApplication.run(SpringcloudconfigserverApplication.class, args);</code></p>
+	</li>
+	<li>
+	<p><code>}</code></p>
+	</li>
+	<li>
+	<p><code>}</code></p>
+	</li>
+</ol>
+
+<p><strong>（4）application.yml</strong></p>
+
+<ol>
+	<li>
+	<p><code>server:</code></p>
+	</li>
+	<li>
+	<p><code>port: 5588</code></p>
+	</li>
+	<li>&nbsp;</li>
+	<li>
+	<p><code>spring:</code></p>
+	</li>
+	<li>
+	<p><code>application:</code></p>
+	</li>
+	<li>
+	<p><code>name: config-server</code></p>
+	</li>
+	<li>
+	<p><code>cloud:</code></p>
+	</li>
+	<li>
+	<p><code>config:</code></p>
+	</li>
+	<li>
+	<p><code>server:</code></p>
+	</li>
+	<li>
+	<p><code>git:</code></p>
+	</li>
+	<li>
+	<p><code>uri: https://gitee.com/smartdt/springcloudconfig.git #配置Git仓库位置。</code></p>
+	</li>
+	<li>
+	<p><code>searchPaths: config-repo #配置仓库路径下的相对搜索位置，可以配置多个。</code></p>
+	</li>
+	<li>
+	<p><code>username: username #访问 Git 仓库的用户名。</code></p>
+	</li>
+	<li>
+	<p><code>password: password #访问 Git 仓库的用户密码。</code></p>
+	</li>
+	<li>
+	<p><code>label: master #配置仓库的分支</code></p>
+	</li>
+	<li>
+	<p><code>###如果Git仓库为公开仓库，可以不填写用户名和密码，如果是私有仓库需要填写。</code></p>
+	</li>
+</ol>
+
+<p>其中Git的配置信息分别表示如下内容：</p>
+
+<ol>
+	<li>spring.cloud.config.server.git.uri: 配置Git仓库位置。</li>
+	<li>spring.cloud.config.server.git.searchPaths: 配置仓库路径下的相对搜索位置，可以配置多个。</li>
+	<li>spring.cloud.config.server.git.username:访问Git仓库的用户名。</li>
+	<li>spring.cloud.config.server.git.password:访问Git仓库的用户密码。</li>
+	<li>如果Git仓库为公开仓库，可以不填写用户名和密码，如果是私有仓库需要填写。</li>
+</ol>
+
+<p>到这里，使用一个通过Spring Cloud Config实现，并使用Git管理配置内容的分布式。</p>
+
+<p>&nbsp;</p>
+
+<p><strong>（5）在Git配置信息中指定的仓库位置</strong>，在https://gitee.com/smartdt/springcloudconfig.git下建立config-repo目录作为配置仓库，并根据不同环境新建下面4个配置文件：</p>
+
+<p><img alt="" src="https://img-blog.csdn.net/20180115160049166?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQvc21hcnRkdA==/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70/gravity/SouthEast" /></p>
+
+<ul>
+	<li>configspace-dev.properties：</li>
+</ul>
+
+<pre>
+
+&nbsp;</pre>
+
+<ol>
+	<li>
+	<p><code>from=git-dev-v1.0 by springcloud config-server</code></p>
+	</li>
+	<li>
+	<p><code>username=springcloud</code></p>
+	</li>
+	<li>
+	<p><code>password=********</code></p>
+	</li>
+</ol>
+
+<ul>
+	<li>configspace-prod.properties：</li>
+</ul>
+
+<pre>
+<code>from=git-prod-v1.0 by springcloud config-server</code></pre>
+
+<ul>
+	<li>configspace-test.properties：</li>
+</ul>
+
+<pre>
+<code>from=git-test-v1.0 by springcloud config-server</code></pre>
+
+<ul>
+	<li>configspace.properties</li>
+</ul>
+
+<pre>
+<code>from=git-default-v1.0 by springcloud config server.</code></pre>
+
+<p><strong>（6）测试：</strong></p>
+
+<p>完成了这些准备工作之后，我们就可以通过浏览器、<a href="http://blog.csdn.net/smartdt/article/details/76085206" rel="nofollow" target="_blank">POSTMAN</a>或<a href="https://www.baidu.com/s?wd=CURL&amp;tn=24004469_oem_dg&amp;rsv_dl=gh_pl_sl_csd" target="_blank">CURL</a>等工具直接来访问我们的配置内容了。访问配置信息的URL与配置文件的映射关系如下所示：</p>
+
+<ol>
+	<li>
+	<p><code><strong>/{application}/{profile}[/{label}]</strong></code></p>
+	</li>
+	<li>
+	<p><code><strong>/{application}-{profile}.yml</strong></code></p>
+	</li>
+	<li>
+	<p><code><strong>/{label}/{application}-{profile}.yml</strong></code></p>
+	</li>
+	<li>
+	<p><code><strong>/{application}-{profile}.properties</strong></code></p>
+	</li>
+	<li>
+	<p><code><strong>/{label}/{application}-{profile}.properties</strong></code></p>
+	</li>
+</ol>
+
+<ul>
+	<li>访问默认：http://localhost:5588/configspace/*</li>
+</ul>
+
+<p><img alt="" src="https://img-blog.csdn.net/20180115160745208?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQvc21hcnRkdA==/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70/gravity/SouthEast" /></p>
+
+<ul>
+	<li>访问http://localhost:5588/configspace/dev</li>
+</ul>
+
+<p><img alt="" src="https://img-blog.csdn.net/20180115160934297?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQvc21hcnRkdA==/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70/gravity/SouthEast" /></p>
+
+<ul>
+	<li>访问http://localhost:5588/configspace/test</li>
+</ul>
+
+<p><img alt="" src="https://img-blog.csdn.net/20180115161034148?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQvc21hcnRkdA==/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70/gravity/SouthEast" /></p>
+
+<ul>
+	<li>访问：http://localhost:5588/configspace/prod</li>
+</ul>
+
+<p><img alt="" src="https://img-blog.csdn.net/20180115161125745?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQvc21hcnRkdA==/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70/gravity/SouthEast" /></p>
+
+<p>&nbsp;</p>
+
+<h1>三、客户端配置映射config-client</h1>
+
+<p>&nbsp;</p>
+
+<p><strong>（1）新建一个SpringBoot项目</strong>，命令无要求，需要添加config的依赖。</p>
+
+<p><strong>（2）pom.xml</strong></p>
+
+<p>&nbsp;</p>
+
+<pre>
+
+&nbsp;</pre>
+
+<ol>
+	<li>
+	<p><code>&lt;dependencies&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;dependency&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;groupId&gt;org.springframework.cloud&lt;/groupId&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;artifactId&gt;spring-cloud-starter-config&lt;/artifactId&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;/dependency&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;dependency&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;groupId&gt;org.springframework.boot&lt;/groupId&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;artifactId&gt;spring-boot-starter-web&lt;/artifactId&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;/dependency&gt;</code></p>
+	</li>
+	<li>&nbsp;</li>
+	<li>
+	<p><code>&lt;dependency&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;groupId&gt;org.springframework.boot&lt;/groupId&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;artifactId&gt;spring-boot-starter-test&lt;/artifactId&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;scope&gt;test&lt;/scope&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;/dependency&gt;</code></p>
+	</li>
+	<li>
+	<p><code>&lt;/dependencies&gt;</code></p>
+	</li>
+</ol>
+
+<p><strong>（2）新建bootstrap.properties</strong></p>
+
+<p>&nbsp;</p>
+
+<pre>
+
+&nbsp;</pre>
+
+<ol>
+	<li>
+	<p><code>spring.application.name=configspace</code></p>
+	</li>
+	<li>
+	<p><code>spring.cloud.config.label=master</code></p>
+	</li>
+	<li>
+	<p><code>spring.cloud.config.profile=dev</code></p>
+	</li>
+	<li>
+	<p><code>spring.cloud.config.uri= http://localhost:5588/</code></p>
+	</li>
+	<li>
+	<p><code>server.port=5589</code></p>
+	</li>
+</ol>
+
+<ul>
+	<li>spring.application.name：对应配置文件规则中的{application} 部分。在这里也就是configspace；</li>
+	<li>spring.cloud.config.profile：对应配置文件规则中的 {profile} 部分。在这里也就是dev；</li>
+	<li>spring.cloud.config.label：对应配置文件规则中的 {label} 部分。在这里就是master；</li>
+	<li>spring.cloud.config.uri：配置中心conigg-server的地址。在这里就是http://localhost:5588/</li>
+</ul>
+
+<p><strong>（3）新建RESTFful接口ConfigController口来返回配置中心的 from 属性</strong></p>
+
+<ol>
+	<li>
+	<p><code>@RefreshScope</code></p>
+	</li>
+	<li>
+	<p><code>@RestController</code></p>
+	</li>
+	<li>
+	<p><code>public class ConfigController {</code></p>
+	</li>
+	<li>&nbsp;</li>
+	<li>
+	<p><code>@Value(&quot;${from}&quot;)</code></p>
+	</li>
+	<li>
+	<p><code>private String from;</code></p>
+	</li>
+	<li>
+	<p><code>@Value(&quot;${username}&quot;)</code></p>
+	</li>
+	<li>
+	<p><code>private String username;</code></p>
+	</li>
+	<li>
+	<p><code>@Value(&quot;${password}&quot;)</code></p>
+	</li>
+	<li>
+	<p><code>private String password;</code></p>
+	</li>
+	<li>&nbsp;</li>
+	<li>
+	<p><code>@RequestMapping(&quot;/from&quot;)</code></p>
+	</li>
+	<li>
+	<p><code>public String from() {</code></p>
+	</li>
+	<li>
+	<p><code>return this.from + &quot;~user:&quot; + this.username + &quot;~pass:&quot; + this.password;</code></p>
+	</li>
+	<li>
+	<p><code>}</code></p>
+	</li>
+	<li>
+	<p><code>}</code></p>
+	</li>
+</ol>
+
+<p><strong>（4）测试</strong></p>
+
+<p>这里配置的http://localhost:5588/，master分支，dev的信息：</p>
+
+<pre>
+<code>git-dev-1.0v and by smartdt~user:springcloudconfig~pass:********</code></pre>
+
+<p><img alt="" src="https://img-blog.csdn.net/20180115162309562?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQvc21hcnRkdA==/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70/gravity/SouthEast" /></p>
+
+<blockquote>
+<p>&nbsp;</p>
+
+<p>通过访问http://localhost:5589/from，得到了http://localhost:5588/configspace/dev分支下from、username、password的信息。</p>
+</blockquote>
+
+<p>&nbsp;</p>
+
+<h1>四、服务端详解</h1>
+
+<p>在动手实践了上面关于SpringCloud Config的基础入门内容之后，在这里我们深入理解一下它是如何运作起来的。<br />
+主要包含下面几个要素:</p>
+
+<ul>
+	<li>远程Git仓库：用来存储配置文件的地方，上例中我们用来存储针对应用名为configspace的多环境配置文件：configspace-{profile}.properties。</li>
+	<li>Config Server: 这是我们上面构建的分布式配置中心，config-server工程，在该工程中指定了所要连接的Git仓库位置以及账户、密码等连接信息。</li>
+	<li>本地Git仓库：在Config Server的文件系统中，每次客户端请求获取配置信息时，Config Server从Git仓库中获取最新配置到本地，然后在本地Git仓库中读取并返回。当远程仓库无法获取时，直接将本地内容返回。</li>
+	<li>Service A、Service B: 具体的微服务应用，它们指定了ConfigServer的地址，从而实现从外部化获取应用自己要用的配置信息。这些应用在启动的时候，会向Config Server请求获取配置信息来进行加载。</li>
+</ul>
+
+<p>&nbsp;</p>
+
+<p><img alt="" src="https://img-blog.csdn.net/20180115162942471?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQvc21hcnRkdA==/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70/gravity/SouthEast" /></p>
+
+<p>客户端应用从配置管理中获取配置信息遵从下面的执行流程：</p>
+
+<p>&nbsp;</p>
+
+<ol>
+	<li>应用启动时，根据bootstrap.properties中配置的应用名{application}、环境名{profile}、分支名{label}, 向ConfigServer请求获取配置信息。</li>
+	<li>Config Server根据自己维护的Git仓库信息和客户端传递过来的配置定位信息去查找配置信息。</li>
+	<li>通过git clone命令将找到的配置信息下载到Config Server的文件系统中。</li>
+	<li>Config Server创建Spring的ApplicalionContext实例，并从Git本地仓库中加载配置文件，最后将这些配置内容读取出来返回给客户端应用。</li>
+	<li>客户端应用在获得外部配置文件后加载到客户端的ApplicationContext实例，该配置内容的优先级高于客户端Jar包内部的配置内容， 所以在Jar包中重复的内容将不再被加载。</li>
+</ol>
+
+<p>&nbsp;</p>
