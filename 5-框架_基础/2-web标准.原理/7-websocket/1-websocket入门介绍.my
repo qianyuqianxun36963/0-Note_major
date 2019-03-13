@@ -1,0 +1,382 @@
+<h1>WebSocket原理及技术</h1>
+
+<p>2018年06月02日 22:28:38&nbsp;<a href="https://me.csdn.net/qq_31001889" target="_blank">chelflan</a>&nbsp;阅读数：534</p>
+
+<p><a href="https://blog.csdn.net/qq_31001889/article/details/80552158"><strong>WebSocket原理及技术简介</strong></a></p>
+
+<p><a href="https://yinqingwang.wordpress.com/" rel="nofollow" target="_blank">Siwind</a>原创，转载请注明。</p>
+
+<p>&nbsp;</p>
+
+<p>WebSocket用于在<a href="https://www.baidu.com/s?wd=Web%E6%B5%8F%E8%A7%88%E5%99%A8&amp;tn=24004469_oem_dg&amp;rsv_dl=gh_pl_sl_csd" target="_blank">Web浏览器</a>和<a href="https://www.baidu.com/s?wd=%E6%9C%8D%E5%8A%A1%E5%99%A8&amp;tn=24004469_oem_dg&amp;rsv_dl=gh_pl_sl_csd" target="_blank">服务器</a>之间进行任意的双向数据传输的一种技术。WebSocket协议基于TCP协议实现，包含初始的握手过程，以及后续的多次数据帧双向传输过程。其目的是在WebSocket应用和WebSocket服务器进行频繁双向通信时，可以使服务器避免打开多个HTTP连接进行工作来节约资源，提高了工作效率和资源利用率。</p>
+
+<h1>1. 引言</h1>
+
+<p>互联网发展的早期，网站上只是一些静态展示页面。用户请求(Request)网站页面，网站回复(Response)页面内容给用户浏览器。因为需求简单，所以也没有很复杂的协议过程。这种形式的Request/Response交互流程如下图所示：</p>
+
+<p>图&nbsp;11 Request/Response</p>
+
+<p>&nbsp;&nbsp;&nbsp;&nbsp;随着互联网技术的发展，带宽逐步提高，用户数也越来越庞大。对互联网的呈现内容提出了要求，随之出现了动态页面技术，对同一个页面，页面的某些部分对不同的访问用户，呈现的内容不同。相关的实现技术有CGI、ASP、PHP、JSP等。由于访问量的增加，WEB服务器同时处理的用户数也达到了万(10K)以上级别，这就是C10K问题：&rdquo;<a href="http://www.kegel.com/c10k.html" rel="nofollow" target="_blank">The C10K problem</a>&rdquo;<sup>[1]</sup>。为了缓解服务器压力，每次Request/Response后连接(TCP连接)继续保持，以及对同一个TCP连接，多次复用Request/Response的方法(也称为Pipeline)也提了出来。这就是HTTP/1.1协议中长连接的主要内容。</p>
+
+<p>&nbsp;&nbsp;&nbsp;&nbsp;伴随移动互联网的发展，大量移动终端和其上的APP应用接入网络，HTML5技术也提了出来，以便支持WEB上的音视频播放、实时游戏、实时聊天等。催生了这样一个<strong>需求</strong>，当服务器有更新时，需要立即将数据发送给客户端，这就是基于服务器端的<strong>推送</strong>技术。</p>
+
+<p>&nbsp;&nbsp;&nbsp;&nbsp;WEBSOCKET之前的解决方法大概这么几种： 1)轮询：客户端设置一个时间间隔，时间到以后，向服务器发送request询问有无新数据，服务器立即返回response，如果有更新则携带更新的数据。2)长连接(long poll): 和轮询相似，但是为阻塞模式的轮询，客户端请求新的数据request, 服务器会阻塞请求，直到有新数据后才返回response给客户端；然后客户端再重复此过程。这两种方式的特点，不断的建立HTTP连接，然后发送请求request，之后服务器等待处理。服务端体现的是一种<strong>被动性</strong>，同时这种处理方式，非常耗费网络带宽和服务器资源。</p>
+
+<p>&nbsp;&nbsp;&nbsp;&nbsp;服务器向客户端<strong>推送更新</strong>时，因为被动性，对低延迟的应用体验不好；因为request/response的交互方式，对网络带宽和服务器带来了额外的负担（例如多次请求的HTTP头部， TCP连接复用会导致的<a href="https://tools.ietf.org/id/draft-scharf-tcpm-reordering-00.html" rel="nofollow" target="_blank">Head-of-Line Blocking</a><a href="https://www.baidu.com/s?wd=%E7%BA%BF%E5%A4%B4%E9%98%BB%E5%A1%9E&amp;tn=24004469_oem_dg&amp;rsv_dl=gh_pl_sl_csd" target="_blank">线头阻塞</a><sup>[2]</sup>等）。如果在单一的TCP连接中，使用双向通信（全双工通信）就能很好的解决此问题。这就是WebSocket技术的缘由。</p>
+
+<p>&nbsp;</p>
+
+<h1>2. WebSocket技术及协议</h1>
+
+<p>WebSocket技术的优点有：1）通过第一次HTTP Request建立了连接之后，后续的数据交换都不用再重新发送HTTP Request，节省了带宽资源； 2) WebSocket的连接是双向通信的连接，在同一个TCP连接上，既可以发送，也可以接收; 3)具有多路复用的功能(multiplexing)，也即几个不同的URI可以复用同一个WebSocket连接。这些特点非常类似TCP连接，但是因为它借用了HTTP协议的一些概念，所以被称为了WebSocket。</p>
+
+<h2>2.1 WebSocket API</h2>
+
+<p><a href="https://www.w3.org/TR/websockets/" rel="nofollow" target="_blank">WebSocket API</a><sup>[3]</sup>, 也称为WebSocket接口(Interface)，定义了Web应用和服务器进行双向通信的公共接口。 如下图所示：</p>
+
+<p>图&nbsp;21 WebSocket API</p>
+
+<p>接口的内容可以分为三类：<strong>状态变量、网络功能和消息处理等</strong>。</p>
+
+<ol>
+	<li>
+	<p>构造函数WebSocket(url, protocols)：构造WebSocket对象，以及建立和服务器连接; protocols可选字段，代表选择的子协议</p>
+	</li>
+	<li>
+	<p>状态变量readyState: 代表当前连接的状态，短整型数据，取值为CONNECTING(值为0)， OPEN(值为1), CLOSING(值为2), CLOSED(值为3)</p>
+	</li>
+	<li>
+	<p>方法变量close(code, reason)： 关闭此WebSocket连接。</p>
+	</li>
+	<li>
+	<p>状态变量bufferedAmount: send函数调用后，被缓存并且未发送到网络上的数据长度</p>
+	</li>
+	<li>
+	<p>方法变量send(data): 将数据data通过此WebSocket发送到对端</p>
+	</li>
+	<li>
+	<p>回调函数onopen/onmessage/onerror/onclose: 当相应的事件发生时会触发此回调函数</p>
+	</li>
+</ol>
+
+<h3>&nbsp;2.1.1&nbsp;示例</h3>
+
+<p>客户端使用例子(JavaScript)：</p>
+
+<p>&nbsp;</p>
+
+<p><strong>[javascript]</strong>&nbsp;<a href="https://blog.csdn.net/qq_31001889/article/details/80552158#" rel="nofollow" target="_self" title="view plain">view plain</a>&nbsp;<a href="https://blog.csdn.net/qq_31001889/article/details/80552158#" rel="nofollow" target="_self" title="copy">copy</a></p>
+
+<ol start="1">
+	<li>var&nbsp;websocket&nbsp;=&nbsp;new&nbsp;WebSocket(&ldquo;ws://www.host.com/path&rdquo;);&nbsp;&nbsp;&nbsp;</li>
+	<li>websocket.onopen&nbsp;=&nbsp;function(evt)&nbsp;{&nbsp;onOpen(evt)&nbsp;};&nbsp;&nbsp;&nbsp;</li>
+	<li>websocket.onclose&nbsp;=&nbsp;function(evt)&nbsp;{&nbsp;onClose(evt)&nbsp;};&nbsp;&nbsp;&nbsp;</li>
+	<li>websocket.onmessage&nbsp;=&nbsp;function(evt)&nbsp;{&nbsp;onMessage(evt)&nbsp;};&nbsp;&nbsp;&nbsp;</li>
+	<li>websocket.onerror&nbsp;=&nbsp;function(evt)&nbsp;{&nbsp;onError(evt)&nbsp;};&nbsp;}&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>function&nbsp;onMessage(evt)&nbsp;{&nbsp;alert(&nbsp;evt.data);&nbsp;}&nbsp;&nbsp;</li>
+	<li>function&nbsp;onError(evt)&nbsp;{&nbsp;alert(&nbsp;evt.data);&nbsp;}&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>websocket.send(&rdquo;client&nbsp;to&nbsp;server&rdquo;);&nbsp;&nbsp;</li>
+</ol>
+
+<pre>
+<code>var websocket = new WebSocket(&quot;ws://www.host.com/path&quot;); 
+websocket.onopen = function(evt) { onOpen(evt) }; 
+websocket.onclose = function(evt) { onClose(evt) }; 
+websocket.onmessage = function(evt) { onMessage(evt) }; 
+websocket.onerror = function(evt) { onError(evt) }; }  
+function onMessage(evt) { alert( evt.data); }
+function onError(evt) { alert( evt.data); }  
+websocket.send(&quot;client to server&quot;);
+</code>
+</pre>
+
+<h2>&nbsp;2.2&nbsp;WebSocket协议</h2>
+
+<p>WebSocket看成是一种类似TCP/IP的socket技术；此socket在Web应用中实现，并获得了和TCP/IP通信一样灵活方便的全双向通信功能。</p>
+
+<p>WebSocket协议由<a href="https://tools.ietf.org/html/rfc6455" rel="nofollow" target="_blank">RFC 6455</a>定义。协议分为两个部分： 握手阶段和数据通信阶段。</p>
+
+<p>WebSocket为应用层协议，其定义在TCP/IP协议栈之上。WebSocket连接服务器的URI以<strong>&ldquo;ws&rdquo;</strong>或者<strong>&ldquo;wss&rdquo;</strong>开头。ws开头的默认TCP端口为80，wss开头的默认端口为443。</p>
+
+<h3>&nbsp;2.2.1&nbsp;握手阶段</h3>
+
+<p>客户端和服务器建立TCP连接之后，客户端发送握手请求，随后服务器发送握手响应即完成握手阶段。如下图所示：</p>
+
+<p>图&nbsp;22 Handshake</p>
+
+<p>客户端握手请求类似如下：</p>
+
+<p>服务器的握手响应类似如下：</p>
+
+<p>需要关闭连接时，任意一方直接发送类型为关闭帧(Close frame)的控制帧数据给对方即可。</p>
+
+<h3>&nbsp;2.2.2&nbsp;数据通信</h3>
+
+<p>WebSocket的数据在发送时，被组织为依次序的一串<strong>数据帧</strong>(data frame)，然后进行传送。</p>
+
+<p>传送的帧类型分为两类：数据帧(data frame)和控制帧(Control frame)。数据帧可以携带文本数据或者二进制数据；控制帧包含关闭帧(Close frame)和Ping/Pong帧。</p>
+
+<p>帧的格式如下所示：</p>
+
+<p><img alt="" src="https://img-blog.csdn.net/20160917203240845" /></p>
+
+<p>其中最重要的字段为opcode(4bit)和MASK(1bit)：</p>
+
+<p>MASK值，从客户端进行发送的帧必须置此位为1，从服务器发送的帧必须置为0。如果任何一方收到的帧不符合此要求，则发送关闭帧(Close frame)关闭连接。​​​​​​​</p>
+
+<p>opcode的值： 0x1代表此帧为文本数据帧, 0x2代表此帧为二进制数据帧, 0x8为控制帧中的连接关闭帧(close frame), 0x9为控制帧中的Ping帧, 0xA(十进制的10)为控制帧中的Pong帧。​​​​​​​</p>
+
+<p>Ping/Pong帧： Ping帧和Pong帧用于连接的保活(keepalive)或者诊断对端是否在线。这两种帧的发送和接收不对WEB应用公开接口，由实现WebSocket协议的底层应用(例如浏览器)来实现它。</p>
+
+<p>&nbsp;</p>
+
+<h3>&nbsp;2.2.3&nbsp;连接关闭</h3>
+
+<p>&nbsp;</p>
+
+<p>任何一端发送关闭帧给对方，即可关闭连接。关闭连接时通常都带有关闭连接的状态码(status code)。常见<strong>状态码</strong>的含义如下：​​​​​​​</p>
+
+<p>1000 连接正常关闭</p>
+
+<p>1001 端点离线，例如服务器down，或者浏览器已经离开此页面​​​​​​​</p>
+
+<p>1002 端点因为协议错误而中断连接​​​​​​​</p>
+
+<p>1003 端点因为受到不能接受的数据类型而中断连接​​​​​​​</p>
+
+<p>1004 保留​​​​​​​</p>
+
+<p>1005 保留, 用于提示应用未收到连接关闭的状态码​​​​​​​</p>
+
+<p>1006 端点异常关闭​​​​​​​</p>
+
+<p>1007 端点收到的数据帧类型不一致而导致连接关闭​​​​​​​</p>
+
+<p>1008 数据违例而关闭连接​​​​​​​</p>
+
+<p>1009 收到的消息数据太大而关闭连接​​​​​​​</p>
+
+<p>1010 客户端因为服务器未协商扩展而关闭​​​​​​​</p>
+
+<p>1011 服务器因为遭遇异常而关闭连接​​​​​​​</p>
+
+<p>1015 TLS握手失败关闭连接</p>
+
+<h3>&nbsp;3.&nbsp;WebSocket示例</h3>
+
+<p>&nbsp;</p>
+
+<p>这里以JAVA+Eclipse+TOMCAT+JDK8+浏览器，做为例子。</p>
+
+<p><strong>具体代码</strong>见<a href="https://github.com/siwind/HelloWebJava" rel="nofollow" target="_blank">github链接</a><strong>:</strong><a href="https://github.com/siwind/HelloWebJava" rel="nofollow" target="_blank"><strong>https://github.com/siwind/HelloWebJava</strong></a></p>
+
+<p>以回声服务器为例，打开Eclipse，新建Web &ndash; Dynamic Web Project项目，项目名称&rdquo;HelloWebJava&rdquo;</p>
+
+<h2>&nbsp;3.1&nbsp;WebSocket服务端</h2>
+
+<p>在项目中新建java类，采用注解的方式，实现OnOpen/OnClose/OnMessage回调方法即可。代码如下：</p>
+
+<ol start="1">
+	<li>import&nbsp;java.io.IOException;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>import&nbsp;javax.websocket.*;&nbsp;&nbsp;</li>
+	<li>import&nbsp;javax.websocket.server.ServerEndpoint;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>@ServerEndpoint(&ldquo;/WSHello&rdquo;)&nbsp;&nbsp;</li>
+	<li>public&nbsp;class&nbsp;HelloEndPoint&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;@OnOpen&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;void&nbsp;onOpen(Session&nbsp;session){&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;System.out.println(&rdquo;Session&nbsp;&rdquo;&nbsp;+&nbsp;session.getId()&nbsp;+&nbsp;&ldquo;&nbsp;has&nbsp;opened&nbsp;a&nbsp;connection&rdquo;);&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;try&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;session.getBasicRemote().sendText(&rdquo;Connection&nbsp;Established&rdquo;);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;catch&nbsp;(IOException&nbsp;ex)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ex.printStackTrace();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;@OnMessage&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;void&nbsp;onMessage(String&nbsp;message,&nbsp;Session&nbsp;session){&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;System.out.println(&rdquo;Message&nbsp;from&nbsp;&rdquo;&nbsp;+&nbsp;session.getId()&nbsp;+&nbsp;&ldquo;:&nbsp;&rdquo;&nbsp;+&nbsp;message);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;try&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;session.getBasicRemote().sendText(message);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;catch&nbsp;(IOException&nbsp;ex)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ex.printStackTrace();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;@OnClose&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;void&nbsp;onClose(Session&nbsp;session){&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;System.out.println(&rdquo;Session&nbsp;&rdquo;&nbsp;+session.getId()+&ldquo;&nbsp;has&nbsp;closed!&rdquo;);&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;/**&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;*&nbsp;注意:&nbsp;OnError()&nbsp;只能出现一次.&nbsp;&nbsp;&nbsp;其中的参数都是可选的。&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;*&nbsp;@param&nbsp;session&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;*&nbsp;@param&nbsp;t&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;*/&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;@OnError&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;public&nbsp;void&nbsp;onError(Session&nbsp;session,&nbsp;Throwable&nbsp;t)&nbsp;{&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;t.printStackTrace();&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</li>
+	<li>}&nbsp;&nbsp;</li>
+</ol>
+
+<pre>
+<code>import java.io.IOException;
+
+import javax.websocket.*;
+import javax.websocket.server.ServerEndpoint;
+
+
+@ServerEndpoint(&quot;/WSHello&quot;)
+public class HelloEndPoint {
+
+    @OnOpen
+    public void onOpen(Session session){
+        System.out.println(&quot;Session &quot; + session.getId() + &quot; has opened a connection&quot;); 
+        try {
+            session.getBasicRemote().sendText(&quot;Connection Established&quot;);
+        } catch (IOException ex) {
+            ex.printStackTrace();
+        }
+    }
+
+
+    @OnMessage
+    public void onMessage(String message, Session session){
+        System.out.println(&quot;Message from &quot; + session.getId() + &quot;: &quot; + message);
+
+        try {
+            session.getBasicRemote().sendText(message);
+        } catch (IOException ex) {
+            ex.printStackTrace();
+        }
+    }
+
+
+    @OnClose
+    public void onClose(Session session){
+        System.out.println(&quot;Session &quot; +session.getId()+&quot; has closed!&quot;);
+    }
+
+    /**
+     * 注意: OnError() 只能出现一次.   其中的参数都是可选的。
+     * @param session
+     * @param t
+     */
+    @OnError
+    public void onError(Session session, Throwable t) {
+        t.printStackTrace();
+    }
+
+}</code>
+</pre>
+
+<h2>3.2&nbsp;WebSocket浏览器客户端</h2>
+
+<p>在项目的WebContent目录下面，新建名称为index.htm的文件，内容如下(部分):</p>
+
+<p>&nbsp;</p>
+
+<p><strong>[javascript]</strong>&nbsp;<a href="https://blog.csdn.net/qq_31001889/article/details/80552158#" rel="nofollow" target="_self" title="view plain">view plain</a>&nbsp;<a href="https://blog.csdn.net/qq_31001889/article/details/80552158#" rel="nofollow" target="_self" title="copy">copy</a></p>
+
+<ol start="1">
+	<li>webSocket&nbsp;=&nbsp;new&nbsp;WebSocket(wsUri);&nbsp;&nbsp;</li>
+	<li>webSocket.onopen&nbsp;=function(event){&nbsp;&nbsp;</li>
+	<li>if(event.data&nbsp;===&nbsp;undefined)&nbsp;&nbsp;</li>
+	<li>return;&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;</li>
+	<li>writeResponse(event.data);&nbsp;&nbsp;</li>
+	<li>};&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;</li>
+	<li>webSocket.onmessage&nbsp;=function(event){&nbsp;&nbsp;</li>
+	<li>writeResponse(event.data);&nbsp;&nbsp;</li>
+	<li>};&nbsp;&nbsp;</li>
+	<li>&nbsp;&nbsp;&nbsp;</li>
+	<li>webSocket.onerror&nbsp;=function(event){&nbsp;&nbsp;</li>
+	<li>writeResponse(&rdquo;&lt;span&nbsp;style=&rsquo;color:&nbsp;red;&rsquo;&gt;ERROR:&nbsp;&lt;/span&gt;Connection&nbsp;error!&nbsp;&rdquo;&nbsp;+&nbsp;event.data);&nbsp;&nbsp;</li>
+	<li>};&nbsp;&nbsp;</li>
+	<li>webSocket.onclose&nbsp;=function(event){&nbsp;&nbsp;</li>
+	<li>writeResponse(&rdquo;&lt;span&nbsp;style=&rsquo;color:&nbsp;blue;&rsquo;&gt;INFO:&nbsp;&lt;/span&gt;Connection&nbsp;closed.&nbsp;code=&rdquo;&nbsp;+&nbsp;event.code);&nbsp;&nbsp;</li>
+	<li>};&nbsp;&nbsp;</li>
+	<li>}&nbsp;&nbsp;</li>
+</ol>
+
+<pre>
+<code>webSocket = new WebSocket(wsUri);
+webSocket.onopen =function(event){
+if(event.data === undefined)
+return;
+
+writeResponse(event.data);
+};
+
+webSocket.onmessage =function(event){
+writeResponse(event.data);
+};
+
+webSocket.onerror =function(event){
+writeResponse(&quot;&lt;span style=&#39;color: red;&#39;&gt;ERROR: &lt;/span&gt;Connection error! &quot; + event.data);
+};
+webSocket.onclose =function(event){
+writeResponse(&quot;&lt;span style=&#39;color: blue;&#39;&gt;INFO: &lt;/span&gt;Connection closed. code=&quot; + event.code);
+};
+}</code>
+</pre>
+
+<h3>3.3&nbsp;部署及运行</h3>
+
+<p>在JDK8环境下，部署到Tomcat8.0.x/Tomcat8.5.x/Wildfly10.x/Glassfish4.x，正常运行。如下图所示：</p>
+
+<p>&nbsp;</p>
+
+<p><img alt="" src="https://img-blog.csdn.net/20160917203241263" /></p>
+
+<p>图&nbsp;31 WebSocket Echo Example</p>
+
+<h1>4. &nbsp;结论</h1>
+
+<p>WebSocket和传统的HTTP交互方式的区别如下图：</p>
+
+<p><img alt="" src="https://img-blog.csdn.net/20160917203241626" /></p>
+
+<p>图&nbsp;41交互方式比较</p>
+
+<p>&nbsp;</p>
+
+<p>WebSocket的<strong>结论</strong>如下：</p>
+
+<ul>
+	<li>
+	<p>基于TCP/IP协议实现</p>
+
+	<p>&nbsp;</p>
+	</li>
+	<li>
+	<p>是一种全双向的通信, 具有底层socket的特点</p>
+
+	<p>&nbsp;</p>
+	</li>
+	<li>
+	<p>节约带宽，节省服务器资源</p>
+
+	<p>&nbsp;</p>
+	</li>
+	<li>
+	<p>是HTML5的技术之一，具有巨大的应用前景</p>
+
+	<p>&nbsp;</p>
+	</li>
+</ul>
+
+<p>&nbsp;</p>
+
+<p>本文的完整示例代码：&nbsp;<a href="https://github.com/siwind/HelloWebJava" rel="nofollow" target="_blank"><strong>https://github.com/siwind/HelloWebJava</strong></a></p>
+
+<p>&nbsp;</p>
