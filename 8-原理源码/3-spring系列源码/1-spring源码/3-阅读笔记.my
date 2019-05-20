@@ -1,0 +1,1005 @@
+<h1>Spring源码阅读笔记(一)：整体架构与核心技术</h1>
+
+<p>2018年06月08日 00:40:06&nbsp;<a href="https://me.csdn.net/u010209217" target="_blank">胖蚂蚁_alleyz</a>&nbsp;阅读数：2949</p>
+
+<p>&nbsp;版权声明：本文为博主原创文章 https://blog.csdn.net/u010209217/article/details/80617310</p>
+
+<blockquote>
+<p>本篇的主要是根据Spring的官方文档加以整理，旨在理解Spring的整体架构与核心技术的基本概念，建立Spring的基本模型.</p>
+</blockquote>
+
+<hr />
+<h1><a name="t0"></a>1. Spring整体架构</h1>
+
+<p>Spring框架是一种分层架构，它包含了一系列的功能，大概由20种模块组成。 这些模块分为<code>核心容器(Core Container)</code>,&nbsp;<code>数据访问/集成(Data Access/Integration)</code>,&nbsp;<code>Web</code>,&nbsp;<code>AOP</code>,&nbsp;<code>工具(Instrumentation)</code>,&nbsp;<code>消息(Messaging)</code>,&nbsp;<code>测试用例(Test)</code>.</p>
+
+<p><img alt="这里写图片描述" src="https://img-blog.csdn.net/2018060800381746?watermark/2/text/aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L3UwMTAyMDkyMTc=/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70" title="" /></p>
+
+<p>1.1&nbsp;<strong>核心容器(Core Container)</strong></p>
+
+<p>包含模块<code>spring-core</code>,&nbsp;<code>spring-beans</code>,&nbsp;<code>spring-context</code>,&nbsp;<code>spring-context-support</code>,<code>spring-expression</code>.</p>
+
+<ul>
+	<li><code>spring-core</code>&nbsp;主要包含Spring框架基本的核心工具类</li>
+	<li><code>spring-beans</code>&nbsp;包含访问配置文件、创建和管理bean以及进行IoC/DI操作的相关类.&nbsp;<strong>BeanFactory</strong></li>
+	<li><code>spring-context</code>&nbsp;构建与<code>Core</code>和<code>Beans</code>之上，继承了Beans的特性，扩展添加了国际化、时间传播、资源加载和对Context的创建和支持。<strong>ApplicationContext</strong></li>
+	<li><code>spring-expression</code>提供 一个强大的表达式语言用于在运行时查询和操作对象，该语言支持<em>设置/获取属性值，属性的分配，方法的调用，访问数组上下文、容器和索引器、逻辑和算是运算符、命名变量以及从Spring的容器中根据名称检索对象</em></li>
+</ul>
+
+<p>1.2&nbsp;<strong>AOP和Instrumentation</strong></p>
+
+<p>包含模块<code>spring-aop</code>,&nbsp;<code>spring-aspects</code>,&nbsp;<code>spring-instrument</code>,&nbsp;<code>spring-instrument-tomcat</code></p>
+
+<ul>
+	<li><code>spring-aop</code>&nbsp;提供了一个AOP联盟标准的面向方面编程的实现，它允许你定义方法拦截器与切入点，从而将逻辑代码与实现函数进行分离。</li>
+	<li><code>spring-aspects</code>&nbsp;提供了与<code>AspectJ</code>的集成</li>
+	<li><code>spring-instrument</code>&nbsp;提供了类工具的支持与<code>classloader</code>的实现，以便在特定的应用服务上使用。</li>
+	<li><code>spring-instrument-tomcat</code>&nbsp;包含了spring对于Tomcat的代理</li>
+</ul>
+
+<p>1.3&nbsp;<strong>消息(Messaging)</strong></p>
+
+<p>spring framework 4 包含了<code>spring-messaging</code>模块，其中使用了来自于<code>spring integration</code>项目的关键抽象，如<code>Message</code>,&nbsp;<code>MessageChannel</code>,&nbsp;<code>MessageHandler</code>等，他们可以作为基于消息的应用服务的基础。该模块还包含了一组可将消息映射到方法的注解，类似于spring-mvc的编程模型.</p>
+
+<p>1.4&nbsp;<strong>数据访问/集成(Data Access/ Integration)</strong></p>
+
+<p>包含<code>spring-jdbc</code>,&nbsp;<code>spring-tx</code>,&nbsp;<code>spring-orm</code>,&nbsp;<code>spring-oxm</code>,&nbsp;<code>spring-jms</code>.</p>
+
+<ul>
+	<li><code>spring-jdbc</code>&nbsp;提供了JDBC抽象层，消除了冗长的JDBC编码和解析数据库厂商特有的错误代码.</li>
+	<li><code>spring-tx</code>&nbsp;为实现了特定接口的类提供了可编程的声明式事务管理支持，对所有的POJOs都适用</li>
+	<li><code>spring-orm</code>&nbsp;提供了对象相关映射(ORM)集成，包含<code>JPA</code>,&nbsp;<code>JDO</code>,&nbsp;<code>Hibernate</code>，使用<code>spring-orm</code>模块可以将这些框架与spring提供的特性结合在一起使用，比如事务管理.</li>
+	<li><code>spring-oxm</code>&nbsp;提供了对Object/Xml Mapping实现的抽象，包括<code>JAXB</code>,<code>Castor</code>,&nbsp;<code>XMLBeans</code>,&nbsp;<code>JiBX</code>以及<code>XStream</code>.</li>
+	<li><code>spring-jms</code>&nbsp;包含了一些生产和消费消息的特性，从<code>spring Framework 4.1</code>开始，提供了与<code>spring-messaging</code>集成.</li>
+</ul>
+
+<p>1.5&nbsp;<strong>Web</strong></p>
+
+<p>包含<code>spring-web</code>,&nbsp;<code>spring-webmvc</code>,&nbsp;<code>spring-websocket</code>,&nbsp;<code>spring-webmvc-portlet</code></p>
+
+<ul>
+	<li><code>spring-web</code>提供了基于面向web集成的特性，如多文件上传功能、通过servlet listener初始化IoC容器与面向web的<code>ApplicationContext</code>，它还包含了HTTP客户端与Spring远程支持的web相关的部分.</li>
+	<li><code>spring-webmvc</code>（又名<code>web-servlet</code>）包含了Spring对于Web应用的MVC与REST实现，Spring MVC框架提供了领域模型代码和Web表单之间的分离，并集成了Spring框架的所有其他特性.</li>
+	<li><code>spring-webmvc-portlet</code>（又名<code>web-portlet</code>）提供了基于Portlet环境使用MVC的实现.</li>
+</ul>
+
+<p>1.6&nbsp;<strong>Test</strong></p>
+
+<p><code>spring-test</code>模块通过Junit或TestNG对spring的组件提供了单元测试和集成测试</p>
+
+<h1><a name="t1"></a>2. 核心技术</h1>
+
+<h2><a name="t2"></a>2.1 IoC容器</h2>
+
+<h3><a name="t3"></a>2.1.1 IoC介绍</h3>
+
+<p>IoC也成为DI(dependency injection), 它是对象定义其依赖关系的过程. 一般对象通过构造器参数、工厂方法参数或者构造(工厂方法返回实例)之后set相应的属性完成依赖配置.&nbsp;<br />
+容器在创建Bean的时候注入这些依赖，这个过程从根本上来说是反转，因此叫做IoC, 它通过直接构建类来控制其初始化或依赖类的位置。这种机制类似<code>服务定位器</code>设计模式。</p>
+
+<p>Spring Framework的IoC容器的基础包是<code>org.springframework.beans</code>与<code>org.springframe.context</code>. 其中接口<code>BeanFactory</code>提供框架配置和基本功能，&nbsp;<br />
+其子接口<code>ApplicationContext</code>增加了更多的企业级功能，如国际化资源处理、事件发布以及应用层特定的上下文(如用于web应用的<code>WebApplicationContext</code>).<code>ApplicationContext</code>是<code>BeanFactory</code>完整的超集.</p>
+
+<h3><a name="t4"></a>2.1.2 容器概述</h3>
+
+<p><code>ApplicationContext</code>接口相当于负责bean的初始化、配置和组装的IoC容器.&nbsp;<br />
+Spring为<code>ApplicationContext</code>提供了一些开箱即用的实现, 独立的应用可以使用<code>ClassPathXmlApplicationContext</code>或者<code>FileSystemXmlApplicationContext</code>，web应用在<code>web.xml</code>配置监听，提供xml位置和<code>org.springframework.web.context.ContextLoaderListener</code>即可初始化<code>WebApplicationContext</code>IoC容器.</p>
+
+<h4>2.1.2.1 配置元数据</h4>
+
+<p>配置元数据配置了应用中实例的实例化、配置以及组装的规则，SpringIoC容器通过此配置进行管理Bean. 配置元数据有以下几种方式：</p>
+
+<ul>
+	<li>基于XML配置： 清晰明了，简单易用</li>
+	<li>基于Java代码配置：无xml,通过<code>@Configuration</code>来声明配置、对象实例化与依赖关系</li>
+	<li>基于Java注解配置：少量的XML(<code>&lt;context:annotation-config/&gt;</code>)，通过注解声明实例化类与依赖关系</li>
+</ul>
+
+<p><strong>后续的分析基于XML配置, 与Java代码和注解大体上的机制是一样</strong></p>
+
+<h4>2.1.2.2 实例化容器</h4>
+
+<p>实例化容器非常简单，只需要提供本地配置路径或者根据<code>ApplicationContext</code>的构造器提供相应的资源(Spring的另一个重要抽象)即可.</p>
+
+<pre>
+<code>ApplicationContext context = new ClassPathXmlApplicationContext(&quot;services.xml&quot;, &quot;daos.xml&quot;);</code></pre>
+
+<ul>
+	<li>1</li>
+</ul>
+
+<p>此处先给出类图， 稍后再做具体分析.</p>
+
+<p><img alt="这里写图片描述" src="https://img-blog.csdn.net/20180608004151416?watermark/2/text/aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L3UwMTAyMDkyMTc=/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70" title="" /></p>
+
+<h3><a name="t5"></a>2.1.3 Bean概述</h3>
+
+<p>spring IoC容器管理了多个根据配置元数据创建的bean. 在容器内部，这些Bean可以描述为<code>BeanDefinition</code>对象，它主要包含这些元数据:</p>
+
+<ul>
+	<li>全类名：通常为Bean的实际实现类</li>
+	<li>Bean的行为配置元素，这种状态描述了bean在容器中的行为，如作用域、生命周期回调等等.</li>
+	<li>当前bean依赖bean的引用: 依赖项</li>
+	<li>新创建对象中的其他配置设置，如池对象bean的池大小限制等.</li>
+</ul>
+
+<p>容器除了通过配置元数据管理bean之外， 还可以通过<code>ApplicationContext</code>的方法<code>getBeanFactory()</code>获取<code>BeanFactory</code>的实现<code>DefaultListableBeanFactory</code>来注册自己的bean, 但通过不建议.</p>
+
+<p><strong>Bean的实例化</strong></p>
+
+<p>可以将bean的定义想象为创建对象的菜谱，容器在请求时查看对应bean的配方(配置元数据)，并使用该配方创建实际对象.</p>
+
+<p>使用XML配置元数据的时候需要指定bean的<code>class</code>属性，class属性强制作为<code>BeanDefinition</code>的<code>getBeanClassName()</code>值，但这个属性不一定是运行时的最终类名(静态工厂方法或者类继承).</p>
+
+<p>使用Class属性有种方式：</p>
+
+<ul>
+	<li>通常，当容器本身通过反射调用其构造函数直接创建bean的时候需要制定Class，这与<code>new ...()</code>操作类似</li>
+	<li>指定包含静态工厂方法的实际类，该方法用于创建对象.</li>
+</ul>
+
+<pre>
+<code>&lt;bean id=&quot;clientService&quot; class=&quot;examples.ClientService&quot; factory-method=&quot;createInstance&quot;/&gt;
+&lt;bean id=&quot;clientService&quot; factory-bean=&quot;serviceLocator&quot; factory-method=&quot;createClientServiceInstance&quot;/&gt;</code></pre>
+
+<ul>
+	<li>1</li>
+	<li>2</li>
+</ul>
+
+<h3><a name="t6"></a>2.1.4 依赖</h3>
+
+<h4>2.1.4.1 Dependency Injection</h4>
+
+<p>使用DI使得代码更加简洁，依赖解耦. 实际对象不需要知道依赖的类的具体实现或依赖项的位置。这更易于测试，尤其是基于接口进行依赖时.</p>
+
+<p>依赖注入方式如下：</p>
+
+<ul>
+	<li>
+	<p><strong>基于构造器的依赖注入</strong></p>
+
+	<pre>
+<code>&lt;beans&gt;
+  &lt;bean id=&quot;foo&quot; class=&quot;x.y.Foo&quot;&gt;
+      &lt;constructor-arg ref=&quot;bar&quot;/&gt;
+      &lt;constructor-arg ref=&quot;baz&quot;/&gt;
+  &lt;/bean&gt;
+
+  &lt;bean id=&quot;exampleBean&quot; class=&quot;examples.ExampleBean&quot;&gt;
+    &lt;constructor-arg type=&quot;int&quot; value=&quot;7500000&quot;/&gt;
+    &lt;constructor-arg type=&quot;java.lang.String&quot; value=&quot;42&quot;/&gt;
+  &lt;/bean&gt;
+
+  &lt;bean id=&quot;exampleBean&quot; class=&quot;examples.ExampleBean&quot;&gt;
+    &lt;constructor-arg index=&quot;0&quot; value=&quot;7500000&quot;/&gt;
+    &lt;constructor-arg index=&quot;1&quot; value=&quot;42&quot;/&gt;
+  &lt;/bean&gt;
+
+  &lt;bean id=&quot;exampleBean&quot; class=&quot;examples.ExampleBean&quot;&gt;
+    &lt;constructor-arg name=&quot;years&quot; value=&quot;7500000&quot;/&gt;
+    &lt;constructor-arg name=&quot;ultimateAnswer&quot; value=&quot;42&quot;/&gt;
+  &lt;/bean&gt;
+&lt;/beans&gt;
+</code></pre>
+
+	<ul>
+		<li>1</li>
+		<li>2</li>
+		<li>3</li>
+		<li>4</li>
+		<li>5</li>
+		<li>6</li>
+		<li>7</li>
+		<li>8</li>
+		<li>9</li>
+		<li>10</li>
+		<li>11</li>
+		<li>12</li>
+		<li>13</li>
+		<li>14</li>
+		<li>15</li>
+		<li>16</li>
+		<li>17</li>
+		<li>18</li>
+		<li>19</li>
+		<li>20</li>
+		<li>21</li>
+		<li>22</li>
+	</ul>
+	</li>
+	<li>
+	<p><strong>基于Setter的依赖注入</strong>&nbsp;<br />
+	<code>ApplicationContext</code>支持基于构造器注入和基于set注入，也支持通过构造器注入后再通过set方法注入.</p>
+
+	<blockquote>
+	<p><strong>使用构造器注入还是使用setter注入？</strong>&nbsp;<br />
+	你可以混合使用两者，构造函数用于强制依赖项，setter方法用于可选依赖项(set方法上加<code>@Required</code>为强制依赖项)&nbsp;<br />
+	Spring团队提倡构造函数注入.&nbsp;<br />
+	set注入的一个好处是对象可以重新配置注入.</p>
+	</blockquote>
+	</li>
+	<li>
+	<p><strong>依赖解析过程</strong></p>
+	</li>
+</ul>
+
+<p>容器执行的解析如下：</p>
+
+<ul>
+	<li>使用配置元数据(xml、java、annotation)来创建和初始化<code>ApplicationContext</code>.</li>
+	<li>对于每个bean, 它的依赖关系可能是属性、构造参数、静态工厂方法。 这些依赖将会在bean实际创建时提供.</li>
+	<li>每个属性或者构造器参数都被设置一个实际定义的值或者引用另一个bean</li>
+	<li>每个属性或者构造器参数的值都会被转换成该属性或构造器的实际类型.</li>
+</ul>
+
+<p>spring在创建容器的时候会验证每个bean的配置，但是在实际创建bean之前不会设置bean本身的属性. 单例作用域的bean在容器创建的时候会被预初始化. 其他的时候bean是在请求的时候才被创建。&nbsp;<br />
+创建一个Bean的时候回创建这个bean的依赖以及依赖的依赖.所以解析一些依赖项的时候出现不匹配问题可能出现的比较晚，比如第一次创建受影响的bean的时候.</p>
+
+<p><code>注意</code>&nbsp;通过构造器注入可能会导致循环引用，如ClassA构造器需要ClassB, 而ClassB的构造器需要ClassA。此时使用set注入可避免此种情况,但尽量避免出现循环引用.</p>
+
+<h4>2.1.4.2 依赖和配置细节</h4>
+
+<ul>
+	<li>直接值（基本类型，字符串等）：可通过<code>&lt;property&gt;</code>元素的<code>value</code>属性指定，也可以使用<code>p-namesoace</code>(<code>xmlns:p=&quot;http://www.springframework.org/schema/p&quot;</code>)指定.</li>
+	<li><code>idref</code>元素：<code>&lt;idref bean=&quot;&quot; /&gt;</code>元素是一种简单的误差检验方式，通过id引用其他的bean.使用<code>idref</code>标签允许容器在部署的时候检测引用的bean是否存在而不是容器部署完成才发现异常.</li>
+	<li>引用其他的bean:<code>&lt;ref&gt;</code>引用其他的bean, 在引用之前将强制设置所需属性.</li>
+	<li>内部bean:&nbsp;<code>&lt;property&gt; &lt;bean ...&gt; &lt;property/&gt;</code></li>
+	<li>集合：&nbsp;<code>&lt;property&gt;</code>内可以配置<code>&lt;props&gt;</code>&nbsp;<code>&lt;list&gt;</code>&nbsp;<code>&lt;map&gt;</code>&nbsp;<code>&lt;set&gt;</code></li>
+</ul>
+
+<h4>2.1.4.3 使用depends-on</h4>
+
+<p>如果一个bean依赖另一个bean，通常作为会作为一个属性. 然而，有时候依赖之间没有明显的关系,如一个类初始化之前需要另一个初始化。&nbsp;<br />
+<code>depends-on</code>属性就明确的声明了初始化当前bean之前应该有那个bean被初始化.<code>&lt;bean id=&quot;beanOne&quot; class=&quot;ExampleBean&quot; depends-on=&quot;manager&quot;/&gt;</code></p>
+
+<h4>2.1.4.4 延迟加载bean</h4>
+
+<p>默认<code>ApplicationContext</code>在初始化流程部分是立即创建配置的所有单例bean.通常这种预先初始化的方式是比较指的肯定的，因为这样在配置或建立环境的时候能立即发现错误。&nbsp;<br />
+但有些时候你可能不想让单例的bean预先初始化，这个时候就可以使用<code>lazy-init</code>属性来告诉IOC容器当第一次请求这个bean时再创建.&nbsp;<br />
+当一个不是lazy init的单例bean依赖一个lazy init的bean时，&nbsp;<code>ApplicationContext</code>在启动的时候会创建lazy init bean.</p>
+
+<h4>2.1.5 自动装配</h4>
+
+<p>Spring容器可以自动装配bean之间的关系. 自动装备具有以下优势:</p>
+
+<ul>
+	<li>显著减少需要指定的属性或构造器参数</li>
+	<li>自动装配可以随着对象的演化而更新配置，例如需要向类中添加新的依赖项时无需修改任何配置就可以满足依赖项.</li>
+</ul>
+
+<p>基于XML的配置可以通过<code>&lt;bean autowire=&#39;&#39;&gt;</code>的属性指定自动装配，它有4种取值：</p>
+
+<ul>
+	<li>no: 不进行自动装配，需要显式的指定引用的对象</li>
+	<li>byName: 通过属性名称自动装配. Spring在容器中寻找与属性名称相同的bean进行装配.</li>
+	<li>byType: 如果在容器中只有一个相应类型的Bean时自动装配, 如果有多个同类的bean则会抛出异常. 如果没有匹配的bean,则属性不会被设置</li>
+	<li>constructor: 类似于byType, 但适用于构造器参数，如果容器中没有此类型的bean, 则会引发致命的错误.</li>
+</ul>
+
+<p><strong>自动装配的限制和缺点</strong></p>
+
+<p>如果项目中始终使用自动装配那是极好的. 如果通常的时候不使用，突然有那么一两个bean使用，那么会造成很多阅读或使用上的疑惑. 自动装配的限制和缺点：</p>
+
+<ul>
+	<li>在<code>property</code>或<code>constructor-arg</code>指定的依赖总司会覆盖自动装配的设置. 不能自动装配简单属性，如基本类型、字符串(这是设计上的限制)。</li>
+	<li>自动装配不如显式装配(通过xml等方式)明确.尽管spring会极力的避免猜错以防止出现意外的结果，但spring管理的对象之间的关系不会被记录下来.</li>
+	<li>从Spring容器生成文档的工具中可能无法获取到装配的信息.</li>
+	<li>容器中的多个bean定义通过指定类型匹配装配时，如果没有唯一的bean可用，则会抛出异常.</li>
+</ul>
+
+<p>在后续的使用场景中，可以选择一下的选项：</p>
+
+<ul>
+	<li>使用显式装配替代自动装配</li>
+	<li>使用基于注解的配置实现更细粒度的控制</li>
+	<li>通过设置<code>&lt;bean autowire-candidate=&quot;false&quot;&gt;</code>避免使用自动装配</li>
+</ul>
+
+<h3><a name="t7"></a>2.1.6 方法注入</h3>
+
+<p>在大多数应用场景中，容器中大多数bean都是单例的. 当一个单例bean使用另一个单例bean，或者一个非单例bean需要组装另一个非单例bean时，通常将其作为属性来处理彼此的依赖。&nbsp;<br />
+那么，<em>一个问题本抛出来了：不同的bean的生命周期不同</em>，假设单例bean A需要使用另一个非单例Bean B时，A只会被创建一次也就只有一次设置属性的机会。容器不能为A每次都提供一个新的B。</p>
+
+<p>解决这个问题有很多种方法，spring提供了一种高级特性&ndash;Method Injection.</p>
+
+<ul>
+	<li>
+	<p><strong>Lookup method injection</strong>（查找方法注入）&nbsp;<br />
+	查找方法注入是容器在容器托管bean上重写方法的能力，以便为容器中的另一个命名bean返回查找结果。查找通常涉及一个原型bean.&nbsp;<br />
+	<em>SpringFramework通过使用CGLIB库来动态生成重写此方法的子类的字节码来实现的</em></p>
+
+	<blockquote>
+	<ul>
+		<li>为了能使动态生成的子类能工作，当前类不能是<code>final</code>并且方法也不能是<code>final</code>修饰</li>
+		<li>单元测试时具有抽象方法的类时需要自己实现此抽象方法</li>
+		<li>扫描为组件的类需要具体的方法</li>
+		<li>一个关键的限制查找方法不能使用工厂方法. 因为此时容器不负责创建实例，因此不能动态生成子类.</li>
+	</ul>
+	</blockquote>
+
+	<p>客户端类的格式：<code>&lt;public|protected&gt; [abstract] &lt;return-type&gt; theMethodName(no-arguments);</code></p>
+
+	<pre>
+<code>public abstract class CommandManager {
+
+public Object process(Object commandState) {
+    // 获取适合command接口的实例
+    Command command = createCommand();
+    // 设置command状态（业务逻辑实现）
+    command.setState(commandState);
+    return command.execute();
+}
+
+// 获取command实例的方法声明， spring通过cglib动态实现此类
+protected abstract Command createCommand();
+}</code></pre>
+
+	<ul>
+		<li>1</li>
+		<li>2</li>
+		<li>3</li>
+		<li>4</li>
+		<li>5</li>
+		<li>6</li>
+		<li>7</li>
+		<li>8</li>
+		<li>9</li>
+		<li>10</li>
+		<li>11</li>
+		<li>12</li>
+		<li>13</li>
+	</ul>
+
+	<p>此处的<code>createCommand()</code>方法为抽象方法，动态生成的类实现此方法，否则动态生成的类重写此方法.</p>
+
+	<p>此例子的XML配置：</p>
+
+	<pre>
+<code>&lt;!-- 原型bean --&gt;
+&lt;bean id=&quot;myCommand&quot; class=&quot;fiona.apple.AsyncCommand&quot; scope=&quot;prototype&quot;&gt;&lt;/bean&gt;
+
+&lt;!-- 通过方法注入原型实例 --&gt;
+&lt;bean id=&quot;commandManager&quot; class=&quot;fiona.apple.CommandManager&quot;&gt;
+    &lt;lookup-method name=&quot;createCommand&quot; bean=&quot;myCommand&quot;/&gt;
+&lt;/bean&gt;</code></pre>
+
+	<ul>
+		<li>1</li>
+		<li>2</li>
+		<li>3</li>
+		<li>4</li>
+		<li>5</li>
+		<li>6</li>
+		<li>7</li>
+	</ul>
+
+	<p>Java注解配置：</p>
+
+	<pre>
+<code>public abstract class CommandManager {
+
+public Object process(Object commandState) {
+    Command command = createCommand();
+    command.setState(commandState);
+    return command.execute();
+}
+
+@Lookup(&quot;myCommand&quot;)
+protected abstract Command createCommand();
+}</code></pre>
+
+	<ul>
+		<li>1</li>
+		<li>2</li>
+		<li>3</li>
+		<li>4</li>
+		<li>5</li>
+		<li>6</li>
+		<li>7</li>
+		<li>8</li>
+		<li>9</li>
+		<li>10</li>
+		<li>11</li>
+	</ul>
+	</li>
+	<li>
+	<p><strong>任意方法替换</strong></p>
+	</li>
+</ul>
+
+<p>实现<code>rg.springframework.beans.factory.support.MethodReplacer</code>定义新的方法.</p>
+
+<pre>
+<code>public class ReplacementComputeValue implements MethodReplacer {
+
+    public Object reimplement(Object o, Method m, Object[] args) throws Throwable {
+        String input = (String) args[0];
+        ...
+        return ...;
+    }
+}
+
+&lt;bean id=&quot;myValueCalculator&quot; class=&quot;x.y.z.MyValueCalculator&quot;&gt;
+    &lt;replaced-method name=&quot;computeValue&quot; replacer=&quot;replacementComputeValue&quot;&gt;
+        &lt;arg-type&gt;String&lt;/arg-type&gt;
+    &lt;/replaced-method&gt;
+&lt;/bean&gt;
+
+&lt;bean id=&quot;replacementComputeValue&quot; class=&quot;a.b.c.ReplacementComputeValue&quot;/&gt;</code></pre>
+
+<ul>
+	<li>1</li>
+	<li>2</li>
+	<li>3</li>
+	<li>4</li>
+	<li>5</li>
+	<li>6</li>
+	<li>7</li>
+	<li>8</li>
+	<li>9</li>
+	<li>10</li>
+	<li>11</li>
+	<li>12</li>
+	<li>13</li>
+	<li>14</li>
+	<li>15</li>
+	<li>16</li>
+</ul>
+
+<h2><a name="t8"></a>2.2 Bean作用域</h2>
+
+<p>bean的作用域主要用来控制单个配置产生的bean实例的数量以及产生的bean实例的作用范围。</p>
+
+<p>spring支持7中作用域，其中5种仅在web的<code>ApplicationContext</code>下起作用.</p>
+
+<ul>
+	<li>singletion: 默认作用域，在每个Spring容器中只有一个定义的bean实例</li>
+	<li>prototype: 一个bean定义有多个实例</li>
+	<li>request: 一个定义的bean的实例的生命周期为一次http request。仅在web下生效</li>
+	<li>session: 一个定义的bean的实例的生命周期为一次http session。仅在web下生效</li>
+	<li>globalSession: 一个定义的bean的实例的生命周期为一次global http request。仅在Portlet下生效</li>
+	<li>application: 一个定义的bean的实例的生命周期为<code>ServletContext</code>，仅在web下生效</li>
+	<li>websocket: 一个定义的bean的实例的生命周期为<code>WebSocket</code></li>
+</ul>
+
+<blockquote>
+<p>spring 3.0 之后，线程作用域也是可用的了.&nbsp;<code>SimpleThreadScope</code>, 通过ThreadLocal实现</p>
+</blockquote>
+
+<ul>
+	<li><strong>singleton scope</strong></li>
+</ul>
+
+<p>当对象为singleton时，IoC容器创建好bean的实例时，会将其缓存，后续所有的请求和引用都返回缓存的对象.</p>
+
+<p>Spring的单例与单例设计模式有所不同的是：单例模式通过在类内部进行硬编码限制返回一个对象，而Spring通过容器缓存来进行单个对象实例的创建于管理.</p>
+
+<ul>
+	<li><strong>prototype scope</strong></li>
+</ul>
+
+<p>当对象为prototype时，IOC容器会为每次的请求（无论是将bean注入到其他对象中还是通过<code>getBean()</code>方法）都创建bean新的实例将其返回。</p>
+
+<p>singleton的实例适合无状态的bean, 而prototype的实例适合有状态的bean.</p>
+
+<p>spring并没有管理prototype bean的完整的生命周期，容器只对bean进行了实例化、配置以及组装，将其交给客户端之后，spring并没有进一步记录这个实例。&nbsp;<br />
+因此，在prototype作用域下实例的销毁生命周期方法并没有被调用. 因而，客户端需要负责释放prototype作用域实例占用的资源. 当然也可以自定义bean的<code>post-processor</code>来交由容器释放.</p>
+
+<ul>
+	<li><strong>Request, session, global session, application, and WebSocket scopes</strong></li>
+</ul>
+
+<p>这些类型的作用域只有在web下生效，如<code>XmlWebApplicationContext</code>，如果使用<code>ClassPathXmlApplicationContext</code>会抛出<code>IllegalStateException</code>异常。</p>
+
+<ul>
+	<li><strong>作用域bean作为依赖</strong></li>
+</ul>
+
+<p>如果想将<code>sope</code>为<code>session</code>的bean注入到生命周期更长的实例中(如<code>scope</code>为<code>singleton</code>的bean), 此时如果用以下方式注入：</p>
+
+<pre>
+<code>    &lt;bean id=&quot;userPreferences&quot; class=&quot;com.foo.UserPreferences&quot; scope=&quot;session&quot;&gt;&lt;/bean&gt;
+
+    &lt;bean id=&quot;userService&quot; class=&quot;com.foo.SimpleUserService&quot;&gt;
+        &lt;property name=&quot;userPreferences&quot; ref=&quot;userPreferences&quot;/&gt;
+    &lt;/bean&gt;</code></pre>
+
+<ul>
+	<li>1</li>
+	<li>2</li>
+	<li>3</li>
+	<li>4</li>
+	<li>5</li>
+</ul>
+
+<p>由于<code>SimpleUserService</code>的<code>scope</code>是<code>singleton</code>仅会被容器初始化一次，所以<code>userService</code>持有的<code>userPreferences</code>对象无法达到预期，每次使用同一个<code>UserPreferences</code>;</p>
+
+<p>为了解决此问题，可以使用<code>&lt;aop:scoped-proxy/&gt;</code>标签，如：</p>
+
+<pre>
+<code>    &lt;!-- HTTP session 作用域的bean暴露一个代理 --&gt;
+    &lt;bean id=&quot;userPreferences&quot; class=&quot;com.foo.UserPreferences&quot; scope=&quot;session&quot;&gt;
+        &lt;!-- 指示容器代理此bean --&gt;
+        &lt;aop:scoped-proxy/&gt;
+    &lt;/bean&gt;
+
+    &lt;!-- 单例作用域的bean注入上边的bean --&gt;
+    &lt;bean id=&quot;userService&quot; class=&quot;com.foo.SimpleUserService&quot;&gt;
+        &lt;!-- 实际引用userPreferences的代理bean --&gt;
+        &lt;property name=&quot;userPreferences&quot; ref=&quot;userPreferences&quot;/&gt;
+    &lt;/bean&gt;</code></pre>
+
+<ul>
+	<li>1</li>
+	<li>2</li>
+	<li>3</li>
+	<li>4</li>
+	<li>5</li>
+	<li>6</li>
+	<li>7</li>
+	<li>8</li>
+	<li>9</li>
+	<li>10</li>
+	<li>11</li>
+</ul>
+
+<p>当bean包含<code>&lt;aop:scoped-proxy/&gt;</code>容器会创建一个和此bean完全相同接口的代理（基于CGLIB的代理），持有此代理引用的bean在每次调用时，先调用代理的方法，代理会从其scope中获取真正的对象。</p>
+
+<ul>
+	<li><strong>选择创建的代理类型</strong>&nbsp;
+
+	<ul>
+		<li>基于CGLIB:默认spring容器基于cglib创建代理类，此种代理类只代理<code>public</code>的方法.而<code>非public</code>并不会委托给真实的类.</li>
+		<li>基于JDK接口: 此种方式意味着代理的bean必须实现至少一个接口，在bean引用中也都是通过接口进行注入的.</li>
+	</ul>
+	</li>
+</ul>
+
+<h2><a name="t9"></a>2.3 自定义作用域</h2>
+
+<p>可以通过实现<code>org.springframework.beans.factory.config.Scope</code>接口自定义作用域或者重写已存在的作用域(<code>singleton</code>与<code>prototype</code>不能被重写)</p>
+
+<h2><a name="t10"></a>2.4 自定义bean的特性</h2>
+
+<h3><a name="t11"></a>2.4.1 生命周期回调</h3>
+
+<ul>
+	<li><strong>bean初始化与销毁回调</strong></li>
+</ul>
+
+<p>可以通过实现<code>InitializingBean</code>和<code>DisposableBean</code>接口参与bean的生命周期交互，容器在初始化bean的时候会调用<code>InitializingBean.afterPropertiesSet()</code>,&nbsp;<br />
+在销毁bean的时候会调用<code>DisposableBean.destroy()</code>方法。也可以通过JSR-250定义的注解<code>@PostConstruct</code>与<code>@PreDestroy</code>达到相同的作用.</p>
+
+<p>在Spring内部使用<code>BeanPostProcessor</code>接口实现类来处理回调接口的.如果需要自定义特性或者干预bean生命周期的行为，可以自己实现<code>BeanPostProcessor</code>接口.</p>
+
+<p>除了初始化和销毁回调之外，Spring管理对象还实现了<code>Lifecycle</code>接口，以便这些对象在容器自身的生命周期的驱动下参与启动和关闭的过程.</p>
+
+<p>如果对象的生命周期方法配置了多个，那么如果相同周期内方法名相同，则方法只会调用一次，如果相同周期内方法名不同，则调用顺序如下：&nbsp;<br />
+- 初始化调用顺序&nbsp;<br />
+- 1.&nbsp;<code>@PostConstruction</code>&nbsp;<br />
+- 2.&nbsp;<code>InitializingBean.afterPropertiesSet</code>&nbsp;<br />
+- 3. 自定义配置<code>init()</code>&nbsp;<br />
+- 销毁调用顺序&nbsp;<br />
+- 1.&nbsp;<code>@PreDestroy</code>&nbsp;<br />
+- 2.&nbsp;<code>DisposableBean.destroy()</code>&nbsp;<br />
+- 3.&nbsp;<code>destroy()</code></p>
+
+<ul>
+	<li><strong>IoC容器启动与关闭回调</strong></li>
+</ul>
+
+<p><code>Lifecycle</code>接口定义了基本的生命周期方法:<code>void start(); void stop(); boolean isRunning();</code></p>
+
+<p>spring管理的任意对象可以实现此接口,然后当<code>ApplicationContext</code>自身接收到启动或停止的信号时,会在其上下文中查找所有的<code>Lifecycle</code>的实现. 这个过程委托给<code>LifecycleProcessor</code>.&nbsp;<br />
+<em><code>LifecycleProcessor</code>本身是<code>Lifecycle</code>的扩展接口，增加了上下文刷新和关闭的响应方法。</em>。</p>
+
+<p>需要注意的是<code>Lifecycle</code>接口只是一个普通的启动/停止通知的契约，但并不意味着在上下文刷新时自动启动。考虑实现<code>SmartLifecycle</code>在指定bean自动启动时进行细粒度的控制.</p>
+
+<p>如果对象之间有依赖关系，这个时候启动或关闭的顺序就非常重要了, 而<code>SmartLifecycle</code>接口继承了<code>Phased</code>接口的方法<code>getPhase()</code>, 此方法会返回一个<code>Integer.MAX_VALUE</code>到<code>Integer.MIN_VALUE</code>范围的阶段值。 当启动的时候，阶段值最低的先启动；当关闭的时候，阶段值最高的先关闭。而实现了<code>Lifecycle</code>而没有实现<code>SmartLifecycle</code>接口的对象默认的<code>阶段值为0</code></p>
+
+<p><strong>如何在非web应用中优雅关机？</strong></p>
+
+<p><code>ConfigurableApplicationContext</code>接口定义了一个<code>registerShutdownHook()</code>方法，此方法的默认实现是在JVM上注册一个关闭钩子(shutdown hook),以实现优雅关机。</p>
+
+<pre>
+<code>public void registerShutdownHook() {
+        if (this.shutdownHook == null) {
+            this.shutdownHook = new Thread() {
+                @Override
+                public void run() {
+                    synchronized (startupShutdownMonitor) {
+                        doClose(); // 具体关闭逻辑
+                    }
+                }
+            };
+            Runtime.getRuntime().addShutdownHook(this.shutdownHook);
+        }
+    }</code></pre>
+
+<ul>
+	<li>1</li>
+	<li>2</li>
+	<li>3</li>
+	<li>4</li>
+	<li>5</li>
+	<li>6</li>
+	<li>7</li>
+	<li>8</li>
+	<li>9</li>
+	<li>10</li>
+	<li>11</li>
+	<li>12</li>
+	<li>13</li>
+</ul>
+
+<h3><a name="t12"></a>2.4.2 ApplicationContextAware and BeanNameAware</h3>
+
+<p>当<code>ApplicationContext</code>创建实现了<code>ApplicationContextAware</code>接口的类时，会调用<code>void setApplicationContext(ApplicationContext applicationContext)</code>提供<code>ApplicationContext</code>的引用。</p>
+
+<p>当<code>ApplicationContext</code>创建实现了<code>BeanNameAware</code>接口的类时，会调用<code>void setBeanName(String name)</code>提供bean在<code>BeanFactory</code>的<code>唯一Id</code>;</p>
+
+<p>这样在需要获取<code>ApplicationContext</code>的时候或者获取bean的时候不需要编写冗余的代码，但随之而来的是违反了IoC的风格，将bean与spring耦合在了一起.</p>
+
+<h3><a name="t13"></a>2.4.3 其他感知接口</h3>
+
+<p>除了<code>ApplicationContextAware</code>与<code>BeanNameAware</code>接口外，Spring还提供了一系列的感知接口，如下：</p>
+
+<ul>
+	<li><code>ApplicationContextAware</code>:&nbsp;<code>ApplicationContext</code>，<code>void setApplicationContext(ApplicationContext applicationContext)</code></li>
+	<li><code>ApplicationEventPublisherAware</code>:&nbsp;<code>ApplicationContext</code>事件发布,&nbsp;<code>void setApplicationEventPublisher(ApplicationEventPublisher applicationEventPublisher)</code></li>
+	<li><code>BeanClassLoaderAware</code>: 加载bean类的类加载器,&nbsp;<code>void setBeanClassLoader(ClassLoader classLoader)</code></li>
+	<li><code>BeanFactoryAware</code>:&nbsp;<code>BeanFactory</code>,&nbsp;<code>void setBeanFactory(BeanFactory beanFactory)</code></li>
+	<li><code>BeanNameAware</code>:&nbsp;<code>void setBeanName(String name);</code></li>
+	<li><code>BootstrapContextAware</code>: 容器运行的资源适配器<code>BootstrapContext</code>,仅在JAC(J2EE连接器)下使用,<code>void setBootstrapContext(BootstrapContext bootstrapContext);</code></li>
+	<li><code>LoadTimeWeaverAware</code>: 类定义加载流程时定义<code>weaver</code>,&nbsp;<code>void setLoadTimeWeaver(LoadTimeWeaver loadTimeWeaver)</code></li>
+	<li><code>MessageSourceAware</code>: 为解析信息（国际化或参数化）配置策略，<code>void setMessageSource(MessageSource messageSource)</code></li>
+	<li><code>NotificationPublisherAware</code>: Spring JMX 通知发布者，&nbsp;<code>void setNotificationPublisher(NotificationPublisher notificationPublisher)</code></li>
+	<li><code>PortletConfigAware</code>: 当前运行容器的<code>PortletConfig</code>,&nbsp;<code>void setPortletConfig(PortletConfig portletConfig);</code></li>
+	<li><code>PortletContextAware</code>: 当前运行容器的<code>PortletContext</code>,&nbsp;<code>void setPortletContext(PortletContext portletContext)</code></li>
+	<li><code>ResourceLoaderAware</code>: 配置用于访问低级资源的加载器，&nbsp;<code>void setResourceLoader(ResourceLoader resourceLoader)</code></li>
+	<li><code>ServletConfigAware</code>: 当前运行容器的<code>ServletConfig</code>,&nbsp;<code>void setServletConfig(ServletConfig servletConfig)</code></li>
+	<li><code>ServletContextAware</code>: 当前运行容器的<code>ServletContext</code>,&nbsp;<code>void setServletContext(ServletContext servletContext)</code></li>
+</ul>
+
+<p><em>使用以上的接口会破坏IOC的风格，因此，建议将实现以上接口的bean作为基础设施</em></p>
+
+<h2><a name="t14"></a>2.5 容器扩展点</h2>
+
+<h3><a name="t15"></a>2.5.1 使用<code>BeanPostProcessor</code>自定义bean</h3>
+
+<p>如果想在容器完成bean的初始化、配置和实例化之前加入一些自己的逻辑，那么可以通过插入一些<code>BeanPostProcessor</code>接口实现类来达到目的。</p>
+
+<p>可以有多个<code>BeanPostProcessor</code>的实例，并且可以通过实现<code>Ordered</code>接口设置其顺序.</p>
+
+<p>当一个<code>BeanPostProcessor</code>实例被注册到容器中后，对于容器中创建的每个bean在其初始化之前之后都会进行回调.一些AOP的基础设施类也是通过实现为<code>BeanPostProcessor</code>来提供代理逻辑.</p>
+
+<p>如果在bean的配置元数据的时候，bean本身实现了<code>BeanPostProcessor</code>，spring容器会自动将其注册到容器中以便后续调用。</p>
+
+<p>使用回调接口或者结合注解自定义<code>BeanPostProcessor</code>是IoC容器通常的扩展方式. 例如Spring的<code>RequiredAnnotationBeanPostProcessor</code>就是<code>BeanPostProcessor</code>的实现，它的作用是确保Java Bean被注解标记的属性是一个可以依赖注入的值.</p>
+
+<h3><a name="t16"></a>2.5.2 使用<code>BeanFactoryPostProcessor</code>自定义配置元</h3>
+
+<p><code>BeanFactoryPostProcessor</code>与<code>BeanPostProcessor</code>重要的不同之处是：<code>BeanFactoryPostProcessor</code>操作的是bean的配置元数据，Spring允许<code>BeanFactoryPostProcessor</code>在容器实例化bean之前读取并修改配置元数据.</p>
+
+<p><code>BeanFactoryPostProcessor</code>可以配置多个，也可以通过实现<code>Ordered</code>接口设置顺序, 但不能将<code>BeanFactoryPostProcessor</code>配置为延迟加载，否则不起作用.</p>
+
+<p>在Spring容器中定义的<code>BeanFactoryPostProcessor</code>可以自动被ApplicationContext执行，Spring中包含了一些农民人的实现，如<code>PropertyOverrideConfigure</code>与<code>PropertyPlaceholderConfigure</code>.</p>
+
+<h3><a name="t17"></a>2.5.3 使用<code>FactoryBean</code>自定义实例化逻辑</h3>
+
+<p><code>FactoryBean</code>接口是IoC实例化逻辑的配置点. 如果有复杂的实例化逻辑，可以创建自己的<code>FactoryBean</code>来实现，并将其插入到容器中.&nbsp;<code>FactoryBean</code>有三个方法：</p>
+
+<pre>
+<code>public interface FactoryBean&lt;T&gt; {
+  T getObject() throws Exception;
+  Class&lt;?&gt; getObjectType();
+  boolean isSingleton();
+}</code></pre>
+
+<ul>
+	<li>1</li>
+	<li>2</li>
+	<li>3</li>
+	<li>4</li>
+	<li>5</li>
+</ul>
+
+<ul>
+	<li><code>getObject()</code>&nbsp;返回当前工厂创建的对象实例，这个实例有可能是共享的</li>
+	<li><code>getObjectType()</code>&nbsp;返回<code>getObject()</code>实例的类型，如果预先不知道则返回<code>null</code></li>
+	<li><code>isSingleton()</code>&nbsp;返回的对象实例是否单例</li>
+</ul>
+
+<p>Spring中大量使用了(超过50个地方)<code>FactoryBean</code>接口，如果想获取产生bean的实际<code>FactoryBean</code>,可在通过在<code>beanName</code>之前加<code>&amp;</code>获取，如:<code>ApplicaionContext.getBean(&quot;&amp;beanName&quot;)</code>.</p>
+
+<h2><a name="t18"></a>2.6 运行环境抽象</h2>
+
+<p><code>Environment</code>是集成在容器应用运行环境的抽象，有两个关键模型：<code>profiles</code>与<code>properties</code>.</p>
+
+<p><code>profile</code>是一个具有名称的逻辑组，它的作用是对bean定义分组，然后在IoC容器启动的时候根据激活的<code>profile</code>注册对应组的bean定义. Bean可以通过XML或者注解被分配到<code>profile</code>上。&nbsp;<br />
+而<code>Environment</code>决定了哪些<code>profile</code>当前是被激活的，哪些<code>profile</code>是需要被默认激活的.</p>
+
+<p><code>properties</code>对于大多数应用来说是一个比较重要的角色，它可能有多个来源：properties文件、JVM系统参数、系统环境变量、JNDI、servlet上下文参数、Map等等.&nbsp;<br />
+<code>Enviroment</code>提供了很方便的用于用户进行配置和解析这些属性的接口服务。</p>
+
+<h3><a name="t19"></a>2.6.1 bean definition profiles</h3>
+
+<p>bean definition profiles是核心容器允许在不同的环境中加载不同bean的一种机制。不同用户对于环境的理解千差万别，一般的使用案例有：</p>
+
+<ul>
+	<li>开发的时候使用内存数据库，QA或者生产环境上使用JNDI的数据源</li>
+	<li>在部署到正式坏境中才注册监控设施</li>
+	<li>为客户A和客户B注册不同的自定义bean实现</li>
+</ul>
+
+<p>注解定义profile:</p>
+
+<pre>
+<code>    @Bean(&quot;dataSource&quot;)
+    @Profile(&quot;development&quot;)
+    public DataSource standaloneDataSource() {
+        return new EmbeddedDatabaseBuilder()
+            .setType(EmbeddedDatabaseType.HSQL)
+            .addScript(&quot;classpath:com/bank/config/sql/schema.sql&quot;)
+            .addScript(&quot;classpath:com/bank/config/sql/test-data.sql&quot;)
+            .build();
+    }</code></pre>
+
+<ul>
+	<li>1</li>
+	<li>2</li>
+	<li>3</li>
+	<li>4</li>
+	<li>5</li>
+	<li>6</li>
+	<li>7</li>
+	<li>8</li>
+	<li>9</li>
+</ul>
+
+<p>XML定义profile:</p>
+
+<pre>
+<code>&lt;beans profile=&quot;development&quot;
+    xmlns=&quot;http://www.springframework.org/schema/beans&quot;
+    xmlns:xsi=&quot;http://www.w3.org/2001/XMLSchema-instance&quot;
+    xmlns:jdbc=&quot;http://www.springframework.org/schema/jdbc&quot;
+    xsi:schemaLocation=&quot;...&quot;&gt;
+
+    &lt;jdbc:embedded-database id=&quot;dataSource&quot;&gt;
+        &lt;jdbc:script location=&quot;classpath:com/bank/config/sql/schema.sql&quot;/&gt;
+        &lt;jdbc:script location=&quot;classpath:com/bank/config/sql/test-data.sql&quot;/&gt;
+    &lt;/jdbc:embedded-database&gt;
+&lt;/beans&gt;</code></pre>
+
+<ul>
+	<li>1</li>
+	<li>2</li>
+	<li>3</li>
+	<li>4</li>
+	<li>5</li>
+	<li>6</li>
+	<li>7</li>
+	<li>8</li>
+	<li>9</li>
+	<li>10</li>
+	<li>11</li>
+</ul>
+
+<p>激活profile:</p>
+
+<pre>
+<code>AnnotationConfigApplicationContext ctx = new AnnotationConfigApplicationContext();
+ctx.getEnvironment().setActiveProfiles(&quot;development&quot;);
+ctx.register(SomeConfig.class, StandaloneDataConfig.class, JndiDataConfig.class);
+ctx.refresh();</code></pre>
+
+<ul>
+	<li>1</li>
+	<li>2</li>
+	<li>3</li>
+	<li>4</li>
+</ul>
+
+<h3><a name="t20"></a>2.6.2 PropertySource抽象</h3>
+
+<p>Spring的<code>Environment</code>抽象提供了对属性资源配置可进行层次查询操作. 在获取一个属性时，<code>Environment</code>回去<code>PropertySource</code>中查找.</p>
+
+<p><code>PropertySource</code>是一个简单的键值对抽象，<code>StandardEnvironment</code>默认会配置两种<code>PropertySource</code>:JVM参数与系统环境变量：</p>
+
+<pre>
+<code>public class StandardEnvironment extends AbstractEnvironment {
+
+    public static final String SYSTEM_ENVIRONMENT_PROPERTY_SOURCE_NAME = &quot;systemEnvironment&quot;;
+    public static final String SYSTEM_PROPERTIES_PROPERTY_SOURCE_NAME = &quot;systemProperties&quot;;
+
+    protected void customizePropertySources(MutablePropertySources propertySources) {
+        propertySources.addLast(new MapPropertySource(SYSTEM_PROPERTIES_PROPERTY_SOURCE_NAME, getSystemProperties()));
+        propertySources.addLast(new SystemEnvironmentPropertySource(SYSTEM_ENVIRONMENT_PROPERTY_SOURCE_NAME, getSystemEnvironment()));
+    }
+}</code></pre>
+
+<ul>
+	<li>1</li>
+	<li>2</li>
+	<li>3</li>
+	<li>4</li>
+	<li>5</li>
+	<li>6</li>
+	<li>7</li>
+	<li>8</li>
+	<li>9</li>
+	<li>10</li>
+</ul>
+
+<blockquote>
+<p><code>StandardEnvironment</code>为单体应用的定义了默认属性资源，&nbsp;<code>StandardServletEnvironment</code>为web应用定义了默认属性资源(除默认资源外，还有servlet配置与servlet上下文属性)</p>
+</blockquote>
+
+<p>属性值搜索是分层的，默认情况下jvm系统参数优先于操作系统环境变量. 需要注意的是属性值不会被合并，只会优先于它的配置覆盖.</p>
+
+<p>属性分级查找例子：<code>StandardServletEnvironment</code>中属性查找顺序：</p>
+
+<ul>
+	<li>
+	<ol>
+		<li>ServletConfig参数</li>
+	</ol>
+	</li>
+	<li>
+	<ol>
+		<li>ServletContext参数</li>
+	</ol>
+	</li>
+	<li>
+	<ol>
+		<li>JNDI环境变量</li>
+	</ol>
+	</li>
+	<li>
+	<ol>
+		<li>JVM系统参数(通过&rsquo;-D&rsquo;命令行添加的参数)</li>
+	</ol>
+	</li>
+	<li>
+	<ol>
+		<li>操作系统环境变量</li>
+	</ol>
+	</li>
+</ul>
+
+<p><code>MutablePropertySources</code>暴露了API用于添加或者修改属性资源以及其查找顺序.</p>
+
+<p><strong><code>@PropertySource</code></strong>注解可用于标记类需要使用到的属性资源.</p>
+
+<h2><a name="t21"></a>2.6 类加载期织入</h2>
+
+<p><code>LoadTimeWeaver</code>用于在JVM加载类的时候动态改变类.</p>
+
+<blockquote>
+<p>在java中，从织入切面的方式上来看，一般由三种织入方式：<code>编译期织入</code>，<code>类加载期织入</code>,&nbsp;<code>运行期织入</code>。&nbsp;<br />
+编译期织入是指在类编译期，采用特殊编译器将切面织入到勒种，如<code>AspectJ</code>通过<code>maven</code>或<code>ant</code>来实现.&nbsp;<br />
+类加载期织入是指在类字节码加载到JVM的时候，采用特殊的<code>类加载器</code>织入切面&nbsp;<br />
+运行期织入是指在运行时通过<code>CGLIB</code>工具或者<code>动态代理</code>的方式织入切面.</p>
+</blockquote>
+
+<p>启用方式：java注解<code>@EnableLoadTimeWeaving</code>或者xml配置<code>&lt;context:load-time-weaver/&gt;</code>.</p>
+
+<p>JPA中使用到了此种方式，<code>LocalContainerEntityManagerFactoryBean</code>.</p>
+
+<h2><a name="t22"></a>2.7 ApplicationContext的附加功能</h2>
+
+<p><code>org.springframework.beans.factory</code>包提供了管理与操作bean的基础功能；&nbsp;<code>org.springframework.context</code>提供了继承自<code>BeanFactory</code>的<code>ApplicationContext</code>接口，它除了扩展其他接口外还提供了更多面向框架编程风格的功能.</p>
+
+<p>为了增强<code>BeanFavtory</code>功能以更面向框架的风格，<code>org.springframework.context</code>还增加了以下功能：</p>
+
+<ul>
+	<li>通过<code>MessageSource</code>接口访问i18n风格的国际化资源</li>
+	<li>通过<code>ResourceLoader</code>接口访问来自于<code>URL</code>或者<code>文件资源</code></li>
+	<li>通过实现<code>ApplicationListener</code>监听<code>ApplicationEventPublisher</code>接口发布的事件</li>
+	<li>加载多层次上下文，允许每一层聚焦于自己的功能.</li>
+</ul>
+
+<h3><a name="t23"></a>2.7.1 标准事件与自定义事件</h3>
+
+<p><code>ApplicationContext</code>提供了<code>ApplicationEvent</code>类与<code>ApplicationListener</code>接口来处理事件. 如果Bean实现了<code>ApplicationListener</code>接口，那么每次<code>ApplicationZEvent</code>被<code>ApplicationContext</code>发布时,这个bean会被通知到, 大体上类似于<code>观察者设计模式</code>.</p>
+
+<blockquote>
+<p>从4.2的版本开始，事件得到了显著的改进，提供更好的基于注解模型发布事件。bean不需要继承<code>ApplicationEvent</code>了.</p>
+</blockquote>
+
+<p>Spring提供的标准事件：</p>
+
+<ul>
+	<li><code>ContextRefreshedEvent</code>: 当<code>ApplicationContext</code>被初始化或者被刷新时被通知。即所有的bean被加载，post-processor bean被检验以及被激活，单例bean已被预先创建，<code>ApplicationContext</code>已经准备好可以使用了. 只要<code>ApplicationContext</code>没有被关闭，就可以触发多次刷新.</li>
+	<li><code>ContextStartedEvent</code>: 当<code>ApplicationContext</code>被启动的时候发布. 被启动以为这所有<code>Lifecycle</code>bean都接收到显式的启动信号。</li>
+	<li><code>ContextStoppedEvent</code>: 当<code>ApplicationContext</code>被停止时发布。被停止意味着所有<code>Lifecycle</code>bean接收到显式的停止信号。</li>
+	<li><code>ContextClosedEvent</code>: 当<code>ApplicationContext</code>被关闭时发布，被关闭意味着所有单例bean被销毁，上下文到达生命的终点，不会被刷新或者被重启</li>
+	<li><code>RequestHandledEvent</code>: web特有事件，当请求完成之后事件被发布</li>
+</ul>
+
+<p>可以通过<code>@EventListener</code>注解监听事件，<code>@Async</code>注解可以异步监听,&nbsp;<code>@Order</code>可以设置触发顺序.</p>
+
+<hr />
+<h1><a name="t24"></a>3. 资源(Resources)</h1>
+
+<p>Java本身的<code>java.net.URL</code>类为处理各种前缀URL提供了一些标准，但不幸的是不能够满足对低级资源的访问.</p>
+
+<p>Spring的<code>Resource</code>接口用于抽象访问低级资源的能力.</p>
+
+<h2><a name="t25"></a>3.1 资源接口</h2>
+
+<pre>
+<code>public interface Resource extends InputStreamSource {
+    boolean exists();
+    boolean isReadable();
+    boolean isOpen();
+    URL getURL() throws IOException;
+    URI getURI() throws IOException;
+    File getFile() throws IOException;
+    long contentLength() throws IOException;
+    long lastModified() throws IOException;
+    Resource createRelative(String relativePath) throws IOException;
+    String getFilename();
+    String getDescription();
+    InputStream getInputStream() throws IOException; // 来源于InputStreamSource接口
+}</code></pre>
+
+<ul>
+	<li>1</li>
+	<li>2</li>
+	<li>3</li>
+	<li>4</li>
+	<li>5</li>
+	<li>6</li>
+	<li>7</li>
+	<li>8</li>
+	<li>9</li>
+	<li>10</li>
+	<li>11</li>
+	<li>12</li>
+	<li>13</li>
+	<li>14</li>
+</ul>
+
+<p>这个接口有一些重要的方法：</p>
+
+<ul>
+	<li><code>getInputStream()</code>: 定位并打开资源，返回一个<code>InputStream</code>，调用者负责关闭输入流</li>
+	<li><code>exists()</code>返回boolean值指明此资源是否真实的存在</li>
+	<li><code>isOpen()</code>返回boolean值指明是否打开了一个流的句柄。一个<code>InputStream</code>不能被使用多次，使用完必须关闭以避免资源泄露.</li>
+	<li><code>getDescription()</code>: 返回资源描述，用于资源出错时输出. 通常是资源名称或资源URL.</li>
+</ul>
+
+<p>Spring中广泛的使用了<code>Resource</code>抽象，当需要资源时，<code>Resource</code>作为方法的签名参数类型，还要一些Spring的API（如<code>ApplicaitonContext</code>的实现类）,提供一个简单的字符串，由上下来适配一个<code>Resource</code>,或者通过制定特殊的字符串前缀来指定<code>Resource</code>的实现类.</p>
+
+<p><code>Reource</code>在不仅Spring中大量使用，自己的代码中也可以使用<code>Resource</code>来替代<code>URL</code>(即使不使用Spring的其他部分).</p>
+
+<h3><a name="t26"></a>3.2 内置的资源实现</h3>
+
+<ul>
+	<li><code>UrlResource</code>: 包装了<code>java.net.URL</code>，可以通过URL访问任何对象，例如文件、http、ftp等，所有的URL都有一个标准的字符串表达方式，前缀代表URL类型，如<code>file:</code>代表文件路径，<code>http:</code>代表http协议的资源,&nbsp;<code>ftp:</code>代表访问FTP资源</li>
+	<li><code>ClassPathResource</code>: 这个类表明应该从<code>classpath</code>加载资源. 使用线程上下文的类加载器、给定的类加载器或者更给定的类加载资源</li>
+	<li><code>FileSystemResource</code>: 处理<code>java.io.File</code>的一个<code>Resource</code>实现</li>
+	<li><code>ServletContextResource</code>:&nbsp;<code>ServletContext</code>资源的实现，用于加载web应用根目录的相对路径下的资源</li>
+	<li><code>InputStreamResource</code>:&nbsp;<code>InputStream</code>资源的实现，仅仅只用于没有指定<code>Resource</code>的实现的时候. 与其他资源实现相比，这个描述的是已经打开的资源。不适用于多次读取流时使用.</li>
+	<li><code>ByteArrayResource</code>: 给定的字节数组的资源实现，可以从给定的字节数组中创建一个<code>ByteArratInputStream</code></li>
+</ul>
+
+<h3><a name="t27"></a>3.3 资源加载器(ResourceLoader)</h3>
+
+<p>所有的<code>ApplicationContext</code>都实现了<code>ResourceLoader</code>接口，因此<code>ApplicationConetxt</code>可以获取<code>Resource</code>实例。当调用<code>getReource()</code>方法时，如果路径没有指定前缀，那将会获得一个适应于上下文的<code>Resource</code>. 如<code>ClassPathXmlApplicationContext</code>获得<code>ClassPathResource</code>，<code>WebApplicationContext</code>获取的<code>ServletContextResource</code>等的。</p>
+
+<h3><a name="t28"></a>3.4&nbsp;<code>ResourceLoaderAware</code>接口</h3>
+
+<p>实现<code>ResourceLoaderAware</code>并将其注册到<code>ApplicationContext</code>后，应用上下文就会执行<code>setResourceLoader(ResourceLoader)</code>方法，提供<code>ResourceLoader</code>引用。</p>
+
+<p>之前也讲过，<code>ApplicationConetxt</code>实现了<code>ResourceLoader</code>，所以它本身就是一个<code>ResourceLoader</code>，所以也可以实现<code>ApplicationContextAware</code>获取到<code>ApplicationContext</code>将其转换为<code>ResourceLoader</code>,但通常不建议这样做，因为很多时候仅仅只是获取<code>ResouceLoader</code>而不是获取整个<code>ApplicationContext</code></p>
+
+<hr />
+<p><code>以上为根据官方文档整理Spring最核心的概念，但并不是全部核心概念(除此之外还包含数据绑定/验证、SpEl、**AOP**)，在后续分析的时候会重新对其进行分析。</code></p>
+
+<hr />
+<p><em>参考资料</em></p>
+
+<p><em><a href="https://docs.spring.io/spring/docs/4.3.18.BUILD-SNAPSHOT/spring-framework-reference/htmlsingle/" rel="nofollow" target="_blank">Spring Framework Reference Documentation</a></em></p>

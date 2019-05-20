@@ -1,0 +1,350 @@
+<p>pipeline{<br />
+agent none<br />
+<br />
+environment {<br />
+GIT_REPO = &quot;http://isource-nj.huawei.com/c00427165/AutotestService.git&quot;<br />
+SVC_PORT = 11114<br />
+PARENT_DIR = &quot;VerificationServitization/2.BackEnd/varificationparent&quot;<br />
+MODULE_NAME = &quot;provider-front_common&quot;<br />
+JAR_DIR = &quot;D:/AiFactoryServices&quot;<br />
+JAR_NAME = &quot;provider-front_common-0.0.1-SNAPSHOT.jar&quot;<br />
+}<br />
+<br />
+//parameters{<br />
+// string(name: &#39;PERSON&#39;, defaultValue: &#39;among&#39;, description: &#39;please input person&#39;)<br />
+// booleanParam(name: &#39;YESORNO&#39;, defaultValue: true, description: &#39;is publish or not&#39;)<br />
+//}<br />
+<br />
+options{<br />
+timeout(time: 6, unit: &#39;MINUTES&#39;)<br />
+}<br />
+<br />
+stages{<br />
+stage(&#39;build&#39;){<br />
+agent {label &#39;windows_build&#39;}<br />
+steps {<br />
+git credentialsId: &#39;b7fc6145-6daa-4384-a7fd-1b83c2657fcd&#39;, url: &quot;&quot;&quot;${GIT_REPO}&quot;&quot;&quot;<br />
+<br />
+bat &quot;&quot;&quot;<br />
+cd ${PARENT_DIR}<br />
+&quot;${MAVEN_HOME}\\bin\\mvn&quot; clean package -pl ${MODULE_NAME} -am -DskipTests=true<br />
+&quot;&quot;&quot;<br />
+<br />
+archiveArtifacts artifacts: &quot;&quot;&quot;${PARENT_DIR}/${MODULE_NAME}/target/*.jar&quot;&quot;&quot;, fingerprint: true, onlyIfSuccessful: true<br />
+//stash includes: &#39;target/*.jar&#39;, name: &#39;demo-service&#39;, useDefaultExcludes: false<br />
+}<br />
+}<br />
+<br />
+stage(&#39;deploy on 10.171.141.237&#39;){<br />
+agent {label &#39;AIFACTORY_10.171.141.237&#39;}<br />
+steps {<br />
+dir(&quot;&quot;&quot;${JAR_DIR}&quot;&quot;&quot;) {<br />
+unarchive mapping: [&quot;&quot;&quot;${PARENT_DIR}/${MODULE_NAME}/target/${JAR_NAME}&quot;&quot;&quot;: &quot;&quot;&quot;${JAR_NAME}&quot;&quot;&quot;]<br />
+}<br />
+<br />
+bat &quot;&quot;&quot;<br />
+set n=0<br />
+for /f &quot;tokens=5&quot; %%i in (&#39;netstat -ano ^| findstr &quot;0.0.0.0:${SVC_PORT}&quot;&#39;) do (<br />
+set n=%%i<br />
+)<br />
+<br />
+if /i %n% gtr 0 (<br />
+taskkill /f /pid %n%<br />
+)<br />
+&quot;&quot;&quot;<br />
+<br />
+bat &quot;&quot;&quot;<br />
+cd /D &quot;${JAR_DIR}&quot;<br />
+start /b java -jar ${JAR_DIR}\\${JAR_NAME} --spring.profiles.active=prod<br />
+&quot;&quot;&quot;<br />
+<br />
+bat &quot;&quot;&quot;<br />
+set pid=0<br />
+<br />
+:loop<br />
+for /f &quot;tokens=5&quot; %%i in (&#39;netstat -ano ^| findstr &quot;0.0.0.0:${SVC_PORT}&quot;&#39;) do (<br />
+set pid=%%i<br />
+)<br />
+<br />
+if /i %pid%==0 (<br />
+ping 1.2.3.4 -n 1 -w 3000 &gt;NUL<br />
+goto loop<br />
+)<br />
+&quot;&quot;&quot;<br />
+}<br />
+}<br />
+<br />
+stage(&#39;deploy on 10.171.108.129&#39;){<br />
+agent {label &#39;AIFACTORY_10.171.108.129&#39;}<br />
+steps {<br />
+dir(&quot;&quot;&quot;${JAR_DIR}&quot;&quot;&quot;) {<br />
+unarchive mapping: [&quot;&quot;&quot;${PARENT_DIR}/${MODULE_NAME}/target/${JAR_NAME}&quot;&quot;&quot;: &quot;&quot;&quot;${JAR_NAME}&quot;&quot;&quot;]<br />
+}<br />
+<br />
+bat &quot;&quot;&quot;<br />
+set n=0<br />
+for /f &quot;tokens=5&quot; %%i in (&#39;netstat -ano ^| findstr &quot;0.0.0.0:${SVC_PORT}&quot;&#39;) do (<br />
+set n=%%i<br />
+)<br />
+<br />
+if /i %n% gtr 0 (<br />
+taskkill /f /pid %n%<br />
+)<br />
+&quot;&quot;&quot;<br />
+<br />
+bat &quot;&quot;&quot;<br />
+cd /D &quot;${JAR_DIR}&quot;<br />
+start /b java -jar ${JAR_DIR}\\${JAR_NAME} --spring.profiles.active=prod<br />
+&quot;&quot;&quot;<br />
+<br />
+bat &quot;&quot;&quot;<br />
+set pid=0<br />
+<br />
+:loop<br />
+for /f &quot;tokens=5&quot; %%i in (&#39;netstat -ano ^| findstr &quot;0.0.0.0:${SVC_PORT}&quot;&#39;) do (<br />
+set pid=%%i<br />
+)<br />
+<br />
+if /i %pid%==0 (<br />
+ping 1.2.3.4 -n 1 -w 3000 &gt;NUL<br />
+goto loop<br />
+)<br />
+&quot;&quot;&quot;<br />
+}<br />
+}<br />
+<br />
+stage(&#39;deploy on 10.120.86.129&#39;){<br />
+agent {label &#39;AIFACTORY_10.120.86.129&#39;}<br />
+steps {<br />
+dir(&quot;&quot;&quot;${JAR_DIR}&quot;&quot;&quot;) {<br />
+unarchive mapping: [&quot;&quot;&quot;${PARENT_DIR}/${MODULE_NAME}/target/${JAR_NAME}&quot;&quot;&quot;: &quot;&quot;&quot;${JAR_NAME}&quot;&quot;&quot;]<br />
+}<br />
+<br />
+bat &quot;&quot;&quot;<br />
+set n=0<br />
+for /f &quot;tokens=5&quot; %%i in (&#39;netstat -ano ^| findstr &quot;0.0.0.0:${SVC_PORT}&quot;&#39;) do (<br />
+set n=%%i<br />
+)<br />
+<br />
+if /i %n% gtr 0 (<br />
+taskkill /f /pid %n%<br />
+)<br />
+&quot;&quot;&quot;<br />
+<br />
+bat &quot;&quot;&quot;<br />
+cd /D &quot;${JAR_DIR}&quot;<br />
+start /b java -jar ${JAR_DIR}\\${JAR_NAME} --spring.profiles.active=prod<br />
+&quot;&quot;&quot;<br />
+<br />
+bat &quot;&quot;&quot;<br />
+set pid=0<br />
+<br />
+:loop<br />
+for /f &quot;tokens=5&quot; %%i in (&#39;netstat -ano ^| findstr &quot;0.0.0.0:${SVC_PORT}&quot;&#39;) do (<br />
+set pid=%%i<br />
+)<br />
+<br />
+if /i %pid%==0 (<br />
+ping 1.2.3.4 -n 1 -w 3000 &gt;NUL<br />
+goto loop<br />
+)<br />
+&quot;&quot;&quot;<br />
+}<br />
+}<br />
+}<br />
+<br />
+post {<br />
+always {<br />
+echo &#39;This will always run&#39;<br />
+}<br />
+success {<br />
+echo &#39;This will run only if successful&#39;<br />
+}<br />
+failure {<br />
+echo &#39;This will run only if failed&#39;<br />
+}<br />
+unstable {<br />
+echo &#39;This will run only if the run was marked as unstable&#39;<br />
+}<br />
+changed {<br />
+echo &#39;This will run only if the state of the Pipeline has changed&#39;<br />
+echo &#39;For example, if the Pipeline was previously failing but is now successful&#39;<br />
+}<br />
+}<br />
+}<br />
+<br />
+<br />
+pipeline{<br />
+agent none<br />
+<br />
+environment {<br />
+GIT_REPO = &quot;http://isource-nj.huawei.com/c00427165/AutotestService.git&quot;<br />
+SVC_PORT = 11114<br />
+PARENT_DIR = &quot;VerificationServitization/2.BackEnd/varificationparent&quot;<br />
+MODULE_NAME = &quot;provider-front_common&quot;<br />
+JAR_DIR = &quot;D:/AiFactoryServices&quot;<br />
+JAR_NAME = &quot;provider-front_common-0.0.1-SNAPSHOT.jar&quot;<br />
+}<br />
+<br />
+//parameters{<br />
+// string(name: &#39;PERSON&#39;, defaultValue: &#39;among&#39;, description: &#39;please input person&#39;)<br />
+// booleanParam(name: &#39;YESORNO&#39;, defaultValue: true, description: &#39;is publish or not&#39;)<br />
+//}<br />
+<br />
+options{<br />
+timeout(time: 6, unit: &#39;MINUTES&#39;)<br />
+}<br />
+<br />
+stages{<br />
+stage(&#39;build&#39;){<br />
+agent {label &#39;windows_build&#39;}<br />
+steps {<br />
+git credentialsId: &#39;b7fc6145-6daa-4384-a7fd-1b83c2657fcd&#39;, url: &quot;&quot;&quot;${GIT_REPO}&quot;&quot;&quot;<br />
+<br />
+bat &quot;&quot;&quot;<br />
+cd ${PARENT_DIR}<br />
+&quot;${MAVEN_HOME}\\bin\\mvn&quot; clean package -pl ${MODULE_NAME} -am -DskipTests=true<br />
+&quot;&quot;&quot;<br />
+<br />
+archiveArtifacts artifacts: &quot;&quot;&quot;${PARENT_DIR}/${MODULE_NAME}/target/*.jar&quot;&quot;&quot;, fingerprint: true, onlyIfSuccessful: true<br />
+//stash includes: &#39;target/*.jar&#39;, name: &#39;demo-service&#39;, useDefaultExcludes: false<br />
+}<br />
+}<br />
+<br />
+stage(&#39;deploy on 10.171.141.237&#39;){<br />
+agent {label &#39;AIFACTORY_10.171.141.237&#39;}<br />
+steps {<br />
+dir(&quot;&quot;&quot;${JAR_DIR}&quot;&quot;&quot;) {<br />
+unarchive mapping: [&quot;&quot;&quot;${PARENT_DIR}/${MODULE_NAME}/target/${JAR_NAME}&quot;&quot;&quot;: &quot;&quot;&quot;${JAR_NAME}&quot;&quot;&quot;]<br />
+}<br />
+<br />
+bat &quot;&quot;&quot;<br />
+set n=0<br />
+for /f &quot;tokens=5&quot; %%i in (&#39;netstat -ano ^| findstr &quot;0.0.0.0:${SVC_PORT}&quot;&#39;) do (<br />
+set n=%%i<br />
+)<br />
+<br />
+if /i %n% gtr 0 (<br />
+taskkill /f /pid %n%<br />
+)<br />
+&quot;&quot;&quot;<br />
+<br />
+bat &quot;&quot;&quot;<br />
+cd /D &quot;${JAR_DIR}&quot;<br />
+start /b java -jar ${JAR_DIR}\\${JAR_NAME} --spring.profiles.active=prod<br />
+&quot;&quot;&quot;<br />
+<br />
+bat &quot;&quot;&quot;<br />
+set pid=0<br />
+<br />
+:loop<br />
+for /f &quot;tokens=5&quot; %%i in (&#39;netstat -ano ^| findstr &quot;0.0.0.0:${SVC_PORT}&quot;&#39;) do (<br />
+set pid=%%i<br />
+)<br />
+<br />
+if /i %pid%==0 (<br />
+ping 1.2.3.4 -n 1 -w 3000 &gt;NUL<br />
+goto loop<br />
+)<br />
+&quot;&quot;&quot;<br />
+}<br />
+}<br />
+<br />
+stage(&#39;deploy on 10.171.108.129&#39;){<br />
+agent {label &#39;AIFACTORY_10.171.108.129&#39;}<br />
+steps {<br />
+dir(&quot;&quot;&quot;${JAR_DIR}&quot;&quot;&quot;) {<br />
+unarchive mapping: [&quot;&quot;&quot;${PARENT_DIR}/${MODULE_NAME}/target/${JAR_NAME}&quot;&quot;&quot;: &quot;&quot;&quot;${JAR_NAME}&quot;&quot;&quot;]<br />
+}<br />
+<br />
+bat &quot;&quot;&quot;<br />
+set n=0<br />
+for /f &quot;tokens=5&quot; %%i in (&#39;netstat -ano ^| findstr &quot;0.0.0.0:${SVC_PORT}&quot;&#39;) do (<br />
+set n=%%i<br />
+)<br />
+<br />
+if /i %n% gtr 0 (<br />
+taskkill /f /pid %n%<br />
+)<br />
+&quot;&quot;&quot;<br />
+<br />
+bat &quot;&quot;&quot;<br />
+cd /D &quot;${JAR_DIR}&quot;<br />
+start /b java -jar ${JAR_DIR}\\${JAR_NAME} --spring.profiles.active=prod<br />
+&quot;&quot;&quot;<br />
+<br />
+bat &quot;&quot;&quot;<br />
+set pid=0<br />
+<br />
+:loop<br />
+for /f &quot;tokens=5&quot; %%i in (&#39;netstat -ano ^| findstr &quot;0.0.0.0:${SVC_PORT}&quot;&#39;) do (<br />
+set pid=%%i<br />
+)<br />
+<br />
+if /i %pid%==0 (<br />
+ping 1.2.3.4 -n 1 -w 3000 &gt;NUL<br />
+goto loop<br />
+)<br />
+&quot;&quot;&quot;<br />
+}<br />
+}<br />
+<br />
+stage(&#39;deploy on 10.120.86.129&#39;){<br />
+agent {label &#39;AIFACTORY_10.120.86.129&#39;}<br />
+steps {<br />
+dir(&quot;&quot;&quot;${JAR_DIR}&quot;&quot;&quot;) {<br />
+unarchive mapping: [&quot;&quot;&quot;${PARENT_DIR}/${MODULE_NAME}/target/${JAR_NAME}&quot;&quot;&quot;: &quot;&quot;&quot;${JAR_NAME}&quot;&quot;&quot;]<br />
+}<br />
+<br />
+bat &quot;&quot;&quot;<br />
+set n=0<br />
+for /f &quot;tokens=5&quot; %%i in (&#39;netstat -ano ^| findstr &quot;0.0.0.0:${SVC_PORT}&quot;&#39;) do (<br />
+set n=%%i<br />
+)<br />
+<br />
+if /i %n% gtr 0 (<br />
+taskkill /f /pid %n%<br />
+)<br />
+&quot;&quot;&quot;<br />
+<br />
+bat &quot;&quot;&quot;<br />
+cd /D &quot;${JAR_DIR}&quot;<br />
+start /b java -jar ${JAR_DIR}\\${JAR_NAME} --spring.profiles.active=prod<br />
+&quot;&quot;&quot;<br />
+<br />
+bat &quot;&quot;&quot;<br />
+set pid=0<br />
+<br />
+:loop<br />
+for /f &quot;tokens=5&quot; %%i in (&#39;netstat -ano ^| findstr &quot;0.0.0.0:${SVC_PORT}&quot;&#39;) do (<br />
+set pid=%%i<br />
+)<br />
+<br />
+if /i %pid%==0 (<br />
+ping 1.2.3.4 -n 1 -w 3000 &gt;NUL<br />
+goto loop<br />
+)<br />
+&quot;&quot;&quot;<br />
+}<br />
+}<br />
+}<br />
+<br />
+post {<br />
+always {<br />
+echo &#39;This will always run&#39;<br />
+}<br />
+success {<br />
+echo &#39;This will run only if successful&#39;<br />
+}<br />
+failure {<br />
+echo &#39;This will run only if failed&#39;<br />
+}<br />
+unstable {<br />
+echo &#39;This will run only if the run was marked as unstable&#39;<br />
+}<br />
+changed {<br />
+echo &#39;This will run only if the state of the Pipeline has changed&#39;<br />
+echo &#39;For example, if the Pipeline was previously failing but is now successful&#39;<br />
+}<br />
+}<br />
+}</p>

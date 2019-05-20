@@ -1,0 +1,218 @@
+<h1>在Ubuntu 14.04上安装和配置OpenShift Origin(OKD)</h1>
+
+<h2>在Ubuntu 14.04上安装Docker CE</h2>
+
+<p>安装docker，过程略。</p>
+
+<h2>在Ubuntu 14.04上下载安装OpenShift Origin</h2>
+
+<p>下载OpenShift客户端实用程序，用于在Ubuntu 14.04上引导Openshift Origin，当前所用的版本是3.11.0：<br />
+wget https://github.com/openshift/origin/releases/download/v3.11.0/openshift-origin-client-tools-v3.11.0-0cbc58b-linux-64bit.tar.gz<br />
+解压缩下载的文件：<br />
+tar xvf openshift-origin-client-tools-v3.11.0-0cbc58b-linux-64bit.tar.gz<br />
+或采用：<br />
+tar xvf openshift-origin-client-tools*.tar.gz<br />
+切换到创建的文件夹并将kubectl和oc二进制文件复制到/usr/local/bin目录：<br />
+cd openshift-origin-client*/<br />
+sudo mv &nbsp;oc kubectl &nbsp;/usr/local/bin/<br />
+验证OpenShift客户端实用程序的安装：<br />
+$ oc version<br />
+oc v3.11.0+0cbc58b<br />
+kubernetes v1.11.0+d4cacc0<br />
+features: Basic-Auth GSSAPI Kerberos SPNEGO<br />
+允许使用不安全的Docker注册表：</p>
+
+<p><code>$ </code><code>vi /etc/docker/daemon.json</code><br />
+{<br />
+&nbsp; &nbsp; &quot;insecure-registries&quot; : [ &quot;172.30.0.0/16&quot; ]<br />
+}<br />
+EOF</p>
+
+<p>添加文件后重新启动Docker服务：</p>
+
+<pre>
+<s><code>$ sudo systemctl daemon-reload
+$ sudo systemctl restart docker</code></s></pre>
+
+<p>一般都说是上面两句，但是我ubuntu14 下不行，而是使用下面这句。</p>
+
+<p><code>service docker start</code></p>
+
+<h2>启动OpenShift Origin All-in-One服务器</h2>
+
+<p>通过运行以下命令启动OKD服务器：<br />
+$ oc cluster up<br />
+上面的命令将：<br />
+启动OKD群集侦听本地接口-127.0.0.1:8443。<br />
+启动一个Web控制台，侦听/console（127.0.0.1:8443）上的所有接口。<br />
+启动Kubernetes系统组件。<br />
+规定注册表，路由器，初始模板和默认项目。<br />
+设置Openshift Origin时可以应用许多选项，查看它们：<br />
+$ oc cluster up --help<br />
+在成功安装后，应该出现类似于下面的输出信息：<br />
+Login to server &hellip;<br />
+Creating initial project &quot;myproject&quot; &hellip;<br />
+Server Information &hellip;<br />
+OpenShift server started.<br />
+The server is accessible via web console at:https://127.0.0.1:8443<br />
+You are logged in as:<br />
+User: &nbsp; &nbsp; developer<br />
+Password: &lt;any value&gt;<br />
+To login as administrator:<br />
+oc login -u system:admin<br />
+以下示例使用自定义选项：<br />
+$ oc cluster up --routing-suffix=&lt;ServerPublicIP&gt;.xip.io \<br />
+&nbsp;--public-hostname=&lt;ServerPulicDNSName&gt;<br />
+或者只是公共/私人IP：<br />
+oc cluster up --public-hostname=192.168.10.10<br />
+注：OpenShift集群配置文件将位于openshift.local.clusterup/目录中。<br />
+要以管理员身份登录，请使用：<br />
+$ oc login -u system:admin<br />
+Logged into &quot;https://116.203.125.128:8443&quot; as &quot;system:admin&quot; using existing credentials.<br />
+You have access to the following projects and can switch between them with &#39;oc &nbsp; project &#39;:<br />
+* default<br />
+kube-dns<br />
+kube-proxy<br />
+kube-public<br />
+kube-system<br />
+myproject<br />
+openshift<br />
+openshift-apiserver<br />
+openshift-controller-manager<br />
+openshift-core-operators<br />
+openshift-infra<br />
+openshift-node<br />
+openshift-service-cert-signer<br />
+openshift-web-console&nbsp;<br />
+Using project &quot;default.<br />
+切换到默认项目：<br />
+oc project default<br />
+部署OKD集群集成容器映像注册表（如果它不存在）：<br />
+$ oc adm registry<br />
+Docker registry &quot;docker-registry&quot; service exists<br />
+检查当前项目状态：<br />
+$ oc status<br />
+In project default on server https://192.168.10.10:8443<br />
+svc/docker-registry - 172.30.1.1:5000<br />
+dc/docker-registry deploys docker.io/openshift/origin-docker-registry:v3.11&nbsp;<br />
+deployment #1 deployed about an hour ago - 1 pod<br />
+svc/kubernetes - 172.30.0.1:443 -&gt; 8443<br />
+svc/router - 172.30.119.192 ports 80, 443, 1936<br />
+dc/router deploys docker.io/openshift/origin-haproxy-router:v3.11&nbsp;<br />
+deployment #1 deployed about an hour ago - 1 pod<br />
+View details with &#39;oc describe /&#39; or list everything with &#39;oc get all&#39;.</p>
+
+<h2>在OKD上创建项目</h2>
+
+<p>现在我们已经安装并运行了OKD，我们可以通过部署测试项目来测试部署，切换到测试用户帐户：<br />
+$ oc login<br />
+Authentication required for https://116.203.125.128:8443 (openshift)<br />
+Username: developer<br />
+Password: developer<br />
+Login successful.<br />
+确认登录是否成功：<br />
+$ oc whoami<br />
+developer<br />
+使用oc new-project命令创建一个新项目。</p>
+
+<h2>在浏览器中访问OKD管理控制台</h2>
+
+<p>OKD包含一个Web控制台，可以将其用于创建和管理操作，此Web控制台可通过端口上的服务器IP/主机名8443通过https访问，如：<br />
+https://&lt;IP|Hostname&gt;:8443/console<br />
+应该看到一个带有用户名和密码表单的OpenShift Origin窗口，如下图：<br />
+在Ubuntu 18.04/16.04上安装和配置OpenShift Origin(OKD)的方法<br />
+登陆信息：Username和Password都是developer，即用户名、密码都是developer。<br />
+登陆后可以看到下面的管理控制台：<br />
+在Ubuntu 18.04/16.04上安装和配置OpenShift Origin(OKD)的方法<br />
+可以从Web控制台创建项目，如图：<br />
+在Ubuntu 18.04/16.04上安装和配置OpenShift Origin(OKD)的方法<br />
+为其命名、可选显示名称和描述，如果单击项目名称，则应进入项目管理控制台，你可以在其中浏览目录，部署映像和导入YAML/JSON：<br />
+在Ubuntu 18.04/16.04上安装和配置OpenShift Origin(OKD)的方法<br />
+可以从CLI查看已部署项目的状态：<br />
+$ oc login<br />
+$ oc project &lt;projectname&gt;<br />
+$ oc status<br />
+In project My Project (myproject) on server https://116.203.125.128:8443<br />
+svc/parksmap-katacoda - 172.30.144.250:8080<br />
+dc/parksmap-katacoda deploys istag/parksmap-katacoda:1.0.0&nbsp;<br />
+deployment #1 deployed 4 minutes ago - 1 pod<br />
+2 infos identified, use &#39;oc status --suggest&#39; to see details.<br />
+至此，配置OKD完成。</p>
+
+<h1>docker daemon 配置文件</h1>
+
+<h2>Ubuntu</h2>
+
+<h4>Ubuntu 14.04</h4>
+
+<p>配置文件位于 <code>/etc/init/docker.conf</code></p>
+
+<h4>Ubuntu 15.04</h4>
+
+<p>配置文件位于 <code>/etc/default/docker</code>，修改配置项<code>DOCKER_OPTS</code></p>
+
+<h2>CentOS / Red Hat</h2>
+
+<h4>CentOS 6.x 和 RHEL 6.x</h4>
+
+<p>配置文件位于 <code>/etc/sysconfig/docker</code>，修改配置项<code>other_args</code>，7.x修改配置项<code>OPTIONS</code></p>
+
+<h4>docker v1.11后</h4>
+
+<p>以systemd方式管理docker，默认没有创建配置文件，需要自己创建<code>/etc/systemd/system/docker.service.d/docker.conf</code>，详情参考官网文档：</p>
+
+<ul>
+	<li><a href="https://link.jianshu.com?t=https://docs.docker.com/engine/admin/systemd/" rel="nofollow" target="_blank">https://docs.docker.com/engine/admin/systemd/</a></li>
+	<li><a href="https://link.jianshu.com?t=https://docs.docker.com/engine/admin/" rel="nofollow" target="_blank">https://docs.docker.com/engine/admin/</a></li>
+</ul>
+
+<pre>
+<code>$ sudo mkdir /etc/systemd/system/docker.service.d
+$ sudo vi /etc/systemd/system/docker.service.d/docker.conf
+</code></pre>
+
+<p>然后再<code>docker.conf</code>文件中添加启动参数，例如(添加无TLS认证的仓库地址)：</p>
+
+<pre>
+<code>[Service]  
+ExecStart=  
+ExecStart=/usr/bin/docker daemon --insecure-registry=192.168.1.104:5000
+</code></pre>
+
+<p>老版本的docker会将配置文件指向<code>/etc/sysconfig/docker</code>，为了向后兼容，你也可以在<code>/etc/systemd/system/docker.service.d</code>创建<code>docker.conf</code>，并添加如下类容：</p>
+
+<pre>
+<code>[Service]
+EnvironmentFile=-/etc/sysconfig/docker
+EnvironmentFile=-/etc/sysconfig/docker-storage
+EnvironmentFile=-/etc/sysconfig/docker-network
+ExecStart=
+ExecStart=/usr/bin/docker daemon -H fd:// $OPTIONS \
+          $DOCKER_STORAGE_OPTIONS \
+          $DOCKER_NETWORK_OPTIONS \
+          $BLOCK_REGISTRY \
+          $INSECURE_REGISTRY
+</code></pre>
+
+<h2>检查配置</h2>
+
+<p>添加配置文件后需要加载然后重启docker</p>
+
+<pre>
+<code>$ sudo systemctl daemon-reload
+$ sudo systemctl restart docker
+</code></pre>
+
+<p>查看docker使用的配置文件:</p>
+
+<pre>
+<code>//查看环境配置文件
+$ systemctl show docker | grep EnvironmentFile
+EnvironmentFile=-/etc/sysconfig/docker (ignore_errors=yes)
+
+//查看服务启动文件位置：
+$ systemctl show --property=FragmentPath docker
+FragmentPath=/usr/lib/systemd/system/docker.service
+
+$ grep EnvironmentFile /usr/lib/systemd/system/docker.service
+EnvironmentFile=-/etc/sysconfig/docker</code></pre>

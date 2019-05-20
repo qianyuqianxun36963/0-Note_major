@@ -1,0 +1,162 @@
+<h1>Mybatis&nbsp;源码下载与部署</h1>
+
+<h2>一、下载源码</h2>
+
+<p>首先到github上下载项目<a href="https://github.com/mybatis/mybatis-3">源码</a></p>
+
+<h2>二、按步骤操作</h2>
+
+<h3>打开项目</h3>
+
+<p>直接用idea打开下载的mybatis源码项目就好</p>
+
+<h3>新建文件</h3>
+
+<p>结构如下：</p>
+
+<pre>
+java
+&nbsp; com.ustc.wang.client.Test.java
+&nbsp; com.ustc.wang.dao.UserDao.java
+&nbsp; com.ustc.wang.model.User.java
+resource
+&nbsp; mybatis/conf/mybatis.xml
+&nbsp; mybatis/mapper/userMapper.xml
+&nbsp; log4j.properties</pre>
+
+<h3>在pom.xml中新增如下依赖：</h3>
+
+<pre>
+<strong>&lt;!-- MySQL相关 --&gt;
+&lt;dependency&gt;
+    &lt;groupId&gt;mysql&lt;/groupId&gt;
+    &lt;artifactId&gt;mysql-connector-java&lt;/artifactId&gt;
+    &lt;version&gt;5.1.38&lt;/version&gt;
+&lt;/dependency&gt;</strong></pre>
+
+<h3>MyBatis配置conf.xml文件</h3>
+
+<p>mybatis.xml</p>
+
+<pre>
+&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot; ?&gt;
+&lt;!DOCTYPE configuration
+        PUBLIC &quot;-//mybatis.org//DTD Config 3.0//EN&quot;
+        &quot;http://mybatis.org/dtd/mybatis-3-config.dtd&quot;&gt;
+&lt;configuration&gt;
+    &lt;environments default=&quot;development&quot;&gt;
+        &lt;environment id=&quot;development&quot;&gt;
+            &lt;transactionManager type=&quot;JDBC&quot;/&gt;
+            &lt;dataSource type=&quot;POOLED&quot;&gt;
+                &lt;property name=&quot;driver&quot; value=&quot;com.mysql.jdbc.Driver&quot;/&gt;
+                &lt;property name=&quot;url&quot; value=&quot;jdbc:mysql://localhost:3306/test&quot;/&gt;
+                &lt;property name=&quot;username&quot; value=&quot;root&quot;/&gt;
+                &lt;property name=&quot;password&quot; value=&quot;root&quot;/&gt;
+            &lt;/dataSource&gt;
+        &lt;/environment&gt;
+    &lt;/environments&gt;
+    &lt;mappers&gt;
+        &lt;mapper resource=&quot;mybatis/mapper/userMapper.xml&quot;/&gt;
+    &lt;/mappers&gt;
+&lt;/configuration&gt;</pre>
+
+<h3>User类的映射文件userMapper.xml</h3>
+
+<p>userMapper.xml</p>
+
+<pre>
+&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot; ?&gt;
+&lt;!DOCTYPE mapper
+        PUBLIC &quot;-//mybatis.org//DTD Mapper 3.0//EN&quot;
+        &quot;http://mybatis.org/dtd/mybatis-3-mapper.dtd&quot;&gt;
+
+&lt;mapper namespace=&quot;com.ustc.wang.dao.UserDao&quot;&gt;
+    &lt;select id=&quot;getById&quot;
+            resultType=&quot;com.ustc.wang.model.User&quot;
+            parameterType=&quot;java.lang.String&quot;&gt;
+        SELECT * FROM user where id = #{id}
+    &lt;/select&gt;
+&lt;/mapper&gt;</pre>
+
+<h3>测试代码</h3>
+
+<p>Test.java</p>
+
+<pre>
+package com.ustc.wang.client;
+
+import com.ustc.wang.model.User;
+import org.apache.ibatis.io.Resources;
+import org.apache.ibatis.session.SqlSession;
+import org.apache.ibatis.session.SqlSessionFactory;
+import org.apache.ibatis.session.SqlSessionFactoryBuilder;
+import java.io.InputStream;
+
+public class Test {
+  public static void main( String[] args ) throws Exception{
+    InputStream inputStream = Resources.getResourceAsStream(&quot;mybatis/conf/mybatis.xml&quot;);
+    SqlSessionFactory sqlSessionFactory = new SqlSessionFactoryBuilder().build(inputStream);
+    SqlSession sqlSession = sqlSessionFactory.openSession();
+    User user = sqlSession.selectOne(&quot;com.ustc.wang.dao.UserDao.getById&quot;,&quot;1&quot;);
+    System.out.println(user);
+  }
+}
+</pre>
+
+<h3>User用户类</h3>
+
+<p>User.java</p>
+
+<pre>
+package com.ustc.wang.model;
+
+public class User {
+  private String id;
+  private String userName;
+  private String password;
+  private int age;
+</pre>
+
+<p>&nbsp; &nbsp;//添加 setter getter 方法，toString 方法</p>
+
+<p>}</p>
+
+<h3>UserDao用户操作类</h3>
+
+<p>UserDao.java</p>
+
+<pre>
+package com.ustc.wang.dao;
+
+import com.ustc.wang.model.User;
+
+public interface UserDao {
+  User getById(String id);
+}</pre>
+
+<h3>日志配置</h3>
+
+<p>在运行的时候，报了日志的错误。要添加日志的配置文件。在resource目录下新建文件。</p>
+
+<p>log4j.properties</p>
+
+<pre>
+# Global logging configuration 开发时候建议使用 debug
+log4j.rootLogger=DEBUG, stdout
+# Console output...
+log4j.appender.stdout=org.apache.log4j.ConsoleAppender
+log4j.appender.stdout.layout=org.apache.log4j.PatternLayout
+log4j.appender.stdout.layout.ConversionPattern=%5p [%t] - %m%n</pre>
+
+<h2>三、附录</h2>
+
+<h3>数据库建表语句</h3>
+
+<pre>
+CREATE TABLE `user` (
+&nbsp; `id` int(32) NOT NULL AUTO_INCREMENT,
+&nbsp; `user_name` varchar(32) DEFAULT NULL,
+&nbsp; `password` varchar(32) DEFAULT NULL,
+&nbsp; `age` int(11) DEFAULT NULL,
+&nbsp; PRIMARY KEY (`id`)
+) ENGINE=InnoDB AUTO_INCREMENT=7 DEFAULT CHARSET=latin1;</pre>

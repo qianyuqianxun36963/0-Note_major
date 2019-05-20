@@ -1,0 +1,281 @@
+<h1>MyBatis源码分析-IDEA新建MyBatis源码工程</h1>
+
+<p>　　MyBatis 是支持定制化 SQL、存储过程以及高级映射的优秀的持久层框架。MyBatis 避免了几乎所有的 JDBC 代码和手动设置参数以及获取结果集。MyBatis 可以对配置和原生Map使用简单的 XML 或注解，将接口和 Java 的 POJOs(Plain Old Java Objects,普通的 Java对象)映射成数据库中的记录。<a href="https://github.com/mybatis/mybatis-3" target="_blank">项目GitHub地址</a></p>
+
+<p>　　下载<a href="https://github.com/mybatis/mybatis-3" target="_blank">MyBatis源码</a>，导入到IDEA工程（Maven工程）中，工程结构如下：</p>
+
+<p><img alt="" src="https://images2015.cnblogs.com/blog/772134/201610/772134-20161003182648145-1839445049.png" /></p>
+
+<h2>在pom.xml中新增如下依赖：</h2>
+
+<pre>
+<strong>&lt;!-- MySQL相关 --&gt;
+&lt;dependency&gt;
+    &lt;groupId&gt;mysql&lt;/groupId&gt;
+    &lt;artifactId&gt;mysql-connector-java&lt;/artifactId&gt;
+    &lt;version&gt;5.1.38&lt;/version&gt;
+&lt;/dependency&gt;</strong>
+</pre>
+
+<p>　　等待依赖更新完毕后，如果出现了@Override覆盖接口方法报错问题，请参考<a href="http://blog.csdn.net/woyaoxuejavaya/article/details/51565356">IDEA中 @override报错的解决方法</a>。</p>
+
+<h2>MyBatis配置conf.xml文件</h2>
+
+<pre>
+&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot;?&gt;
+&lt;!DOCTYPE configuration PUBLIC &quot;-//mybatis.org//DTD Config 3.0//EN&quot; &quot;http://mybatis.org/dtd/mybatis-3-config.dtd&quot;&gt;
+
+&lt;configuration&gt;
+
+    &lt;settings&gt;
+        &lt;setting name=&quot;cacheEnabled&quot; value=&quot;true&quot;/&gt;
+        &lt;setting name=&quot;lazyLoadingEnabled&quot; value=&quot;false&quot;/&gt;
+        &lt;!--setting name=&quot;logImpl&quot; value=&quot;STDOUT_LOGGING&quot;/--&gt; &lt;!-- 日志 --&gt;
+    &lt;/settings&gt;
+
+    &lt;typeAliases&gt;
+        &lt;typeAlias type=&quot;com.luoxn28.dao.User&quot; alias=&quot;User&quot;/&gt;
+    &lt;/typeAliases&gt;
+
+    &lt;environments default=&quot;development&quot;&gt;
+        &lt;environment id=&quot;development&quot;&gt;
+            &lt;transactionManager type=&quot;JDBC&quot; /&gt; &lt;!-- 声明使用那种事务管理机制 JDBC/MANAGED --&gt;
+            &lt;!-- 配置数据库连接信息 --&gt;
+            &lt;dataSource type=&quot;POOLED&quot;&gt;
+                &lt;property name=&quot;driver&quot; value=&quot;com.mysql.jdbc.Driver&quot; /&gt;
+                &lt;property name=&quot;url&quot; value=&quot;jdbc:mysql://192.168.1.150:3306/xxx&quot; /&gt;
+                &lt;property name=&quot;username&quot; value=&quot;xxx&quot; /&gt;
+                &lt;property name=&quot;password&quot; value=&quot;xxx&quot; /&gt;
+            &lt;/dataSource&gt;
+        &lt;/environment&gt;
+    &lt;/environments&gt;
+
+    &lt;mappers&gt;
+        &lt;mapper resource=&quot;userMapper.xml&quot;/&gt;
+    &lt;/mappers&gt;
+
+&lt;/configuration&gt;</pre>
+
+<h2>User类的映射文件userMapper.xml</h2>
+
+<pre>
+&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot;?&gt;
+&lt;!DOCTYPE mapper PUBLIC &quot;-//mybatis.org//DTD Mapper 3.0//EN&quot; &quot;http://mybatis.org/dtd/mybatis-3-mapper.dtd&quot;&gt;
+
+&lt;mapper namespace=&quot;com.luoxn28.dao.UserDao&quot;&gt;
+
+    &lt;select id=&quot;getById&quot; parameterType=&quot;int&quot; resultType=&quot;User&quot;&gt;
+        SELECT * FROM user WHERE id=#{id}; &lt;!-- #{xxx} xxx为类中的数据域名称 --&gt;
+    &lt;/select&gt;
+
+    &lt;select id=&quot;getAll&quot; resultType=&quot;com.luoxn28.dao.User&quot;&gt;
+        SELECT * FROM user;
+    &lt;/select&gt;
+&lt;/mapper&gt;
+</pre>
+
+<h2>测试代码</h2>
+
+<pre>
+/**
+ * MyBatis测试类
+ */
+public class TestMain {
+
+    public static void main(String[] args) throws IOException {
+        String resouce = &quot;conf.xml&quot;;
+        //InputStream is = TestMain.class.getClassLoader().getResourceAsStream(resouce);
+        InputStream is = Resources.getResourceAsStream(resouce);
+
+        // 构建sqlSession工厂
+        SqlSessionFactory sqlSessionFactory = new SqlSessionFactoryBuilder().build(is);
+        SqlSession session = sqlSessionFactory.openSession();
+
+        /**
+         * 第一种方式: 直接执行已映射的 SQL 语句
+         */
+        String statement = &quot;com.luoxn28.dao.UserDao.getById&quot;;
+        User user = session.selectOne(statement, 1);
+        System.out.println(user);
+
+        System.out.println(&quot;---------------------&quot;);
+
+        /**
+         * 第二种方式: 执行更清晰和类型安全的代码
+         */
+        UserDao userDao = session.getMapper(UserDao.class);
+        user = userDao.getById(1);
+        System.out.println(user);
+    }
+
+}
+</pre>
+
+<h2>User用户类</h2>
+
+<pre>
+/**
+ * User - 用户类
+ */
+public class User {
+
+    public static final int MAN  = 0;   // 男生
+    public static final int WOMAN = 1;  // 女生
+    public static final int OTHER = 2;  // 其他
+
+    private int id;             // 用户id
+    private String name;        // 用户名
+    private String password;    // 用户密码
+    private int sex;            // 用户性别
+    private String email;       // 用户邮箱
+    private String phone;       // 用户手机
+    private String admin;       // 用户是否是管理员，&quot;admin&quot;表示是管理员，其他为普通用户
+
+    public User() { }
+
+    public User(String name, String password, int sex, String email, String phone) {
+        this.name = name;
+        this.password = password;
+        this.sex = sex;
+        this.email = email;
+        this.phone = phone;
+        this.admin = &quot;&quot;;
+    }
+    public User(String name, String password, String sex, String email, String phone) {
+        this.name = name;
+        this.password = password;
+        setSex(sex); // this.sex = sex;
+        this.email = email;
+        this.phone = phone;
+        this.admin = &quot;&quot;;
+    }
+
+    public int getId() {
+        return id;
+    }
+
+    public void setId(int id) {
+        this.id = id;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    public String getPassword() {
+        return password;
+    }
+
+    public void setPassword(String password) {
+        this.password = password;
+    }
+
+    public int getSex() {
+        return sex;
+    }
+
+    public void setSex(int sex) {
+        this.sex = sex;
+    }
+
+    public void setSex(String sexStr) {
+        int sex = Integer.valueOf(sexStr);
+        switch (Integer.valueOf(sexStr)) {
+            case 0: {
+                this.sex = MAN;
+                break;
+            }
+            case 1: {
+                this.sex = WOMAN;
+                break;
+            }
+            default: {
+                this.sex = OTHER;
+                break;
+            }
+        }
+    }
+
+    public String getEmail() {
+        return email;
+    }
+
+    public void setEmail(String email) {
+        this.email = email;
+    }
+
+    public String getPhone() {
+        return phone;
+    }
+
+    public void setPhone(String phone) {
+        this.phone = phone;
+    }
+
+    public String getAdmin() {
+        return admin;
+    }
+
+    public void setAdmin(String admin) {
+        this.admin = admin;
+    }
+
+    @Override
+    public String toString() {
+        return &quot;User{&quot; +
+                &quot;id=&quot; + id +
+                &quot;, name=&#39;&quot; + name + &#39;\&#39;&#39; +
+                &quot;, password=&#39;&quot; + password + &#39;\&#39;&#39; +
+                &quot;, sex=&quot; + sex +
+                &quot;, email=&#39;&quot; + email + &#39;\&#39;&#39; +
+                &quot;, phone=&#39;&quot; + phone + &#39;\&#39;&#39; +
+                &quot;, admin=&#39;&quot; + admin + &#39;\&#39;&#39; +
+                &#39;}&#39;;
+    }
+
+}
+</pre>
+
+<h2>UserDao用户操作类</h2>
+
+<pre>
+/**
+ * UserDao - User操作类
+ */
+public interface UserDao {
+
+    public User getById(int id);
+    public List&lt;User&gt; getAll();
+
+}
+</pre>
+
+<p>　　以上示例代码是用XML来设置映射语句的，当然，也可以用Java注解来做。比如，上面的 XML 示例可被替换如下：</p>
+
+<pre>
+/**
+ * UserDao - User操作类
+ */
+public interface UserDao {
+
+    @Select(&quot;SELECT * FROM user WHERE id=#{id}&quot;)
+    public User getById(int id);
+
+    @Select(&quot;SELECT * FROM user&quot;)
+    public List&lt;User&gt; getAll();
+
+}
+</pre>
+
+<p>　　使用注解时调用实例：</p>
+
+<pre>
+UserDao userDao = session.getMapper(UserDao.class);
+user = userDao.getById(1);
+System.out.println(user);</pre>
+
+<p>　　对于简单语句来说，注解使代码显得更加简洁，然而 Java 注解对于稍微复杂的语句就会力不从心并且会显得更加混乱。因此，如果你需要做很复杂的事情，那么最好使用 XML 来映射语句。选择何种方式以及映射语句的定义的一致性对你来说有多重要这些完全取决于你和你的团队。换句话说，永远不要拘泥于一种方式，你可以很轻松的在基于注解和 XML 的语句映射方式间自由移植和切换。注意：UserDao接口的getById方法配置了注解，那么就不要XML中配置&lt;select id=&quot;getById&quot;&gt;xxx&lt;/select&gt;了，否则程序会报异常。</p>

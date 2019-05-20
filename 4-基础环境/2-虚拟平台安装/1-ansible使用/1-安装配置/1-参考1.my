@@ -1,0 +1,220 @@
+<p>获取安装包的服务器进行替换，避免翻墙</p>
+
+<p>sudo sed &nbsp;-i &nbsp;-re &nbsp;&#39;s/\w+\.archive\.ubuntu\.com/archive.ubuntu.com/g&#39; &nbsp;/etc/apt/sources.list</p>
+
+<p>更新安装库</p>
+
+<p>sudo apt-get update</p>
+
+<p>然后输入最后的四行命令进行安装的操作</p>
+
+<p>sudo apt-get install software-properties-common<br />
+sudo apt-add-repository ppa:ansible/ansible<br />
+sudo apt-get update<br />
+sudo apt-get install ansible</p>
+
+<p>设置SSH密钥</p>
+
+<p>&nbsp;<br />
+如上所述，Ansible主要通过SSH与客户端计算机通信。&nbsp;虽然它当然有能力处理基于密码的SSH身份验证，SSH密钥帮助保持简单。</p>
+
+<p>我们可以通过两种不同的方式设置SSH密钥，具体取决于您是否已经拥有要使用的密钥。&nbsp;我们假设您要管理的服务器将是DigitalOceanDroplet。</p>
+
+<p>创建新的SSH密钥对<br />
+如果您还没有要用于Ansible管理的SSH密钥对，我们可以立即在您的Ansible VPS上创建一个SSH密钥对。</p>
+
+<p>我们将在我们的AnsibleDroplet上创建一个SSH密钥对，以与将管理的主机进行身份验证。</p>
+
+<p>作为您将控制Ansible的用户，请通过键入以下命令来创建RSA密钥对：</p>
+
+<p>ssh-keygen<br />
+将要求您指定创建的密钥对的文件位置，密码和密码短语确认。&nbsp;按所有这些键的ENTER接受默认值。</p>
+
+<p>您的新钥匙就在您的用户可用~/.ssh目录。&nbsp;公钥（一个可以共享）被称为id_rsa.pub&nbsp;。&nbsp;私钥（您保持安全的）被称为id_rsa&nbsp;。</p>
+
+<p>您可以将它们添加到您的DigitalOcean控制面板，以允许您将SSH密钥嵌入新创建的Droplet。&nbsp;这将允许您的AnsibleDroplet立即SSH到你的新Droplet，没有任何其他身份验证。</p>
+
+<p>为此，请点击左侧导航菜单上的&ldquo;SSH Keys&rdquo;链接。&nbsp;在新屏幕中，点击右上角的&ldquo;添加SSH密钥&rdquo;按钮：</p>
+
+<p>在顶部字段中输入要与此键相关联的名称。&nbsp;在您的Ansible VPS实例上，键入此以获取您的公钥的内容：</p>
+
+<p>cat ~/.ssh/id_rsa.pub<br />
+公钥示例<br />
+ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDzmGgsqjSFuOBbjZB1sgquKpp3Ty+FgqoLrzjKbbk9VGOH6kM37aAhyxxmTQfe69lhYi/WCai+mrXOyY9IiQbUfZ4jsfPE9DS3zHhmnGiBWA7pedCTJ/Nhf06dmhAJIbExW3uDghbPbzbSA5Ihn1x0F5FXtSMDoFtyjcwUwJxc2z/kk9TKcFSl8qqf4IYBYE7c+EKaYRBjjDP4AQmiwjTPuipsmub7C0OGF0dTMatIa0lok6rwy91nmhCQV6polG0+Fsk4YrY8Yh5xz6wE0lOvc8BwP9nL0zsnw6Ey0MHV9BbMqtyD6x/fCurpIkMHJK4nv79rToSWA0AwoP/bJXh7 demo@ansible0<br />
+返回给您的字符串是您需要粘贴到DigitalOcean控制面板的第二个字段中的字符串：</p>
+
+<p>单击&ldquo;创建SSH密钥&rdquo;将您的密钥添加到控制面板。&nbsp;现在，无论何时创建新的Droplet，您都将能够将公共SSH密钥嵌入到新服务器中，从而允许您与您的Ansible实例进行通信。&nbsp;您只需要在Droplet创建过程的&ldquo;添加可选SSH密钥&rdquo;部分中选择密钥：</p>
+
+<p>将现有SSH密钥对传输到Ansible<br />
+如果您已经有一个SSH密钥对，您正在使用它来认证您的Droplet，您可以将凭据转移到您的新AnsibleDroplet，而不是创建一个新的对。&nbsp;这具有使其自动与您已配置为使用密钥的任何服务器一起工作的优点。</p>
+
+<p>在您为Droplet配置SSH密钥身份验证的计算机上，键入以下内容获取公钥：</p>
+
+<p>cat ~/.ssh/id_rsa.pub<br />
+公钥示例<br />
+ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDzmGgsqjSFuOBbjZB1sgquKpp3Ty+FgqoLrzjKbbk9VGOH6kM37aAhyxxmTQfe69lhYi/WCai+mrXOyY9IiQbUfZ4jsfPE9DS3zHhmnGiBWA7pedCTJ/Nhf06dmhAJIbExW3uDghbPbzbSA5Ihn1x0F5FXtSMDoFtyjcwUwJxc2z/kk9TKcFSl8qqf4IYBYE7c+EKaYRBjjDP4AQmiwjTPuipsmub7C0OGF0dTMatIa0lok6rwy91nmhCQV6polG0+Fsk4YrY8Yh5xz6wE0lOvc8BwP9nL0zsnw6Ey0MHV9BbMqtyD6x/fCurpIkMHJK4nv79rToSWA0AwoP/bJXh7 demo@ansible0<br />
+在您的Ansible服务器上，您需要创建一个隐藏目录来存储您的密钥。&nbsp;说它.ssh从而使SSH程序知道在哪里找到它：</p>
+
+<p>mkdir ~/.ssh<br />
+我们应该锁定对此目录的访问，以便只有您可以输入或写入：</p>
+
+<p>chmod 700 ~/.ssh<br />
+现在，进入该目录，并打开一个名为id_rsa.pub在文本编辑器：</p>
+
+<p>cd ~/.ssh<br />
+nano id_rsa.pub<br />
+将您的公钥的输出从家用计算机粘贴到此文件中：</p>
+
+<p>示例id_rsa.pub<br />
+ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDzmGgsqjSFuOBbjZB1sgquKpp3Ty+FgqoLrzjKbbk9VGOH6kM37aAhyxxmTQfe69lhYi/WCai+mrXOyY9IiQbUfZ4jsfPE9DS3zHhmnGiBWA7pedCTJ/Nhf06dmhAJIbExW3uDghbPbzbSA5Ihn1x0F5FXtSMDoFtyjcwUwJxc2z/kk9TKcFSl8qqf4IYBYE7c+EKaYRBjjDP4AQmiwjTPuipsmub7C0OGF0dTMatIa0lok6rwy91nmhCQV6polG0+Fsk4YrY8Yh5xz6wE0lOvc8BwP9nL0zsnw6Ey0MHV9BbMqtyD6x/fCurpIkMHJK4nv79rToSWA0AwoP/bJXh7 demo@ansible0<br />
+保存并关闭文件。&nbsp;我们将通过键入以下内容确保此文件具有正确的权限：</p>
+
+<p>chmod 644 id_rsa.pub<br />
+现在，回到配置为SSH密钥访问的本地计算机上，键入：</p>
+
+<p>cat ~/.ssh/id_rsa<br />
+示例私钥<br />
+-----BEGIN RSA PRIVATE KEY-----<br />
+MIIEpgIBAAKCAQEA85hoLKo0hbjgW42QdbIKriqad08vhYKqC684ym25PVRjh+pD<br />
+N+2gIcl8Zk0H3uvZYWIv1gmsfpq1zsmPSIkG1H2eI7HzxPQ0qMx4ZpxogVgO6XnQ<br />
+kyfzYX9OnZoQCSGxMVt7g4IWz2820gOSIZ9cdBeRV7UjA6Bbco3MFMCcXNs/5JPU<br />
+ynBUpfKqn+CGAWBO3PhCmmEQY4wz+AEJosI0z7oqbJrm/AtDhhdHUzGrSGtJaJOq<br />
+. . .<br />
+. . .<br />
+cqsqOEzXAoGBAPMJJ8RrKUBuSjVNkzebst9sBgNadmaoQUoMHUDr8KpCZhWAoHB7<br />
+1VKmq7VSphQSruI31qy2M88Uue1knC/nQr1bE1DITZgezETSsDqsAMBo8bqDN6TT<br />
+qVJgG+TS9BRC+IowuzMVV5mzrfJjkrb+GG+xWSXrTLZMbeeTf+D0SfVo<br />
+-----END RSA PRIVATE KEY-----<br />
+输出将相当长。</p>
+
+<p>回到你的AnsibleDroplet，我们需要创建了一个新文件~/.ssh目录：</p>
+
+<p>nano id_rsa<br />
+在里面，将上一个命令的结果粘贴到本地计算机上：</p>
+
+<p>id_rsa<br />
+-----BEGIN RSA PRIVATE KEY-----<br />
+MIIEpgIBAAKCAQEA85hoLKo0hbjgW42QdbIKriqad08vhYKqC684ym25PVRjh+pD<br />
+N+2gIcl8Zk0H3uvZYWIv1gmsfpq1zsmPSIkG1H2eI7HzxPQ0qMx4ZpxogVgO6XnQ<br />
+kyfzYX9OnZoQCSGxMVt7g4IWz2820gOSIZ9cdBeRV7UjA6Bbco3MFMCcXNs/5JPU<br />
+ynBUpfKqn+CGAWBO3PhCmmEQY4wz+AEJosI0z7oqbJrm/AtDhhdHUzGrSGtJaJOq<br />
+. . .<br />
+. . .<br />
+cqsqOEzXAoGBAPMJJ8RrKUBuSjVNkzebst9sBgNadmaoQUoMHUDr8KpCZhWAoHB7<br />
+1VKmq7VSphQSruI31qy2M88Uue1knC/nQr1bE1DITZgezETSsDqsAMBo8bqDN6TT<br />
+qVJgG+TS9BRC+IowuzMVV5mzrfJjkrb+GG+xWSXrTLZMbeeTf+D0SfVo<br />
+-----END RSA PRIVATE KEY-----<br />
+确保包括第一个和最后一个标记线。&nbsp;它们是必需的，以便密钥文件有效。&nbsp;保存并关闭文件。</p>
+
+<p>我们需要更改权限以确保此文件安全：</p>
+
+<p>chmod 600 id_rsa<br />
+在这一点上，Ansible将能够使用这些SSH密钥与嵌入了密钥的任何服务器进行通信。</p>
+
+<p>配置Ansible主机<br />
+Ansible通过&ldquo;hosts&rdquo;文件跟踪它所知道的所有服务器。&nbsp;我们需要先设置此文件，然后才能开始与我们的其他计算机通信。</p>
+
+<p>使用root权限打开文件，如下所示：</p>
+
+<p>sudo nano /etc/ansible/hosts<br />
+你会看到一个文件有很多示例配置，没有一个将真正为我们工作，因为这些主机组成。&nbsp;因此，首先，我们通过在每行之前添加一个&ldquo;＃&rdquo;来注释掉这个文件中的所有行。</p>
+
+<p>我们将在文件中保留这些示例，以帮助我们进行配置，如果我们希望在将来实现更复杂的场景。</p>
+
+<p>一旦所有的行都注释掉，我们可以开始添加我们的实际主机。</p>
+
+<p>hosts文件相当灵活，可以通过几种不同的方式进行配置。&nbsp;我们将使用的语法看起来像这样：</p>
+
+<p>主机文件示例<br />
+[group_name]<br />
+alias ansible_ssh_host=your_server_ip<br />
+group_name是一个组织标记，可让您使用一个字来引用下面列出的任何服务器。&nbsp;别名只是一个引用该服务器的名称。</p>
+
+<p>所以在我们的场景中，我们想象我们有三个服务器，我们将要控制与Ansible。&nbsp;这些服务器可以从AnsibleDroplet输入：</p>
+
+<p>ssh root@your_server_ip<br />
+如果您已正确设置此密码，则不应提示您输入密码。&nbsp;我们将假定，我们的Droplet的IP地址是192.0.2.1&nbsp;，&nbsp;192.0.2.2和192.0.2.3&nbsp;。&nbsp;我们将设置这使我们可以把这些单独的host1&nbsp;，&nbsp;host2和host3&nbsp;，或作为一个群体的droplets&nbsp;。</p>
+
+<p>这是我们应该添加到我们的hosts文件来完成这个块：</p>
+
+<p>[droplets]<br />
+host1 ansible_ssh_host=192.0.2.1<br />
+host2 ansible_ssh_host=192.0.2.2<br />
+host3 ansible_ssh_host=192.0.2.3<br />
+主机可以在多个组中，组可以为其所有成员配置参数。&nbsp;让我们现在尝试一下。</p>
+
+<p>使用我们当前的设置，如果我们尝试使用Ansible连接到任何这些主机，该命令将失败（假设您不是以root用户身份操作）。&nbsp;这是因为您的SSH密钥是为远程系统上的root用户嵌入的，并且Ansible将默认尝试作为当前用户连接。&nbsp;连接尝试将获得此错误：</p>
+
+<p>Ansible连接错误<br />
+host1 | FAILED =&gt; SSH encountered an unknown error during the connection. We recommend you re-run the command using -vvvv, which will enable SSH debugging output to help diagnose the issue<br />
+在我的电脑Ansible，我使用了一个名为用户demo&nbsp;。&nbsp;Ansible会尝试连接到与每个主机ssh demo@server&nbsp;。如果演示用户不在远程系统上，这将不工作。</p>
+
+<p>我们可以创建一个文件，告诉&ldquo;droplet&rdquo;组中的所有服务器使用root用户连接。</p>
+
+<p>要做到这一点，我们将创建在Ansible配置结构称为目录group_vars&nbsp;。&nbsp;在此文件夹中，我们可以为要配置的每个组创建YAML格式的文件：</p>
+
+<p>sudo mkdir /etc/ansible/group_vars<br />
+sudo nano /etc/ansible/group_vars/droplets<br />
+我们可以把我们的配置在这里。&nbsp;YAML文件以&ldquo;&mdash;&rdquo;开头，因此请确保不要忘记该部分。</p>
+
+<p>/ etc / ansible / group_vars / droplet<br />
+---<br />
+ansible_ssh_user: root<br />
+保存并在完成后关闭此文件。</p>
+
+<p>如果你想为每个服务器指定配置细节，而不管组关联的，你可以在把这些信息在一个文件中/etc/ansible/group_vars/all&nbsp;。&nbsp;单个主机可以通过在目录下创建文件进行配置/etc/ansible/host_vars。</p>
+
+<p>使用简单的Ansible命令<br />
+现在我们已经设置了主机和足够的配置详细信息，以允许我们成功连接到我们的主机，我们可以尝试我们的第一个命令。</p>
+
+<p>通过键入以下命令来ping您配置的所有服务器：</p>
+
+<p>ansible -m ping all<br />
+平滑输出<br />
+host1 | success &gt;&gt; {<br />
+&nbsp; &nbsp; &quot;changed&quot;: false,<br />
+&nbsp; &nbsp; &quot;ping&quot;: &quot;pong&quot;<br />
+}<br />
+&nbsp;<br />
+host3 | success &gt;&gt; {<br />
+&nbsp; &nbsp; &quot;changed&quot;: false,<br />
+&nbsp; &nbsp; &quot;ping&quot;: &quot;pong&quot;<br />
+}<br />
+&nbsp;<br />
+host2 | success &gt;&gt; {<br />
+&nbsp; &nbsp; &quot;changed&quot;: false,<br />
+&nbsp; &nbsp; &quot;ping&quot;: &quot;pong&quot;<br />
+}<br />
+这是一个基本测试，以确保Ansible已连接到其所有主机。</p>
+
+<p>&ldquo;all&rdquo;表示所有主机。&nbsp;我们可以很容易地指定一个组：</p>
+
+<p>ansible -m ping droplets<br />
+我们还可以指定单个主机：</p>
+
+<p>ansible -m ping host1<br />
+我们可以通过用冒号分隔它们来指定多个主机：</p>
+
+<p>ansible -m ping host1:host2<br />
+该-m ping命令的部分是Ansible指令使用&ldquo;平&rdquo;模块。&nbsp;这些基本上是可以在远程主机上运行的命令。&nbsp;ping模块以很多方式运行，就像Linux中的正常ping实用程序一样，而是检查Ansible连接。</p>
+
+<p>ping模块不会真正采取任何参数，但我们可以尝试另一个命令，看看它是如何工作。&nbsp;我们通过输入参数传递到脚本-a&nbsp;。</p>
+
+<p>&ldquo;shell&rdquo;模块允许我们向远程主机发送终端命令并检索结果。&nbsp;例如，要找出我们的host1机器上的内存使用情况，我们可以使用：</p>
+
+<p>ansible -m shell -a &#39;free -m&#39; host1<br />
+Shell输出<br />
+host1 | success | rc=0 &gt;&gt;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;total &nbsp; &nbsp; &nbsp; used &nbsp; &nbsp; &nbsp; free &nbsp; &nbsp; shared &nbsp; &nbsp;buffers &nbsp; &nbsp; cached<br />
+Mem: &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;3954 &nbsp; &nbsp; &nbsp; &nbsp;227 &nbsp; &nbsp; &nbsp; 3726 &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;0 &nbsp; &nbsp; &nbsp; &nbsp; 14 &nbsp; &nbsp; &nbsp; &nbsp; 93<br />
+-/+ buffers/cache: &nbsp; &nbsp; &nbsp; &nbsp;119 &nbsp; &nbsp; &nbsp; 3834<br />
+Swap: &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;0 &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;0 &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;0<br />
+结论<br />
+现在，您应该将您的Ansible服务器配置为与您要控制的服务器通信。&nbsp;我们已验证Ansible可以与每个主机沟通，我们已经使用了ansible命令来远程执行简单的任务。</p>
+
+<p>虽然这是有用的，我们没有涵盖Ansible的最强大的功能在这篇文章：Playbooks。&nbsp;我们已经通过Ansible为我们的服务器建立了一个很好的基础，但是当我们介绍如何使用Playbooks来自动化远程计算机的配置时，我们将在以后的文章中进行大量的工作。<br />
+---------------------&nbsp;<br />
+作者：sliderSun&nbsp;<br />
+来源：CSDN&nbsp;<br />
+原文：https://blog.csdn.net/weixin_37947156/article/details/75633975&nbsp;<br />
+版权声明：本文为博主原创文章，转载请附上博文链接！</p>

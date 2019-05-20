@@ -14,8 +14,9 @@ slaveE:155 slaveF:156
 client:211   
 portal:212  
 middle:213  
+store:215  
 file:219   
-serverA:201 serverB:202 
+serverA:201 serverB:202 serverC:203 
 
 ## 1.本机通过虚拟机查看的信息如下：
 
@@ -26,7 +27,7 @@ serverA:201 serverB:202
 	- 子网掩码：255.255.255.0
 	- 网关: 192.168.146.2
 	通过实体机cmd查看的信息如下：
-	DNS 180.76.76.76
+	DNS 192.168.1.1
 
 	thinkpadS5的网：
 
@@ -58,7 +59,7 @@ serverA:201 serverB:202
 	address  192.168.175.***  151,152,153,154,155,156
 	netmask 255.255.255.0
 	gateway 192.168.175.2
-	dns-nameservers 180.76.76.76    
+	dns-nameservers 192.168.1.1
 	//这个地址，通过实体机的ipconfig/all查看。
 	
 	IP设置好以后，需要重启，其他机器才能ping通
@@ -67,13 +68,13 @@ serverA:201 serverB:202
 
 	vi /etc/resolv.conf
 	
-	nameserver 180.76.76.76
+	nameserver 192.168.1.1
 	
 ## 5.配置持久化
 
 	vi /etc/resolvconf/resolv.conf.d/base，如图：
 	
-	nameserver 180.76.76.76
+	nameserver 192.168.1.1
 	
 ## 6.完成后步骤
 

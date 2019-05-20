@@ -1,0 +1,103 @@
+<h1>Singleton 单例模式</h1>
+
+<h2>单例模式的概念：</h2>
+
+<p>单例模式的意思就是只有一个实例。单例模式确保某一个类只有一个实例，而且自行实例化并向整个系统提供这个实例。这个类称为单例类。</p>
+
+<p>关键点：</p>
+
+<p>1、单例类确保自己只有一个实例。</p>
+
+<p>2、单例类必须自己创建自己的实例。</p>
+
+<p>3、单例类必须为其他对象提供唯一的实例。</p>
+
+<h2>懒汉模式和恶汉模式理解和优缺点</h2>
+
+<p>1、时间和空间</p>
+
+<p>比较上面两种写法：懒汉式是典型的时间换空间，也就是每次获取实例都会进行判断，看是否需要创建实例，浪费判断的时间。当然，如果一直没有人使用的话，那就不会创建实例，则节约内存空间。</p>
+
+<p>饿汉式是典型的空间换时间，当类装载的时候就会创建类实例，不管你用不用，先创建出来，然后每次调用的时候，就不需要再判断了，节省了运行时间。</p>
+
+<p>2、线程安全</p>
+
+<p>（1）从线程安全性上讲，不加同步的懒汉式是线程不安全的，比如，有两个线程，一个是线程A，一个是线程B，它们同时调用getInstance方法，那就可能导致并发问题。如下示例：</p>
+
+<p>（2）饿汉式是线程安全的，因为虚拟机保证只会装载一次，在装载类的时候是不会发生并发的。</p>
+
+<p>（3）如何实现懒汉式的线程安全呢？</p>
+
+<p>当然懒汉式也是可以实现线程安全的，只要加上synchronized即可，如下：</p>
+
+<p><strong>public&nbsp;static&nbsp;synchronized&nbsp;Singleton&nbsp;getInstance(){}&nbsp;</strong></p>
+
+<p>但是这样一来，会降低整个访问的速度，而且每次都要判断。那么有没有更好的方式来实现呢？</p>
+
+<h2>两种实现方式：</h2>
+
+<h3>1&nbsp; 懒汉模式（类加载时不初始化）</h3>
+
+<pre>
+package Singleton;
+
+public class LazySingleton {
+    //懒汉式单例模式
+    //<strong>比较懒，在类加载时，不创建实例，因此类加载速度快，但运行时获取对象的速度慢</strong>
+    
+    
+    private static LazySingleton intance = null;//静态私用成员，没有初始化
+    
+    private LazySingleton()
+    {
+        //私有构造函数
+    }
+    
+    public static LazySingleton getInstance()    //静态，同步，公开访问点
+    {
+        if(intance == null)
+        {
+            synchronized (LazySingleton.class) {
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp;&nbsp;if (intance == null) {
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;intance = new LazySingleton();
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp;&nbsp;}
+&nbsp; &nbsp; &nbsp; &nbsp; }
+        }
+        return intance;
+    }
+}
+
+<strong>1）私有构造函数</strong><strong>
+2）成员变量为static的，没有初始化----类加载快，但访问类的唯一实例慢，static保证在自身类中获取自身对象
+3）公开访问点getInstance： public和synchronized的-----public保证对外公开，同步保证多线程时的正确性（因为类变量不是在加载时初始化的）</strong>
+
+优缺点见代码注释。</pre>
+
+<h3>2&nbsp; 饿汉式单例模式（<strong>在类加载时就完成了初始化，所以类加载较慢，但获取对象的速度快</strong>）</h3>
+
+<pre>
+package Singleton;
+
+public class EagerSingleton {
+    //饿汉单例模式
+    //<strong>在类加载时就完成了初始化，所以类加载较慢，但获取对象的速度快</strong>
+    
+    private static final EagerSingleton instance = new EagerSingleton();//静态私有成员，已初始化
+    
+    private EagerSingleton() 
+    {
+        //私有构造函数
+    }
+    
+    public static EagerSingleton getInstance()    //静态，不用同步（类加载时已初始化，不会有多线程的问题）
+    {
+        return instance;
+    }
+}
+</pre>
+
+<p>关键点：（代码注释已写）</p>
+
+<p><strong>1）私有构造函数<br />
+2）静态私有成员--在类加载时已初始化<br />
+3）公开访问点getInstance-----不需要同步，因为在类加载时已经初始化完毕，也不需要判断null，直接返回</strong></p>
