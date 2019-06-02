@@ -1,0 +1,320 @@
+<h1>Atom中七牛图床配置+解决无法上传的问题</h1>
+
+<h1>基于Atom安装七牛图床</h1>
+
+<h2>&gt;1、安装qiniu-uploader和markwodn-assistant</h2>
+
+<p>步骤：点击文件，然后打开设置，随后点击安装，先安装qiniu-uploader</p>
+
+<p>然后安装markwodn-assistant</p>
+
+<h2>&gt;2、配置ainiu-uploader</h2>
+
+<p>首先注册七牛云的会员，进入控制管理台<br />
+<br />
+新建存储空间<br />
+<br />
+获取 AK 和 SK<br />
+点击右上角的 个人面板 下的 密钥管理，在新的页面中点击 创建密钥，就会生成 AK 和 SK ，进入个人中心-密钥管理，如图：</p>
+
+<h2>&gt;3、配置qiniu-uploader</h2>
+
+<p>点击文件-设置-扩展，找到qiniu-uploader,点击setting，然后配置如下图：<br />
+<br />
+接下来解决不能上传的问题<br />
+&nbsp;</p>
+
+<h1>解决Bug</h1>
+
+<p>需要手动替换三个文件，这个三个文件在 ~/.atom/packages/qiniu-uploader/node_modules/qiniu/qiniu 目录中，这三个文件分别是 ：</p>
+
+<h2>&gt;1、io.js</h2>
+
+<p>var conf = require(&#39;./conf&#39;);<br />
+var util = require(&#39;./util&#39;);<br />
+var rpc = require(&#39;./rpc&#39;);<br />
+var fs = require(&#39;fs&#39;);<br />
+var getCrc32 = require(&#39;crc32&#39;);<br />
+var url = require(&#39;url&#39;);<br />
+var mime = require(&#39;mime&#39;);<br />
+var Readable = require(&#39;stream&#39;).Readable;<br />
+var formstream = require(&#39;formstream&#39;);<br />
+var urllib = require(&#39;urllib&#39;);<br />
+var zone = require(&#39;./zone&#39;);<br />
+exports.UNDEFINED_KEY = &#39;?&#39;<br />
+exports.PutExtra = PutExtra;<br />
+exports.PutRet = PutRet;<br />
+exports.put = put;<br />
+exports.putWithoutKey = putWithoutKey;<br />
+exports.putFile = putFile;<br />
+exports.putReadable = putReadable;<br />
+exports.putFileWithoutKey = putFileWithoutKey;<br />
+// @gist PutExtra<br />
+function PutExtra(params, mimeType, crc32, checkCrc) {<br />
+&nbsp; this.params = params || {};<br />
+&nbsp; this.mimeType = mimeType || null;<br />
+&nbsp; this.crc32 = crc32 || null;<br />
+&nbsp; this.checkCrc = checkCrc || 0;<br />
+}<br />
+// @endgist<br />
+function PutRet(hash, key) {<br />
+&nbsp; this.hash = hash || null;<br />
+&nbsp; this.key = key || null;<br />
+}<br />
+// onret: callback function instead of ret<br />
+function putReadable(uptoken, key, rs, extra, onret) {<br />
+&nbsp; if (!extra) {<br />
+&nbsp; &nbsp; &nbsp; extra = new PutExtra();<br />
+&nbsp; }<br />
+&nbsp; if (!extra.mimeType) {<br />
+&nbsp; &nbsp; &nbsp; extra.mimeType = &#39;application/octet-stream&#39;;<br />
+&nbsp; }<br />
+&nbsp; if (!key) {<br />
+&nbsp; &nbsp; &nbsp; key = exports.UNDEFINED_KEY;<br />
+&nbsp; }<br />
+&nbsp; rs.on(&quot;error&quot;, function(err) {<br />
+&nbsp; &nbsp; &nbsp; onret({ code: -1, error: err.toString() }, {});<br />
+&nbsp; });<br />
+&nbsp; // 设置上传域名<br />
+&nbsp; // zone.up_host(uptoken, conf);<br />
+&nbsp; zone.up_host_async(uptoken, conf, function() {<br />
+&nbsp; &nbsp; &nbsp; var form = getMultipart(uptoken, key, rs, extra);<br />
+&nbsp; &nbsp; &nbsp; return rpc.postMultipart(conf.UP_HOST, form, onret);<br />
+&nbsp; });<br />
+}<br />
+<br />
+<br />
+function put(uptoken, key, body, extra, onret) {<br />
+&nbsp; var rs = new Readable();<br />
+&nbsp; rs.push(body);<br />
+&nbsp; rs.push(null);<br />
+&nbsp; if (!extra) {<br />
+&nbsp; &nbsp; &nbsp; extra = new PutExtra();<br />
+&nbsp; }<br />
+&nbsp; if (extra.checkCrc == 1) {<br />
+&nbsp; &nbsp; &nbsp; var bodyCrc32 = getCrc32(body);<br />
+&nbsp; &nbsp; &nbsp; extra.crc32 = &#39;&#39; + parseInt(bodyCrc32, 16);<br />
+&nbsp; } else if (extra.checkCrc == 2 &amp;&amp; extra.crc32) {<br />
+&nbsp; &nbsp; &nbsp; extra.crc32 = &#39;&#39; + extra.crc32<br />
+&nbsp; }<br />
+&nbsp; return putReadable(uptoken, key, rs, extra, onret)<br />
+}<br />
+<br />
+<br />
+function putWithoutKey(uptoken, body, extra, onret) {<br />
+&nbsp; return put(uptoken, null, body, extra, onret);<br />
+}<br />
+<br />
+<br />
+function getMultipart(uptoken, key, rs, extra) {<br />
+&nbsp; var form = formstream();<br />
+&nbsp; form.field(&#39;token&#39;, uptoken);<br />
+&nbsp; if (key != exports.UNDEFINED_KEY) {<br />
+&nbsp; &nbsp; &nbsp; form.field(&#39;key&#39;, key);<br />
+&nbsp; }<br />
+&nbsp; form.stream(&#39;file&#39;, rs, key, extra.mimeType);<br />
+&nbsp; if (extra.crc32) {<br />
+&nbsp; &nbsp; &nbsp; form.field(&#39;crc32&#39;, extra.crc32);<br />
+&nbsp; }<br />
+&nbsp; for (var k in extra.params) {<br />
+&nbsp; &nbsp; &nbsp; form.field(k, extra.params[k]);<br />
+&nbsp; }<br />
+&nbsp; return form;<br />
+}<br />
+<br />
+<br />
+function putFile(uptoken, key, loadFile, extra, onret) {<br />
+&nbsp; var rs = fs.createReadStream(loadFile);<br />
+&nbsp; if (!extra) {<br />
+&nbsp; &nbsp; &nbsp; extra = new PutExtra();<br />
+&nbsp; }<br />
+&nbsp; if (extra.checkCrc == 1) {<br />
+&nbsp; &nbsp; &nbsp; var fileCrc32 = getCrc32(fs.readFileSync(loadFile));<br />
+&nbsp; &nbsp; &nbsp; extra.crc32 = &#39;&#39; + parseInt(fileCrc32, 16);<br />
+&nbsp; } else if (extra.checkCrc == 2 &amp;&amp; extra.crc32) {<br />
+&nbsp; &nbsp; &nbsp; extra.crc32 = &#39;&#39; + extra.crc32<br />
+&nbsp; }<br />
+&nbsp; if (!extra.mimeType) {<br />
+&nbsp; &nbsp; &nbsp; extra.mimeType = mime.lookup(loadFile);<br />
+&nbsp; }<br />
+&nbsp; return putReadable(uptoken, key, rs, extra, onret);<br />
+}<br />
+<br />
+<br />
+function putFileWithoutKey(uptoken, loadFile, extra, onret) {</p>
+
+<p>&nbsp; return putFile(uptoken, null, loadFile, extra, onret);</p>
+
+<p>}</p>
+
+<h2>&gt;2、rpc.js</h2>
+
+<p>var urllib = require(&#39;urllib&#39;);<br />
+var util = require(&#39;./util&#39;);<br />
+var conf = require(&#39;./conf&#39;);<br />
+exports.postMultipart = postMultipart;<br />
+exports.postWithForm = postWithForm;<br />
+exports.postWithoutForm = postWithoutForm;<br />
+<br />
+<br />
+function postMultipart(uri, form, onret) {<br />
+&nbsp; return post(uri, form, form.headers(), onret);<br />
+}<br />
+<br />
+<br />
+function postWithForm(uri, form, token, onret) {<br />
+&nbsp; var headers = {<br />
+&nbsp; &nbsp; &nbsp; &#39;Content-Type&#39;: &#39;application/x-www-form-urlencoded&#39;<br />
+&nbsp; };<br />
+&nbsp; if (token) {<br />
+&nbsp; &nbsp; &nbsp; headers[&#39;Authorization&#39;] = token;<br />
+&nbsp; }<br />
+&nbsp; return post(uri, form, headers, onret);<br />
+}<br />
+<br />
+<br />
+function postWithoutForm(uri, token, onret) {<br />
+&nbsp; var headers = {<br />
+&nbsp; &nbsp; &nbsp; &#39;Content-Type&#39;: &#39;application/x-www-form-urlencoded&#39;,<br />
+&nbsp; };<br />
+&nbsp; if (token) {<br />
+&nbsp; &nbsp; &nbsp; headers[&#39;Authorization&#39;] = token;<br />
+&nbsp; }<br />
+&nbsp; return post(uri, null, headers, onret);<br />
+}<br />
+<br />
+<br />
+function post(uri, form, headers, onresp) {<br />
+&nbsp; headers = headers || {};<br />
+&nbsp; headers[&#39;User-Agent&#39;] = headers[&#39;User-Agent&#39;] || conf.USER_AGENT;<br />
+&nbsp; var data = {<br />
+&nbsp; &nbsp; &nbsp; headers: headers,<br />
+&nbsp; &nbsp; &nbsp; method: &#39;POST&#39;,<br />
+&nbsp; &nbsp; &nbsp; dataType: &#39;json&#39;,<br />
+&nbsp; &nbsp; &nbsp; timeout: conf.RPC_TIMEOUT,<br />
+&nbsp; };<br />
+&nbsp; if (Buffer.isBuffer(form) || typeof form === &#39;string&#39;) {<br />
+&nbsp; &nbsp; &nbsp; data.content = form;<br />
+&nbsp; } else if (form) {<br />
+&nbsp; &nbsp; &nbsp; data.stream = form;<br />
+&nbsp; } else {<br />
+&nbsp; &nbsp; &nbsp; data.headers[&#39;Content-Length&#39;] = 0;<br />
+&nbsp; };<br />
+&nbsp; var req = urllib.request(uri, data, function(err, result, res) {<br />
+&nbsp; &nbsp; &nbsp; var rerr = null;<br />
+&nbsp; &nbsp; &nbsp; if (err || Math.floor(res.statusCode / 100) !== 2) {<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; rerr = { code: res &amp;&amp; res.statusCode || -1, error: err || result &amp;&amp; result.error || &#39;&#39; };<br />
+&nbsp; &nbsp; &nbsp; }<br />
+&nbsp; &nbsp; &nbsp; onresp(rerr, result, res);<br />
+&nbsp; });<br />
+&nbsp; return req;<br />
+}</p>
+
+<h2>&gt;3、zone.js</h2>
+
+<p>// var request = require(&#39;urllib-sync&#39;).request;<br />
+var urllib = require(&#39;urllib&#39;);<br />
+var util = require(&#39;./util&#39;);<br />
+//conf 为全局变量<br />
+exports.up_host = function(uptoken, conf) {<br />
+&nbsp; var version = process.versions;<br />
+&nbsp; var num = version.node.split(&quot;.&quot;)[0];<br />
+&nbsp; // node 版本号低于 1.0.0, 使用默认域名上传，可以在conf中指定上传域名<br />
+&nbsp; if (num &lt; 1) {<br />
+&nbsp; &nbsp; &nbsp; conf.AUTOZONE = false;<br />
+&nbsp; }<br />
+&nbsp; if (!conf.AUTOZONE) {<br />
+&nbsp; &nbsp; &nbsp; return;<br />
+&nbsp; }<br />
+&nbsp; var ak = uptoken.toString().split(&quot;:&quot;)[0];<br />
+&nbsp; var tokenPolicy = uptoken.toString().split(&quot;:&quot;)[2];<br />
+&nbsp; var tokenPolicyStr = new Buffer(tokenPolicy, &#39;base64&#39;).toString();<br />
+&nbsp; var json_tokenPolicyStr = JSON.parse(tokenPolicyStr);<br />
+&nbsp; var scope = json_tokenPolicyStr.scope;<br />
+&nbsp; var bucket = scope.toString().split(&quot;:&quot;)[0];<br />
+&nbsp; // bucket 相同，上传域名仍在过期时间内<br />
+&nbsp; if ((new Date().getTime() &lt; conf.EXPIRE) &amp;&amp; bucket == conf.BUCKET) {<br />
+&nbsp; &nbsp; &nbsp; return;<br />
+&nbsp; }<br />
+&nbsp; //记录bucket名<br />
+&nbsp; conf.BUCKET = bucket;<br />
+&nbsp; var request_url = &#39;http://uc.qbox.me/v1/query?ak=&#39; + ak + &#39;&amp;bucket=&#39; + bucket;<br />
+&nbsp; var res = request(&#39;http://uc.qbox.me/v1/query?ak=&#39; + ak + &#39;&amp;bucket=&#39; + bucket, {<br />
+&nbsp; &nbsp; &nbsp; &#39;headers&#39;: {<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &#39;Content-Type&#39;: &#39;application/json&#39;<br />
+&nbsp; &nbsp; &nbsp; }<br />
+&nbsp; });<br />
+&nbsp; if (res.statusCode == 200) {<br />
+&nbsp; &nbsp; &nbsp; var json_str = JSON.parse(res.body.toString());<br />
+&nbsp; &nbsp; &nbsp; //判断设置使用的协议, 默认使用http<br />
+&nbsp; &nbsp; &nbsp; if (conf.SCHEME == &#39;http&#39;) {<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; conf.UP_HOST = json_str.http.up[1];<br />
+&nbsp; &nbsp; &nbsp; } else {<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; conf.UP_HOST = json_str.https.up[0];<br />
+&nbsp; &nbsp; &nbsp; }<br />
+&nbsp; &nbsp; &nbsp; conf.EXPIRE = 86400 + new Date().getTime();<br />
+&nbsp; } else {<br />
+&nbsp; &nbsp; &nbsp; var err = new Error(&#39;Server responded with status code &#39; + res.statusCode + &#39;:\n&#39; + res.body.toString());<br />
+&nbsp; &nbsp; &nbsp; err.statusCode = res.statusCode;<br />
+&nbsp; &nbsp; &nbsp; err.headers = res.headers;<br />
+&nbsp; &nbsp; &nbsp; err.body = res.body;<br />
+&nbsp; &nbsp; &nbsp; throw err;<br />
+&nbsp; }<br />
+}<br />
+exports.up_host_async = function(uptoken, conf, callback) {<br />
+&nbsp; var version = process.versions;<br />
+&nbsp; var num = version.node.split(&quot;.&quot;)[0];<br />
+&nbsp; // node 版本号低于 1.0.0, 使用默认域名上传，可以在conf中指定上传域名<br />
+&nbsp; if (num &lt; 1) {<br />
+&nbsp; &nbsp; &nbsp; conf.AUTOZONE = false;<br />
+&nbsp; }<br />
+&nbsp; if (!conf.AUTOZONE) {<br />
+&nbsp; &nbsp; &nbsp; callback();<br />
+&nbsp; &nbsp; &nbsp; return;<br />
+&nbsp; }<br />
+&nbsp; var ak = uptoken.toString().split(&quot;:&quot;)[0];<br />
+&nbsp; var tokenPolicy = uptoken.toString().split(&quot;:&quot;)[2];<br />
+&nbsp; var tokenPolicyStr = new Buffer(tokenPolicy, &#39;base64&#39;).toString();<br />
+&nbsp; var json_tokenPolicyStr = JSON.parse(tokenPolicyStr);<br />
+&nbsp; var scope = json_tokenPolicyStr.scope;<br />
+&nbsp; var bucket = scope.toString().split(&quot;:&quot;)[0];<br />
+&nbsp; // bucket 相同，上传域名仍在过期时间内<br />
+&nbsp; if ((new Date().getTime() &lt; conf.EXPIRE) &amp;&amp; bucket == conf.BUCKET) {<br />
+&nbsp; &nbsp; &nbsp; callback();<br />
+&nbsp; &nbsp; &nbsp; return;<br />
+&nbsp; }<br />
+&nbsp; //记录bucket名<br />
+&nbsp; conf.BUCKET = bucket;<br />
+&nbsp; var request_url = &#39;http://uc.qbox.me/v1/query?ak=&#39; + ak + &#39;&amp;bucket=&#39; + bucket;<br />
+&nbsp; var data = {<br />
+&nbsp; &nbsp; &nbsp; contentType: &#39;application/json&#39;,<br />
+&nbsp; &nbsp; &nbsp; method: &#39;GET&#39;,<br />
+&nbsp; };<br />
+&nbsp; var req = urllib.request(request_url, data, function(err, result, res) {<br />
+&nbsp; &nbsp; &nbsp; // console.log(result);<br />
+&nbsp; &nbsp; &nbsp; if (res.statusCode == 200) {<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; // console.log(result);<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; var json_str = JSON.parse(result.toString());<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; // console.log(json_str);<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; //判断设置使用的协议, 默认使用http<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; if (conf.SCHEME == &#39;http&#39;) {<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; conf.UP_HOST = json_str.http.up[1];<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; } else {<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; conf.UP_HOST = json_str.https.up[0];<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; }<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; conf.EXPIRE = 86400 + new Date().getTime();<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; callback();<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; return;<br />
+&nbsp; &nbsp; &nbsp; } else {<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; var err = new Error(&#39;Server responded with status code &#39; + res.statusCode + &#39;:\n&#39; + res.body.toString());<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; err.statusCode = res.statusCode;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; err.headers = res.headers;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; err.body = res.body;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; throw err;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; callback();<br />
+&nbsp; &nbsp; &nbsp; }<br />
+&nbsp; });<br />
+&nbsp; return;<br />
+}</p>
+
+<p>将上述三个文件中的内容删除掉，换成上面的代码，然后重启Atom，就ok了。</p>
