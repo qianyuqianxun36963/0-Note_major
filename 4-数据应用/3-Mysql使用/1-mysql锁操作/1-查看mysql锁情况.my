@@ -1,0 +1,234 @@
+<h1>MySQL&nbsp;事务没有提交导致&nbsp;锁等待&nbsp;Lock&nbsp;wait&nbsp;timeout&nbsp;exceeded</h1>
+
+<p>&nbsp;java.lang.Exception:</p>
+
+<p>### Error updating database. &nbsp;Cause: java.sql.SQLException: Lock wait timeout exceeded; try restarting transaction<br />
+### The error may involve defaultParameterMap<br />
+### The error occurred while setting parameters<br />
+### Cause: java.sql.SQLException: Lock wait timeout exceeded; try restarting transaction<br />
+; SQL []; Lock wait timeout exceeded; try restarting transaction; nested exception is java.sql.SQLException: Lock wait timeout exceeded; try restarting transaction<br />
+&nbsp;</p>
+
+<p>select * from information_schema.innodb_trx 之后找到了一个一直没有提交的只读事务，</p>
+
+<p>kill 到了对应的线程后ok 了。</p>
+
+<p>==============================================</p>
+
+<p>转载:http://blog.sina.com.cn/s/blog_6bb63c9e0100s7cb.html</p>
+
+<h3>MySQL 5.5 -- innodb_lock_wait 锁 等待</h3>
+
+<p>记得以前，当出现：ERROR 1205 (HY000): Lock wait timeout exceeded; try restarting transaction，<br />
+要解决是一件麻烦的事情 ；<br />
+特别是当一个SQL执行完了，但未COMMIT，后面的SQL想要执行就是被锁，超时结束；<br />
+DBA光从数据库无法着手找出源头是哪个SQL锁住了；<br />
+有时候看看show engine innodb status&nbsp;, 并结合 show full processlist; 能暂时解决问题；但一直不能精确定位；</p>
+
+<p>在5.5中，information_schema 库中增加了三个关于锁的表（MEMORY引擎）；</p>
+
+<p>innodb_trx ## 当前运行的所有事务<br />
+innodb_locks ## 当前出现的锁<br />
+innodb_lock_waits ## 锁等待的对应关系</p>
+
+<p>看到这个就非常激动 ； 这可是解决了一个大麻烦，先来看一下表结构</p>
+
+<p><a href="mailto:root@127.0.0.1">root</a><a href="http://my.oschina.net/u/567043" target="_blank">@127.0.0.1</a>&nbsp;&nbsp;: information_schema 13:28:38&gt; desc innodb_locks;<br />
++-------------+---------------------+------+-----+---------+-------+<br />
+| Field | Type | Null | Key | Default | Extra |<br />
++-------------+---------------------+------+-----+---------+-------+<br />
+| lock_id | varchar(81) | NO | | | |#锁ID<br />
+| lock_trx_id | varchar(18) | NO | | | |#拥有锁的事务ID<br />
+| lock_mode | varchar(32) | NO | | | |#锁模式<br />
+| lock_type | varchar(32) | NO | | | |#锁类型<br />
+| lock_table | varchar(1024) | NO | | | |#被锁的表<br />
+| lock_index | varchar(1024) | YES | | NULL | |#被锁的索引<br />
+| lock_space | bigint(21) unsigned | YES | | NULL | |#被锁的表空间号<br />
+| lock_page | bigint(21) unsigned | YES | | NULL | |#被锁的页号<br />
+| lock_rec | bigint(21) unsigned | YES | | NULL | |#被锁的记录号<br />
+| lock_data | varchar(8192) | YES | | NULL | |#被锁的数据<br />
++-------------+---------------------+------+-----+---------+-------+<br />
+10 rows in set (0.00 sec)<br />
+<br />
+<a href="mailto:root@127.0.0.1">root</a><a href="http://my.oschina.net/u/567043" target="_blank">@127.0.0.1</a>&nbsp;&nbsp;: information_schema 13:28:56&gt; desc innodb_lock_waits;<br />
++-------------------+-------------+------+-----+---------+-------+<br />
+| Field | Type | Null | Key | Default | Extra |<br />
++-------------------+-------------+------+-----+---------+-------+<br />
+| requesting_trx_id | varchar(18) | NO | | | |#请求锁的事务ID<br />
+| requested_lock_id | varchar(81) | NO | | | |#请求锁的锁ID<br />
+| blocking_trx_id | varchar(18) | NO | | | |#当前拥有锁的事务ID<br />
+| blocking_lock_id | varchar(81) | NO | | | |#当前拥有锁的锁ID<br />
++-------------------+-------------+------+-----+---------+-------+<br />
+4 rows in set (0.00 sec)<br />
+<br />
+<a href="mailto:root@127.0.0.1">root</a><a href="http://my.oschina.net/u/567043" target="_blank">@127.0.0.1</a>&nbsp;&nbsp;: information_schema 13:29:05&gt; desc innodb_trx ;<br />
++----------------------------+---------------------+------+-----+---------------------+-------+<br />
+| Field | Type | Null | Key | Default | Extra |<br />
++----------------------------+---------------------+------+-----+---------------------+-------+<br />
+| trx_id | varchar(18) | NO | | | |#事务ID<br />
+| trx_state | varchar(13) | NO | | | |#事务状态：<br />
+| trx_started | datetime | NO | | 0000-00-00 00:00:00 | |#事务开始时间；<br />
+| trx_requested_lock_id | varchar(81) | YES | | NULL | |#innodb_locks.lock_id<br />
+| trx_wait_started | datetime | YES | | NULL | |#事务开始等待的时间<br />
+| trx_weight | bigint(21) unsigned | NO | | 0 | |#<br />
+| trx_mysql_thread_id | bigint(21) unsigned | NO | | 0 | |#事务线程ID<br />
+| trx_query | varchar(1024) | YES | | NULL | |#具体SQL语句<br />
+| trx_operation_state | varchar(64) | YES | | NULL | |#事务当前操作状态<br />
+| trx_tables_in_use | bigint(21) unsigned | NO | | 0 | |#事务中有多少个表被使用<br />
+| trx_tables_locked | bigint(21) unsigned | NO | | 0 | |#事务拥有多少个锁<br />
+| trx_lock_structs | bigint(21) unsigned | NO | | 0 | |#<br />
+| trx_lock_memory_bytes | bigint(21) unsigned | NO | | 0 | |#事务锁住的内存大小（B）<br />
+| trx_rows_locked | bigint(21) unsigned | NO | | 0 | |#事务锁住的行数<br />
+| trx_rows_modified | bigint(21) unsigned | NO | | 0 | |#事务更改的行数<br />
+| trx_concurrency_tickets | bigint(21) unsigned | NO | | 0 | |#事务并发票数<br />
+| trx_isolation_level | varchar(16) | NO | | | |#事务隔离级别<br />
+| trx_unique_checks | int(1) | NO | | 0 | |#是否唯一性检查<br />
+| trx_foreign_key_checks | int(1) | NO | | 0 | |#是否外键检查<br />
+| trx_last_foreign_key_error | varchar(256) | YES | | NULL | |#最后的外键错误<br />
+| trx_adaptive_hash_latched | int(1) | NO | | 0 | |#<br />
+| trx_adaptive_hash_timeout | bigint(21) unsigned | NO | | 0 | |#<br />
++----------------------------+---------------------+------+-----+---------------------+-------+<br />
+22 rows in set (0.01 sec)</p>
+
+<p>下面我们来动手看看数据吧：<br />
+##建立测试数据：<br />
+use test;<br />
+create table tx1<br />
+(id int primary key ,<br />
+c1 varchar(20),<br />
+c2 varchar(30))<br />
+engine=innodb default charset = utf8 ;</p>
+
+<p>insert into tx1 values<br />
+(1,&#39;aaaa&#39;,&#39;aaaaa2&#39;),<br />
+(2,&#39;bbbb&#39;,&#39;bbbbb2&#39;),<br />
+(3,&#39;cccc&#39;,&#39;ccccc2&#39;);</p>
+
+<p>commit;</p>
+
+<p>###产生事务；<br />
+### Session1<br />
+start transaction;<br />
+update tx1 set c1=&#39;heyf&#39;,c2=&#39;heyf&#39; where id =3 ;</p>
+
+<p>## 产生事务，在innodb_trx就有数据 ；<br />
+<a href="mailto:root@127.0.0.1">root</a><a href="http://my.oschina.net/u/567043" target="_blank">@127.0.0.1</a>&nbsp;&nbsp;: information_schema 13:38:21&gt; select * from innodb_trx G<br />
+*************************** 1. row ***************************<br />
+trx_id: 3669D82<br />
+trx_state: RUNNING<br />
+trx_started: 2010-12-24 13:38:06<br />
+trx_requested_lock_id: NULL<br />
+trx_wait_started: NULL<br />
+trx_weight: 3<br />
+trx_mysql_thread_id: 2344<br />
+trx_query: NULL<br />
+trx_operation_state: NULL<br />
+trx_tables_in_use: 0<br />
+trx_tables_locked: 0<br />
+trx_lock_structs: 2<br />
+trx_lock_memory_bytes: 376<br />
+trx_rows_locked: 1<br />
+trx_rows_modified: 1<br />
+trx_concurrency_tickets: 0<br />
+trx_isolation_level: REPEATABLE READ<br />
+trx_unique_checks: 1<br />
+trx_foreign_key_checks: 1<br />
+trx_last_foreign_key_error: NULL<br />
+trx_adaptive_hash_latched: 0<br />
+trx_adaptive_hash_timeout: 10000<br />
+1 row in set (0.00 sec)</p>
+
+<p>### 由于没有产生锁等待，下面两个表没有数据 ；<br />
+<a href="mailto:root@127.0.0.1">root</a><a href="http://my.oschina.net/u/567043" target="_blank">@127.0.0.1</a>&nbsp;&nbsp;: information_schema&nbsp;13:38:31&gt; select * from innodb_lock_waits G<br />
+Empty set (0.00 sec)</p>
+
+<p><a href="mailto:root@127.0.0.1">root</a><a href="http://my.oschina.net/u/567043" target="_blank">@127.0.0.1</a>&nbsp;&nbsp;: information_schema 13:38:57&gt; select * from innodb_locks G<br />
+Empty set (0.00 sec)</p>
+
+<p>#### 产生锁等待<br />
+#### session 2<br />
+start transaction;<br />
+update tx1 set c1=&#39;heyfffff&#39;,c2=&#39;heyffffff&#39; where id =3 ;</p>
+
+<p><br />
+<a href="mailto:root@127.0.0.1">root</a><a href="http://my.oschina.net/u/567043" target="_blank">@127.0.0.1</a>&nbsp;&nbsp;: information_schema 13:39:01&gt; select * from innodb_trx G<br />
+*************************** 1. row ***************************<br />
+trx_id: 3669D83 ##第2个事务<br />
+trx_state: LOCK WAIT ## 处于等待状态<br />
+trx_started: 2010-12-24 13:40:07<br />
+trx_requested_lock_id: 3669D83:49:3:4 ##请求的锁ID<br />
+trx_wait_started: 2010-12-24 13:40:07<br />
+trx_weight: 2<br />
+trx_mysql_thread_id: 2346 ##线程 ID<br />
+trx_query: update tx1 set c1=&#39;heyfffff&#39;,c2=&#39;heyffffff&#39; where id =3<br />
+trx_operation_state: starting index read<br />
+trx_tables_in_use: 1 ##需要用到1个表<br />
+trx_tables_locked: 1 ##有1个表被锁<br />
+trx_lock_structs: 2<br />
+trx_lock_memory_bytes: 376<br />
+trx_rows_locked: 1<br />
+trx_rows_modified: 0<br />
+trx_concurrency_tickets: 0<br />
+trx_isolation_level: REPEATABLE READ<br />
+trx_unique_checks: 1<br />
+trx_foreign_key_checks: 1<br />
+trx_last_foreign_key_error: NULL<br />
+trx_adaptive_hash_latched: 0<br />
+trx_adaptive_hash_timeout: 10000<br />
+*************************** 2. row ***************************<br />
+trx_id: 3669D82 ##第1个事务<br />
+trx_state: RUNNING<br />
+trx_started: 2010-12-24 13:38:06<br />
+trx_requested_lock_id: NULL<br />
+trx_wait_started: NULL<br />
+trx_weight: 3<br />
+trx_mysql_thread_id: 2344<br />
+trx_query: NULL<br />
+trx_operation_state: NULL<br />
+trx_tables_in_use: 0<br />
+trx_tables_locked: 0<br />
+trx_lock_structs: 2<br />
+trx_lock_memory_bytes: 376<br />
+trx_rows_locked: 1<br />
+trx_rows_modified: 1<br />
+trx_concurrency_tickets: 0<br />
+trx_isolation_level: REPEATABLE READ<br />
+trx_unique_checks: 1<br />
+trx_foreign_key_checks: 1<br />
+trx_last_foreign_key_error: NULL<br />
+trx_adaptive_hash_latched: 0<br />
+trx_adaptive_hash_timeout: 10000<br />
+2 rows in set (0.00 sec)</p>
+
+<p><a href="mailto:root@127.0.0.1">root</a><a href="http://my.oschina.net/u/567043" target="_blank">@127.0.0.1</a>&nbsp;&nbsp;: information_schema 13:40:12&gt; select * from innodb_locks G<br />
+*************************** 1. row ***************************<br />
+lock_id: 3669D83:49:3:4 ## 第2个事务需要的锁<br />
+lock_trx_id: 3669D83<br />
+lock_mode: X<br />
+lock_type: RECORD<br />
+lock_table: `test`.`tx1`<br />
+lock_index: `PRIMARY`<br />
+lock_space: 49<br />
+lock_page: 3<br />
+lock_rec: 4<br />
+lock_data: 3<br />
+*************************** 2. row ***************************<br />
+lock_id: 3669D82:49:3:4 ## 第1个事务需要的锁<br />
+lock_trx_id: 3669D82<br />
+lock_mode: X<br />
+lock_type: RECORD<br />
+lock_table: `test`.`tx1`<br />
+lock_index: `PRIMARY`<br />
+lock_space: 49<br />
+lock_page: 3<br />
+lock_rec: 4<br />
+lock_data: 3<br />
+2 rows in set (0.00 sec)</p>
+
+<p><a href="mailto:root@127.0.0.1">root</a><a href="http://my.oschina.net/u/567043" target="_blank">@127.0.0.1</a>&nbsp;&nbsp;: information_schema 13:40:15&gt; select * from innodb_lock_waits G<br />
+*************************** 1. row ***************************<br />
+requesting_trx_id: 3669D83 ## 请求锁的事务<br />
+requested_lock_id: 3669D83:49:3:4 ## 请求锁的锁ID<br />
+blocking_trx_id: 3669D82 ## 拥有锁的事务<br />
+blocking_lock_id:&nbsp;3669D82:49:3:4 ## 拥有锁的锁ID<br />
+1 row in set (0.00 sec)</p>

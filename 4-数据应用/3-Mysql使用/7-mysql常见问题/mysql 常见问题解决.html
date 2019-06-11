@@ -1,0 +1,176 @@
+<h1>mysql 常见问题解决</h1>
+
+<h2>windows无法启动MySQL服务 错误1067</h2>
+
+<p>&nbsp;&nbsp; &nbsp;直接点击mysql安装文件，不要安装和卸载，直接modify，修复一下就行。<br />
+&nbsp;&nbsp; &nbsp;选择要修复的sqlservice，可能不能进入下一步，在service右侧对应的几个功能点，删除一个没必要修复的，如document。这样就能进入下一步了。</p>
+
+<p>&nbsp;&nbsp; &nbsp;如果删除不成功，试试删除在MySQL安装目录下的Data目录中的ib_logfile0和ib_logfile1，再来一次。<br />
+&nbsp;&nbsp; &nbsp;Access denied for user &#39;root&#39;@&#39;localhost&#39; (using password: YES)</p>
+
+<p>&nbsp;&nbsp; &nbsp;重新修复mysql之后里面的用户没有了。此时可以用用户名：root 和密码：空。进行初始登录。</p>
+
+<h2>mysql安装完成之后为root用户添加密码</h2>
+
+<p>&nbsp;&nbsp; &nbsp;如果知道密码，只是修改密码，这样可以跳过一、二两步。<br />
+&nbsp;&nbsp; &nbsp;1、编辑MySql的配置文件：my.ini（在MySql安装目录下）。<br />
+&nbsp;&nbsp; &nbsp;打开配置文件，在文件最后一行添加：skip-grant-tables，然后保存退出。<br />
+&nbsp;&nbsp; &nbsp;意思为就是在启mysql时不启动grant-tables</p>
+
+<p>&nbsp;&nbsp; &nbsp;2、&nbsp;&nbsp; &nbsp;重启MySql服务：<br />
+&nbsp;&nbsp; &nbsp; &nbsp; net stop mysql &nbsp;&nbsp;<br />
+&nbsp;&nbsp; &nbsp; &nbsp; net start mysql</p>
+
+<p>&nbsp;&nbsp; &nbsp;3、设置新的root密码。<br />
+&nbsp;&nbsp; &nbsp;mysql -u root -p 直接回车，无需输入密码就可以进入数据库了。<br />
+&nbsp;&nbsp; &nbsp;此时在命令行下执行 use mysql （切换到系统数据库）<br />
+&nbsp;&nbsp; &nbsp;执行以下语句既可修改root用户密码：<br />
+&nbsp;&nbsp; &nbsp;update user set password=PASSWORD(&quot;123456&quot;) where user=&#39;root&#39;;<br />
+&nbsp;&nbsp; &nbsp;update user set password=root where user=&#39;root&#39;;</p>
+
+<p>&nbsp;&nbsp; &nbsp;本机：<br />
+&nbsp;&nbsp; &nbsp;cd C:\Program Files\MySQL\MySQL Server 5.6\bin<br />
+&nbsp;&nbsp; &nbsp;mysql -u root -p<br />
+&nbsp;&nbsp; &nbsp;use mysql<br />
+&nbsp;&nbsp; &nbsp;update user set password=root where user=&#39;root&#39;;<br />
+&nbsp;&nbsp; &nbsp;insert into mysql.user(Host,User,Password) values(&quot;localhost&quot;,&quot;root&quot;,password(&quot;root&quot;));<br />
+&nbsp;&nbsp; &nbsp;grant all privileges on mysql.* to root@localhost identified by &#39;root&#39;;<br />
+&nbsp;&nbsp; &nbsp;<br />
+&nbsp;&nbsp; &nbsp;flush privileges;</p>
+
+<p>&nbsp;&nbsp; &nbsp;</p>
+
+<p>&nbsp;&nbsp; &nbsp;有点问题，创建完用户之后要加一句：flush privileges;//重新加载授权表<br />
+&nbsp;&nbsp; &nbsp;不然新创建的用户是的登不上去的，总是会显示错误：Access denied for user &#39;mantis&#39;@&#39;localhost&#39; (using password: YES)</p>
+
+<p>&nbsp;&nbsp; &nbsp;4、&nbsp;&nbsp; &nbsp;还原配置文件，删除刚才在配置文件中添加的一行。然后重启mysql服务，就可以使用新设置的密码进行登录了。</p>
+
+<p>1. reload 是 administrative 级的权限，即 server administration；这类权限包括：<br />
+&nbsp; &nbsp;CREATE USER, PROCESS, RELOAD, REPLICATION CLIENT, REPLICATION SLAVE, SHOW DATABASES, SHUTDOWN, SUPER</p>
+
+<p>2. 这类权限的授权不是针对某个数据库的，因此须使用on *.* 来进行：<br />
+&nbsp;&nbsp; &nbsp;grant reload on *.* to &#39;root&#39;@&#39;localhost&#39;;</p>
+
+<p>&nbsp;</p>
+
+<p>3. 修改最大连接数</p>
+
+<p><span style="font-family:宋体">方式一：命令行：</span>set global max_connections=200<span style="font-family:宋体">；这种方式在重启后丢失。</span></p>
+
+<p><span style="font-family:宋体">方式二：找到</span>mysql<span style="font-family:宋体">安装目，修改其中启动文件中</span> max_connection=**;</p>
+
+<pre>
+1、在使用group by 查询一张表的数据的时候：select date,time,max(delaytime) as delaytime,sum(delaynum) as delaynum, max(onlineCount) as onlineCount,sum(perMinuteVerify) as perMinuteVerify,auditor from verifyDelayLog WHERE `date` = &#39;2016-06-29&#39; group by time;</pre>
+
+<pre>
+&nbsp;</pre>
+
+<h2>4、执行sql报错，group by 语法被严格限制了，可以解开限制。</h2>
+
+<pre>
+报错如下：</pre>
+
+<pre>
+ERROR 1055 (42000): Expression #7 of SELECT list is not in GROUP BY clause and contains nonaggregated column &#39;postscan.verifyDelayLog.auditor&#39; which is not functionally dependent on columns in GROUP BY clause; this is incompatible with sql_mode=only_full_group_by</pre>
+
+<h3>解决办法一：修改配置文件</h3>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>If you want to disable&nbsp;<strong>permanently</strong>&nbsp;error &quot;<em>Expression #N of SELECT list is not in GROUP BY clause and contains nonaggregated column &#39;db.table.COL&#39; which is not functionally dependent on columns in GROUP BY clause; this is incompatible with sql_mode=only_full_group_by</em>&quot; do those steps:</p>
+
+			<ol>
+				<li><code>sudo nano /etc/mysql/my.cnf</code></li>
+				<li>
+				<p>Add this to the end of the file</p>
+
+				<pre>
+<code>[mysqld]  
+sql_mode = &quot;STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_AUTO_CREATE_USER,NO_ENGINE_SUBSTITUTION&quot;</code></pre>
+				</li>
+				<li>
+				<p><code>sudo service mysql restart</code>&nbsp;to restart MySQL</p>
+				</li>
+			</ol>
+
+			<p>This will disable&nbsp;<code>ONLY_FULL_GROUP_BY</code>&nbsp;for&nbsp;<strong>ALL</strong>&nbsp;users</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>解决办法二：命令行方式：</p>
+
+<p>&nbsp;set&nbsp; @@sql_mode=&#39;STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_AUTO_CREATE_USER,<br />
+NO_ENGINE_SUBSTITUTION&#39;</p>
+
+<p>去掉ONLY_FULL_GROUP_BY即可正常执行sql.</p>
+
+<pre>
+原因：使用  select @@sql_mode； 命令可以看到，数据库设置了 ONLY_FULL_GROUP_BY 的mode，意思就是：</pre>
+
+<pre>
+      对于GROUP BY聚合操作，如果在SELECT中的列，没有在GROUP BY中出现，那么这个SQL是不合法的，因为列不在GROUP BY从句中</pre>
+
+<pre>
+	    所以对于设置了这个mode的数据库，在使用group by 的时候，就要用MAX(),SUM(),ANT_VALUE()这种聚合函数，才能完成GROUP BY 的聚合	    操作。</pre>
+
+<pre>
+其他的一些mode含义：</pre>
+
+<pre>
+&nbsp;</pre>
+
+<p>STRICT_TRANS_TABLES：</p>
+
+<p>在该模式下，如果一个值不能插入到一个事务表中，则中断当前的操作，对非事务表不做限制</p>
+
+<p>&nbsp;</p>
+
+<p>NO_ZERO_IN_DATE：</p>
+
+<p>在严格模式下，不允许日期和月份为零</p>
+
+<p>NO_ZERO_DATE：</p>
+
+<p>设置该值，mysql数据库不允许插入零日期，插入零日期会抛出错误而不是警告。</p>
+
+<p>ERROR_FOR_DIVISION_BY_ZERO：</p>
+
+<p>在INSERT或UPDATE过程中，如果数据被零除，则产生错误而非警告。如&nbsp;果未给出该模式，那么数据被零除时MySQL返回NULL</p>
+
+<p>NO_AUTO_CREATE_USER：</p>
+
+<p>禁止GRANT创建密码为空的用户</p>
+
+<p>NO_ENGINE_SUBSTITUTION：</p>
+
+<p>如果需要的存储引擎被禁用或未编译，那么抛出错误。不设置此值时，用默认的存储引擎替代，并抛出一个异常</p>
+
+<p>&nbsp;</p>
+
+<p>PIPES_AS_CONCAT：</p>
+
+<p>将&quot;||&quot;视为字符串的连接操作符而非或运算符，这和Oracle数据库是一样的，也和字符串的拼接函数Concat相类似</p>
+
+<p>ANSI_QUOTES：</p>
+
+<p>启用ANSI_QUOTES后，不能用双引号来引用字符串，因为它被解释为识别符</p>
+
+<p>NO_AUTO_VALUE_ON_ZERO：</p>
+
+<p>该值影响自增长列的插入。默认设置下，插入0或NULL代表生成下一个自增长值。如果用户&nbsp;希望插入的值为0，而该列又是自增长的，那么这个选项就有用了。</p>
+
+<p>&nbsp;</p>
+
+<h2>5、在使用Host,User,Password来测试数据库连接的时候，报这样的错误：</h2>
+
+<p>&nbsp;Connection failed: Could not connect to the DB: Access denied for user &#39;root&#39;@&#39;localhost&#39; (using password: NO)</p>
+
+<p>或者是明明设置了用户名和密码，却能无密码登陆，有密码反而登陆不了</p>
+
+<p>原因：user表中有一条数据是Host=&#39;localhost&#39;，但是密码和用户名都为空，而数据库在user表中读取权限时，优先匹配最能确定具体主机的纪录，由于&#39;%&#39;匹配所有主机，所以localhost优先于&#39;%&#39;，所以即使你创建了用户名和密码，在dos中直接连接mysql，相当于Host就是localhost,所以会优先去读取localhost这一条记录，然后进行无密码登录</p>
+
+<p>解决方法：delete from user where Host=&#39;localhost&#39; and User=&#39;&#39;;</p>

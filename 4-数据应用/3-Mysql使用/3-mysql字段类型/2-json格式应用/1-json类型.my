@@ -1,0 +1,399 @@
+<h1>mysql json 使用 类型 查询 函数</h1>
+
+<h2>一,对记录的操作</h2>
+
+<p>1.创建有json字段的表</p>
+
+<pre>
+-- 创建表
+CREATE TABLE t_json(id INT PRIMARY KEY, sname VARCHAR(20) , info  JSON);
+</pre>
+
+<p>2.插入记录</p>
+
+<pre>
+-- 插入含有json数组的记录
+INSERT INTO t_json(id,sname,info) VALUES( 1, &#39;name1&#39;, JSON_ARRAY(1, &quot;abc&quot;, NULL, TRUE, CURTIME()));
+
+-- 插入含有json对象的记录
+INSERT INTO t_json(id,sname,info) VALUES( 2, &#39;name2&#39;, JSON_OBJECT(&quot;age&quot;, 20, &quot;time&quot;, now()));
+INSERT INTO t_json(id,sname,info) VALUES( 3, &#39;name3&#39;, &#39;{&quot;age&quot;:20, &quot;time&quot;:&quot;2018-07-14 10:52:00&quot;}&#39;);
+</pre>
+
+<p>3.查询记录</p>
+
+<pre>
+-- 查询记录
+SELECT sname,JSON_EXTRACT(info,&#39;$.age&#39;) FROM t_json;
+SELECT sname,info-&gt;&#39;$.age&#39; FROM t_json;
+-- 查询key
+SELECT id,json_keys(info) FROM t_json;
+</pre>
+
+<p>4.修改记录</p>
+
+<pre>
+-- 增加键
+UPDATE t_json SET info = json_set(info,&#39;$.ip&#39;,&#39;192.168.1.1&#39;) WHERE id = 2;
+
+-- 变更值
+UPDATE t_json SET info = json_set(info,&#39;$.ip&#39;,&#39;192.168.1.2&#39;) WHERE id = 2;
+
+-- 删除键
+UPDATE t_json SET info = json_remove(info,&#39;$.ip&#39;) WHERE id = 2;
+</pre>
+
+<h2>二,创建json值函数</h2>
+
+<p>1.JSON_ARRAY 生成json数组</p>
+
+<pre>
+-- JSON_ARRAY(val1,val2,val3...)
+-- 生成一个包含指定元素的json数组。
+SELECT JSON_ARRAY(1, &quot;abc&quot;, NULL, TRUE, CURTIME()); -- [1, &quot;abc&quot;, null, true, &quot;10:37:08.000000&quot;]
+</pre>
+
+<p>2.JSON_OBJECT 生成json对象</p>
+
+<pre>
+-- JSON_OBJECT(key1,val1,key2,val2...)
+-- 生成一个包含指定K-V对的json object。如果有key为NULL或参数个数为奇数，则抛错。
+SELECT JSON_OBJECT(&#39;age&#39;, 20, &#39;time&#39;, now()); -- {&quot;id&quot;: 87, &quot;name&quot;: &quot;carrot&quot;}
+</pre>
+
+<p>3.JSON_QUOTE 加&quot;号</p>
+
+<pre>
+-- JSON_QUOTE(json_val)
+-- 将json_val用&quot;号括起来。
+SELECT JSON_QUOTE(&#39;[1,2,3]&#39;); -- &quot;[1,2,3]&quot; 
+</pre>
+
+<h2>三,搜索json值函数</h2>
+
+<p>1.JSON_CONTAINS 指定数据是否存在</p>
+
+<pre>
+set @j = &#39;{&quot;a&quot;: 1, &quot;b&quot;: 2, &quot;c&quot;: {&quot;d&quot;: 4}}&#39;;
+-- JSON_CONTAINS(json_doc, val[, path])
+-- 查询json文档是否在指定path包含指定的数据，包含则返回1，否则返回0。如果有参数为NULL或path不存在，则返回NULL。
+SELECT JSON_CONTAINS(@j, &#39;4&#39;, &#39;$.c.d&#39;); -- 1
+</pre>
+
+<p>2.JSON_CONTAINS_PATH 指定路径是否存在</p>
+
+<pre>
+-- JSON_CONTAINS_PATH(json_doc, one_or_all, path[, path] ...)
+-- 查询是否存在指定路径，存在则返回1，否则返回0。如果有参数为NULL，则返回NULL。
+-- one_or_all只能取值&quot;one&quot;或&quot;all&quot;，one表示只要有一个存在即可；all表示所有的都存在才行。
+SELECT JSON_CONTAINS_PATH(@j, &#39;one&#39;, &#39;$.a&#39;, &#39;$.e&#39;); -- 1
+SELECT JSON_CONTAINS_PATH(@j, &#39;all&#39;, &#39;$.a&#39;, &#39;$.c.d&#39;); -- 1
+</pre>
+
+<p>3.JSON_EXTRACT 查找所有指定数据</p>
+
+<pre>
+-- JSON_EXTRACT(json_doc, path[, path] ...)
+-- 从json文档里抽取数据。如果有参数有NULL或path不存在，则返回NULL。如果抽取出多个path，则返回的数据封闭在一个json array里。
+set @j2 = &#39;[10, 20, [30, 40]]&#39;;
+SELECT JSON_EXTRACT(&#39;[10, 20, [30, 40]]&#39;, &#39;$[1]&#39;); -- 20
+SELECT JSON_EXTRACT(&#39;[10, 20, [30, 40]]&#39;, &#39;$[1]&#39;, &#39;$[0]&#39;); -- [20, 10]
+SELECT JSON_EXTRACT(&#39;[10, 20, [30, 40]]&#39;, &#39;$[2][*]&#39;); -- [30, 40]
+</pre>
+
+<p>4.JSON_KEYS 查找所有指定键值</p>
+
+<pre>
+-- JSON_KEYS(json_doc[, path])
+-- 获取json文档在指定路径下的所有键值，返回一个json array。如果有参数为NULL或path不存在，则返回NULL。
+SELECT JSON_KEYS(&#39;{&quot;a&quot;: 1, &quot;b&quot;: {&quot;c&quot;: 30}}&#39;); -- [&quot;a&quot;, &quot;b&quot;]
+SELECT JSON_KEYS(&#39;{&quot;a&quot;: 1, &quot;b&quot;: {&quot;c&quot;: 30}}&#39;, &#39;$.b&#39;); -- [&quot;c&quot;]
+SELECT id,json_keys(info) FROM t_json;
+</pre>
+
+<p>5.JSON_SEARCH 查找所有指定值的位置</p>
+
+<pre>
+-- JSON_SEARCH(json_doc, one_or_all, search_str[, escape_char[, path] ...])
+-- 查询包含指定字符串的paths，并作为一个json array返回。如果有参数为NUL或path不存在，则返回NULL。
+-- one_or_all：&quot;one&quot;表示查询到一个即返回；&quot;all&quot;表示查询所有。
+-- search_str：要查询的字符串。 可以用LIKE里的&#39;%&#39;或&lsquo;_&rsquo;匹配。
+-- path：在指定path下查。
+SET @j3 = &#39;[&quot;abc&quot;, [{&quot;k&quot;: &quot;10&quot;}, &quot;def&quot;], {&quot;x&quot;:&quot;abc&quot;}, {&quot;y&quot;:&quot;bcd&quot;}]&#39;;
+SELECT JSON_SEARCH(@j3, &#39;one&#39;, &#39;abc&#39;); -- &quot;$[0]&quot;
+SELECT JSON_SEARCH(@j3, &#39;all&#39;, &#39;abc&#39;); -- [&quot;$[0]&quot;, &quot;$[2].x&quot;]
+SELECT JSON_SEARCH(@j3, &#39;all&#39;, &#39;abc&#39;, NULL, &#39;$[2]&#39;); -- &quot;$[2].x&quot;
+SELECT JSON_SEARCH(@j3, &#39;all&#39;, &#39;10&#39;); -- &quot;$[1][0].k&quot;
+SELECT JSON_SEARCH(@j3, &#39;all&#39;, &#39;%b%&#39;); -- [&quot;$[0]&quot;, &quot;$[2].x&quot;, &quot;$[3].y&quot;]
+SELECT JSON_SEARCH(@j3, &#39;all&#39;, &#39;%b%&#39;, NULL, &#39;$[2]&#39;); -- &quot;$[2].x&quot;
+</pre>
+
+<h2>四,修改json值函数</h2>
+
+<p>1.JSON_ARRAY_APPEND&nbsp; 指定位置追加数组元素</p>
+
+<pre>
+-- JSON_ARRAY_APPEND(json_doc, path, val[, path, val] ...)
+-- 在指定path的json array尾部追加val。如果指定path是一个json object，则将其封装成一个json array再追加。如果有参数为NULL，则返回NULL。
+SET @j4 = &#39;[&quot;a&quot;, [&quot;b&quot;, &quot;c&quot;], &quot;d&quot;]&#39;;
+-- SELECT JSON_ARRAY_APPEND(@j4, &#39;$[1][0]&#39;, 3); -- [&quot;a&quot;, [[&quot;b&quot;, 3], &quot;c&quot;], &quot;d&quot;]
+SET @j5 = &#39;{&quot;a&quot;: 1, &quot;b&quot;: [2, 3], &quot;c&quot;: 4}&#39;;
+SELECT JSON_ARRAY_APPEND(@j5, &#39;$.b&#39;, &#39;x&#39;); -- {&quot;a&quot;: 1, &quot;b&quot;: [2, 3, &quot;x&quot;], &quot;c&quot;: 4} 
+SELECT JSON_ARRAY_APPEND(@j5, &#39;$.c&#39;, &#39;y&#39;); -- {&quot;a&quot;: 1, &quot;b&quot;: [2, 3], &quot;c&quot;: [4, &quot;y&quot;]}
+SELECT JSON_ARRAY_APPEND(@j5, &#39;$&#39;, &#39;z&#39;); -- [{&quot;a&quot;: 1, &quot;b&quot;: [2, 3], &quot;c&quot;: 4}, &quot;z&quot;]
+</pre>
+
+<p>2.JSON_ARRAY_INSERT 指定位置插入数组元素</p>
+
+<pre>
+-- JSON_ARRAY_INSERT(json_doc, path, val[, path, val] ...)
+-- 在path指定的json array元素插入val，原位置及以右的元素顺次右移。如果path指定的数据非json array元素，则略过此val；如果指定的元素下标超过json array的长度，则插入尾部。
+SET @j6 = &#39;[&quot;a&quot;, {&quot;b&quot;: [1, 2]}, [3, 4]]&#39;;
+SELECT JSON_ARRAY_INSERT(@j6, &#39;$[1]&#39;, &#39;x&#39;); -- [&quot;a&quot;, &quot;x&quot;, {&quot;b&quot;: [1, 2]}, [3, 4]]
+SELECT JSON_ARRAY_INSERT(@j6, &#39;$[100]&#39;, &#39;x&#39;); -- [&quot;a&quot;, {&quot;b&quot;: [1, 2]}, [3, 4], &quot;x&quot;]
+SELECT JSON_ARRAY_INSERT(@j6, &#39;$[1].b[0]&#39;, &#39;x&#39;); -- [&quot;a&quot;, {&quot;b&quot;: [&quot;x&quot;, 1, 2]}, [3, 4]]
+SELECT JSON_ARRAY_INSERT(@j6, &#39;$[0]&#39;, &#39;x&#39;, &#39;$[3][1]&#39;, &#39;y&#39;); -- [&quot;x&quot;, &quot;a&quot;, {&quot;b&quot;: [1, 2]}, [3, &quot;y&quot;, 4]]
+</pre>
+
+<p>3.JSON_INSERT 指定位置插入</p>
+
+<pre>
+-- JSON_INSERT(json_doc, path, val[, path, val] ...)
+-- 在指定path下插入数据，如果path已存在，则忽略此val（不存在才插入）。
+SET @j7 = &#39;{ &quot;a&quot;: 1, &quot;b&quot;: [2, 3]}&#39;;
+SELECT JSON_INSERT(@j7, &#39;$.a&#39;, 10, &#39;$.c&#39;, &#39;[true, false]&#39;); -- {&quot;a&quot;: 1, &quot;b&quot;: [2, 3], &quot;c&quot;: &quot;[true, false]&quot;}
+</pre>
+
+<p>4.JSON_REPLACE 指定位置替换</p>
+
+<pre>
+-- JSON_REPLACE(json_doc, path, val[, path, val] ...)
+-- 替换指定路径的数据，如果某个路径不存在则略过（存在才替换）。如果有参数为NULL，则返回NULL。
+SELECT JSON_REPLACE(@j7, &#39;$.a&#39;, 10, &#39;$.c&#39;, &#39;[true, false]&#39;); -- {&quot;a&quot;: 10, &quot;b&quot;: [2, 3]}
+</pre>
+
+<p>5.JSON_SET 指定位置设置</p>
+
+<pre>
+-- JSON_SET(json_doc, path, val[, path, val] ...)
+-- 设置指定路径的数据（不管是否存在）。如果有参数为NULL，则返回NULL。
+SELECT JSON_SET(@j7, &#39;$.a&#39;, 10, &#39;$.c&#39;, &#39;[true, false]&#39;); -- {&quot;a&quot;: 10, &quot;b&quot;: [2, 3], &quot;c&quot;: &quot;[true, false]&quot;}
+</pre>
+
+<p>6.JSON_MERGE 合并</p>
+
+<pre>
+-- JSON_MERGE(json_doc, json_doc[, json_doc] ...)
+-- merge多个json文档。规则如下：
+-- 如果都是json array，则结果自动merge为一个json array；
+-- 如果都是json object，则结果自动merge为一个json object；
+-- 如果有多种类型，则将非json array的元素封装成json array再按照规则一进行mege。
+SELECT JSON_MERGE(&#39;[1, 2]&#39;, &#39;[true, false]&#39;); -- [1, 2, true, false]
+SELECT JSON_MERGE(&#39;{&quot;name&quot;: &quot;x&quot;}&#39;, &#39;{&quot;id&quot;: 47}&#39;); -- {&quot;id&quot;: 47, &quot;name&quot;: &quot;x&quot;}
+SELECT JSON_MERGE(&#39;1&#39;, &#39;true&#39;); -- [1, true]
+SELECT JSON_MERGE(&#39;[1, 2]&#39;, &#39;{&quot;id&quot;: 47}&#39;); -- [1, 2, {&quot;id&quot;: 47}]
+</pre>
+
+<p>7.JSON_REMOVE 指定位置移除</p>
+
+<pre>
+-- JSON_REMOVE(json_doc, path[, path] ...)
+-- 移除指定路径的数据，如果某个路径不存在则略过此路径。如果有参数为NULL，则返回NULL。
+SET @j8 = &#39;[&quot;a&quot;, [&quot;b&quot;, &quot;c&quot;], &quot;d&quot;]&#39;;
+SELECT JSON_REMOVE(@j8, &#39;$[1]&#39;); -- [&quot;a&quot;, &quot;d&quot;]
+</pre>
+
+<p>8.JSON_UNQUOTE 去&quot;号</p>
+
+<pre>
+-- JSON_UNQUOTE(val)
+-- 去掉val的引号。如果val为NULL，则返回NULL。
+SELECT JSON_UNQUOTE(&quot;\&quot;123\&quot;&quot;); -- 123
+</pre>
+
+<h2>五,返回json值属性的函数</h2>
+
+<p>1.JSON_DEPTH 深度</p>
+
+<pre>
+-- JSON_DEPTH(json_doc)
+-- 获取json文档的深度。如果参数为NULL，则返回NULL。
+-- 空的json array、json object或标量的深度为1。
+SELECT JSON_DEPTH(&#39;{}&#39;), JSON_DEPTH(&#39;[]&#39;), JSON_DEPTH(&#39;true&#39;); -- 1 1 1
+SELECT JSON_DEPTH(&#39;[10, 20]&#39;), JSON_DEPTH(&#39;[[], {}]&#39;); -- 2 2
+SELECT JSON_DEPTH(&#39;[10, {&quot;a&quot;: 20}]&#39;); -- 3</pre>
+
+<p>2.JSON_LENGTH 长度</p>
+
+<pre>
+-- JSON_LENGTH(json_doc[, path])
+-- 获取指定路径下的长度。如果参数为NULL，则返回NULL。　
+-- 长度的计算规则：
+-- 标量的长度为1；
+-- json array的长度为元素的个数；
+-- json object的长度为key的个数。
+SELECT JSON_LENGTH(&#39;[1, 2, {&quot;a&quot;: 3}]&#39;); -- 3
+SELECT JSON_LENGTH(&#39;{&quot;a&quot;: 1, &quot;b&quot;: {&quot;c&quot;: 30}}&#39;); -- 2
+SELECT JSON_LENGTH(&#39;{&quot;a&quot;: 1, &quot;b&quot;: {&quot;c&quot;: 30}}&#39;, &#39;$.b&#39;); -- 1</pre>
+
+<p>3.JSON_TYPE 类型</p>
+
+<pre>
+-- JSON_TYPE(json_val)
+-- 获取json文档的具体类型。如果参数为NULL，则返回NULL。
+select JSON_TYPE(&#39;[1,2]&#39;); -- ARRAY</pre>
+
+<p>4.JSON_VALID 是否有效json格式</p>
+
+<pre>
+-- JSON_VALID(val)
+-- 判断val是否为有效的json格式，是为1，不是为0。如果参数为NUL，则返回NULL。
+SELECT JSON_VALID(&#39;{&quot;a&quot;: 1}&#39;); -- 1
+SELECT JSON_VALID(&#39;hello&#39;), JSON_VALID(&#39;&quot;hello&quot;&#39;); -- 1</pre>
+
+<p>附录:</p>
+
+<pre>
+JSON_ARRAY 生成json数组
+JSON_OBJECT 生成json对象
+JSON_QUOTE 加&quot;号
+JSON_CONTAINS 指定数据是否存在
+JSON_CONTAINS_PATH 指定路径是否存在
+JSON_EXTRACT 查找所有指定数据
+JSON_KEYS 查找所有指定键值
+JSON_SEARCH 查找所有指定值的位置
+JSON_ARRAY_APPEND  指定位置追加数组元素
+JSON_ARRAY_INSERT 指定位置插入数组元素
+JSON_INSERT 指定位置插入
+JSON_REPLACE 指定位置替换
+JSON_SET 指定位置设置
+JSON_MERGE 合并
+JSON_REMOVE 指定位置移除
+JSON_UNQUOTE 去&quot;号
+JSON_DEPTH 深度
+JSON_LENGTH 长度
+JSON_TYPE 类型
+JSON_VALID 是否有效json格式</pre>
+
+<table summary="A reference that lists all JSON functions.">
+	<thead>
+		<tr>
+			<th scope="col">函数名</th>
+			<th scope="col">描述</th>
+		</tr>
+	</thead>
+	<tbody>
+		<tr>
+			<td scope="row"><a href="https://dev.mysql.com/doc/refman/5.7/en/json-modification-functions.html#function_json-append"><code>JSON_APPEND()</code></a>（废弃的5.7.9）</td>
+			<td>JSON文件追加数据</td>
+		</tr>
+		<tr>
+			<td scope="row"><a href="https://dev.mysql.com/doc/refman/5.7/en/json-creation-functions.html#function_json-array"><code>JSON_ARRAY()</code></a></td>
+			<td>创建JSON数组</td>
+		</tr>
+		<tr>
+			<td scope="row"><a href="https://dev.mysql.com/doc/refman/5.7/en/json-modification-functions.html#function_json-array-append"><code>JSON_ARRAY_APPEND()</code></a></td>
+			<td>JSON文件追加数据</td>
+		</tr>
+		<tr>
+			<td scope="row"><a href="https://dev.mysql.com/doc/refman/5.7/en/json-modification-functions.html#function_json-array-insert"><code>JSON_ARRAY_INSERT()</code></a></td>
+			<td>插入JSON数组</td>
+		</tr>
+		<tr>
+			<td scope="row"><a href="https://dev.mysql.com/doc/refman/5.7/en/json-search-functions.html#operator_json-column-path"><code>-&gt;</code></a></td>
+			<td>在评估路径返回JSON列值；相当于json_extract()。</td>
+		</tr>
+		<tr>
+			<td scope="row"><a href="https://dev.mysql.com/doc/refman/5.7/en/json-search-functions.html#function_json-contains"><code>JSON_CONTAINS()</code></a></td>
+			<td>是否包含特定对象的JSON文档路径</td>
+		</tr>
+		<tr>
+			<td scope="row"><a href="https://dev.mysql.com/doc/refman/5.7/en/json-search-functions.html#function_json-contains-path"><code>JSON_CONTAINS_PATH()</code></a></td>
+			<td>无论是JSON文件包含任何数据路径</td>
+		</tr>
+		<tr>
+			<td scope="row"><a href="https://dev.mysql.com/doc/refman/5.7/en/json-attribute-functions.html#function_json-depth"><code>JSON_DEPTH()</code></a></td>
+			<td>JSON文档的最大深度</td>
+		</tr>
+		<tr>
+			<td scope="row"><a href="https://dev.mysql.com/doc/refman/5.7/en/json-search-functions.html#function_json-extract"><code>JSON_EXTRACT()</code></a></td>
+			<td>从JSON文档返回数据</td>
+		</tr>
+		<tr>
+			<td scope="row"><a href="https://dev.mysql.com/doc/refman/5.7/en/json-search-functions.html#operator_json-inline-path"><code>-&gt;&gt;</code></a></td>
+			<td>在评估路径和结束引语结果返回JSON列值；相当于json_unquote（json_extract()）。</td>
+		</tr>
+		<tr>
+			<td scope="row"><a href="https://dev.mysql.com/doc/refman/5.7/en/json-modification-functions.html#function_json-insert"><code>JSON_INSERT()</code></a></td>
+			<td>将数据插入到JSON文档</td>
+		</tr>
+		<tr>
+			<td scope="row"><a href="https://dev.mysql.com/doc/refman/5.7/en/json-search-functions.html#function_json-keys"><code>JSON_KEYS()</code></a></td>
+			<td>从JSON文件密钥数组</td>
+		</tr>
+		<tr>
+			<td scope="row"><a href="https://dev.mysql.com/doc/refman/5.7/en/json-attribute-functions.html#function_json-length"><code>JSON_LENGTH()</code></a></td>
+			<td>在JSON文档中的元素数</td>
+		</tr>
+		<tr>
+			<td scope="row"><a href="https://dev.mysql.com/doc/refman/5.7/en/json-modification-functions.html#function_json-merge"><code>JSON_MERGE()</code></a>（废弃的5.7.22）</td>
+			<td>合并的JSON文件，保存重复键。不json_merge_preserve()的同义词</td>
+		</tr>
+		<tr>
+			<td scope="row"><a href="https://dev.mysql.com/doc/refman/5.7/en/json-modification-functions.html#function_json-merge-patch"><code>JSON_MERGE_PATCH()</code></a></td>
+			<td>合并的JSON文件，免去重复键的值</td>
+		</tr>
+		<tr>
+			<td scope="row"><a href="https://dev.mysql.com/doc/refman/5.7/en/json-modification-functions.html#function_json-merge-preserve"><code>JSON_MERGE_PRESERVE()</code></a></td>
+			<td>合并的JSON文件，保存重复键</td>
+		</tr>
+		<tr>
+			<td scope="row"><a href="https://dev.mysql.com/doc/refman/5.7/en/json-creation-functions.html#function_json-object"><code>JSON_OBJECT()</code></a></td>
+			<td>创建JSON对象</td>
+		</tr>
+		<tr>
+			<td scope="row"><a href="https://dev.mysql.com/doc/refman/5.7/en/json-utility-functions.html#function_json-pretty"><code>JSON_PRETTY()</code></a></td>
+			<td>版画在人类可读的格式JSON文档，每个数组元素或对象成员打印在新的行中，缩进两个空格就其母。</td>
+		</tr>
+		<tr>
+			<td scope="row"><a href="https://dev.mysql.com/doc/refman/5.7/en/json-creation-functions.html#function_json-quote"><code>JSON_QUOTE()</code></a></td>
+			<td>引用JSON文档</td>
+		</tr>
+		<tr>
+			<td scope="row"><a href="https://dev.mysql.com/doc/refman/5.7/en/json-modification-functions.html#function_json-remove"><code>JSON_REMOVE()</code></a></td>
+			<td>从JSON文件中删除数据</td>
+		</tr>
+		<tr>
+			<td scope="row"><a href="https://dev.mysql.com/doc/refman/5.7/en/json-modification-functions.html#function_json-replace"><code>JSON_REPLACE()</code></a></td>
+			<td>在JSON文件的值替换</td>
+		</tr>
+		<tr>
+			<td scope="row"><a href="https://dev.mysql.com/doc/refman/5.7/en/json-search-functions.html#function_json-search"><code>JSON_SEARCH()</code></a></td>
+			<td>在JSON文件价值路径</td>
+		</tr>
+		<tr>
+			<td scope="row"><a href="https://dev.mysql.com/doc/refman/5.7/en/json-modification-functions.html#function_json-set"><code>JSON_SET()</code></a></td>
+			<td>将数据插入到JSON文档</td>
+		</tr>
+		<tr>
+			<td scope="row"><a href="https://dev.mysql.com/doc/refman/5.7/en/json-utility-functions.html#function_json-storage-size"><code>JSON_STORAGE_SIZE()</code></a></td>
+			<td>用于一个JSON文件的二进制表示形式存储空间；一个JSON柱，空间时使用的文档插入到任何部分更新之前，</td>
+		</tr>
+		<tr>
+			<td scope="row"><a href="https://dev.mysql.com/doc/refman/5.7/en/json-attribute-functions.html#function_json-type"><code>JSON_TYPE()</code></a></td>
+			<td>JSON值类型</td>
+		</tr>
+		<tr>
+			<td scope="row"><a href="https://dev.mysql.com/doc/refman/5.7/en/json-modification-functions.html#function_json-unquote"><code>JSON_UNQUOTE()</code></a></td>
+			<td>JSON值而言</td>
+		</tr>
+		<tr>
+			<td scope="row"><a href="https://dev.mysql.com/doc/refman/5.7/en/json-attribute-functions.html#function_json-valid"><code>JSON_VALID()</code></a></td>
+			<td>JSON值是否是有效的</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>mysql官方文档:https://dev.mysql.com/doc/refman/5.7/en/json-utility-functions.html</p>
+
+<p>参考:https://www.cnblogs.com/waterystone/p/5626098.html</p>

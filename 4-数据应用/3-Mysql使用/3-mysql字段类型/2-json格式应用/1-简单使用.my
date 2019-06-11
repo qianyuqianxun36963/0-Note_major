@@ -1,0 +1,88 @@
+<h1>json格式数据简单使用</h1>
+
+<h2>数据库创建</h2>
+
+<pre>
+CREATE&nbsp;TABLE&nbsp;json_test(id&nbsp;INT(11)&nbsp;AUTO_INCREMENT&nbsp;PRIMARY&nbsp;KEY,person_desc&nbsp;JSON)ENGINE&nbsp;INNODB;</pre>
+
+<h2>数据库插入</h2>
+
+<pre>
+INSERT&nbsp;INTO&nbsp;json_test(person_desc)&nbsp;VALUES&nbsp;(&#39;{&nbsp;&nbsp;
+&nbsp;&nbsp;&nbsp;&nbsp;&quot;programmers&quot;:&nbsp;[{&nbsp;&nbsp;
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&quot;firstName&quot;:&nbsp;&quot;Brett&quot;,&nbsp;&nbsp;
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&quot;lastName&quot;:&nbsp;&quot;McLaughlin&quot;,&nbsp;&nbsp;
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&quot;email&quot;:&nbsp;&quot;aaaa&quot;&nbsp;&nbsp;
+&nbsp;&nbsp;&nbsp;&nbsp;},&nbsp;{&nbsp;&nbsp;
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&quot;firstName&quot;:&nbsp;&quot;Jason&quot;,&nbsp;&nbsp;
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&quot;lastName&quot;:&nbsp;&quot;Hunter&quot;,&nbsp;&nbsp;
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&quot;email&quot;:&nbsp;&quot;bbbb&quot;&nbsp;&nbsp;
+&nbsp;&nbsp;&nbsp;&nbsp;},&nbsp;{&nbsp;&nbsp;
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&quot;firstName&quot;:&nbsp;&quot;Elliotte&quot;,&nbsp;&nbsp;
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&quot;lastName&quot;:&nbsp;&quot;Harold&quot;,&nbsp;&nbsp;
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&quot;email&quot;:&nbsp;&quot;cccc&quot;&nbsp;&nbsp;
+&nbsp;&nbsp;&nbsp;&nbsp;}],&nbsp;&nbsp;
+&nbsp;&nbsp;&nbsp;&nbsp;&quot;authors&quot;:&nbsp;[{&nbsp;&nbsp;
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&quot;firstName&quot;:&nbsp;&quot;Isaac&quot;,&nbsp;&nbsp;
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&quot;lastName&quot;:&nbsp;&quot;Asimov&quot;,&nbsp;&nbsp;
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&quot;genre&quot;:&nbsp;&quot;sciencefiction&quot;&nbsp;&nbsp;
+&nbsp;&nbsp;&nbsp;&nbsp;},&nbsp;{&nbsp;&nbsp;
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&quot;firstName&quot;:&nbsp;&quot;Tad&quot;,&nbsp;&nbsp;
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&quot;lastName&quot;:&nbsp;&quot;Williams&quot;,&nbsp;&nbsp;
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&quot;genre&quot;:&nbsp;&quot;fantasy&quot;&nbsp;&nbsp;
+&nbsp;&nbsp;&nbsp;&nbsp;},&nbsp;{&nbsp;&nbsp;
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&quot;firstName&quot;:&nbsp;&quot;Frank&quot;,&nbsp;&nbsp;
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&quot;lastName&quot;:&nbsp;&quot;Peretti&quot;,&nbsp;&nbsp;
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&quot;genre&quot;:&nbsp;&quot;christianfiction&quot;&nbsp;&nbsp;
+&nbsp;&nbsp;&nbsp;&nbsp;}],&nbsp;&nbsp;
+&nbsp;&nbsp;&nbsp;&nbsp;&quot;musicians&quot;:&nbsp;[{&nbsp;&nbsp;
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&quot;firstName&quot;:&nbsp;&quot;Eric&quot;,&nbsp;&nbsp;
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&quot;lastName&quot;:&nbsp;&quot;Clapton&quot;,&nbsp;&nbsp;
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&quot;instrument&quot;:&nbsp;&quot;guitar&quot;&nbsp;&nbsp;
+&nbsp;&nbsp;&nbsp;&nbsp;},&nbsp;{&nbsp;&nbsp;
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&quot;firstName&quot;:&nbsp;&quot;Sergei&quot;,&nbsp;&nbsp;
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&quot;lastName&quot;:&nbsp;&quot;Rachmaninoff&quot;,&nbsp;&nbsp;
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&quot;instrument&quot;:&nbsp;&quot;piano&quot;&nbsp;&nbsp;
+&nbsp;&nbsp;&nbsp;&nbsp;}]&nbsp;&nbsp;
+}&#39;);</pre>
+
+<h2>数据库查询</h2>
+
+<p>查看插入的这行JSON数据有哪些KEY：</p>
+
+<pre>
+SELECT id,json_keys(person_desc) as &quot;keys&quot; FROM json_test;</pre>
+
+<p>可以看到里面有三个KEY，分别为authors，musicians，programmers。那现在找一个KEY把对应的值拿出来：</p>
+
+<pre>
+SELECT&nbsp;json_extract(AUTHORS,&#39;$.lastName[0]&#39;)&nbsp;AS&nbsp;&#39;name&#39;,&nbsp;AUTHORS&nbsp;FROM&nbsp;&nbsp;
+(&nbsp;&nbsp;
+&nbsp;&nbsp; &nbsp;SELECT&nbsp;id,json_extract(person_desc,&#39;$.authors[0][0]&#39;)&nbsp;AS&nbsp;&quot;authors&quot;&nbsp;FROM&nbsp;json_test&nbsp;&nbsp;
+&nbsp;&nbsp; &nbsp;UNION&nbsp;ALL&nbsp;&nbsp;
+&nbsp;&nbsp; &nbsp;SELECT&nbsp;id,json_extract(person_desc,&#39;$.authors[1][0]&#39;)&nbsp;AS&nbsp;&quot;authors&quot;&nbsp;FROM&nbsp;json_test&nbsp;&nbsp;
+&nbsp;&nbsp; &nbsp;UNION&nbsp;ALL&nbsp;&nbsp;
+&nbsp;&nbsp; &nbsp;SELECT&nbsp;id,json_extract(person_desc,&#39;$.authors[2][0]&#39;)&nbsp;AS&nbsp;&quot;authors&quot;&nbsp;FROM&nbsp;json_test&nbsp;&nbsp;
+)&nbsp;AS&nbsp;T1
+ORDER&nbsp;BY&nbsp;NAME&nbsp;DESC
+</pre>
+
+<p>列出详细值：</p>
+
+<pre>
+SELECT &nbsp;
+&nbsp; &nbsp; json_extract(AUTHORS,&#39;$.firstName[0]&#39;) AS &quot;firstname&quot;, &nbsp;
+&nbsp; &nbsp; json_extract(AUTHORS,&#39;$.lastName[0]&#39;) AS &quot;lastname&quot;, &nbsp;
+&nbsp; &nbsp; json_extract(AUTHORS,&#39;$.genre[0]&#39;) AS &quot;genre&quot; &nbsp;
+&nbsp; &nbsp; FROM ( &nbsp;
+&nbsp; &nbsp; SELECT id,json_extract(person_desc,&#39;$.authors[0]&#39;) AS &quot;authors&quot; FROM json_test &nbsp;
+) AS T
+ORDER&nbsp;BY&nbsp;NAME&nbsp;DESC
+</pre>
+
+<p>删掉authors这个KEY对应的所有对象</p>
+
+<pre>
+UPDATE&nbsp;json_test&nbsp;SET&nbsp;person_desc = json_remove(person_desc,&#39;$.authors&#39;)</pre>
+
+<p>&nbsp;</p>
