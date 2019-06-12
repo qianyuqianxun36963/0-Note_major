@@ -1,0 +1,65 @@
+<h1>openshift S2I构建过程及应用部署流程</h1>
+
+<p>openshift提供三种build策略</p>
+
+<p>    1、S2I（source to image）build：一个为重复build产生的docker格式的container工具，它将application source装进一个容器镜像并组合生产出一个read-to-run的新镜像。这个新镜像随时准备好接收docker run指令，同时支持增量build，也就是对之前版本的image再build操作。</p>
+
+<p>    2、Customer build：自定义的build策略允许开发者定义一个特殊的build image来完成整个build过程。</p>
+
+<p>    3、Pipeline build：通过定义一个Jenkins pipeline来执行插件，Pipeline的workflows定义在Jenkins file里，也可以直接嵌套在build configuration里。</p>
+
+<p>Source to Image S2I的步骤如下：</p>
+
+<p>        1、用户输入源代码仓库地址</p>
+
+<p>        2、用户选择S2I构建的基础镜像(又称Builder镜像)，Builder镜像中包含了操作系统、操作语言，软件及配置。</p>
+
+<p>        3、用户或系统触发S2I构建，OpenShift将实例化S2I构建执行器</p>
+
+<p>        4、S2I构建执行器将从用户指定的代码仓库下载源代码</p>
+
+<p>        5、S2I构建执行器实例化Builder镜像。代码将会被注入Builder镜像中</p>
+
+<p>        6、Builder奖项将根据预定义的逻辑(assemble脚本)执行源代码的编译、购进并完成部署。</p>
+
+<p>        7、S2I构建执行器将完成操作的Builder镜像生成新的Docker镜像</p>
+
+<p>        8、S2I构建执行器将新的镜像推送到OpenShift内部的镜像仓库</p>
+
+<p>        9、S2I构建执行器更新该次构建相关的Image Stream信息</p>
+
+<p>    除了接受源代码仓库地址作为输入外，S2I还接受Dockerfile以及二进制文件作为构建的输入</p>
+
+<p><img alt="" src="https://img-blog.csdnimg.cn/20190123103226983.png?x-oss-process=image/watermark,type_ZmFuZ3poZW5naGVpdGk,shadow_10,text_aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L3FxXzIzMzQ4MDcx,size_16,color_FFFFFF,t_70" style="height:363px; width:629px" /></p>
+
+<p>核心流程详解：</p>
+
+<p>    OpenShift项目，最核心的流程就是将应用从静态的源代码变成动态的应用服务的过程。</p>
+
+<p>应用构建： </p>
+
+<p>   1、部署应用：oc new-app 创建应用，根据用户提供的源代码仓库地址及Builder镜像，平台将生成构建配置(Build Config)，部署配置(Deployment Config)，Service及Route等对象</p>
+
+<p>    2、触发构建：应用相关的对象创建完毕后，平台触发一次S2I构建</p>
+
+<p>    3、实例化构建：平台依据应用的Build Config实例化一次构建，生成一个Build对象。Build对象生成后，平台将执行具体的构建操作，包括下载源代码、实例化Builder镜像、执行编译和构建脚本等</p>
+
+<p>    4、生成镜像：构建成功后将生成一个可供部署的应用容器镜像。平台将把此镜像推送至内部的镜像仓库组件Registry中</p>
+
+<p>    5、更新Image Stream：镜像推送至内部的仓库后，平台将创建或更新应用的Image Stream的镜像信息，使之指向最新的镜像</p>
+
+<p>应用部署：</p>
+
+<p>    6、触发镜像部署：当Image Stream的镜像信息更新后，将触发平台部署S2I构建生成的镜像</p>
+
+<p>    7、实例化镜像部署：Deployment Config对象记录了部署的定义，平台将依据此配置实例化一次部署，生成一个Deploy对象跟踪当次部署的状态</p>
+
+<p>    8、生成Replication Cotroller：平台实例化一个Replication Controller用以调度应用容器的部署</p>
+
+<p>    9、部署容器：通过Replication Controller,OpenShift将Pod及应用容器部署到集群的计算节点中</p>
+
+<p>请求处理：</p>
+
+<p>    10、用户访问：用户通过浏览器访问Route对象中定义的应用域名</p>
+
+<p>    11、请求处理并返回：请求都Router组件后，Router根据Route定义的规则找到请求所含域名相关联的Service的容器，并将请求转发给容器实例。容器实例除了返回请求数据，还会通过Router将数据返回给调用的客户端</p>

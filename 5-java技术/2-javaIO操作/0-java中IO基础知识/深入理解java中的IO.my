@@ -1,0 +1,416 @@
+<h1><a href="http://www.cnblogs.com/ylspace/p/8128112.html" id="cb_post_title_url">深入理解JAVA中的IO</a></h1>
+<h2><strong>深入理解Java中的IO</strong></h2>
+<h2><a name="t2"></a><strong>引言：</strong></h2>
+<h2><a name="t3"></a><strong>    对程序语言的设计者来说，创建一个好的输入/输出(I/O)系统是一项艰难的任务 < Thinking in Java ></strong></h2>
+<h2><a name="t4"></a><strong> </strong></h2>
+<h2><a name="t5"></a><strong>本文的目录视图如下：</strong></h2>
+<p><strong> </strong></p>
+<h2><a name="t6"></a>Java IO概要</h2>
+<h2><a name="t7"></a>   a.Java IO中常用的类</h2>
+<h2><a name="t8"></a>     b.Java流类的类结构图</h2>
+<h2><a name="t9"></a>1.流的概念和作用</h2>
+<h2><a name="t10"></a>2.Java IO所采用的模型  :</h2>
+<h2><a name="t11"></a>3.IO流的分类</h2>
+<h2><a name="t12"></a>4.Java IO流对象</h2>
+<p>     1.输入字节流InputStream</p>
+<h2><a name="t13"></a>     2.输出字节流OutputStream</h2>
+<h2><a name="t14"></a>     3.字符输入流Reader</h2>
+<h2><a name="t15"></a>     4.字符输出流Writer</h2>
+<h2><a name="t16"></a>5.字符流的输入与输出的对应</h2>
+<h2><a name="t17"></a>6.字符流与字节流转换</h2>
+<h2><a name="t18"></a>7.字节流和字符流的区别</h2>
+<h2><a name="t19"></a>8.File类</h2>
+<h2><a name="t20"></a>9.RandomAccessFile类</h2>
+<h2><a name="t21"></a><strong> </strong></h2>
+<h2><a name="t22"></a><strong>Java IO概要</strong></h2>
+<p><strong> </strong></p>
+<h2><a name="t23"></a><strong>为了方便理解与阐述，先引入两张图：</strong></h2>
+<h2><a name="t24"></a><strong>       a、Java IO中常用的类</strong></h2>
+<p><strong><img alt="" src="http://img.blog.csdn.net/20160421004103005?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQv/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70/gravity/Center" /></strong></p>
+<p>  在整个Java.io包中最重要的就是5个类和一个接口。5个类指的是File、OutputStream、InputStream、Writer、Reader；一个接口指的是Serializable.掌握了这些IO的核心操作那么对于Java中的IO体系也就有了一个初步的认识了</p>
+<p> </p>
+<p>Java I/O主要包括如下几个层次，包含三个部分：</p>
+<p>  <strong>1.流式部分</strong>――IO的主体部分；</p>
+<p>  <strong>2.非流式部分</strong>――主要包含一些辅助流式部分的类，如：File类、RandomAccessFile类和FileDescriptor等类；</p>
+<p>  <strong>3.其他类</strong>--文件读取部分的与安全相关的类，如：SerializablePermission类，以及与本地操作系统相关的文件系统的类，如：FileSystem类和Win32FileSystem类和WinNTFileSystem类。</p>
+<p> </p>
+<p>  主要的类如下：</p>
+<p>     1. File（文件特征与管理）：用于文件或者目录的描述信息，例如生成新目录，修改文件名，删除文件，判断文件所在路径等。</p>
+<p>     2. InputStream（二进制格式操作）：抽象类，基于字节的输入操作，是所有输入流的父类。定义了所有输入流都具有的共同特征。</p>
+<p>     3. OutputStream（二进制格式操作）：抽象类。基于字节的输出操作。是所有输出流的父类。定义了所有输出流都具有的共同特征。</p>
+<p><strong>     </strong>4.Reader（文件格式操作）：抽象类，基于字符的输入操作。</p>
+<p>     5. Writer（文件格式操作）：抽象类，基于字符的输出操作。</p>
+<p>     6. RandomAccessFile（随机文件操作）：一个独立的类，直接继承至Object.它的功能丰富，<strong>可以从文件的任意位置进行存取（输入输出）操作</strong>。</p>
+<p> </p>
+<p><strong> Java中IO流的体系结构如图：</strong></p>
+<h2><a name="t25"></a><strong> <img alt="" src="http://img.blog.csdn.net/20160421004203974?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQv/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70/gravity/Center" /></strong></h2>
+<h2><a name="t26"></a></h2>
+<h2><a name="t27"></a>b、Java流类的类结构图：</h2>
+<h2><a name="t28"></a><strong><img alt="" src="http://img.blog.csdn.net/20160421004327228?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQv/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70/gravity/Center" /></strong></h2>
+<h2><a name="t29"></a><strong>1、流的概念和作用</strong></h2>
+<h2><a name="t30"></a>流：代表任何有能力产出数据的数据源对象或者是有能力接受数据的接收端对象<Thinking in Java></h2>
+<h2><a name="t31"></a>流的本质:数据传输，根据数据传输特性将流抽象为各种类，方便更直观的进行数据操作。 </h2>
+<p><strong>流的作用：为数据源和目的地建立一个输送通道。</strong></p>
+<p><strong> </strong></p>
+<p>     Java中将输入输出抽象称为流，就好像水管，将两个容器连接起来。流是一组有顺序的，有起点和终点的字节集合，是对数据传输的总称或抽象。即数据在两设备间的传输称为流.</p>
+<p> </p>
+<p><strong>2、Java IO所采用的模型  </strong></p>
+<p><br />
+     Java的IO模型设计非常优秀，它使用Decorator(装饰者)模式，按功能划分Stream，您可以动态装配这些Stream，以便获得您需要的功能。</p>
+<p>       例如，您需要一个具有缓冲的文件输入流，则应当组合使用FileInputStream和BufferedInputStream。 </p>
+<p> </p>
+<h2><a name="t32"></a><strong>3、IO流的分类</strong></h2>
+<p>·        根据处理数据类型的不同分为：字符流和字节流</p>
+<p>·        根据数据流向不同分为：输入流和输出流</p>
+<p>·        按数据来源（去向）分类：</p>
+<p>         1、File（文件）： FileInputStream, FileOutputStream, FileReader, FileWriter <br />
+         2、byte[]：ByteArrayInputStream, ByteArrayOutputStream <br />
+         3、Char[]: CharArrayReader,CharArrayWriter <br />
+         4、String:StringBufferInputStream, StringReader, StringWriter <br />
+         5、网络数据流：InputStream,OutputStream, Reader, Writer </p>
+<p> </p>
+<h3><a name="t33"></a>字符流和字节流</h3>
+<p>流序列中的数据既可以是未经加工的原始二进制数据，也可以是经一定编码处理后符合某种格式规定的特定数据。因此Java中的流分为两种：</p>
+<p><br />
+<strong> 1)  </strong><strong>字节流：</strong>数据流中最小的数据单元是字节<br />
+<strong> 2)  </strong><strong>字符流：</strong>数据流中最小的数据单元是字符， Java中的字符是Unicode编码，一个字符占用两个字节。</p>
+<p> </p>
+<p><strong>字符流的由来：</strong> Java中字符是采用Unicode标准，一个字符是16位，即一个字符使用两个字节来表示。为此，JAVA中引入了处理字符的流。因为数据编码的不同，而有了对字符进行高效操作的流对象。本质其实就是基于字节流读取时，去查了指定的码表。</p>
+<p> </p>
+<h3><a name="t34"></a>输入流和输出流</h3>
+<p>根据数据的输入、输出方向的不同对而将流分为输入流和输出流。</p>
+<h3><a name="t35"></a><strong>1) 输入流</strong></h3>
+<p>     程序从输入流读取数据源。数据源包括外界(键盘、文件、网络…)，即是将数据源读入到程序的通信通道</p>
+<p> </p>
+<p>    <img alt="" src="http://img.blog.csdn.net/20160421004522335?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQv/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70/gravity/Center" /></p>
+<h3><a name="t36"></a>2) 输出流</h3>
+<p>   程序向输出流写入数据。将程序中的数据输出到外界（显示器、打印机、文件、网络…）的通信通道。</p>
+<p>    <img alt="" src="http://img.blog.csdn.net/20160421004605951?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQv/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70/gravity/Center" /></p>
+<p>        </p>
+<p>采用数据流的目的就是使得输出输入独立于设备。</p>
+<p>输入流( Input  Stream )不关心数据源来自何种设备（键盘，文件，网络）。<br />
+输出流( Output Stream )不关心数据的目的是何种设备（键盘，文件，网络）。</p>
+<h3><a name="t37"></a><strong>3）特性</strong></h3>
+<p>  相对于程序来说，输出流是往存储介质或数据通道写入数据，而输入流是从存储介质或数据通道中读取数据，一般来说关于流的特性有下面几点：</p>
+<p>1、先进先出，最先写入输出流的数据最先被输入流读取到。</p>
+<p>2、顺序存取，可以一个接一个地往流中写入一串字节，读出时也将按写入顺序读取一串字节，不能随机访问中间的数据。（RandomAccessFile<strong>可以从文件的任意位置进行存取（输入输出）操作</strong>）</p>
+<p>3、只读或只写，每个流只能是输入流或输出流的一种，不能同时具备两个功能，输入流只能进行读操作，对输出流只能进行写操作。在一个数据传输通道中，如果既要写入数据，又要读取数据，则要分别提供两个流。 </p>
+<p> </p>
+<h2><a name="t38"></a><strong>4、Java IO流对象</strong></h2>
+<p><strong>1.输入字节流InputStream</strong></p>
+<p> <img alt="" src="http://img.blog.csdn.net/20160421004733383?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQv/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70/gravity/Center" /></p>
+<p>IO 中输入字节流的继承图可见上图，可以看出：</p>
+<p>1.    InputStream是所有的输入字节流的父类，它是一个抽象类。</p>
+<p>2.    ByteArrayInputStream、StringBufferInputStream(上图的StreamBufferInputStream)、FileInputStream是三种基本的介质流，它们分别从Byte数组、StringBuffer、和本地文件中读取数据。</p>
+<p>3.    PipedInputStream是从与其它线程共用的管道中读取数据.</p>
+<p>4.    ObjectInputStream和所有FilterInputStream的子类都是装饰流（装饰器模式的主角）。</p>
+<p> </p>
+<p> <img alt="" src="http://img.blog.csdn.net/20160421004839055?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQv/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70/gravity/Center" /></p>
+<p> </p>
+<p><strong>InputStream中的三个基本的读方法</strong><br />
+      abstract int read() ：读取一个字节数据，并返回读到的数据，如果返回-1，表示读到了输入流的末尾。<br />
+      intread(byte[]?b) ：将数据读入一个字节数组，同时返回实际读取的字节数。如果返回-1，表示读到了输入流的末尾。<br />
+      intread(byte[]?b, int?off, int?len) ：将数据读入一个字节数组，同时返回实际读取的字节数。如果返回-1，表示读到了输入流的末尾。off指定在数组b中存放数据的起始偏移位置；len指定读取的最大字节数。</p>
+<p>流结束的判断：方法read()的返回值为-1时；readLine()的返回值为null时。<br />
+ </p>
+<p><strong>其它方法</strong><br />
+      long skip(long?n)：在输入流中跳过n个字节，并返回实际跳过的字节数。<br />
+      int available() ：返回在不发生阻塞的情况下，可读取的字节数。<br />
+      void close() ：关闭输入流，释放和这个流相关的系统资源。<br />
+      voidmark(int?readlimit) ：在输入流的当前位置放置一个标记，如果读取的字节数多于readlimit设置的值，则流忽略这个标记。<br />
+      void reset() ：返回到上一个标记。<br />
+      booleanmarkSupported() ：测试当前流是否支持mark和reset方法。如果支持，返回true，否则返回false。</p>
+<h3><a name="t39"></a>2.输出字节流OutputStream</h3>
+<p><img alt="" src="http://img.blog.csdn.net/20160421004936555?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQv/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70/gravity/Center" /></p>
+<p> </p>
+<p> </p>
+<p>IO 中输出字节流的继承图可见上图，可以看出：</p>
+<p>1.    OutputStream是所有的输出字节流的父类，它是一个抽象类。</p>
+<p>2.    ByteArrayOutputStream、FileOutputStream是两种基本的介质流，它们分别向Byte数组、和本地文件中写入数据。PipedOutputStream是向与其它线程共用的管道中写入数据。</p>
+<p>3.    ObjectOutputStream和所有FilterOutputStream的子类都是装饰流。</p>
+<p> </p>
+<p> <img alt="" src="http://img.blog.csdn.net/20160421005135582?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQv/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70/gravity/Center" /></p>
+<h2>outputStream中的三个基本的写方法<br />
+   abstract void write(int?b)：往输出流中写入一个字节。<br />
+     void write(byte[]?b) ：往输出流中写入数组b中的所有字节。<br />
+     void write(byte[]?b, int?off, int?len) ：往输出流中写入数组b中从偏移量off开始的len个字节的数据。</h2>
+<h2><a name="t41"></a><br />
+其它方法<br />
+   void flush() ：刷新输出流，强制缓冲区中的输出字节被写出。<br />
+     void close() ：关闭输出流，释放和这个流相关的系统资源。<br />
+ </h2>
+<h3><a name="t42"></a>3.字符输入流Reader</h3>
+<p><img alt="" src="http://img.blog.csdn.net/20160421005211916?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQv/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70/gravity/Center" /></p>
+<p> </p>
+<p>在上面的继承关系图中可以看出：</p>
+<p>1.    Reader是所有的输入字符流的父类，它是一个抽象类。</p>
+<p>2.    CharReader、StringReader是两种基本的介质流，它们分别将Char数组、String中读取数据。PipedReader是从与其它线程共用的管道中读取数据。</p>
+<p>3.    BufferedReader很明显就是一个装饰器，它和其子类负责装饰其它Reader对象。</p>
+<p>4.    FilterReader是所有自定义具体装饰流的父类，其子类PushbackReader对Reader对象进行装饰，会增加一个行号。</p>
+<p>5.    InputStreamReader是一个连接字节流和字符流的桥梁，它将字节流转变为字符流。FileReader可以说是一个达到此功能、常用的工具类，在其源代码中明显使用了将FileInputStream转变为Reader的方法。我们可以从这个类中得到一定的技巧。Reader中各个类的用途和使用方法基本和InputStream中的类使用一致。后面会有Reader与InputStream的对应关系。</p>
+<p> </p>
+<p><img alt="" src="http://img.blog.csdn.net/20160421005305178?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQv/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70/gravity/Center" /></p>
+<p>主要方法：</p>
+<p>     (1) public int read() throws IOException; //读取一个字符，返回值为读取的字符 </p>
+<p>     (2) public int read(char cbuf[]) throws IOException; /*读取一系列字符到数组cbuf[]中，返回值为实际读取的字符的数量*/ <br />
+     (3) public abstract int read(char cbuf[],int off,int len) throws IOException; <br />
+/*读取len个字符，从数组cbuf[]的下标off处开始存放，返回值为实际读取的字符数量，该方法必须由子类实现*/ </p>
+<p> </p>
+<h3><a name="t43"></a>4.字符输出流Writer</h3>
+<p><img alt="" src="http://img.blog.csdn.net/20160421005336445?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQv/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70/gravity/Center" /></p>
+<p> </p>
+<p>在上面的关系图中可以看出：</p>
+<p>1.    Writer是所有的输出字符流的父类，它是一个抽象类。</p>
+<p>2.    CharArrayWriter、StringWriter是两种基本的介质流，它们分别向Char数组、String中写入数据。PipedWriter是向与其它线程共用的管道中写入数据，</p>
+<p>3.    BufferedWriter是一个装饰器为Writer提供缓冲功能。</p>
+<p>4.    PrintWriter和PrintStream极其类似，功能和使用也非常相似。</p>
+<p>5.    OutputStreamWriter是OutputStream到Writer转换的桥梁，它的子类FileWriter其实就是一个实现此功能的具体类（具体可以研究一SourceCode）。功能和使用和OutputStream极其类似.</p>
+<p> </p>
+<p> <img alt="" src="http://img.blog.csdn.net/20160421005423165?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQv/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70/gravity/Center" /></p>
+<p> </p>
+<p>主要方法：</p>
+<p>(1)  public void write(int c) throws IOException； //将整型值c的低16位写入输出流 <br />
+(2)  public void write(char cbuf[]) throws IOException； //将字符数组cbuf[]写入输出流 <br />
+(3)  public abstract void write(char cbuf[],int off,int len) throws IOException； //将字符数组cbuf[]中的从索引为off的位置处开始的len个字符写入输出流 <br />
+(4)  public void write(String str) throws IOException； //将字符串str中的字符写入输出流 <br />
+(5)  public void write(String str,int off,int len) throws IOException； //将字符串str 中从索引off开始处的len个字符写入输出流 </p>
+<p> </p>
+<h3><a name="t44"></a>5.字节流的输入与输出的对应</h3>
+<p> <img alt="" src="http://img.blog.csdn.net/20160421005454478?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQv/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70/gravity/Center" /></p>
+<p>图中蓝色的为主要的对应部分，红色的部分就是不对应部分。从上面的图中可以看出JavaIO中的字节流是极其对称的。“存在及合理”我们看看这些字节流中不太对称的几个类吧！</p>
+<p> </p>
+<p>1.    LineNumberInputStream主要完成从流中读取数据时，会得到相应的行号，至于什么时候分行、在哪里分行是由改类主动确定的，并不是在原始中有这样一个行号。在输出部分没有对应的部分，我们完全可以自己建立一个LineNumberOutputStream，在最初写入时会有一个基准的行号，以后每次遇到换行时会在下一行添加一个行号，看起来也是可以的。好像更不入流了。</p>
+<p>2.    PushbackInputStream的功能是查看最后一个字节，不满意就放入缓冲区。主要用在编译器的语法、词法分析部分。输出部分的BufferedOutputStream几乎实现相近的功能。</p>
+<p>3.    StringBufferInputStream已经被Deprecated，本身就不应该出现在InputStream部分，主要因为String应该属于字符流的范围。已经被废弃了，当然输出部分也没有必要需要它了！还允许它存在只是为了保持版本的向下兼容而已。</p>
+<p>4.    SequenceInputStream可以认为是一个工具类，将两个或者多个输入流当成一个输入流依次读取。完全可以从IO包中去除，还完全不影响IO包的结构，却让其更“纯洁”――纯洁的Decorator模式。</p>
+<p>5.    PrintStream也可以认为是一个辅助工具。主要可以向其他输出流，或者FileInputStream写入数据，本身内部实现还是带缓冲的。本质上是对其它流的综合运用的一个工具而已。一样可以踢出IO包！System.out和System.out就是PrintStream的实例！</p>
+<p> </p>
+<h3><a name="t45"></a>字符流的输入与输出的对应</h3>
+<p><img alt="" src="http://img.blog.csdn.net/20160421005558870?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQv/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70/gravity/Center" /></p>
+<p> </p>
+<h3><a name="t46"></a>6.字符流与字节流转换</h3>
+<p>转换流的特点：</p>
+<p>1.    其是字符流和字节流之间的桥梁</p>
+<p>2.    可对读取到的字节数据经过指定编码转换成字符</p>
+<p>3.    可对读取到的字符数据经过指定编码转换成字节</p>
+<p> </p>
+<p>何时使用转换流？</p>
+<p>1.    当字节和字符之间有转换动作时；</p>
+<p>2.    流操作的数据需要编码或解码时。</p>
+<p> </p>
+<p>具体的对象体现：</p>
+<p>转换流：在IO中还存在一类是转换流，将字节流转换为字符流，同时可以将字符流转化为字节流。</p>
+<p> </p>
+<p>1.    InputStreamReader:<em>字节到字符的桥梁</em></p>
+<p><em>2.     </em>OutputStreamWriter:<em>字符到字节的桥梁</em></p>
+<p><em> </em></p>
+<p>OutputStreamWriter(OutStreamout):将字节流以字符流输出。</p>
+<p>InputStreamReader(InputStream in)：将字节流以字符流输入。</p>
+<p> </p>
+<p>这两个流对象是字符体系中的成员，它们有转换作用，本身又是字符流，所以在构造的时候需要传入字节流对象进来。</p>
+<h3><a name="t47"></a>7.字节流和字符流的区别（重点）</h3>
+<p><strong>字节流和字符流的区别</strong>：(详细可以参见http://blog.csdn.net/qq_25184739/article/details/51203733)    </p>
+<p> </p>
+<p>         节流没有缓冲区，是直接输出的，而字符流是输出到缓冲区的。因此在输出时，字节流不调用colse()方法时，信息已经输出了，而字符流只有在调用close()方法关闭缓冲区时，信息才输出。要想字符流在未关闭时输出信息，则需要手动调用flush()方法。</p>
+<p> </p>
+<p>·        读写单位不同：字节流以字节（8bit）为单位，字符流以字符为单位，根据码表映射字符，一次可能读多个字节。</p>
+<p>·        处理对象不同：字节流能处理所有类型的数据（如图片、avi等），而字符流只能处理字符类型的数据。</p>
+<p> </p>
+<p>结论：只要是处理纯文本数据，就优先考虑使用字符流。除此之外都使用字节流。</p>
+<p> </p>
+<h3><a name="t48"></a>8.非流式文件类--File类</h3>
+<p><img alt="" src="http://img.blog.csdn.net/20160421005706418?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQv/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70/gravity/Center" /></p>
+<p>  从定义看，File类是Object的直接子类，同时它继承了Comparable接口可以进行数组的排序。</p>
+<p>File类的操作包括文件的创建、删除、重命名、得到路径、创建时间等，以下是文件操作常用的函数。</p>
+<p> <img alt="" src="http://img.blog.csdn.net/20160421005754700?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQv/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70/gravity/Center" /></p>
+<p> </p>
+<p>File类是对文件系统中文件以及文件夹进行封装的对象，可以通过对象的思想来操作文件和文件夹。File类保存文件或目录的各种元数据信息，包括文件名、文件长度、最后修改时间、是否可读、获取当前文件的路径名，判断指定文件是否存在、获得当前目录中的文件列表，创建、删除文件和目录等方法。 </p>
+<p>File类共提供了三个不同的构造函数，以不同的参数形式灵活地接收文件和目录名信息。</p>
+<p>构造函数：<br />
+1）File (String   pathname)   <br />
+     例:File  f1=new File("FileTest1.txt"); //创建文件对象f1，f1所指的文件是在当前目录下创建的FileTest1.txt<br />
+2）File (String  parent  ,  String child)<br />
+     例:File f2=new  File(“D:\\dir1","FileTest2.txt") ;//  注意：D:\\dir1目录事先必须存在，否则异常<br />
+3）File (File    parent  , String child)<br />
+     例:File  f4=new File("\\dir3");<br />
+          File  f5=new File(f4,"FileTest5.txt");  //在如果 \\dir3目录不存在使用f4.mkdir()先创建</p>
+<p>        一个对应于某磁盘文件或目录的File对象一经创建， 就可以通过调用它的方法来获得文件或目录的属性。    <br />
+       1）public boolean exists( ) 判断文件或目录是否存在<br />
+       2）public boolean isFile( ) 判断是文件还是目录 <br />
+       3）public boolean isDirectory( ) 判断是文件还是目录<br />
+       4）public String getName( ) 返回文件名或目录名<br />
+       5）public String getPath( ) 返回文件或目录的路径。<br />
+       6）public long length( ) 获取文件的长度 <br />
+       7）public String[ ] list ( ) 将目录中所有文件名保存在字符串数组中返回。 <br />
+       File类中还定义了一些对文件或目录进行管理、操作的方法，常用的方法有：<br />
+       1） public boolean renameTo( File newFile );    重命名文件<br />
+       2） public void delete( );   删除文件<br />
+       3）  public boolean mkdir( ); 创建目录</p>
+<p>例子：</p>
+<p> </p>
+<p><strong>[java]</strong> <a href="http://blog.csdn.net/qq_25184739/article/details/51205186#" title="view plain">view plain</a> <a href="http://blog.csdn.net/qq_25184739/article/details/51205186#" title="copy">copy</a></p>
+<p> </p>
+<ol start="1">
+<li>1.  public class FileDemo1 {     </li>
+<li>2.      public static void main(String[] args) {    </li>
+<li>3.          File file = new File("D:" + File.separator + "test.txt");     </li>
+<li>4.          if (file.exists()) {     </li>
+<li>5.              file.delete();    </li>
+<li>6.          } else {     </li>
+<li>7.              try {     </li>
+<li>8.                  file.createNewFile();    </li>
+<li>9.              } catch (IOException e) {    </li>
+<li>10.                 // TODO Auto-generated catch block     </li>
+<li>11.                 e.printStackTrace();    </li>
+<li>12.             }    </li>
+<li>13.         }    </li>
+<li>14.     }    </li>
+<li>15. }    </li>
+</ol>
+<p> </p>
+<p> </p>
+<h3><a name="t49"></a>9.RandomAccessFile类</h3>
+<p><img alt="" src="http://img.blog.csdn.net/20160421005857372?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQv/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70/gravity/Center" /></p>
+<p> </p>
+<p>该对象并不是流体系中的一员，其封装了字节流，同时还封装了一个缓冲区（字符数组），通过内部的指针来操作字符数组中的数据。该对象特点：</p>
+<p> </p>
+<p> <img alt="" src="http://img.blog.csdn.net/20160421005936106?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQv/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70/gravity/Center" /></p>
+<p>1.    该对象只能操作文件，所以构造函数接收两种类型的参数：a.字符串文件路径；b.File对象。</p>
+<p>2.    该对象既可以对文件进行读操作，也能进行写操作，在进行对象实例化时可指定操作模式(r,rw)</p>
+<p> </p>
+<p><em><strong>注意：该对象在实例化时，如果要操作的文件不存在，会自动创建；如果文件存在，写数据未指定位置，会从头开始写，即覆盖原有的内容。</strong></em> 可以用于多线程下载或多个线程同时写数据到文件。</p>
+<p> </p>
+<p><strong>10、System类对IO的支持</strong><br />
+<img alt="" src="http://img.blog.csdn.net/20160421010054372?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQv/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70/gravity/Center" /></p>
+<p> 针对一些频繁的设备交互，Java语言系统预定了3个可以直接使用的流对象，分别是：</p>
+<p>·        System.in（标准输入），通常代表键盘输入。</p>
+<p>·        System.out（标准输出）：通常写往显示器。</p>
+<p>·        System.err（标准错误输出）：通常写往显示器。</p>
+<p> 标准I/O<br />
+      Java程序可通过命令行参数与外界进行简短的信息交换，同时，也规定了与标准输入、输出设备，如键盘、显示器进行信息交换的方式。而通过文件可以与外界进行任意数据形式的信息交换。<br />
+<br />
+<br />
+1. 命令行参数</p>
+<ol start="1">
+<li>public class TestArgs {    </li>
+<li>    public static void main(String[] args) {    </li>
+<li>        for (int i = 0; i < args.length; i++) {    </li>
+<li>            System.out.println("args[" + i + "] is <" + args[i] + ">");    </li>
+<li>        }    </li>
+<li>    }    </li>
+<li>}    </li>
+</ol>
+<p><br />
+<br />
+运行命令：java Java C VB<br />
+<br />
+<br />
+运行结果：</p>
+<ol start="1">
+<li>args[0] is <Java>  </li>
+<li>  </li>
+<li>  </li>
+<li>args[1] is <C>  </li>
+<li>  </li>
+<li>  </li>
+<li>args[2] is <VB>  </li>
+</ol>
+<p><br />
+2. 标准输入，输出数据流</p>
+<p> </p>
+<p><br />
+java系统自带的标准数据流：java.lang.System:</p>
+<p><strong>[java]</strong> <a href="http://blog.csdn.net/qq_25184739/article/details/51205186#" title="view plain">view plain</a> <a href="http://blog.csdn.net/qq_25184739/article/details/51205186#" title="copy">copy</a></p>
+<p> </p>
+<ol start="1">
+<li>java.lang.System     </li>
+<li>public final class System  extends Object{     </li>
+<li>   static  PrintStream  err;//标准错误流（输出）    </li>
+<li>   static  InputStream  in;//标准输入(键盘输入流)    </li>
+<li>   static  PrintStream  out;//标准输出流(显示器输出流)    </li>
+<li>}    </li>
+</ol>
+<p><br />
+注意：<br />
+（1）System类不能创建对象，只能直接使用它的三个静态成员。<br />
+（2）每当main方法被执行时,就自动生成上述三个对象。<br />
+<br />
+1) 标准输出流 System.out<br />
+<br />
+   System.out向标准输出设备输出数据，其数据类型为PrintStream。方法：<br />
+<br />
+      Void print(参数)<br />
+      Void println(参数)<br />
+2)标准输入流 System.in<br />
+<br />
+    System.in读取标准输入设备数据（从标准输入获取数据，一般是键盘），其数 据类型为InputStream。方法：<br />
+<br />
+        int read()  //返回ASCII码。若,返回值=-1，说明没有读取到任何字节读取工作结束。<br />
+        int read(byte[] b)//读入多个字节到缓冲区b中返回值是读入的字节数<br />
+例如：<br />
+ </p>
+<p><strong>[java]</strong> <a href="http://blog.csdn.net/qq_25184739/article/details/51205186#" title="view plain">view plain</a> <a href="http://blog.csdn.net/qq_25184739/article/details/51205186#" title="copy">copy</a></p>
+<p> </p>
+<ol start="1">
+<li>import java.io.*;    </li>
+<li>public class StandardInputOutput {    </li>
+<li>    public static void main(String args[]) {    </li>
+<li>        int b;    </li>
+<li>        try {    </li>
+<li>            System.out.println("please Input:");    </li>
+<li>            while ((b = System.in.read()) != -1) {    </li>
+<li>                System.out.print((char) b);    </li>
+<li>            }    </li>
+<li>        } catch (IOException e) {    </li>
+<li>            System.out.println(e.toString());    </li>
+<li>        }    </li>
+<li>    }    </li>
+<li>}    </li>
+</ol>
+<p>等待键盘输入，键盘输入什么，就打印出什么：<br />
+<br />
+3)标准错误流<br />
+<br />
+   System.err输出标准错误，其数据类型为PrintStream。可查阅API获得详细说明。<br />
+<br />
+    标准输出通过System.out调用println方法输出参数并换行，而print方法输出参数但不换行。println或print方法都通 过重载实现了输出基本数据类型的多个方法，包括输出参数类型为boolean、char、int、long、float和double。同时，也重载实现 了输出参数类型为char[]、String和Object的方法。其中，print（Object）和println（Object）方法在运行时将调 用参数Object的toString方法。</p>
+<p><strong>[java]</strong> <a href="http://blog.csdn.net/qq_25184739/article/details/51205186#" title="view plain">view plain</a> <a href="http://blog.csdn.net/qq_25184739/article/details/51205186#" title="copy">copy</a></p>
+<p> </p>
+<ol start="1">
+<li>import java.io.BufferedReader;    </li>
+<li>import java.io.IOException;    </li>
+<li>import java.io.InputStreamReader;    </li>
+<li>    </li>
+<li>public class StandardInputOutput {    </li>
+<li>    public static void main(String args[]) {    </li>
+<li>        String s;    </li>
+<li>        // 创建缓冲区阅读器从键盘逐行读入数据    </li>
+<li>        InputStreamReader ir = new InputStreamReader(System.in);    </li>
+<li>        BufferedReader in = new BufferedReader(ir);    </li>
+<li>        System.out.println("Unix系统: ctrl-d 或 ctrl-c 退出"    </li>
+<li>                + "\nWindows系统: ctrl-z 退出");    </li>
+<li>        try {    </li>
+<li>            // 读一行数据，并标准输出至显示器    </li>
+<li>            s = in.readLine();    </li>
+<li>            // readLine()方法运行时若发生I/O错误，将抛出IOException异常    </li>
+<li>            while (s != null) {    </li>
+<li>                System.out.println("Read: " + s);    </li>
+<li>                s = in.readLine();    </li>
+<li>            }    </li>
+<li>            // 关闭缓冲阅读器    </li>
+<li>            in.close();    </li>
+<li>        } catch (IOException e) { // Catch any IO exceptions.    </li>
+<li>            e.printStackTrace();    </li>
+<li>        }    </li>
+<li>    }    </li>
+<li>}    </li>
+</ol>
+<p> </p>
+<p> </p>
+<p>在Java语言中使用字节流和字符流的步骤基本相同，以输入流为例，首先创建一个与数据源相关的流对象，然后利用流对象的方法从流输入数据，最后执行close()方法关闭流。</p>
+<p><br />
+<strong>附加：</strong></p>
+<p> IOException异常类的子类<br />
+1.public class  EOFException ：   非正常到达文件尾或输入流尾时，抛出这种类型的异常。    </p>
+<p>      2.public class FileNotFoundException：   当文件找不到时，抛出的异常。</p>
+<p>      3.public class InterruptedIOException： 当I/O操作被中断时，抛出这种类型的异常。</p>

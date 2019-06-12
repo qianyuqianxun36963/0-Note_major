@@ -1,0 +1,298 @@
+<h1>druid监控及慢sql记录</h1>
+
+<h2>本文提要</h2>
+
+<p>前文也提到过druid不仅仅是一个连接池技术，因此在将整合druid到项目中后，这一篇文章将去介绍druid的其他特性和功能，作为一个辅助工具帮助提升项目的性能，本文的重点就是两个字：监控。<br />
+我的github地址<a href="https://github.com/ZHENFENG13/ssm-demo" rel="nofollow" target="_blank">点这里</a></p>
+
+<h2>druid监控</h2>
+
+<p>因为已经做了整合，所以这一步较为简单，只需要在web.xml中做一下简单的Servlet配置即可。</p>
+
+<ol>
+<li>
+<p><code><!--druid监控页面 --></code></p>
+</li>
+<li>
+<p><code><servlet></code></p>
+</li>
+<li>
+<p><code><servlet-name>DruidStatView</servlet-name></code></p>
+</li>
+<li>
+<p><code><servlet-class>com.alibaba.druid.support.http.StatViewServlet</servlet-class></code></p>
+</li>
+<li>
+<p><code><init-param></code></p>
+</li>
+<li>
+<p><code><!-- 不允许清空统计数据 --></code></p>
+</li>
+<li>
+<p><code><param-name>resetEnable</param-name></code></p>
+</li>
+<li>
+<p><code><param-value>false</param-value></code></p>
+</li>
+<li>
+<p><code></init-param></code></p>
+</li>
+<li>
+<p><code><init-param></code></p>
+</li>
+<li>
+<p><code><!-- 用户名 --></code></p>
+</li>
+<li>
+<p><code><param-name>loginUsername</param-name></code></p>
+</li>
+<li>
+<p><code><param-value>yourname</param-value></code></p>
+</li>
+<li>
+<p><code></init-param></code></p>
+</li>
+<li>
+<p><code><init-param></code></p>
+</li>
+<li>
+<p><code><!-- 密码 --></code></p>
+</li>
+<li>
+<p><code><param-name>loginPassword</param-name></code></p>
+</li>
+<li>
+<p><code><param-value>yourpassword</param-value></code></p>
+</li>
+<li>
+<p><code></init-param></code></p>
+</li>
+<li>
+<p><code></servlet></code></p>
+</li>
+<li>
+<p><code><servlet-mapping></code></p>
+</li>
+<li>
+<p><code><servlet-name>DruidStatView</servlet-name></code></p>
+</li>
+<li>
+<p><code><url-pattern>/druid/*</url-pattern></code></p>
+</li>
+<li>
+<p><code></servlet-mapping></code></p>
+</li>
+<li>
+<p><code><!--druid监控页面 --></code></p>
+</li>
+</ol>
+
+<p>重新构建工程并启动tomcat，在浏览器中输入druid即可进入到druid监控面板的登录页面。</p>
+
+<p><img alt="登录页面" src="http://images2015.cnblogs.com/blog/859549/201704/859549-20170418221234556-659611918.png" style="height:306px; width:500px" /></p>
+
+<p>输入在web.xml中配置的账号和密码即可进入监控后台，注意，配置的账号和密码是明文，你在这里配置什么就是什么，并没有经过加密。<br />
+<img alt="druid简述信息" src="http://images2015.cnblogs.com/blog/859549/201704/859549-20170418221255977-960654626.png" style="height:397px; width:800px" /></p>
+
+<p>OK，我们看到系统的一些简述信息，当然，你也应该看到启动时间了，没错，我就是在下班后9点多才开始写这篇博客的。</p>
+
+<p>接下来是比较重要的一个页面，SQL监控<br />
+<img alt="SQL监控" src="http://images2015.cnblogs.com/blog/859549/201704/859549-20170418221327212-1035531418.png" style="height:323px; width:800px" /></p>
+
+<p>从这个页面里我们能看到网站从启动开始执行的sql语句统计，每一条语句的执行次数、执行时间之和、最慢执行时间、执行错误数等等多个统计指标，通过这个统计数据我们可以找出sql语句的执行规律及sql语句的不足之处，也可以通过错误数来定位程序的不足并及时修改。</p>
+
+<p>在配置druid数据源时，做了如下配置，开启了druid防火墙。</p>
+
+<pre>
+<code> <property name="filters" value="wall,stat"/></code></pre>
+
+<p>因此在控制后台也能见到SQL防火墙面板，如下图所示：<br />
+<img alt="SQL防火墙" src="http://images2015.cnblogs.com/blog/859549/201704/859549-20170418221414165-1652189920.png" style="height:420px; width:800px" /></p>
+
+<p>面板里是防御统计及sql的统计信息，这里用的是druid默认的一些过滤规则，并没有自定义复杂的防火墙规则，因此也不细说了。</p>
+
+<p>但是再去点击其他几个页面的时候，发现页面中都是空数据，因为并没有开启druid相关的功能。这是比较粗糙些的做法，不用做其他配置，就是默认的filters配置加上Servlet配置，虽然也有监控和统计，但是并不是特别满足需求。</p>
+
+<h2>开启慢sql监控</h2>
+
+<p>在SQL监控中，有一项关于sql执行最慢执行时间的统计，但是只有一个值，就是一条sql语句最慢的执行时间记录，其他执行时间是看不到的，只能通过总时间来进行粗略的估计，还有一个问题就是，一旦项目重启，这些记录就全都没了，因此制定对应的日志输出策略是极其必要的。<br />
+大致想法就是通过druid获取所有项目运行中的慢sql执行记录，并将这些数据输出到日志文件中，查了一下druid的资料，调试了一段时间，最终成功实现。</p>
+
+<p>1、修改数据源配置，增加拦截器：</p>
+
+<ol>
+<li>
+<p><code><property name="proxyFilters"></code></p>
+</li>
+<li>
+<p><code><list></code></p>
+</li>
+<li>
+<p><code><ref bean="stat-filter"/></code></p>
+</li>
+<li>
+<p><code><ref bean="log-filter"/></code></p>
+</li>
+<li>
+<p><code></list></code></p>
+</li>
+<li>
+<p><code></property></code></p>
+</li>
+</ol>
+
+<p>2、配置慢sql及日志拦截器：</p>
+
+<ol>
+<li>
+<p><code><!-- 慢SQL记录 --></code></p>
+</li>
+<li>
+<p><code><bean id="stat-filter" class="com.alibaba.druid.filter.stat.StatFilter"></code></p>
+</li>
+<li>
+<p><code><!-- 慢sql时间设置,即执行时间大于200毫秒的都是慢sql --></code></p>
+</li>
+<li>
+<p><code><property name="slowSqlMillis" value="200"/></code></p>
+</li>
+<li>
+<p><code><property name="logSlowSql" value="true"/></code></p>
+</li>
+<li>
+<p><code></bean></code></p>
+</li>
+<li> </li>
+<li>
+<p><code><bean id="log-filter" class="com.alibaba.druid.filter.logging.Log4jFilter"></code></p>
+</li>
+<li>
+<p><code><property name="dataSourceLogEnabled" value="true" /></code></p>
+</li>
+<li>
+<p><code><property name="statementExecutableSqlLogEnable" value="true" /></code></p>
+</li>
+<li>
+<p><code></bean></code></p>
+</li>
+</ol>
+
+<p>3、修改log4j配置文件，增加慢sql日志的输出策略：</p>
+
+<ol>
+<li>
+<p><code>log4j.rootLogger=DEBUG,debug,druid</code></p>
+</li>
+<li>
+<p><code># Druid</code></p>
+</li>
+<li>
+<p><code>log4j.logger.druid.sql=WARN,druid</code></p>
+</li>
+<li>
+<p><code>log4j.logger.druid.sql.DataSource=WARN,druid</code></p>
+</li>
+<li>
+<p><code>log4j.logger.druid.sql.Connection=WARN,druid</code></p>
+</li>
+<li>
+<p><code>log4j.logger.druid.sql.Statement=WARN,druid</code></p>
+</li>
+<li> </li>
+<li>
+<p><code>log4j.appender.druid=org.apache.log4j.DailyRollingFileAppender</code></p>
+</li>
+<li>
+<p><code>log4j.appender.druid.layout=org.apache.log4j.PatternLayout</code></p>
+</li>
+<li>
+<p><code>log4j.appender.druid.layout.ConversionPattern= [%d{HH\:mm\:ss}] %c{1} - %m%n</code></p>
+</li>
+<li>
+<p><code>log4j.appender.druid.datePattern='.'yyyy-MM-dd</code></p>
+</li>
+<li>
+<p><code>log4j.appender.druid.Threshold = WARN</code></p>
+</li>
+<li>
+<p><code>log4j.appender.druid.append=true</code></p>
+</li>
+<li>
+<p><code>log4j.appender.druid.File=${catalina.home}/logs/ssm-maven/druid-slow-sql.log</code></p>
+</li>
+</ol>
+
+<p>重启再去查看druid监控后台，可以看到跟原来有了一些差别，由于设置了慢sql的时间为大于200毫秒，所以执行时间大于200毫秒的都会被红色标注。<br />
+<img alt="慢sql标红" src="http://images2015.cnblogs.com/blog/859549/201704/859549-20170418221450134-5263342.png" style="height:310px; width:800px" /></p>
+
+<p>再去tomcat日志文件夹中查看日志文件，可以看到日志文件中已经存在配置的慢sql日志文件了，点击查看其中也已经有了慢sql记录的数据，慢sql以及这条sql语句执行的时间都有记录。<br />
+<img alt="慢sql日志" src="http://images2015.cnblogs.com/blog/859549/201704/859549-20170418221604837-1013708772.png" style="height:446px; width:800px" /></p>
+
+<h2>开启spring监控</h2>
+
+<p>在监控面板中看到有spring监控这个功能，但是由于没有进行配置，所以功能不能用，查了一下druid的文档，最终开启了spring监控功能。</p>
+
+<p>配置如下：</p>
+
+<pre>
+
+ </pre>
+
+<ol>
+<li>
+<p><code><bean id="druid-stat-interceptor"</code></p>
+</li>
+<li>
+<p><code>class="com.alibaba.druid.support.spring.stat.DruidStatInterceptor"></code></p>
+</li>
+<li>
+<p><code></bean></code></p>
+</li>
+<li> </li>
+<li>
+<p><code><bean id="druid-stat-pointcut" class="org.springframework.aop.support.JdkRegexpMethodPointcut"</code></p>
+</li>
+<li>
+<p><code>scope="prototype"></code></p>
+</li>
+<li>
+<p><code><property name="patterns"></code></p>
+</li>
+<li>
+<p><code><list></code></p>
+</li>
+<li>
+<p><code><value>com.ssm.maven.core.service.*</value></code></p>
+</li>
+<li>
+<p><code><value>com.ssm.maven.core.dao.*</value></code></p>
+</li>
+<li>
+<p><code></list></code></p>
+</li>
+<li>
+<p><code></property></code></p>
+</li>
+<li>
+<p><code></bean></code></p>
+</li>
+<li> </li>
+<li>
+<p><code><aop:config></code></p>
+</li>
+<li>
+<p><code><aop:advisor advice-ref="druid-stat-interceptor" pointcut-ref="druid-stat-pointcut"/></code></p>
+</li>
+<li>
+<p><code></aop:config></code></p>
+</li>
+</ol>
+
+<p>再次查看spring监控页面，已经有了数据：<br />
+<img alt="spring监控" src="http://images2015.cnblogs.com/blog/859549/201704/859549-20170418221518118-37917214.png" style="height:439px; width:800px" /></p>
+
+<p>原先的做法只能对sql语句及jdbc相关操作进行监控，无法监控到代码级别的运行，因此进一步设置，结合spring的AOP特性对代码的运行效果进行监控，druid可以做到方法级别的监控，这个功能可以让你发现方法的调用频率及方法的运行时间，及时做出调整和修正使得项目更健壮。</p>
+
+<h2>结语</h2>
+
+<p>因为我想对网站的一些信息和运行情况进行监控，因此在代码中集成了druid的相关功能，也上传到了github仓库，如果你不需要的话，可以根据我在代码里写的注释删除相关配置文件即可。</p>

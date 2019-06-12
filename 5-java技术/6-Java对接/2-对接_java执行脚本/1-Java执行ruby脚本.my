@@ -1,0 +1,90 @@
+<h1>Java调用ruby脚本</h1>
+
+<h2>主要调用函数</h2>
+
+<pre>
+public Result Rubycmd(String rubyPath,String scene_name,String exe_flag,String scenefilespath){
+StringBuffer sb = new StringBuffer();
+Process process = null;
+BufferedReader br = null;
+InputStreamReader isr = null;
+Result result=new Result();
+try {
+process = Runtime.getRuntime().exec("cmd");
+SequenceInputStream sis = new SequenceInputStream(
+process.getInputStream(), process.getErrorStream());
+isr = new InputStreamReader(sis, Charset.forName("GBK"));
+br = new BufferedReader(isr);
+
+OutputStreamWriter osw = new OutputStreamWriter(
+process.getOutputStream(),"GBK");
+BufferedWriter bw = new BufferedWriter(osw);
+// 要下发的命令
+String command = "ruby " + rubyPath;
+if(null != scene_name) {
+command += " " + scene_name;
+}if(null != exe_flag) {
+command += " " + exe_flag;
+}if(null != scenefilespath) {
+command += " " + scenefilespath;
+}
+//command= "ruby D:/test/fabric构建/step1_LabFabric_Construct_2.rb";
+bw.write(command);
+logger.info(command);
+bw.newLine();
+bw.flush();
+bw.close();
+osw.close();
+
+String line = null;
+while (null != (line = br.readLine())) {
+logger.info(line);
+if (line.contains("match_result_hash:"))
+{
+System.err.println(line);
+result.setMatch_result_hash(line.substring(line.indexOf(":")+1));
+}
+if (line.contains("psw_result:"))
+{
+System.err.println(line);
+result.setPsw_result(line.substring(line.indexOf(":")+1));
+}
+if (line.contains("release_result:"))
+{
+System.err.println(line);
+result.setRelease_result(line.substring(line.indexOf(":")+1));
+}
+if (line.contains("no error"))
+{
+System.err.println(line);
+result.setRescue(line);
+}
+
+}
+} catch (Exception e) {
+System.err.println("Processing launch failed" + e.getMessage());
+logger.info("Processing launch failed" + e.getMessage());
+return null;
+} finally {
+if (process != null) {
+process.destroy();
+}
+if (br != null) {
+try {
+br.close();
+} catch (IOException e) {
+System.err.println("stream close failed" + e.getMessage());
+logger.info("stream close failed" + e.getMessage());
+}
+}
+if (isr != null) {
+try {
+isr.close();
+} catch (IOException e) {
+System.err.println("stream close failed" + e.getMessage());
+logger.info("stream close failed" + e.getMessage());
+}
+}
+}
+return result;
+}</pre>

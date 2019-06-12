@@ -1,0 +1,128 @@
+<h1><a href="https://www.cnblogs.com/silent2012/p/4586273.html" id="cb_post_title_url">Linux下磁盘挂载</a></h1>
+
+<p>公司硬盘不够用了，新买了一个存储，需要挂载到现在的系统上。前期的步骤运维已经全部搞定，在Linux下如何挂载，具体步骤如下：</p>
+
+<h2>1、查看是否已经分配</h2>
+
+<pre>
+[root@localhost home]# fdisk -l
+
+磁盘 /dev/sda：64.4 GB, 64424509440 字节，125829120 个扇区
+Units = 扇区 of 1 * 512 = 512 bytes
+扇区大小(逻辑/物理)：512 字节 / 512 字节
+I/O 大小(最小/最佳)：512 字节 / 512 字节
+磁盘标签类型：dos
+磁盘标识符：0x000a47ad
+
+设备 Boot Start End Blocks Id System
+/dev/sda1 * 2048 1026047 512000 83 Linux
+/dev/sda2 1026048 125829119 62401536 8e Linux LVM
+
+磁盘 /dev/sdb：1649.3 GB, 1649267441664 字节，3221225472 个扇区
+Units = 扇区 of 1 * 512 = 512 bytes
+扇区大小(逻辑/物理)：512 字节 / 512 字节
+I/O 大小(最小/最佳)：512 字节 / 512 字节</pre>
+
+<h2>2、发现有磁盘，路径为/dev/sdb。然后使用fdisk命令进行建立分区</h2>
+
+<pre>
+[root@localhost home]# fdisk /dev/sdb</pre>
+
+<p>fdisk命令如下：</p>
+
+<pre>
+命令(输入 m 获取帮助)：m
+命令操作
+a toggle a bootable flag
+b edit bsd disklabel
+c toggle the dos compatibility flag
+d delete a partition
+g create a new empty GPT partition table
+G create an IRIX (SGI) partition table
+l list known partition types
+m print this menu
+n add a new partition
+o create a new empty DOS partition table
+p print the partition table
+q quit without saving changes
+s create a new empty Sun disklabel
+t change a partition's system id
+u change display/entry units
+v verify the partition table
+w write table to disk and exit
+x extra functionality (experts only)
+</pre>
+
+<h2>3、然后先新建分区（我这里因为要存储大数据库文件   所以逻辑全部是一个分区）</h2>
+
+<pre>
+命令(输入 m 获取帮助)：n
+Partition type:
+p primary (0 primary, 0 extended, 4 free)
+e extended
+Select (default p): 
+Using default response p
+分区号 (1-4，默认 1)：
+起始 扇区 (2048-3221225471，默认为 2048)：
+将使用默认值 2048
+Last 扇区, +扇区 or +size{K,M,G} (2048-3221225471，默认为 3221225471)：
+将使用默认值 3221225471
+分区 1 已设置为 Linux 类型，大小设为 1.5 TiB
+</pre>
+
+<h2>4、最后保存分区</h2>
+
+<pre>
+命令(输入 m 获取帮助)：w
+The partition table has been altered!
+
+Calling ioctl() to re-read partition table.
+正在同步磁盘。</pre>
+
+<h2>5、使用fdisk -l命令查看，已经有分区了</h2>
+
+<pre>
+磁盘 /dev/sdb：1649.3 GB, 1649267441664 字节，3221225472 个扇区
+Units = 扇区 of 1 * 512 = 512 bytes
+扇区大小(逻辑/物理)：512 字节 / 512 字节
+I/O 大小(最小/最佳)：512 字节 / 512 字节
+磁盘标签类型：dos
+磁盘标识符：0xe0bc0098
+
+设备 Boot Start End Blocks Id System
+/dev/sdb1 2048 3221225471 1610611712 83 Linux
+</pre>
+
+<h2>6、建好分区后要格式化分区，建立文件系统</h2>
+
+<pre>
+[root@localhost home]# mkfs.xfs -f /dev/sd
+sda sda1 sda2 sdb sdb1 
+[root@localhost home]# mkfs.xfs -f /dev/sdb1
+meta-data=/dev/sdb1 isize=256 agcount=4, agsize=100663232 blks
+= sectsz=512 attr=2, projid32bit=1
+= crc=0 finobt=0
+data = bsize=4096 blocks=402652928, imaxpct=5
+= sunit=0 swidth=0 blks
+naming =version 2 bsize=4096 ascii-ci=0 ftype=0
+log =internal log bsize=4096 blocks=196607, version=2
+= sectsz=512 sunit=0 blks, lazy-count=1
+realtime =none extsz=4096 blocks=0, rtextents=0
+</pre>
+
+<h2>7、这样文件系统就建好了，然后选择一个挂载点挂上就可以了，我挂载在/home/data/ 下了</h2>
+
+<pre>
+[root@localhost home]# mount /dev/sdb1 /home/data/</pre>
+
+<h2>8、查看一下挂载是否成功了</h2>
+
+<pre>
+[root@localhost home]# df -TH /home/data/
+文件系统 类型 容量 已用 可用 已用% 挂载点
+/dev/sdb1 xfs 1.7T 34M 1.7T 1% /home/data</pre>
+
+<h2>9、修改一下系统配置加入下列行到/etc/fstab，让系统启动后自动挂载，否则有可能会掉啊</h2> 
+
+<pre>
+/dev/sdb1 /home/data xfs defaults 0 0</pre>

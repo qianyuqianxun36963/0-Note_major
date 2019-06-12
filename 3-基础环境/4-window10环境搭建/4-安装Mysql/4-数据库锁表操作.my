@@ -1,0 +1,150 @@
+<h1>数据库锁表与解锁</h1>
+
+<p>没有实验过程了。<br />
+ALL PRIVILEGES权限：</p>
+
+<pre>
+<code> # 除非grant option权限,
+</code></pre>
+
+<p>SUPER privileges:</p>
+
+<pre>
+<code># 超级权限
+</code></pre>
+
+<p>普通用户权限：</p>
+
+<pre>
+<code> SELECT UPDATE INSERT ......
+</code></pre>
+
+<p>read_only:</p>
+
+<pre>
+<code>When the read_only system variable is enabled, 
+the server permits no client updates except from users who have the SUPER privilege. 
+This variable is disabled by default.
+</code></pre>
+
+<p>FLUSH TABLE WITH READ LOCK:</p>
+
+<pre>
+<code>锁表，只读，任何用户都没有写入数据库的权限。
+</code></pre>
+
+<h5>一：mysql单机架构</h5>
+
+<p>1、read_only</p>
+
+<pre>
+<code>SET GLOBAL read_only=ON
+1、SUPER,ALL PRIVILEGES,root,具备修改数据库的能力
+2、普通用户则没有，报只读错误
+</code></pre>
+
+<p>2、read_only + flush table with read lock</p>
+
+<pre>
+<code>SET GLOBAL read_only=ON
+flush table with read lock
+1、SUPER,ALL PRIVILEGES,root,修改数据库提交事物之后会被暂停。
+1、要么自己退出
+2、要么等解除表锁之后继续此事物
+2、普通用户直接报只读错误
+</code></pre>
+
+<h5>二：mysql主从复制架构</h5>
+
+<p>1、从数据库read_only</p>
+
+<pre>
+<code> 单机一样，此时的mysql 主从同步复制是可以正常进行
+</code></pre>
+
+<p>2、从数据库read_only + flush table with read lock</p>
+
+<pre>
+<code> 单机一样，此时的mysql主从同步复制是不能正常进行。
+1、从服务器可以将主服务器的二进制日志读取过来（日志记录位置）
+2、从服务器不能更新数据到数据库，需要解表锁之后才可以将数据写入到数据库。
+</code></pre>
+
+<p>1、要避免往从库写入数据，需要避免普通用户赋予super & all权限。<br />
+2、flush table with read lock应该比较常用于master锁表，同步数据时。<br />
+3、解锁表：unlock table;</p>
+
+<h1>为什么要使用FTWRL</h1>
+
+<p>  MySQL dba在日常工作中，数据备份绝对是工作频度最高的工作内容之一。当你使用逻辑方式进行备份（mydumper，mysqldump）或物理方式进行备份（percona-xtrabackup），为了保证数据的一致性，这两种备份方式都会在备份过程中执行 flush table with read lock 这个命令（<code>**以下简称为FTWRL**</code>），通过执行FTWRL，来对事务和非事务表来加table level级别的共享锁，取得此时的gtid或者binlog偏移量，继而得到某一个时间点的备份数据。</p>
+
+<p> </p>
+
+<h1>FTWRL是如何工作的</h1>
+
+<p>  在过去的很长一段时间内，我们做备份一直是按以上的方式来做的，那么这种依靠FTWRL这种方式获得备份点的做法是否真的合理，对数据库有什么不良的影响吗？</p>
+
+<p>  首先让我们来看下，FTWRL具体做了哪些事情，当flush tables with read lock这条命令在数据库中被执行的时候，执行逻辑可以分为下面的几个步骤：</p>
+
+<blockquote>
+<pre>
+<code>步骤一、请求获得相关类型的 MDL lock,这里我们暂时称之为 FTWRL_MDL_LOCK.
+步骤二、清空query cache中的内容（当前应该很少有人开启这个功能了）
+步骤三、FLUSH TABLES,将当前所有打开的table的fd关闭
+步骤四、请求获得全局table-level lock
+步骤五、</code><code>上全局COMMIT锁(make_global_read_lock_block_commit)</code></pre>
+
+<pre>
+
+ </pre>
+</blockquote>
+
+<p>  以上步骤，在某些db场景下会产生非常严重的问题，我们以下面栗子说明： <br />
+  当有很大的事务在进行的时候，此时FTWRL的步骤一，步骤二可以完成，但是进行到步骤三的时候，由于表相关的事务正在执行中，相应table的句柄被占用，无法进行flush table操作。</p>
+
+<p>  笔者当时在现网就遇到这种情景，当时使用的工具是mydumper，该工具在进行到FTWRL步骤的时候，在步骤三卡住了，此时工具hang在那里，但是还误以为加锁失败，自然对业务不会造成影响，实际上步骤一，步骤二已经成功执行了，要命的是步骤一的FTWRL_MDL_LOCK对DML事务的排他的，所以在工具hang住的期间，其他的后续DML事务都是被阻塞的 -_-</p>
+
+<p> </p>
+
+<h1>有比FTWRL更好的方法吗</h1>
+
+<p>  我们发现FTWRL是一种非常重量级锁，或者说采取了一些额外过度的动作。有非常大的可能失败，比如非常大的事务正在执行，这时候会被阻塞；而阻塞的时候又会影响其他的DML事务的执行，这时候是很危险的！</p>
+
+<p>  那是否有改良的更好方案呢，percona的回答的是肯定的，在 5.6.16-64.0这个版本中，percona开始引入了两个新的MDL类型的锁，相应的引入了两个新的备份命令</p>
+
+<pre>
+<code> > LOCK TABLES FOR BACKUP
+> LOCK BINLOG FOR BACKUP
+</code></pre>
+
+<p> </p>
+
+<h2>lock tables for backup</h2>
+
+<p>  执行该命令后，获得的新的MDL锁会阻塞对非事务表的更新及所有DDL动作，此时其他用户可以继续更新inonodb引擎的表，但是无法对myisam表进行更新动作。</p>
+
+<p> </p>
+
+<h2>lock binglog for backup</h2>
+
+<p>  执行该命令后，如果加锁成功，将会阻塞binglog的更新，此时所有的DML操作被阻塞。</p>
+
+<p> 那么通过上面两个命令在获取一致性的数据备份相比之前用FTWRL，有什么好处呢，我们通过下面两张图可以看到区别：</p>
+
+<p>  首先我们看下在非percona-5.6.16-64.0版本中。xtrabackup的工作流程：</p>
+
+<p><img alt="" src="http://top.oa.com/apis/imgcache.php/http%3A%2F%2Fstatic.zybuluo.com%2Fsuperdian%2Fdgtgc4rp4wj3zvfgmzvkhuei%2Fimage_1bgvkr9ve16iose71fj51kp01ske9.png" /></p>
+
+<p>  然后我们看下percona-5.6.16-64.0版本及以上中，xtrabackup备份的流程是怎样的： <br />
+<img alt="" src="http://top.oa.com/apis/imgcache.php/http%3A%2F%2Fstatic.zybuluo.com%2Fsuperdian%2Fgh9qb3ivnuhvpdwrvw0hv6ef%2FSnap12.jpg" /></p>
+
+<p>从上面两张图我们可以总结如下： <br />
+  1、使用FTWTRL备份的方式，如果myisam表数量众多，或者当前有大事务在执行，FTWTRL处于等待或者FTWTRL保持，这个时间段期间，后续对innod的DML都将被阻塞，因此时间持续越长，对业务影响越大。 <br />
+  2、使用 lock tables for backup备份myisam表期间，对innodb的dml事务无影响，且加锁过程不受当前是否有大事务正在执行的影响</p>
+
+<p>  我们可以发现使用 lock table和lock binlog来备份数据，不仅可以实现更轻量级的上锁，并且可以节约myisam备份期间对业务的写操作影响，我在percona server的环境下试验证了以下，可以看到xtrabackup不再使用FTWRL命令了 <br />
+<img alt="" src="http://top.oa.com/apis/imgcache.php/http%3A%2F%2Fstatic.zybuluo.com%2Fsuperdian%2Fsh69goede4qtyqwd9kzvobm1%2Fimage_1bgvpn8i41pj81ebu1bfk1s2d1hav9.png" /></p>
+
+<p>  percona这个小的改动解决了之前长期以来热备数据的问题，特别是非percona server 版本下的云平用户有的执着使用myisam引擎，在备份期间非常容易造成监控程序的写入失败，从而触发告警，-_-。</p>
+
+<p>安心做技术</p>

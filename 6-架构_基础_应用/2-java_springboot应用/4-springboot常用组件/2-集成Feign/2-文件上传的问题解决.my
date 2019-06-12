@@ -1,0 +1,113 @@
+<h1>FeignClient文件上传问题解决办法</h1>
+
+<p>@FeignClient注解默认是不支持文件上传的,但是Github上feign-form的项目，其中提供了上传文件的Encoder，详见[https://github.com/OpenFeign/feign-form][1]</p>
+
+<p>一开始，我尝试使用这种方式</p>
+
+<p>@FeignClient(name = "file-upload-service", configuration = FileUploadServiceClient.MultipartSupportConfig.class)<br />
+public interface FileUploadServiceClient extends IFileUploadServiceClient {</p>
+
+<p>    public class MultipartSupportConfig {</p>
+
+<p>        @Bean<br />
+        public Encoder feignFormEncoder() {<br />
+            return new SpringFormEncoder();<br />
+        }<br />
+    }<br />
+}<br />
+<br />
+但是呢，这种方式会影响传其他参数，为啥呢，让我们来看看SpringFormEncoder的构造方法</p>
+
+<p>  /**<br />
+   * Constructor with the default Feign's encoder as a delegate.<br />
+   */<br />
+  public SpringFormEncoder () {<br />
+    this(new Encoder.Default());<br />
+  }</p>
+
+<p>  /**<br />
+   * Constructor with specified delegate encoder.<br />
+   *<br />
+   * @param delegate  delegate encoder, if this encoder couldn't encode object.<br />
+   */<br />
+  public SpringFormEncoder (Encoder delegate) {<br />
+    super(delegate); //调用父类的构造方法</p>
+
+<p>    val processor = (MultipartFormContentProcessor) getContentProcessor(MULTIPART);<br />
+    processor.addWriter(new SpringSingleMultipartFileWriter());<br />
+    processor.addWriter(new SpringManyMultipartFilesWriter()); //从这大概能猜到可以支持多文件上传<br />
+  }<br />
+<br />
+还有他的encode方法</p>
+
+<p>@Override<br />
+  public void encode (Object object, Type bodyType, RequestTemplate template) throws EncodeException {<br />
+    if (!bodyType.equals(MultipartFile.class)) {<br />
+      super.encode(object, bodyType, template); //调用FormEncoder对应方法<br />
+      return;<br />
+    }</p>
+
+<p>    val file = (MultipartFile) object;<br />
+    val data = singletonMap(file.getName(), object);<br />
+    super.encode(data, MAP_STRING_WILDCARD, template);<br />
+  }<br />
+<br />
+encode方法中我们可以看到bodyType不为MultipartFile.class会调用super.encode， <br />
+也就是FormEncoder的encode方法</p>
+
+<p>@Override<br />
+  @SuppressWarnings("unchecked")<br />
+  public void encode (Object object, Type bodyType, RequestTemplate template) throws EncodeException {<br />
+    String contentTypeValue = getContentTypeValue(template.headers()); //这里会去到@PostMapping中consumes的值，所以参数需要传对象时指定一下consumes<br />
+    val contentType = ContentType.of(contentTypeValue);<br />
+    if (!MAP_STRING_WILDCARD.equals(bodyType) || !processors.containsKey(contentType)) {//为啥指定consumes，是因为不指定就是application/x-www-form-urlencoded，而且processors中也包含，为啥包含见FormEncoder的构造函数<br />
+      delegate.encode(object, bodyType, template); //在指定consumes=application/json是会调用这个，delegate是啥呢，是SpringFormEncoder传递过来，也就是new Encoder.Default()<br />
+      return;<br />
+    }</p>
+
+<p>    val charset = getCharset(contentTypeValue);<br />
+    val data = (Map<String, Object>) object;<br />
+    try {<br />
+      processors.get(contentType).process(template, charset, data);<br />
+    } catch (Exception ex) {<br />
+      throw new EncodeException(ex.getMessage());<br />
+    }<br />
+  }<br />
+<br />
+所以呢，再看看</p>
+
+<p>class Default implements Encoder {</p>
+
+<p>    @Override<br />
+    public void encode(Object object, Type bodyType, RequestTemplate template) {<br />
+      if (bodyType == String.class) {<br />
+        template.body(object.toString());<br />
+      } else if (bodyType == byte[].class) {<br />
+        template.body((byte[]) object, null);<br />
+      } else if (object != null) { //当我们用对象传递参数的时候，会走这里<br />
+        throw new EncodeException(<br />
+            format("%s is not a type supported by this encoder.", object.getClass()));<br />
+      }<br />
+    }<br />
+  }<br />
+<br />
+原因找到了，那我们怎么改呢，看到其他博客找了这种方式</p>
+
+<p>SomeApi github = Feign.builder()<br />
+                     .encoder(new FormEncoder(new JacksonEncoder()))<br />
+                     .target(SomeApi.class, "http://api.some.org");<br />
+<br />
+但是，我不想指定target的第二个参数，还是想用@FeignClient，那该怎么办呢， <br />
+那我们可以这样，JacksonEncoder不是支持传对应的吗，那我们改写Default，把抛异常的那部分换成JacksonEncoder的处理方式</p>
+
+<p> JavaType javaType = mapper.getTypeFactory().constructType(bodyType);<br />
+                  template.body(mapper.writerFor(javaType).writeValueAsString(object));<br />
+<br />
+然后在new SpringFormEncoder()时传入改写之后的Encoder，及new SpringFormEncoder(new MyFormEncoder())；这样问题就解决了，但是</p>
+
+<p>多文件上传咋办呢，从FeignForm的相关代码中我们可以看出本身是支持多文件的，所以，所以，只需要再把SpringFormEncoder也改写了，从他的encode方法中可以看到val file = (MultipartFile) object;我们只要改成bodyType为MultipartFile[]时， <br />
+改成类似val file = (MultipartFile[]) object; <br />
+val data = singletonMap(file[0].getName(), object);这种方式就可以了</p>
+
+<p>以上就是，让@FeignClient支持文件上传的解决思路<br />
+ </p>

@@ -1,0 +1,162 @@
+<h1>maven 集成 findbugs</h1>
+
+<h3><strong>maven的findbugs插件</strong></h3>
+
+<p>使用findbugs的maven插件也非常方便，需要为pom.xml的project添加如下子节点：</p>
+
+<p><reporting><br />
+    <plugins><br />
+        <plugin><br />
+            <groupId>org.codehaus.mojo</groupId><br />
+            <artifactId>findbugs-maven-plugin</artifactId><br />
+            <version>2.5.2</version><br />
+        </plugin><br />
+    </plugins><br />
+</reporting></p>
+
+<h3>maven命令：</h3>
+
+<p>mvn findbugs:findbugs</p>
+
+<p>结果显示：</p>
+
+<p><img alt="" src="https://images0.cnblogs.com/blog2015/484310/201507/041140397478413.gif" /></p>
+
+<p>此时会在target目录会生成文件：findbugsXml.xml，可以用findbugs打开以便可视化分析。</p>
+
+<p> </p>
+
+<h2>maven集成findbugs</h2>
+
+<p>findbugs插件我就不做描述了，一般都是直接集成到eclipse中来检查代码。</p>
+
+<p>由于希望持续集成，每天定时从svn中检出代码并使用findbugs扫描bugs，所以这里介绍下maven集成findbugs插件，并生成报告。</p>
+
+<p>检查代码，可以讲build标签下，</p>
+
+<ol start="1">
+<li><build>   </li>
+<li>      <plugins>   </li>
+<li>            <plugin>  </li>
+<li>              <groupId>org.codehaus.mojo</groupId>  </li>
+<li>              <artifactId>findbugs-maven-plugin</artifactId>  </li>
+<li>              <version>2.3.2</version>  </li>
+<li>              <configuration>  </li>
+<li>                  <threshold>High</threshold>  </li>
+<li>                  <effort>Default</effort>  </li>
+<li>                  <findbugsXmlOutput>true</findbugsXmlOutput>  </li>
+<li>                   <!-- findbugs xml输出路径-->           </li>
+<li>                   <findbugsXmlOutputDirectory>target/site</findbugsXmlOutputDirectory>  </li>
+<li>              </configuration>  </li>
+<li>           </plugin>  </li>
+<li>        </plugins>  </li>
+<li></build>  </li>
+</ol>
+
+<pre>
+<build> 
+<plugins> 
+<plugin>
+<groupId>org.codehaus.mojo</groupId>
+<artifactId>findbugs-maven-plugin</artifactId>
+<version>2.3.2</version>
+<configuration>
+<threshold>High</threshold>
+<effort>Default</effort>
+<findbugsXmlOutput>true</findbugsXmlOutput>
+<!-- findbugs xml输出路径--> 
+<findbugsXmlOutputDirectory>target/site</findbugsXmlOutputDirectory>
+</configuration>
+</plugin>
+</plugins>
+</build></pre>
+
+<p> 然后执行mvn compile findbugs:findbugs  注意，这里一定要先编译，因为findbugs是检查class文件。</p>
+
+<p>如果是想要生成html报告，则需要将插件放在reporting标签中，如下：</p>
+
+<ol start="1">
+<li><reporting>    </li>
+<li>        <plugins>   </li>
+<li>            <plugin>  </li>
+<li>              <groupId>org.codehaus.mojo</groupId>  </li>
+<li>              <artifactId>findbugs-maven-plugin</artifactId>  </li>
+<li>              <version>2.3.2</version>  </li>
+<li>              <configuration>  </li>
+<li>                  <threshold>High</threshold>  </li>
+<li>                  <effort>Default</effort>  </li>
+<li>                  <findbugsXmlOutput>true</findbugsXmlOutput>  </li>
+<li>                   <!-- findbugs xml输出路径-->           </li>
+<li>                   <findbugsXmlOutputDirectory>target/site</findbugsXmlOutputDirectory>  </li>
+<li>              </configuration>  </li>
+<li>           </plugin>  </li>
+<li>        </plugins>  </li>
+<li>    </reporting>  </li>
+</ol>
+
+<pre>
+<reporting> 
+<plugins> 
+<plugin>
+<groupId>org.codehaus.mojo</groupId>
+<artifactId>findbugs-maven-plugin</artifactId>
+<version>2.3.2</version>
+<configuration>
+<threshold>High</threshold>
+<effort>Default</effort>
+<findbugsXmlOutput>true</findbugsXmlOutput>
+<!-- findbugs xml输出路径--> 
+<findbugsXmlOutputDirectory>target/site</findbugsXmlOutputDirectory>
+</configuration>
+</plugin>
+</plugins>
+</reporting></pre>
+
+<p> 最后执行mvn compile site</p>
+
+<p><br />
+<img alt="" src="http://dl2.iteye.com/upload/attachment/0109/0379/4c9ac150-11fc-3417-b89b-b1f524f1ed2c.png" /></p>
+
+<p> </p>
+
+<h2>配置忽略文件</h2>
+
+<p>今天用findbugs扫描项目，发现一个问题：</p>
+
+<p><code>MS_MUTABLE_ARRAY, Priority: High<br />
+com.aa.bb.common.Constants.ARRAY_RUNNING_KING_SYSTEM_MESSAGE_DAY is a mutable array </code></p>
+
+<p>由于不想修改类，只希望findbugs能够忽略他，于是有了如下的了解和学习。<br />
+1.在pom.xml加入findbugs插件</p>
+
+<pre>
+<code> <!-- findbugs插件 -->
+<plugin> 
+<groupId>org.codehaus.mojo</groupId> 
+<artifactId>findbugs-maven-plugin</artifactId> 
+<version>3.0.1</version> 
+<configuration> 
+<!--此处还可以配置一些其他东西，比如输出格式是xml还是html,默认xml，具体可参考网上的详细配置-->
+<!--findbugs需要忽略的类型的xml-->
+<excludeFilterFile>findbugs-exclude.xml</excludeFilterFile>
+</configuration> 
+</plugin></code></pre>
+
+<p>2 . 在pom.xml同目录下建立findbugs-exclude.xml文件，内容为：</p>
+
+<pre>
+<code><?xml version="1.0"?>
+<FindBugsFilter>
+<!--更多详细的可参考网上的类似findbugs-exclude.xml的文件-->
+<Match>
+<Class name="com.aa.bb.common.Constants"/>
+<Bug pattern="MS_MUTABLE_ARRAY" />
+</Match>
+</FindBugsFilter></code></pre>
+
+<p>3 . 执行命令mvn package编译工程<br />
+4 . 执行mvn findbugs:findbugs ，执行完成后默认会生成 target/findbugsXml.xml文件。</p>
+
+<p>5 . 执行mvn findbugs:gui ,可是查看视图界面，发现原来的问题不存在了。（当然也可以通过配置jenkins查看）</p>
+
+<p>完。。</p>

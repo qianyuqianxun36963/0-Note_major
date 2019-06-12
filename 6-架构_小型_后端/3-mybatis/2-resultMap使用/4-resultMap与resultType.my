@@ -1,0 +1,171 @@
+<h1>ResultMap和ResultType在使用中的区别</h1>
+<p>在使用mybatis进行数据库连接操作时对于SQL语句返回结果的处理通常有两种方式，一种就是resultType另一种就是resultMap,下面说下我对这两者的认识和理解</p>
+<p><strong>resultType：当使用resultType做SQL语句返回结果类型处理时，对于SQL语句查询出的字段在相应的pojo中必须有和它相同的字段对应，而resultType中的内容就是pojo在本项目中的位置。</strong></p>
+<p><img alt="" src="http://csdnimg.cn/release/phoenix/" />因此对于单表查询的话用resultType是最合适的。但是，如果在写pojo时，不想用数据库表中定义的字段名称，也是可以使用resultMap进行处理对应的。多表连接查询时，若是一对一的连接查询，那么需要新建一个pojo，pojo中包括两个表中需要查询出的所有的字段，这个地方的处理方式通常为创建一个继承一个表字段的pojo，再在里面添加另外一个表内需要查询出的字段即可。若是一对多查询时，若是使用内连接查询，则很可能出现查询出的字段有重复。使用双重for循环嵌套处理即可。</p>
+<p><strong>resultMap：当使用resultMap做SQL语句返回结果类型处理时，通常需要在mapper.xml中定义resultMap进行pojo和相应表字段的对应。</strong></p>
+<h1>一、resultType</h1>
+<p>使用resultType进行输出映射，只有查询出来的列名和pojo（实体bean）中的属性名一致，该列才可以映射成功。</p>
+<p>如果查询出来的列名和pojo中的属性名全部不一致，没有创建pojo对象。<br />
+只要查询出来的列名和pojo中的属性有一个一致，就会创建pojo对象。</p>
+<h2>1、输出简单类型</h2>
+<h3>1）需求</h3>
+<p>用户信息的综合查询列表总数，通过查询总数和上边用户综合查询列表才可以实现分页。</p>
+<h3>2）mapper.xml</h3>
+<ol start="1">
+<li><mapper namespace="cn.edu.hpu.mybatis.mapper.UserMapper">  </li>
+<li>      </li>
+<li>    <!-- 用户信息综合查询   </li>
+<li>    #{UserCustom.sex}取出包装对象中性别值  </li>
+<li>    ${UserCustom.username}取得pojo包装对象中用户名称  </li>
+<li>    -->  </li>
+<li>    <select id="findUserList" parameterType="cn.edu.hpu.mybatis.PO.UserQueryVo"   </li>
+<li>                                resultType="cn.edu.hpu.mybatis.PO.UserCustom">  </li>
+<li>        select * from user </li>
+<li>where user.sex=#{userCustom.sex} and user.username like '%${userCustom.username}%'  </li>
+<li>    </select>  </li>
+<li>      </li>
+<li>    <!-- 用户信息综合查询总数 -->  </li>
+<li>    <select id="findUserCount" parameterType="cn.edu.hpu.mybatis.PO.UserQueryVo" resultType="int">  </li>
+<li>        select count(*) from user where user.sex=#{userCustom.sex} and user.username like '%${userCustom.username}%'  </li>
+<li>    </select>  </li>
+<li>    ......  </li>
+<li></mapper>  </li>
+</ol>
+<h3>3）mapper.java</h3>
+<ol start="1">
+<li>//用户管理的Dao接口  </li>
+<li>public interface UserMapper {  </li>
+<li>      </li>
+<li>    //用户信息综合查询  </li>
+<li>    public List<UserCustom> findUserList(UserQueryVo userQueryVo) throws Exception;  </li>
+<li>      </li>
+<li>    //用户信息综合查询总数  </li>
+<li>    public int findUserCount(UserQueryVo userQueryVo) throws Exception;  </li>
+<li>    ......  </li>
+<li>}  </li>
+</ol>
+<h3>4）测试代码</h3>
+<ol start="1">
+<li>//用户信息综合查询总数  </li>
+<li>    @Test  </li>
+<li>    public void testFindUserCount() throws Exception{  </li>
+<li>          </li>
+<li>        SqlSession sqlSession=sqlSessionFactory.openSession();  </li>
+<li>          </li>
+<li>        //创建UserMapper代理对象  </li>
+<li>        UserMapper userMapper=sqlSession.getMapper(UserMapper.class);  </li>
+<li>          </li>
+<li>        //创建包装对象，设置查询条件  </li>
+<li>        UserQueryVo userQueryVo=new UserQueryVo();  </li>
+<li>        UserCustom userCustom=new UserCustom();  </li>
+<li>        userCustom.setSex("男");  </li>
+<li>        userCustom.setUsername("张三");  </li>
+<li>        userQueryVo.setUserCustom(userCustom);  </li>
+<li>          </li>
+<li>        //调用userMapper的方法  </li>
+<li>        int count=userMapper.findUserCount(userQueryVo);  </li>
+<li>          </li>
+<li>        System.out.println("总数为:"+count);  </li>
+<li>    }  </li>
+</ol>
+<p>测试结果：总数为:2<br />
+<br />
+输出日志：</p>
+<ol start="1">
+<li>DEBUG [main] - Opening JDBC Connection  </li>
+<li>DEBUG [main] - Created connection 7832149.  </li>
+<li>DEBUG [main] - Setting autocommit to false on JDBC Connection [com.mysql.jdbc.Connection@778255]  </li>
+<li>DEBUG [main] - ==>  Preparing: select count(*) from user where user.sex=? and user.username like '%张三%'   </li>
+<li>DEBUG [main] - ==> Parameters: 男(String)  </li>
+<li>DEBUG [main] - <==      Total: 1  </li>
+</ol>
+<h3>5）.小结</h3>
+<p>查询出来的结果集只有一行且一列，可以使用简单类型进行输出映射。（输出简单类型的要求）</p>
+<h2>2、输出pojo对象和pojo列表</h2>
+<p>不管是输出的pojo单个对象还是一个列表（list中包括pojo），在mapper.xml中resultType指定的类型是一样的。<br />
+在mapper.java指定的方法返回值类型不一样：<br />
+1）.输出单个pojo对象，方法返回值是单个对象类型<br />
+2）.输出pojo对象list，方法返回值是List<Pojo><br />
+<br />
+生成的动态代理对象中是根据mapper方法的返回值类型确定是调用selectOne(返回单个对象调用)还是selectList （返回集合对象调用 ）.</p>
+<h2>3、输出HashMap</h2>
+<p>输出pojo对象可以改用HashMap输出类型，将输出的字段名称作为map的key，value为字段值。如果是集合，那就是list里面套了HashMap。</p>
+<h1>二、resultMap</h1>
+<p>mybatis中使用resultMap完成高级输出结果映射。</p>
+<h2>1、resultMap使用方法</h2>
+<p>如果查询出来的列名和pojo的属性名不一致，通过定义一个resultMap对列名和pojo属性名之间作一个映射关系。<br />
+ </p>
+<h2>2、下面来进行实验</h2>
+<p>1）实验需求</p>
+<p>将下边的sql使用User完成映射<br />
+SELECT id id_,username username_ FROM USER WHERE id=#{value}<br />
+<br />
+User类中属性名和上边查询列名不一致。</p>
+<p>resultMap使用方法:(以下属性均定义在Mapper.xml映射文件中)</p>
+<p>2）定义resultMap</p>
+<ol start="1">
+<li><!-- 定义resultType  </li>
+<li>将select id id_,username _username from user和User类中的属性做一个映射关系  </li>
+<li>      </li>
+<li>type:resultMap最终所映射的Java对象类型，可以使用别名  </li>
+<li>id:对resultMap的唯一标识   </li>
+<li>-->  </li>
+<li><resultMap type="user" id="userResultMap">  </li>
+<li>    <!-- id表示查询结果集中唯一标识   </li>
+<li>    column:查询出的列名  </li>
+<li>    property:type所指定的POJO中的属性名  </li>
+<li>    最终reslutMap对column和property做一个映射关系(对应关系)  </li>
+<li>    -->  </li>
+<li>    <id column="_id" property="id"/>  </li>
+<li>    <!-- 对普通列的映射定义 -->  </li>
+<li>    <result column="_username" property="username"/>  </li>
+<li></resultMap>  </li>
+</ol>
+<p>3）使用resultMap作为statement的输出映射类型</p>
+<ol start="1">
+<li><!-- 使用resultMap进行输出映射   </li>
+<li>    resultMap:指定定义的resultMap的id，如果这个resultMap在其它的mapper文件，前面需要加namespace  </li>
+<li>    -->  </li>
+<li><select id="findUserByResultMap" parameterType="int" resultMap="userResultMap">  </li>
+<li>    select id _id,username _username from user where id=#{value}  </li>
+<li></select>  </li>
+</ol>
+<p>4）mapper接口类中添加相应方法</p>
+<ol start="1">
+<li>//用户管理的Dao接口  </li>
+<li>public interface UserMapper {  </li>
+<li>      </li>
+<li>    public User findUserByResultMap(int id) throws Exception;  </li>
+<li>    ......  </li>
+<li>}  </li>
+</ol>
+<p>测试：</p>
+<ol start="1">
+<li>@Test  </li>
+<li>public void testFindUserByResultMap() throws Exception{  </li>
+<li>          </li>
+<li>    SqlSession sqlSession=sqlSessionFactory.openSession();  </li>
+<li>          </li>
+<li>    //创建UserMapper代理对象  </li>
+<li>    UserMapper userMapper=sqlSession.getMapper(UserMapper.class);  </li>
+<li>          </li>
+<li>    //调用userMapper的方法  </li>
+<li>    User user=userMapper.findUserByResultMap(1);  </li>
+<li>          </li>
+<li>    System.out.println(user.getUsername());  </li>
+<li>}  </li>
+</ol>
+<p><br />
+测试结果：张三<br />
+输出日志：</p>
+<ol start="1">
+<li>EBUG [main] - Opening JDBC Connection  </li>
+<li>DEBUG [main] - Created connection 1465214.  </li>
+<li>DEBUG [main] - Setting autocommit to false on JDBC Connection [com.mysql.jdbc.Connection@165b7e]  </li>
+<li>DEBUG [main] - ==>  Preparing: select id _id,username _username from user where id=?   </li>
+<li>DEBUG [main] - ==> Parameters: 1(Integer)  </li>
+<li>DEBUG [main] - <==      Total: 1  </li>
+</ol>
+<h1>三、总结</h1>
+<p>使用resultType进行输出映射，只有查询出来的列名和pojo中的属性名一致，该列才可以映射成功。</p>
+<p>如果查询出来的列名和pojo的属性名不一致，通过定义一个resultMap对列名和pojo属性名之间作一个映射关系。</p>

@@ -1,0 +1,345 @@
+<h1><a href="http://blog.csdn.net/u013850857/article/details/49761433">ubuntu下简单使用activemq</a></h1>
+
+<h2>1.首先官网下载activemq</h2>
+
+<p>http://activemq.apache.org/activemq-5120-release.html</p>
+
+<h2>2.然后解压</h2>
+
+<p>sudo tar -zxvf 源文件.tar.gz /usr/local/soft</p>
+
+<h2>3.更改配置</h2>
+
+<p>然后在/usr/local/soft/apache-activemq-5.12.1/bin下有一个env文件,编辑此文件设置对应的jdk目录,要说明的是,新版本的activemq已经不支持jdk1.7以下,亲测不支持6u45,所以还是尽量在jdk1.7版本以上吧,最后一行(JAVACMD="auto")上面添加<br />
+JAVA_HOME="/usr/lib/jvm/jdk1.7.0_65"</p>
+
+<h2>4.启动activemq</h2>
+
+<p>进入到bin目录下,使用sudo ./activemq start<br />
+出现如下信息说明启动成功,即可访问管理界面:http://localhost:8161/admin/,默认的用户名与密码一般都是admin</p>
+
+<p>INFO: Loading '/usr/local/soft/apache-activemq-5.12.1//bin/env'<br />
+INFO: Using java '/usr/lib/jvm/jdk1.7.0_65/bin/java'<br />
+INFO: Starting - inspect logfiles specified in logging.properties and log4j.properties to get details<br />
+INFO: pidfile created : '/usr/local/soft/apache-activemq-5.12.1//data/activemq.pid' (pid '5532')</p>
+
+<p>看到PID(进程号,每次会有所不同)</p>
+
+<p>管理界面:</p>
+
+<h2>5. 验证</h2>
+
+<p>查看61616端口是否正常启动<br />
+netstat -an | grep 61616</p>
+
+<h2>6. 关闭activemq</h2>
+
+<p>ps -ef | grep activemq<br />
+然后把对应的进程杀掉，假设找到的进程编号为 8669</p>
+
+<p>kill -9 8669</p>
+
+<h2>7.简单实例:</h2>
+
+<h2>5.1 P2P(point-point点对点模式)</h2>
+
+<h3>5.1.1Sender.java</h3>
+
+<ol start="1">
+<li>package cn.example.activemq;  </li>
+<li>  </li>
+<li>  </li>
+<li>import org.apache.activemq.ActiveMQConnection;  </li>
+<li>import org.apache.activemq.ActiveMQConnectionFactory;  </li>
+<li>  </li>
+<li>import javax.jms.*;  </li>
+<li>  </li>
+<li>/** </li>
+<li> * @author  </li>
+<li> * @company  </li>
+<li> * @date  </li>
+<li> */  </li>
+<li>public class Sender {  </li>
+<li>    private static  final int SEND_NUM=5;  </li>
+<li>  </li>
+<li>    /** </li>
+<li>     * 发送消息 </li>
+<li>     * @param session </li>
+<li>     * @param messageProducer </li>
+<li>     */  </li>
+<li>    public static void sendMessage(Session session,MessageProducer messageProducer) {  </li>
+<li>  </li>
+<li>        for (int i = 0; i < SEND_NUM; i++) {  </li>
+<li>            TextMessage message = null;  </li>
+<li>            try {  </li>
+<li>                //创建消息  </li>
+<li>                message = session.createTextMessage("ActiveMQ发送消息:" + i);  </li>
+<li>                System.out.println("发送消息：" + "ActiveMQ发送消息" + i);  </li>
+<li>                messageProducer.send(message);  </li>
+<li>            } catch (JMSException e) {  </li>
+<li>                e.printStackTrace();  </li>
+<li>            }  </li>
+<li>        }  </li>
+<li>    }  </li>
+<li>  </li>
+<li>    public static void main(String[] args){  </li>
+<li>        //ConnectionFactory 连接工厂，JMS用它建立工厂  </li>
+<li>        ConnectionFactory connectionFactory;  </li>
+<li>        //Connection是JMS客户端连接Provider  </li>
+<li>        Connection connection=null;  </li>
+<li>        //一个接收或者发送消息的线程  </li>
+<li>        Session session;  </li>
+<li>        //消息的目的地  </li>
+<li>        Destination destination;  </li>
+<li>        //消息发送者  </li>
+<li>        MessageProducer messageProducer;  </li>
+<li>        //构造ConllectionFactory的实例对象，使用ActiveMQ  </li>
+<li>        connectionFactory = new ActiveMQConnectionFactory(  </li>
+<li>                ActiveMQConnection.DEFAULT_USER,  </li>
+<li>                ActiveMQConnection.DEFAULT_PASSWORD,  </li>
+<li>                "tcp://localhost:61616");  </li>
+<li>        try {  </li>
+<li>            //构造connection  </li>
+<li>            connection = connectionFactory.createConnection();  </li>
+<li>            connection.start();  </li>
+<li>            //获取连接  </li>
+<li>            session = connection.createSession(Boolean.TRUE, Session.AUTO_ACKNOWLEDGE);  </li>
+<li>            //通过链接创建队列给消息目的地  </li>
+<li>            destination = session.createQueue("FirstQueue");  </li>
+<li>            //创建消息发送者  </li>
+<li>            messageProducer = session.createProducer(destination);  </li>
+<li>            //设置不持久化  </li>
+<li>            messageProducer.setDeliveryMode(DeliveryMode.NON_PERSISTENT);  </li>
+<li>  </li>
+<li>            sendMessage(session,messageProducer);  </li>
+<li>            session.commit();  </li>
+<li>        }catch (JMSException e) {  </li>
+<li>            e.printStackTrace();  </li>
+<li>        } finally {  </li>
+<li>            if(null!=connection){  </li>
+<li>                try {  </li>
+<li>                    connection.close();  </li>
+<li>                } catch (JMSException e) {  </li>
+<li>                    e.printStackTrace();  </li>
+<li>                }  </li>
+<li>            }  </li>
+<li>        }  </li>
+<li>    }  </li>
+<li>}  </li>
+</ol>
+
+<p> </p>
+
+<p> </p>
+
+<h3>5.1.2Receiver</h3>
+
+<ol start="1">
+<li>package cn.example.activemq;  </li>
+<li>  </li>
+<li>import org.apache.activemq.ActiveMQConnection;  </li>
+<li>import org.apache.activemq.ActiveMQConnectionFactory;  </li>
+<li>  </li>
+<li>import javax.jms.*;  </li>
+<li>import java.util.logging.Logger;  </li>
+<li>  </li>
+<li>/** </li>
+<li> * @author  </li>
+<li> * @company  </li>
+<li> * @date </li>
+<li> */  </li>
+<li>public class Receiver {  </li>
+<li>  </li>
+<li>  </li>
+<li>  </li>
+<li>    public static void main(String[] args) {  </li>
+<li>        //ConnectionFactory连接工厂  </li>
+<li>        ConnectionFactory connectionFactory;  </li>
+<li>        //是JMS客户端连接JMS Provider:他是用来处理消息路由与传递的消息  </li>
+<li>        Connection connection=null;  </li>
+<li>        //创建连接  </li>
+<li>        Session session;  </li>
+<li>        //消息目的地  </li>
+<li>        Destination destination;  </li>
+<li>        //消息接收者  </li>
+<li>        MessageConsumer messageConsumer;  </li>
+<li>  </li>
+<li>        connectionFactory = new ActiveMQConnectionFactory(  </li>
+<li>                ActiveMQConnection.DEFAULT_USER,  </li>
+<li>                ActiveMQConnection.DEFAULT_PASSWORD,  </li>
+<li>                "tcp://localhost:61616");  </li>
+<li>        try {  </li>
+<li>            connection = connectionFactory.createConnection();  </li>
+<li>            connection.start();  </li>
+<li>            session = connection.createSession(Boolean.FALSE, Session.AUTO_ACKNOWLEDGE);  </li>
+<li>            destination = session.createQueue("FirstQueue");  </li>
+<li>            messageConsumer = session.createConsumer(destination);  </li>
+<li>            while(true){  </li>
+<li>                TextMessage textMessage = (TextMessage) messageConsumer.receive(500000);  </li>
+<li>                if(null!=textMessage){  </li>
+<li>                    System.out.println("收到消息:" + textMessage.getText());  </li>
+<li>                }else{  </li>
+<li>                    break;  </li>
+<li>                }  </li>
+<li>            }  </li>
+<li>        } catch (JMSException e) {  </li>
+<li>            e.printStackTrace();  </li>
+<li>        }finally {  </li>
+<li>            if(null!=connection){  </li>
+<li>                try {  </li>
+<li>                    connection.close();  </li>
+<li>                } catch (JMSException e) {  </li>
+<li>                    e.printStackTrace();  </li>
+<li>                }  </li>
+<li>            }  </li>
+<li>        }  </li>
+<li>    }  </li>
+<li>}  </li>
+</ol>
+
+<h2>5.1.3测试</h2>
+
+<p>上面的500000代表500秒,当然没必要设置这么长时间,你可以同时启动4台Receiver,然后启动Sender,会出现如下情况,这就是点对点的效果</p>
+
+<p><img alt="" src="http://img.blog.csdn.net/20151111210348863?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQv/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70/gravity/Center" /></p>
+
+<p><img alt="" src="http://img.blog.csdn.net/20151111210239408?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQv/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70/gravity/Center" /></p>
+
+<p><img alt="" src="http://img.blog.csdn.net/20151111210254666?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQv/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70/gravity/Center" /></p>
+
+<p><img alt="" src="http://img.blog.csdn.net/20151111210302496?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQv/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70/gravity/Center" /></p>
+
+<p><img alt="" src="http://img.blog.csdn.net/20151111210310565?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQv/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70/gravity/Center" /></p>
+
+<p>同时在web页面你会看到如下效果</p>
+
+<p><img alt="" src="http://img.blog.csdn.net/20151111210429285?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQv/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70/gravity/Center" /></p>
+
+<h2>5.2publisher-Subscriber(发布-订阅)</h2>
+
+<h4>5.2.1TopicPublisher</h4>
+
+<ol start="1">
+<li>package cn.example.activemq.topic;  </li>
+<li>  </li>
+<li>import org.apache.activemq.ActiveMQConnection;  </li>
+<li>import org.apache.activemq.ActiveMQConnectionFactory;  </li>
+<li>  </li>
+<li>import javax.jms.*;  </li>
+<li>  </li>
+<li>/** </li>
+<li> * Created by  </li>
+<li> */  </li>
+<li>public class TopicPublisher {  </li>
+<li>  </li>
+<li>    public static void main(String[] args) throws InterruptedException {  </li>
+<li>        //JMS建立工厂  </li>
+<li>        ActiveMQConnectionFactory connectionFactory;  </li>
+<li>        //JMS客户端连接Provider  </li>
+<li>        Connection connection = null;  </li>
+<li>        //接受发送消息的线程  </li>
+<li>        Session session = null;  </li>
+<li>        //主题定义  </li>
+<li>        Topic topic;  </li>
+<li>        connectionFactory = new ActiveMQConnectionFactory(ActiveMQConnection.DEFAULT_USER,ActiveMQConnection.DEFAULT_PASSWORD,"tcp://localhost:61616");  </li>
+<li>        try {  </li>
+<li>            connection = connectionFactory.createConnection();  </li>
+<li>            connection.start();  </li>
+<li>            session = connection.createSession(Boolean.TRUE, Session.AUTO_ACKNOWLEDGE);  </li>
+<li>            Destination destination = session.createTopic("mq.topic");  </li>
+<li>            MessageProducer producer = session.createProducer(destination);  </li>
+<li>            //消息的创建以及发送  </li>
+<li>            for (int i = 1; i <= 20; i++) {  </li>
+<li>                MapMessage message = session.createMapMessage();  </li>
+<li>                message.setLong("count", i);  </li>
+<li>                producer.send(message);  </li>
+<li>                System.out.println("发布者发送的消息"+i);  </li>
+<li>            }  </li>
+<li>            session.commit();  </li>
+<li>            session.close();  </li>
+<li>        } catch (JMSException e) {  </li>
+<li>            e.printStackTrace();  </li>
+<li>        } finally {  </li>
+<li>            if(null!=session){  </li>
+<li>                try {  </li>
+<li>                    session.close();  </li>
+<li>                } catch (JMSException e) {  </li>
+<li>                    e.printStackTrace();  </li>
+<li>                }  </li>
+<li>            }  </li>
+<li>            if(null!=connection){  </li>
+<li>                try {  </li>
+<li>                    connection.close();  </li>
+<li>                } catch (JMSException e) {  </li>
+<li>                    e.printStackTrace();  </li>
+<li>                }  </li>
+<li>            }  </li>
+<li>  </li>
+<li>        }  </li>
+<li>  </li>
+<li>    }  </li>
+<li>}  </li>
+</ol>
+
+<h3>5.2.2 TopicSubscriber</h3>
+
+<ol start="1">
+<li>package cn.example.activemq.topic;  </li>
+<li>  </li>
+<li>import org.apache.activemq.ActiveMQConnection;  </li>
+<li>import org.apache.activemq.ActiveMQConnectionFactory;  </li>
+<li>  </li>
+<li>import javax.jms.*;  </li>
+<li>  </li>
+<li>/** </li>
+<li> * Created by  </li>
+<li> */  </li>
+<li>public class TopicSubscriber {  </li>
+<li>  </li>
+<li>    public static void main(String[] args) {  </li>
+<li>        ActiveMQConnectionFactory connectionFactory;  </li>
+<li>        Connection connection=null;  </li>
+<li>        connectionFactory = new ActiveMQConnectionFactory(ActiveMQConnection.DEFAULT_USER,ActiveMQConnection.DEFAULT_PASSWORD,"tcp://localhost:61616");  </li>
+<li>        try {  </li>
+<li>            connection = connectionFactory.createConnection();  </li>
+<li>            connection.start();  </li>
+<li>            final Session session = connection.createSession(Boolean.TRUE, Session.AUTO_ACKNOWLEDGE);  </li>
+<li>            Topic topic = session.createTopic("mq.topic");  </li>
+<li>            final MessageConsumer consumer = session.createConsumer(topic);  </li>
+<li>            while(true){  </li>
+<li>                consumer.setMessageListener(new MessageListener() {  </li>
+<li>                    public void onMessage(Message message) {  </li>
+<li>                        MapMessage mapMessage = null;  </li>
+<li>                        try {  </li>
+<li>                            mapMessage = (MapMessage) message;  </li>
+<li>                            System.out.println("订阅者接收到消息:" + mapMessage.getLong("count"));  </li>
+<li>                        } catch (JMSException e) {  </li>
+<li>                            e.printStackTrace();  </li>
+<li>                        }  </li>
+<li>                    }  </li>
+<li>                });  </li>
+<li>            }  </li>
+<li>        } catch (JMSException e) {  </li>
+<li>            e.printStackTrace();  </li>
+<li>        }finally {  </li>
+<li>            if(null!=connection){  </li>
+<li>                try {  </li>
+<li>                    connection.close();  </li>
+<li>                } catch (JMSException e) {  </li>
+<li>                    e.printStackTrace();  </li>
+<li>                }  </li>
+<li>            }  </li>
+<li>        }  </li>
+<li>  </li>
+<li>  </li>
+<li>    }  </li>
+<li>  </li>
+<li>}  </li>
+</ol>
+
+<p><br />
+ </p>
+
+<p> </p>
+
+<p>同时开5个开启TopicSubscriber,使用TopicPublisher发送消息,这时会发现与点对点队列形式之间最大的区别,在发布-订阅的情况下,订阅的每个人都会接收到发布的同样的消息,生产者(发送消息)一对多消费者(接收消息)而队列如果要接收所有消息,只能发给一个消费者,生产者(发送消息)一对一消费者(接收消息)</p>

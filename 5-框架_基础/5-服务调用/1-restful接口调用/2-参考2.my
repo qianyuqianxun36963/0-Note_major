@@ -1,0 +1,283 @@
+<h1>三种方法实现调用Restful接口</h1>
+
+<h2>1.基本介绍</h2>
+
+<p>    Restful接口的调用，前端一般使用ajax调用，后端可以使用的方法比较多，</p>
+
+<p>    本次介绍三种：</p>
+
+<p>        1.HttpURLConnection实现</p>
+
+<p>        2.HttpClient实现</p>
+
+<p>        3.Spring的RestTemplate</p>
+
+<h2>2.HttpURLConnection实现</h2>
+
+<p>@Controller<br />
+public class RestfulAction {<br />
+    <br />
+    @Autowired<br />
+    private UserService userService;</p>
+
+<p>    // 修改<br />
+    @RequestMapping(value = "put/{param}", method = RequestMethod.PUT)<br />
+    public @ResponseBody String put(@PathVariable String param) {<br />
+        return "put:" + param;<br />
+    }</p>
+
+<p>    // 新增<br />
+    @RequestMapping(value = "post/{param}", method = RequestMethod.POST)<br />
+    public @ResponseBody String post(@PathVariable String param,String id,String name) {<br />
+        System.out.println("id:"+id);<br />
+        System.out.println("name:"+name);<br />
+        return "post:" + param;<br />
+    }<br />
+    </p>
+
+<p>    // 删除<br />
+    @RequestMapping(value = "delete/{param}", method = RequestMethod.DELETE)<br />
+    public @ResponseBody String delete(@PathVariable String param) {<br />
+        return "delete:" + param;<br />
+    }</p>
+
+<p>    // 查找<br />
+    @RequestMapping(value = "get/{param}", method = RequestMethod.GET)<br />
+    public @ResponseBody String get(@PathVariable String param) {<br />
+        return "get:" + param;<br />
+    }<br />
+    <br />
+    <br />
+    // HttpURLConnection 方式调用Restful接口<br />
+    // 调用接口<br />
+    @RequestMapping(value = "dealCon/{param}")<br />
+    public @ResponseBody String dealCon(@PathVariable String param) {<br />
+        try {<br />
+            String url = "http://localhost:8080/tao-manager-web/";<br />
+            url+=(param+"/xxx");<br />
+            URL restServiceURL = new URL(url);<br />
+            HttpURLConnection httpConnection = (HttpURLConnection) restServiceURL<br />
+                    .openConnection();<br />
+            //param 输入小写，转换成 GET POST DELETE PUT <br />
+            httpConnection.setRequestMethod(param.toUpperCase());<br />
+//            httpConnection.setRequestProperty("Accept", "application/json");<br />
+            if("post".equals(param)){<br />
+                //打开输出开关<br />
+                httpConnection.setDoOutput(true);<br />
+//                httpConnection.setDoInput(true);<br />
+                <br />
+                //传递参数<br />
+                String input = "&id="+ URLEncoder.encode("abc", "UTF-8");<br />
+                input+="&name="+ URLEncoder.encode("啊啊啊", "UTF-8");<br />
+                OutputStream outputStream = httpConnection.getOutputStream();<br />
+                outputStream.write(input.getBytes());<br />
+                outputStream.flush();<br />
+            }<br />
+            if (httpConnection.getResponseCode() != 200) {<br />
+                throw new RuntimeException(<br />
+                        "HTTP GET Request Failed with Error code : "<br />
+                                + httpConnection.getResponseCode());<br />
+            }<br />
+            BufferedReader responseBuffer = new BufferedReader(<br />
+                    new InputStreamReader((httpConnection.getInputStream())));<br />
+            String output;<br />
+            System.out.println("Output from Server:  \n");<br />
+            while ((output = responseBuffer.readLine()) != null) {<br />
+                System.out.println(output);<br />
+            }<br />
+            httpConnection.disconnect();<br />
+        } catch (MalformedURLException e) {<br />
+            e.printStackTrace();<br />
+        } catch (IOException e) {<br />
+            e.printStackTrace();<br />
+        }<br />
+        return "success";<br />
+    }</p>
+
+<p>}</p>
+
+<h2> <br />
+3.HttpClient实现</h2>
+
+<p>package com.taozhiye.controller;</p>
+
+<p>import org.apache.http.HttpEntity;<br />
+import org.apache.http.HttpResponse;<br />
+import org.apache.http.NameValuePair;<br />
+import org.apache.http.client.HttpClient;<br />
+import org.apache.http.client.entity.UrlEncodedFormEntity;<br />
+import org.apache.http.client.methods.HttpDelete;<br />
+import org.apache.http.client.methods.HttpGet;<br />
+import org.apache.http.client.methods.HttpPost;<br />
+import org.apache.http.client.methods.HttpPut;<br />
+import org.apache.http.impl.client.HttpClients;<br />
+import org.apache.http.message.BasicNameValuePair;<br />
+import org.springframework.beans.factory.annotation.Autowired;<br />
+import org.springframework.stereotype.Controller;<br />
+import org.springframework.web.bind.annotation.PathVariable;<br />
+import org.springframework.web.bind.annotation.RequestMapping;<br />
+import org.springframework.web.bind.annotation.RequestMethod;<br />
+import org.springframework.web.bind.annotation.ResponseBody;</p>
+
+<p>import com.fasterxml.jackson.databind.ObjectMapper;<br />
+import com.taozhiye.entity.User;<br />
+import com.taozhiye.service.UserService;</p>
+
+<p>import java.io.BufferedReader;<br />
+import java.io.IOException;<br />
+import java.io.InputStreamReader;<br />
+import java.io.OutputStream;<br />
+import java.net.HttpURLConnection;<br />
+import java.net.MalformedURLException;<br />
+import java.net.URL;<br />
+import java.net.URLEncoder;<br />
+import java.util.ArrayList;<br />
+import java.util.List;</p>
+
+<p>@Controller<br />
+public class RestfulAction {<br />
+    <br />
+    @Autowired<br />
+    private UserService userService;</p>
+
+<p>    // 修改<br />
+    @RequestMapping(value = "put/{param}", method = RequestMethod.PUT)<br />
+    public @ResponseBody String put(@PathVariable String param) {<br />
+        return "put:" + param;<br />
+    }</p>
+
+<p>    // 新增<br />
+    @RequestMapping(value = "post/{param}", method = RequestMethod.POST)<br />
+    public @ResponseBody User post(@PathVariable String param,String id,String name) {<br />
+        User u = new User();<br />
+        System.out.println(id);<br />
+        System.out.println(name);<br />
+        u.setName(id);<br />
+        u.setPassword(name);<br />
+        u.setEmail(id);<br />
+        u.setUsername(name);<br />
+        return u;<br />
+    }<br />
+    </p>
+
+<p>    // 删除<br />
+    @RequestMapping(value = "delete/{param}", method = RequestMethod.DELETE)<br />
+    public @ResponseBody String delete(@PathVariable String param) {<br />
+        return "delete:" + param;<br />
+    }</p>
+
+<p>    // 查找<br />
+    @RequestMapping(value = "get/{param}", method = RequestMethod.GET)<br />
+    public @ResponseBody User get(@PathVariable String param) {<br />
+        User u = new User();<br />
+        u.setName(param);<br />
+        u.setPassword(param);<br />
+        u.setEmail(param);<br />
+        u.setUsername("爱爱啊");<br />
+        return u;<br />
+    }</p>
+
+<p>    <br />
+    <br />
+    @RequestMapping(value = "dealCon2/{param}")<br />
+    public @ResponseBody User dealCon2(@PathVariable String param) {<br />
+        User user = null;<br />
+        try {<br />
+            HttpClient client = HttpClients.createDefault();<br />
+            if("get".equals(param)){<br />
+                HttpGet request = new HttpGet("http://localhost:8080/tao-manager-web/get/"<br />
+                        +"啊啊啊");<br />
+                request.setHeader("Accept", "application/json");<br />
+                HttpResponse response = client.execute(request);<br />
+                HttpEntity entity = response.getEntity();<br />
+                ObjectMapper mapper = new ObjectMapper();<br />
+                user = mapper.readValue(entity.getContent(), User.class);<br />
+            }else if("post".equals(param)){<br />
+                HttpPost request2 = new HttpPost("http://localhost:8080/tao-manager-web/post/xxx");<br />
+                List<NameValuePair> nvps = new ArrayList<NameValuePair>();  <br />
+                nvps.add(new BasicNameValuePair("id", "啊啊啊"));  <br />
+                nvps.add(new BasicNameValuePair("name", "secret"));<br />
+                UrlEncodedFormEntity formEntity = new UrlEncodedFormEntity(nvps, "GBK");<br />
+                request2.setEntity(formEntity);<br />
+                HttpResponse response2 = client.execute(request2);<br />
+                HttpEntity entity = response2.getEntity();<br />
+                ObjectMapper mapper = new ObjectMapper();<br />
+                user = mapper.readValue(entity.getContent(), User.class);<br />
+            }else if("delete".equals(param)){<br />
+                <br />
+            }else if("put".equals(param)){<br />
+                <br />
+            }<br />
+        } catch (Exception e) {<br />
+            e.printStackTrace();<br />
+        }<br />
+        return user;<br />
+    }<br />
+    <br />
+    <br />
+}</p>
+
+<h2> <br />
+4.Spring的RestTemplate</h2>
+
+<p>springmvc.xml增加</p>
+
+<p><!-- 配置RestTemplate --><br />
+<!--Http client Factory --><br />
+<bean id="httpClientFactory"<br />
+    class="org.springframework.http.client.SimpleClientHttpRequestFactory"><br />
+    <property name="connectTimeout" value="10000" /><br />
+    <property name="readTimeout" value="10000" /><br />
+</bean><br />
+<!--RestTemplate --><br />
+<bean id="restTemplate" class="org.springframework.web.client.RestTemplate"><br />
+    <constructor-arg ref="httpClientFactory" /><br />
+</bean></p>
+
+<p>controller</p>
+
+<p>@Controller<br />
+public class RestTemplateAction {</p>
+
+<p>    @Autowired<br />
+    private RestTemplate template;</p>
+
+<p>    @RequestMapping("RestTem")<br />
+    public @ResponseBody User RestTem(String method) {<br />
+        User user = null;<br />
+        //查找<br />
+        if ("get".equals(method)) {<br />
+            user = template.getForObject(<br />
+                    "http://localhost:8080/tao-manager-web/get/{id}",<br />
+                    User.class, "呜呜呜呜");<br />
+            <br />
+            //getForEntity与getForObject的区别是可以获取返回值和状态、头等信息<br />
+            ResponseEntity<User> re = template.<br />
+                    getForEntity("http://localhost:8080/tao-manager-web/get/{id}",<br />
+                    User.class, "呜呜呜呜");<br />
+            System.out.println(re.getStatusCode());<br />
+            System.out.println(re.getBody().getUsername());<br />
+            <br />
+        //新增<br />
+        } else if ("post".equals(method)) {<br />
+            HttpHeaders headers = new HttpHeaders();<br />
+            headers.add("X-Auth-Token", UUID.randomUUID().toString());<br />
+            MultiValueMap<String, String> postParameters = new LinkedMultiValueMap<String, String>();<br />
+            postParameters.add("id", "啊啊啊");<br />
+            postParameters.add("name", "部版本");<br />
+            HttpEntity<MultiValueMap<String, String>> requestEntity = new HttpEntity<MultiValueMap<String, String>>(<br />
+                    postParameters, headers);<br />
+            user = template.postForObject(<br />
+                    "http://localhost:8080/tao-manager-web/post/aaa", requestEntity,<br />
+                    User.class);<br />
+        //删除<br />
+        } else if ("delete".equals(method)) {<br />
+            template.delete("http://localhost:8080/tao-manager-web/delete/{id}","aaa");<br />
+        //修改<br />
+        } else if ("put".equals(method)) {<br />
+            template.put("http://localhost:8080/tao-manager-web/put/{id}",null,"bbb");<br />
+        }<br />
+        return user;</p>
+
+<p>    }<br />
+}</p>

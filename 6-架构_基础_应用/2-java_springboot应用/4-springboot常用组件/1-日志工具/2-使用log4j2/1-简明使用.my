@@ -1,0 +1,495 @@
+<h1>Log4j2 简明教程</h1>
+
+<h2>一、概述</h2>
+
+<p>log4j2官方文档内容非常多，要一次性了解全部是不可能的。正确的步骤应当是先了解最常见的配置，当发现原有知识无法解决问题，再重新查看文档看有没有合适的配置。<br />
+下面将从文件结构入手，再到简单的实例，从实例入手分析常见的配置的用途，其中涉及其中包括Appenders, Filters, Layout, Lookups的知识，最后根据学习。</p>
+
+<h3>log4j2.xml文件结构</h3>
+
+<p><?xml version="1.0" encoding="UTF-8"?>;<br />
+<Configuration><br />
+  <Properties><br />
+    <Property name="name1">value</property><br />
+    <Property name="name2" value="value2"/><br />
+  </Properties><br />
+  <Filter type="type" ... /><br />
+  <Appenders><br />
+    <Appender type="type" name="name"><br />
+      <Filter type="type" ... /><br />
+    </Appender><br />
+    ...<br />
+  </Appenders><br />
+  <Loggers><br />
+    <Logger name="name1"><br />
+      <Filter type="type" ... /><br />
+    </Logger><br />
+    ...<br />
+    <Root level="level"><br />
+      <AppenderRef ref="name"/><br />
+    </Root><br />
+  </Loggers><br />
+</Configuration></p>
+
+<h3>下面是一个比较完整的例子：</h3>
+
+<p><?xml version="1.0" encoding="UTF-8"?><br />
+<!-- 设置log4j2的自身log级别为warn --><br />
+<!-- OFF > FATAL > ERROR > WARN > INFO > DEBUG > TRACE > ALL --><br />
+<configuration status="WARN" monitorInterval="30"><br />
+    <appenders><br />
+        <console name="Console" target="SYSTEM_OUT"><br />
+            <PatternLayout pattern="[%d{HH:mm:ss:SSS}] [%p] - %l - %m%n"/><br />
+        </console><br />
+ <br />
+        <RollingFile name="RollingFileInfo" fileName="${sys:user.home}/logs/info.log"<br />
+                     filePattern="${sys:user.home}/logs/$${date:yyyy-MM}/info-%d{yyyy-MM-dd}-%i.log"><br />
+            <!--控制台只输出level及以上级别的信息（onMatch），其他的直接拒绝（onMismatch）-->        <br />
+            <Filters><br />
+                <ThresholdFilter level="INFO"/><br />
+                <ThresholdFilter level="WARN" onMatch="DENY" onMismatch="NEUTRAL"/><br />
+            </Filters><br />
+            <PatternLayout pattern="[%d{HH:mm:ss:SSS}] [%p] - %l - %m%n"/><br />
+            <Policies><br />
+                <TimeBasedTriggeringPolicy/><br />
+                <SizeBasedTriggeringPolicy size="100 MB"/><br />
+            </Policies><br />
+        </RollingFile><br />
+ <br />
+        <RollingFile name="RollingFileWarn" fileName="${sys:user.home}/logs/warn.log"<br />
+                     filePattern="${sys:user.home}/logs/$${date:yyyy-MM}/warn-%d{yyyy-MM-dd}-%i.log"><br />
+            <Filters><br />
+                <ThresholdFilter level="WARN"/><br />
+                <ThresholdFilter level="ERROR" onMatch="DENY" onMismatch="NEUTRAL"/><br />
+            </Filters><br />
+            <PatternLayout pattern="[%d{HH:mm:ss:SSS}] [%p] - %l - %m%n"/><br />
+            <Policies><br />
+                <TimeBasedTriggeringPolicy/><br />
+                <SizeBasedTriggeringPolicy size="100 MB"/><br />
+            </Policies><br />
+        </RollingFile><br />
+ <br />
+        <RollingFile name="RollingFileError" fileName="${sys:user.home}/logs/error.log"<br />
+                     filePattern="${sys:user.home}/logs/$${date:yyyy-MM}/error-%d{yyyy-MM-dd}-%i.log"><br />
+            <ThresholdFilter level="ERROR"/><br />
+            <PatternLayout pattern="[%d{HH:mm:ss:SSS}] [%p] - %l - %m%n"/><br />
+            <Policies><br />
+                <TimeBasedTriggeringPolicy/><br />
+                <SizeBasedTriggeringPolicy size="100 MB"/><br />
+            </Policies><br />
+        </RollingFile><br />
+ <br />
+    </appenders><br />
+ <br />
+    <loggers><br />
+        <!--过滤掉spring和mybatis的一些无用的DEBUG信息--><br />
+        <logger name="org.springframework" level="INFO"></logger><br />
+        <logger name="org.mybatis" level="INFO"></logger><br />
+        <root level="all"><br />
+            <appender-ref ref="Console"/><br />
+            <appender-ref ref="RollingFileInfo"/><br />
+            <appender-ref ref="RollingFileWarn"/><br />
+            <appender-ref ref="RollingFileError"/><br />
+        </root><br />
+    </loggers><br />
+ <br />
+</configuration></p>
+
+<p>log4j2有默认的配置，如果要替换配置，只需要在classpath根目录下放置log4j2.xml。<br />
+log4j 2.0与以往的1.x有一个明显的不同，其配置文件只能采用.xml, .json或者 .jsn。在默认情况下，系统选择configuration文件的优先级如下：（classpath为src文件夹）</p>
+
+<ul>
+<li>classpath下名为 log4j-test.json 或者log4j-test.jsn文件</li>
+<li>classpath下名为 log4j2-test.xml</li>
+<li>classpath下名为 log4j.json 或者log4j.jsn文件</li>
+<li>classpath下名为 log4j2.xml</li>
+</ul>
+
+<p>如果本地要测试，可以把log4j2-test.xml放到classpath，而正式环境使用log4j2.xml，则在打包部署的时候不要打包log4j2-test.xml即可。</p>
+
+<h3>下面是其缺省配置：</h3>
+
+<p><?xml version="1.0" encoding="UTF-8"?><br />
+<Configuration status="WARN"><br />
+  <Appenders><br />
+    <Console name="Console" target="SYSTEM_OUT"><br />
+      <strong><PatternLayout pattern="%d{HH:mm:ss.SSS} [%t] %-5level %logger{36} - %msg%n"/></strong><br />
+    </Console><br />
+  </Appenders><br />
+  <Loggers><br />
+    <Root level="error"><br />
+      <strong><AppenderRef ref="Console"/></strong><br />
+    </Root><br />
+  </Loggers><br />
+</Configuration></p>
+
+<p>下面将对上面的配置文件进行一一讲解。</p>
+
+<h3>关于日志level:</h3>
+
+<p>    共有8个级别，按照从低到高为：All < Trace < Debug < Info < Warn < Error < Fatal < OFF.<br />
+    All:最低等级的，用于打开所有日志记录.<br />
+    Trace:是追踪，就是程序推进以下，你就可以写个trace输出，所以trace应该会特别多，不过没关系，我们可以设置最低日志级别不让他输出.<br />
+    Debug:指出细粒度信息事件对调试应用程序是非常有帮助的.<br />
+    Info:消息在粗粒度级别上突出强调应用程序的运行过程.<br />
+    Warn:输出警告及warn以下级别的日志.<br />
+    Error:输出错误信息日志.<br />
+    Fatal:输出每个严重的错误事件将会导致应用程序的退出的日志.<br />
+    OFF:最高等级的，用于关闭所有日志记录.</p>
+
+<p><strong>程序会打印高于或等于所设置级别的日志，设置的日志等级越高，打印出来的日志就越少</strong>。</p>
+
+<h2>二、示例Java代码</h2>
+
+<p>package com.foo;<br />
+// Import log4j classes.<br />
+import org.apache.logging.log4j.Logger;<br />
+import org.apache.logging.log4j.LogManager;<br />
+ <br />
+public class MyApp {<br />
+ <br />
+    // Define a static logger variable so that it references the<br />
+    // Logger instance named "MyApp".<br />
+    private static final Logger logger = LogManager.getLogger(MyApp.class);<br />
+ <br />
+    public static void main(final String... args) {<br />
+ <br />
+        // Set up a simple configuration that logs on the console.<br />
+ <br />
+        logger.trace("Entering application.");<br />
+        Bar bar = new Bar();<br />
+        if (!bar.doIt()) {<br />
+            logger.error("Didn't do it.");<br />
+        }<br />
+        logger.trace("Exiting application.");<br />
+    }<br />
+}<br />
+ <br />
+package com.foo;<br />
+ <br />
+ <br />
+import org.apache.logging.log4j.LogManager;<br />
+import org.apache.logging.log4j.Logger;<br />
+ <br />
+public class Bar {<br />
+ <br />
+  static final Logger logger = LogManager.getLogger(Bar.class.getName());<br />
+ <br />
+  public boolean doIt() {<br />
+    logger.entry();<br />
+    logger.error("Did it again!");<br />
+    return logger.exit(false);<br />
+  }<br />
+}</p>
+
+<p>如果使用缺省配置输出如下：</p>
+
+<p>17:13:01.540 [main] ERROR com.foo.Bar - Did it again!<br />
+17:13:01.540 [main] ERROR MyApp - Didn't do it.</p>
+
+<p>如果我们希望除了com.foo.Bar类下输出TRACE以上到控制台外，其他停止TRACE的输出到控制台，只输出ERROR以上的日志。可以如下配置：</p>
+
+<p><Loggers><br />
+  <Logger name="com.foo.Bar" level="TRACE"/><br />
+  <Root level="ERROR"><br />
+    <AppenderRef ref="STDOUT"><br />
+  </Root><br />
+</Loggers></p>
+
+<p>因为com.foo.Bar没有自己的Appender，所以会使用ROOT的Appender，如果自己也配置了在控制台打印，就要注意可加性：如下配置，会ERROR以上的会打印两次</p>
+
+<p><?xml version="1.0" encoding="UTF-8"?><br />
+<Configuration status="WARN"><br />
+  <Appenders><br />
+    <Console name="Console" target="SYSTEM_OUT"><br />
+      <PatternLayout pattern="%d{HH:mm:ss.SSS} [%t] %-5level %logger{36} - %msg%n"/><br />
+    </Console><br />
+  </Appenders><br />
+  <Loggers><br />
+    <Logger name="com.foo.Bar" level="trace"><br />
+      <AppenderRef ref="Console"/><br />
+    </Logger><br />
+    <Root level="error"><br />
+      <AppenderRef ref="Console"/><br />
+    </Root><br />
+  </Loggers><br />
+</Configuration></p>
+
+<p>结果如下</p>
+
+<p>14:11:27.103 [main] TRACE com.foo.Bar - Enter<br />
+14:11:27.103 [main] TRACE com.foo.Bar - Enter<br />
+14:11:27.106 [main] ERROR com.foo.Bar - Did it again!<br />
+14:11:27.106 [main] ERROR com.foo.Bar - Did it again!<br />
+14:11:27.107 [main] TRACE com.foo.Bar - Exit with(false)<br />
+14:11:27.107 [main] TRACE com.foo.Bar - Exit with(false)<br />
+14:11:27.107 [main] ERROR com.foo.MyApp - Didn't do it.</p>
+
+<p>如果我们确实有这种需求(不想遵循父类的Appender)，可以加上<code>additivity="false"</code>参数。如下配置，com.foo.Bar的trace以上日志将保存到文件中，并且不会打印到控制台。</p>
+
+<p><Configuration status="WARN"><br />
+  <Appenders><br />
+    <Console name="Console" target="SYSTEM_OUT"><br />
+      <PatternLayout pattern="%d{HH:mm:ss.SSS} [%t] %-5level %logger{36} - %msg%n"/><br />
+    </Console><br />
+    <RollingFile name="RollingFile" fileName="${sys:user.home}/logs/trace.log"<br />
+                     filePattern="${sys:user.home}/logs/$${date:yyyy-MM}/warn-%d{yyyy-MM-dd}-%i.log"><br />
+           ...<br />
+    </RollingFile><br />
+  </Appenders><br />
+  <Loggers><br />
+    <Logger name="com.foo.Bar" level="trace" additivity="false"><br />
+      <AppenderRef ref="RollingFile"/><br />
+    </Logger><br />
+    <Root level="error"><br />
+      <AppenderRef ref="Console"/><br />
+    </Root><br />
+  </Loggers><br />
+</Configuration></p>
+
+<p>log4j2支持自动重新配置,如果配置了monitorInterval，那么log4j2每隔一段时间就会检查一遍这个文件是否修改。最小是5s</p>
+
+<p><?xml version="1.0" encoding="UTF-8"?><br />
+<Configuration monitorInterval="30"><br />
+...<br />
+</Configuration></p>
+
+<h2>三、Appenders</h2>
+
+<h3>ConsoleAppender</h3>
+
+<p>将使用 System.out 或 System.err输出到控制台。</p>
+
+<p>可以有如下参数</p>
+
+<ul>
+<li>name：Appender的名字</li>
+<li>target：SYSTEM_OUT 或 SYSTEM_ERR，默认是SYSTEM_OUT</li>
+<li>layout：如何格式化，如果没有默认是%m%n</li>
+</ul>
+
+<p>典型的ConsoleAppender如下</p>
+
+<p><?xml version="1.0" encoding="UTF-8"?><br />
+<Configuration status="warn" name="MyApp" packages=""><br />
+  <Appenders><br />
+    <Console name="STDOUT" target="SYSTEM_OUT"><br />
+      <PatternLayout pattern="%m%n"/><br />
+    </Console><br />
+  </Appenders><br />
+  <Loggers><br />
+    <Root level="error"><br />
+      <AppenderRef ref="STDOUT"/><br />
+    </Root><br />
+  </Loggers><br />
+</Configuration></p>
+
+<h3>RollingFileAppender</h3>
+
+<p>顾名思义，日志文件回滚，也就是删除最旧的日志文件，默认是3个文件。可以通过DefaultRolloverStrategy设置max参数为多个</p>
+
+<p>例子如下:</p>
+
+<p><Appenders><br />
+    <RollingFile name="RollingFile" fileName="logs/app.log" filePattern="logs/$${date:yyyy-MM}/app-%d{MM-dd-yyyy}-%i.log.gz"><br />
+      <PatternLayout><br />
+        <Pattern>%d %p %c{1.} [%t] %m%n</Pattern><br />
+      </PatternLayout><br />
+      <Policies><br />
+        <TimeBasedTriggeringPolicy /><br />
+        <SizeBasedTriggeringPolicy size="250 MB"/><br />
+      </Policies><br />
+      <DefaultRolloverStrategy max="20"/><br />
+    </RollingFile><br />
+  </Appenders></p>
+
+<p>现在说说TimeBasedTriggeringPolicy和SizeBasedTriggeringPolicy的作用。<br />
+第一个是基于时间的rollover，第二个是基于大小的rollover。第二个很容易理解，如果大小大于某个阈值，上面是50MB的时候就会滚动。</p>
+
+<p>TimeBasedTriggeringPolicy中有其中一个参数是interval，表示多久滚动一次。默认是1 hour。modulate=true用来调整时间：比如现在是早上3am，interval是4，那么第一次滚动是在4am，接着是8am，12am...而不是7am</p>
+
+<h2>四、Layouts</h2>
+
+<p>这里只描述最常见的PatternLayout！更多看官方文档<a href="http://logging.apache.org/log4j/2.x/manual/layouts.html" target="_blank">Layouts</a></p>
+
+<p><RollingFile name="RollingFileError" fileName="${sys:user.home}/logs/error.log" filePattern="${sys:user.home}/logs/$${date:yyyy-MM}/error-%d{yyyy-MM-dd}-%i.log"><br />
+    <ThresholdFilter level="ERROR"/><br />
+    <PatternLayout pattern="[%d{HH:mm:ss:SSS}] [%p] - %l - %m%n"/><br />
+    <Policies><br />
+        <TimeBasedTriggeringPolicy/><br />
+        <SizeBasedTriggeringPolicy size="50 MB"/><br />
+    </Policies><br />
+    <DefaultRolloverStrategy max="20"/><br />
+</RollingFile></p>
+
+<p>上面的%是什么含义，还有哪些呢？其实最主要的参数还是%d, %p, %l, %m, %n, %X。下面的图是摘取网上的。</p>
+
+<p>%X用来获取MDC记录，这些记录从哪来的？我们可以使用org.apache.logging.log4j.ThreadContext将需要记录的值put进去。（我发现slf的MDC.java的put方法对log4j2不可用，因为底层依赖的是log4j1）</p>
+
+<p>package com.bensonlin.service.web.interceptor;<br />
+ <br />
+import javax.servlet.http.HttpServletRequest;<br />
+import javax.servlet.http.HttpServletResponse;<br />
+ <br />
+import org.apache.logging.log4j.ThreadContext;<br />
+import org.springframework.web.servlet.HandlerInterceptor;<br />
+import org.springframework.web.servlet.ModelAndView;<br />
+ <br />
+public class MDCInterceptor implements HandlerInterceptor {<br />
+ <br />
+    public final static String USER_KEY            = "user_id";<br />
+    public final static String REQUEST_REQUEST_URI = "request_uri";<br />
+ <br />
+    public boolean preHandle(HttpServletRequest httpServletRequest, HttpServletResponse httpServletResponse, Object arg2) throws Exception {<br />
+        ThreadContext.put(REQUEST_REQUEST_URI, httpServletRequest.getRequestURI());<br />
+        return true;<br />
+    }<br />
+ <br />
+    public void postHandle(HttpServletRequest httpServletRequest, HttpServletResponse httpServletResponse, Object arg2, ModelAndView modelAndView) throws Exception {<br />
+    }<br />
+ <br />
+    public void afterCompletion(HttpServletRequest httpServletRequest, HttpServletResponse httpServletResponse, Object arg2, Exception exception) throws Exception {<br />
+        ThreadContext.remove(USER_KEY);<br />
+        ThreadContext.remove(REQUEST_REQUEST_URI);<br />
+    }<br />
+ <br />
+    public static void setUserKeyForMDC(String userId) {<br />
+        ThreadContext.put(USER_KEY, userId);<br />
+    }<br />
+}</p>
+
+<p>xml中使用%X{aaa}取出来：</p>
+
+<p><console name="Console" target="SYSTEM_OUT"><br />
+    <PatternLayout pattern="%X{user_id} %X{request_uri} [%d{HH:mm:ss:SSS}] [%p] - %l - %m%n"/><br />
+</console></p>
+
+<p>对应ThreadContext的文档在<a href="https://logging.apache.org/log4j/2.x/manual/thread-context.html" target="_blank">这里</a></p>
+
+<h2>五、Filters</h2>
+
+<p>Filters决定日志事件能否被输出。过滤条件有三个值：ACCEPT(接受), DENY(拒绝) or NEUTRAL(中立).</p>
+
+<p>ACCEP和DENY比较好理解就是接受和拒绝的意思，在使用单个过滤器的时候，一般就是使用这两个值。但是在组合过滤器中，如果用接受ACCEPT的话，日志信息就会直接写入日志文件,后续的过滤器不再进行过滤。所以，在组合过滤器中，接受使用NEUTRAL（中立），被第一个过滤器接受的日志信息，会继续用后面的过滤器进行过滤，只有符合所有过滤器条件的日志信息，才会被最终写入日志文件。</p>
+
+<h3>ThresholdFilter</h3>
+
+<p>有几个参数：</p>
+
+<ul>
+<li>level：将被过滤的级别。</li>
+<li>onMatch:默认值是NEUTRAL</li>
+<li>onMismatch：默认是DENY</li>
+</ul>
+
+<p>如果LogEvent 中的 Log Level 大于 ThresholdFilter 中配置的 Log Level，那么返回 onMatch 的值， 否则返回 onMismatch 的值，例如 : 如果ThresholdFilter 配置的 Log Level 是 ERROR ， LogEvent 的Log Level 是 DEBUG。 那么 onMismatch 的值将被返回， 因为 ERROR 小于DEBUG。如果是Accept，将自己被接受，而不经过下一个过滤器</p>
+
+<p>下面的例子可以这样理解：如果是INFO级别及其以上，将经过通过第一个过滤，进入第二个，否则是onMismatch：拒绝进入。对于第二个，如果是大于等于WARN(WARN/ERROR/ERROR)，那么将返回onMatch，也就是拒绝，如果是其他情况(也就是INFO)，将是中立情况，因为后面没有其他过滤器，则被接受。最后的结果就只剩下INFO级别的日志。也就符合了RollingFileInfo只记录Info级别的规则。</p>
+
+<p><RollingFile name="RollingFileInfo" fileName="${sys:user.home}/logs/info.log" filePattern="${sys:user.home}/logs/$${date:yyyy-MM}/info-%d{yyyy-MM-dd}-%i.log"><br />
+    <!--控制台只输出level及以上级别的信息（onMatch），其他的直接拒绝（onMismatch）-->        <br />
+    <Filters><br />
+        <ThresholdFilter level="INFO"/><br />
+        <ThresholdFilter level="WARN" onMatch="DENY" onMismatch="NEUTRAL"/><br />
+    </Filters><br />
+    <PatternLayout pattern="[%d{HH:mm:ss:SSS}] [%p] - %l - %m%n"/><br />
+    <Policies><br />
+        <TimeBasedTriggeringPolicy interval="24" modulate="true"/><br />
+        <SizeBasedTriggeringPolicy size="50 MB"/><br />
+    </Policies><br />
+    <DefaultRolloverStrategy max="20"/><br />
+</RollingFile></p>
+
+<h2>六、Lookups</h2>
+
+<p>提供另外一种方式添加某些特殊的值到日志中。</p>
+
+<h3>Date Lookup</h3>
+
+<p>与其他lookup不同，它不是通过key去查找值，而是通过SimpleDateFormat验证格式是否有效，然后记录当前时间</p>
+
+<p><RollingFile name="Rolling-${map:type}" fileName="${filename}" filePattern="target/rolling1/test1-$${date:MM-dd-yyyy}.%i.log.gz"><br />
+  <PatternLayout><br />
+    <pattern>%d %p %c{1.} [%t] %m%n</pattern><br />
+  </PatternLayout><br />
+  <SizeBasedTriggeringPolicy size="500" /><br />
+</RollingFile></p>
+
+<h3>Context Map Lookup: 如记录loginId</h3>
+
+<p><File name="Application" fileName="application.log"><br />
+  <PatternLayout><br />
+    <pattern>%d %p %c{1.} [%t] $${ctx:loginId} %m%n</pattern><br />
+  </PatternLayout><br />
+</File></p>
+
+<p>这个的结果和前面的MDC是一样的，即 %X{loginId}</p>
+
+<h3>Environment Lookup：记录系统环境变量</h3>
+
+<p>比如可以获取如<code>/etc/profile</code>中的变量值</p>
+
+<p><File name="Application" fileName="application.log"><br />
+  <PatternLayout><br />
+    <pattern>%d %p %c{1.} [%t] $${env:USER} %m%n</pattern><br />
+  </PatternLayout><br />
+</File></p>
+
+<h3>System Properties Lookup</h3>
+
+<p>可以获取Java中的系统属性值。</p>
+
+<p><Appenders><br />
+  <File name="ApplicationLog" fileName="${sys:logPath}/app.log"/><br />
+</Appenders></p>
+
+<p>和系统属性值有什么区别呢？其实就是System.getProperties();和System.getenv();的区别。下面是一个小例子。</p>
+
+<p>package com.bensonlin.service.common;<br />
+ <br />
+import java.util.Iterator;<br />
+import java.util.Map;<br />
+import java.util.Map.Entry;<br />
+import java.util.Properties;<br />
+ <br />
+public class Main {<br />
+ <br />
+    public static void main(String[] args) {<br />
+ <br />
+        Properties properties = System.getProperties();<br />
+        Iterator i = properties.entrySet().iterator();<br />
+        while (i.hasNext()) {<br />
+            Map.Entry entry = (Map.Entry) i.next();<br />
+            Object key = entry.getKey();<br />
+            Object value = entry.getValue();<br />
+            System.out.println(key + "=" + value);<br />
+        }<br />
+ <br />
+        System.out.println("===================");<br />
+        Map map = System.getenv();<br />
+        Iterator it = map.entrySet().iterator();<br />
+        while (it.hasNext()) {<br />
+            Entry entry = (Entry) it.next();<br />
+            System.out.print(entry.getKey() + "=");<br />
+            System.out.println(entry.getValue());<br />
+        }<br />
+    }<br />
+}</p>
+
+<p>输出（摘取部分）：</p>
+
+<p>java.runtime.name=Java(TM) SE Runtime Environment<br />
+sun.boot.library.path=C:\Program Files\Java\jdk1.8.0_25\jre\bin<br />
+java.vm.version=25.25-b02<br />
+java.vm.vendor=Oracle Corporation<br />
+java.vendor.url=http://java.oracle.com/<br />
+path.separator=;<br />
+...<br />
+===================<br />
+JAVA_HOME=C:\Program Files\Java\jdk1.8.0_25<br />
+TEMP=D:\Temp<br />
+ProgramFiles=C:\Program Files</p>
+
+<p>可以看到其实Environment是获取环境变量，而System Properties获取的更多是与Java相关的值</p>
+
+<p>转载注明地址：http://blog.bensonlin.me/post/log4j2-tutorial</p>

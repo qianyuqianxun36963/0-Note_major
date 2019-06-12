@@ -1,0 +1,116 @@
+<h1>MongoDB操作-备份和恢复</h1>
+
+<p>Mongodb数据库操作-备份 恢复 导出 导入</p>
+
+<p>mongodb数据备份和恢复主要分为二种：一种是针对库的mongodump和mongorestore，一种是针对库中表的mongoexport和mongoimport。</p>
+
+<h2>一、 mongodump备份数据库</h2>
+
+<p>1. 常用命令格式</p>
+
+<p>mongodump -h IP --port 端口 -u 用户名 -p 密码 -d 数据库 -c 表 -o 文件存放路径</p>
+
+<p>参数说明：<br />
+-h 指明数据库宿主机的IP<br />
+--port 指明数据库的端口 <br />
+-u 指明数据库的用户名<br />
+-p 指明数据库的密码<br />
+-d 指明数据库的名字<br />
+-c 指明collection的名字<br />
+-o 指明到要导出的文件名<br />
+-q 指明导出数据的过滤条件</p>
+
+<p><br />
+2. 导出所有数据库</p>
+
+<p>mongodump -o /data/mongobak/</p>
+
+<p>3. 导出指定数据库</p>
+
+<p>mongodump -d SERVERLOG -o /data/mongobak/SERVERLOG.bak/</p>
+
+<h2>二、 mongorestore恢复数据库</h2>
+
+<p>1. 常用命令格式</p>
+
+<p>mongorestore -h IP --port 端口 -u 用户名 -p 密码 -d 数据库 --drop 文件存在路径</p>
+
+<p>--drop：先删除所有的记录，然后恢复.</p>
+
+<p>2. 恢复所有数据库到mongodb中</p>
+
+<p>mongorestore /data/mongobak/ #所有库的备份路径</p>
+
+<p>3. 恢复指定的数据库</p>
+
+<p>mongorestore -d SERVERLOG /data/mongobak/SERVERLOG.bak/SERVERLOG/ #SERVERLOG这个数据库的备份路径</p>
+
+<p>mongorestore -d SERVERLOG_new /data/mongobak/SERVERLOG.bak/SERVERLOG/ #将SERVERLOG备份数据还原到SERVERLOG_new数据库中</p>
+
+<h2>三、 mongoexport导出（表或者表中部分字段）</h2>
+
+<p>1. 常用命令格式</p>
+
+<p>mongoexport -h IP --port 端口 -u 用户名 -p 密码 -d 数据库 -c 表名 -f 字段 -q 条件导出 --csv -o 文件名</p>
+
+<p>参数重点说明：<br />
+-f 导出指定字段，以逗号分割，-f uid,name,age导出uid,name,age这三个字段<br />
+-q 可以根据查询条件导出，-q '{ "uid" : "100" }' 导出uid为100的数据<br />
+--csv 表示导出的文件格式为csv的。这个比较有用，因为大部分的关系型数据库都是支持csv，在这里有共同点</p>
+
+<p>2. 导出整张表</p>
+
+<p>mongoexport -d SERVERLOG -c users -o /data/mongobak/SERVERLOG.bak/users.dat <br />
+connected to: 127.0.0.1 <br />
+exported 4 records</p>
+
+<p>3. 导出表中部分字段</p>
+
+<p>mongoexport -d SERVERLOG -c users --csv -f uid,name,age -o /data/mongobak/SERVERLOG.bak/users.csv <br />
+connected to: 127.0.0.1 <br />
+exported 4 records</p>
+
+<p>4. 根据条件导出数据</p>
+
+<p>mongoexport -d SERVERLOG -c users -q '{uid:{$gt:1}}' -o /data/mongobak/SERVERLOG.bak/users.json <br />
+connected to: 127.0.0.1 <br />
+exported 3 records</p>
+
+<h2>四、 mongoimport导入（表或者表中部分字段）</h2>
+
+<p>1. 常用命令格式</p>
+
+<p>恢复整表导出的非csv文件<br />
+mongoimport -h IP --port 端口 -u 用户名 -p 密码 -d 数据库 -c 表名 --upsert --drop 文件名</p>
+
+<p>--upsert:插入或者更新现有数据</p>
+
+<p>恢复部分字段的导出文件<br />
+mongoimport -h IP --port 端口 -u 用户名 -p 密码 -d 数据库 -c 表名 --upsertFields 字段 --drop 文件名</p>
+
+<p>--upsertFields:更新部分的查询字段，必须为索引,以逗号分隔.</p>
+
+<p>恢复导出的csv文件<br />
+mongoimport -h IP --port 端口 -u 用户名 -p 密码 -d 数据库 -c 表名 --type 类型 --headerline --upsert --drop 文件名</p>
+
+<p>--type：导入的文件类型（默认json）</p>
+
+<p>2. 恢复导出的表数据</p>
+
+<p>mongoimport -d SERVERLOG -c users --upsert /data/mongobak/SERVERLOG.bak/users.dat <br />
+connected to: 127.0.0.1 <br />
+Tue Dec 3 08:26:52.852 imported 4 objects</p>
+
+<p>3. 部分字段的表数据导入</p>
+
+<p>mongoimport -d SERVERLOG -c users --upsertFields uid,name,age /data/mongobak/SERVERLOG.bak/users.dat<br />
+connected to: 127.0.0.1 <br />
+Tue Dec 3 08:31:15.179 imported 4 objects</p>
+
+<p>4. 恢复csv文件</p>
+
+<p>mongoimport -d SERVERLOG -c users --type csv --headerline --file /data/mongobak/SERVERLOG.bak/users.csv <br />
+connected to: 127.0.0.1 <br />
+Tue Dec 3 08:37:21.961 imported 4 objects</p>
+
+<p>--file:需要导入的文件</p>

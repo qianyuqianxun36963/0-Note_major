@@ -1,0 +1,492 @@
+<h1>SonarQube7.3安装和使用说明</h1>
+
+<h1>一 . SonarQube代码质量检查工具简介</h1>
+
+<p><strong>Sonar (SonarQube)是一个开源平台，用于管理源代码的质量.</strong></p>
+
+<p><strong>Sonar 不只是一个质量数据报告工具，更是代码质量管理平台。</strong></p>
+
+<p>支持Java, C#, C/C++, PL/SQL, Cobol, JavaScrip, Groovy 等等二十几种编程语言的代码质量管理与检测。 <br />
+Sonar可以从以下七个维度检测代码质量，而作为开发人员至少需要处理前5种代码质量问题。</p>
+
+<pre>
+<code>1. 不遵循代码标准
+sonar可以通过PMD,CheckStyle,Findbugs等等代码规则检测工具规范代码编写。
+2. 潜在的缺陷
+sonar可以通过PMD,CheckStyle,Findbugs等等代码规则检测工具检 测出潜在的缺陷。
+3. 糟糕的复杂度分布
+文件、类、方法等，如果复杂度过高将难以改变，这会使得开发人员 难以理解它们, 且如果没有自动化的单元测试，对于程序中的任何组件的改变都将可能导致需要全面的回归测试。
+4. 重复
+显然程序中包含大量复制粘贴的代码是质量低下的，sonar可以展示 源码中重复严重的地方。
+5. 注释不足或者过多
+没有注释将使代码可读性变差，特别是当不可避免地出现人员变动 时，程序的可读性将大幅下降 而过多的注释又会使得开发人员将精力过多地花费在阅读注释上，亦违背初衷。
+6. 缺乏单元测试
+sonar可以很方便地统计并展示单元测试覆盖率。
+7. 糟糕的设计
+通过sonar可以找出循环，展示包与包、类与类之间的相互依赖关系，可以检测自定义的架构规则 通过sonar可以管理第三方的jar包，可以利用LCOM4检测单个任务规则的应用情况， 检测藕合。
+
+通过以下介绍SonarQube的安装、使用说明。
+</code></pre>
+
+<h4>为什么要选择sonarQube?</h4>
+
+<pre>
+<code>个人使用之后认为 : sonarQube的优势如下(相比于阿里编码规约这种市面上常见类似软件):
+
+1. 更加优秀的图形化界面
+
+基本上通过界面就可以对自己项目的代码状况一目了然
+
+2. 可以查询出其它软件难以定位到的问题
+
+比如 : 可能导致空指针异常的问题 (对象在进行使用前没有加空的判断)
+可能导致内存泄漏的问题, 在try catch 块里面,直接使用e.printStackTrace()将堆栈信息打印到内存的
+可能导致的漏洞 : 成员变量使用public定义的
+还有诸如 : 流等未关闭或者是非正常关闭都能够检测出来!
+功能非常强大!!
+</code></pre>
+
+<h3>二. 安装：</h3>
+
+<h4>2.1 安装SonarQube web server</h4>
+
+<pre>
+<code>1. 首先确保安装了jdk1.8 +
+2. 到此链接 https://www.sonarqube.org/downloads/ 
+下载sonalqube(下载社区版,是开源的),
+我下载的是当前最新版本 7.3 
+并解压,解压完之后的目录如下 :
+</code></pre>
+
+<p><img alt="解压之后的目录" src="https://img-blog.csdn.net/20180827182510289?watermark/2/text/aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L3dlaXhpbl80MDg2MTcwNw==/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70" title="" /> <br />
+3. 到解压目录的bin\windows-x86-64(我的是64位的)目录下: <br />
+双击StartSonar.bat文件 启动SonarQube</p>
+
+<pre>
+<code>4. 到浏览器界面,输入 : http://localhost:9000 
+// 能够进入界面证明安装成功
+</code></pre>
+
+<h4>2.2 安装数据库</h4>
+
+<pre>
+<code>1. 版本要求:
+
+在conf目录下的sonar.properties文件下:
+有这样一行配置 : 
+#----- MySQL >=5.6 && < 8.0
+
+所以, mysql版本过高的话,要降级!! 比如说我... 用的就是8.0.11版本的
+
+附 : mysql 8.0.11 版本卸载
+1. 关闭mysql服务 
+net stop mysql
+2. 删除mysql
+sc delete mysql
+3. 删除mysql的目录文件, 我直接把mysql安装目录整个删除了
+4. 将mysql的环境变量清空
+
+然后在下载安装一个合适版本的即可
+
+2. 为sonarqube 创建一个数据库
+create database 数据库名; 
+
+3. 创建sonarqube用户并进行授权
+
+CREATE USER 'username'@'host' IDENTIFIED BY 'password'; // 创建用户并设置密码
+// username 为创建的用户名
+host为对应的主机地址,本地就是localhost
+password为设置的密码
+
+GRANT ALL ON *.* TO '用户名'@'localhost'; //对用户进行授权操作
+
+4. 修改SonarQube配置文件,添加Mysql相关配置
+sonar.jdbc.url=jdbc:mysql://localhost:3306/sonarqube?useUnicode=true&characterEncoding=utf8&rewriteBatchedStatements=true&useConfigs=maxPerformance&useSSL=false
+sonar.jdbc.username=用户名 // 刚刚创建的sonarQube用户
+sonar.jdbc.password=密码 // 创建用户对应的密码
+sonar.sorceEncoding=UTF-8 // 设置编码格式为UTF-8
+</code></pre>
+
+<h4>2.3 重新启动服务端</h4>
+
+<pre>
+<code>1. 退出 SonarQube 服务端
+在之前弹出的cmd窗口执行ctrl + c,
+弹出来的提示选择Y,退出SonarQube服务
+
+2. 双击StartSonar.bat文件, 重新启动SonarQube
+这次因为要进行数据库的初始化操作,所以需要的时间可能稍微久一点
+
+3. 启动成功后,浏览器输入 : http://localhost:9000 进入界面
+
+4. 登录 
+
+点击界面右上角的登录按钮, 进行登录 :
+初始的账户名 : admin
+初始的密码 : admin
+
+如上 , SonarQube的安装已经OK!
+
+附 : 一些关键配置的修改,如 主机地址,context,端口号等:
+通常情况下使用默认的配置即可!
+文件 /conf/sonar.properties
+#sonar.web.host=0.0.0.0 
+#sonar.web.context=
+#sonar.web.port=9000
+</code></pre>
+
+<h3>三. 使用</h3>
+
+<h4>3.1. 安装必要的插件 (最重要的是汉化包)</h4>
+
+<pre>
+<code>点击 导航栏的 config, 选择应用市场
+搜索 Chinese pack, 点击install进行安装
+
+安装成功后, 重启 SonarQube !
+
+如下图 : 进入到了很友好的中文界面!
+</code></pre>
+
+<p><img alt="中文界面!" src="https://img-blog.csdn.net/20180827182553968?watermark/2/text/aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L3dlaXhpbl80MDg2MTcwNw==/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70" style="height:448px; width:800px" title="" /></p>
+
+<h4>3.2. 开始分析项目代码源代码</h4>
+
+<pre>
+<code>我是使用maven的方式进行分析
+</code></pre>
+
+<h5>3.2.1 编辑maven 的settings.xml文件</h5>
+
+<pre>
+<code> 位置 $MAVEN_HOME/conf 
+或者是 ~/.m2 
+找到对应的位置添加以下配置代码：
+我的maven版本是3.5.4 对应的文件是settings.xml
+版本低一点的对应的文件可能是setting.xml
+</code></pre>
+
+<pre>
+<code><settings>
+<pluginGroups>
+<pluginGroup>org.sonarsource.scanner.maven</pluginGroup>
+</pluginGroups>
+<profiles>
+<profile>
+<id>sonar</id>
+<activation>
+<activeByDefault>true</activeByDefault>
+</activation>
+<properties>
+<!-- Optional URL to server. Default value is http://localhost:9000 -->
+<sonar.host.url>
+http://loaclhost:9000
+</sonar.host.url>
+</properties>
+</profile>
+</profiles>
+</settings></code></pre>
+
+<pre>
+<code>其中sonar.host.url 值就是 上文启动的sonar 服务器地址。
+</code></pre>
+
+<h5>3.2.2 对maven项目进行分析</h5>
+
+<pre>
+<code>到项目所在的文件路径下: 
+
+使用命令提示符或者是power shell执行 如下命令: 
+mvn org.sonarsource.scanner.maven:sonar-maven-plugin:3.2:sonar
+
+出现: BUILD SUCCESS 标识之后
+刷新界面查看 :
+</code></pre>
+
+<h4>3.3 配置分析参数</h4>
+
+<pre>
+<code>强制参数：
+
+1. Server
+sonar.host.url http://localhost:9000
+2. Project Configuration
+sonar.projectKey Maven <groupId>:<artifactId>
+sonar.sources Maven 默认的源码路径
+
+可以配置的参数：
+1. Project identity
+sonar.projectName 项目名称
+sonar.projectversion 项目版本
+
+2. Authentication
+sonar.login 分析该项目的用户名称
+sonar.password 分析该项目的用户密码
+</code></pre>
+
+<h4>3.4. 程序员用户使用说明</h4>
+
+<p>SonarQube Web管理者通过配置和设置以下参数值对项目源代码进行：</p>
+
+<p>复杂度、覆盖率、文档、重复、问题、可维护性、可靠性、安全性、大小等约束和规范。</p>
+
+<p>sonar中的质量阈管理以下内容。</p>
+
+<pre>
+<code> 复杂度
+复杂度
+复杂度/类
+复杂度/文件
+复杂度/方法
+覆盖率
+分支覆盖
+集成测试的新分支覆盖
+新代码的分支覆盖率
+覆盖率
+新集成测试覆盖
+新覆盖率
+集成测试分支覆盖
+集成测试覆盖
+集成测试覆盖行
+集成测试未覆盖分支
+集成测试未覆盖行
+代码覆盖率
+集成测试的新行覆盖
+新代码覆盖率
+代码行
+集成测试的新行覆盖
+覆盖的新代码
+总体分支覆盖率
+总体新分支覆盖率
+总体覆盖率
+总体新覆盖率
+总体代码覆盖率
+总体新代码覆盖率
+总体覆盖的新行数
+总体未覆盖分支
+总体未覆盖的新分支
+总体未覆盖代码
+总体未覆盖新行数
+单元测试忽略数
+未覆盖分支
+集成测试未覆盖的新分支
+未覆盖新分支
+未覆盖的代码
+集成测试未覆盖的行
+未覆盖的新代码
+单元测试持续时间
+单元测试错误数
+单元测试失败数
+单元测试成功 (%)
+单元测试数
+文档
+注释行
+注释 (%)
+公共API
+公共注释的API (%)
+公共未注释的API
+重复
+重复块
+重复文件
+重复行
+重复行(%)
+问题
+阻断违规
+确认问题
+严重违规
+误判问题
+提示违规
+违规
+主要违规
+次要违规
+新阻断违规
+新严重违规
+新提示违规
+新违规
+新主要违规
+新次要违规
+开启问题
+重开问题
+不修复的问题
+可维护性
+新代码的技术债务
+坏味道
+达到可维护性A级所需的工作
+新增坏味道
+技术债务
+技术债务比率
+新代码技术债务比率
+Management
+Burned budget
+Business value
+Team size
+可靠性
+Bugs
+新增Bugs
+可靠性修复工作
+新代码的可靠性修复工作
+安全性
+新增漏洞
+安全修复工作
+新代码的安全修复工作
+漏洞
+大小
+类
+目录
+文件
+方法
+生成的行数
+生成的代码行数
+行数
+代码行数
+项目
+语句</code></pre>
+
+<h4>3.5管理员使用手册</h4>
+
+<h5>3.5.1 管理员配置管理</h5>
+
+<p>配置管理内容有： <br />
+1. 配置 <br />
+2. 权限 <br />
+3. 项目 <br />
+4. 系统</p>
+
+<p><img alt="管理员配置管理管理项目" src="https://static.oschina.net/uploads/img/201702/22111334_E9f9.png" title="管理员配置管理管理项目" /></p>
+
+<h5>3.5.2 管理员配置管理–系统</h5>
+
+<p>包含两部分内容分别为： <br />
+1. 更新中心</p>
+
+<ol>
+<li>系统信息</li>
+</ol>
+
+<h6>3.5.2.1 更新中心</h6>
+
+<p>方便管理插件、安装插件。 <br />
+<img alt="SonarQube更新中心" src="https://static.oschina.net/uploads/img/201702/22111921_Av8z.png" title="SonarQube更新中心" /></p>
+
+<h5>3.5.2.2 系统信息</h5>
+
+<p>系统信息就是现实SonarQube安装环境的配置变量和系统配置路径。</p>
+
+<p>如下部分截图： <br />
+<img alt="SonarQube系统信息" src="https://static.oschina.net/uploads/img/201702/22111714_qSSC.png" title="SonarQube系统信息" /></p>
+
+<h5>3.5.3 管理员配置管理–项目管理</h5>
+
+<p>包含两部分内容分别为： <br />
+1. SonarQube项目管理</p>
+
+<ol>
+<li>SonarQube后台任务</li>
+</ol>
+
+<h6>3.5.3.1 SonarQube项目管理</h6>
+
+<p>创建、编辑、修改、删除(批量)SonarQube项目 <br />
+<img alt=" SonarQube项目管理" src="https://static.oschina.net/uploads/img/201702/22112429_2uRv.png" title=" SonarQube项目管理" /></p>
+
+<h6>3.5.3.2. SonarQube后台任务</h6>
+
+<p><img alt="SonarQube后台任务" src="https://static.oschina.net/uploads/img/201702/22112301_HxqQ.png" title="SonarQube后台任务" /></p>
+
+<h5>3.5.4 管理员配置管理–权限管理</h5>
+
+<p>权限管理内容包含： <br />
+1. 用户 <br />
+2. 群组 <br />
+3. 全局权限 <br />
+4. 项目权限 <br />
+5. 权限模板</p>
+
+<h5>3.5.4.1. 用户</h5>
+
+<p><img alt="用户" src="https://static.oschina.net/uploads/img/201702/22113509_jrfY.png" title="用户" /></p>
+
+<h5>3.5.4.2. 群组</h5>
+
+<p><img alt="群组" src="https://static.oschina.net/uploads/img/201702/22112937_5Oiv.png" title="群组" /></p>
+
+<h5>3.5.4.3. 全局权限</h5>
+
+<p><img alt="全局权限" src="https://static.oschina.net/uploads/img/201702/22112959_UePj.png" title="全局权限" /></p>
+
+<h5>3.5.4.4. 项目权限</h5>
+
+<p><img alt="项目权限" src="https://static.oschina.net/uploads/img/201702/22113031_6Aid.png" title="项目权限" /></p>
+
+<h5>3.5.4.5. 权限模板</h5>
+
+<p><img alt="权限模板" src="https://static.oschina.net/uploads/img/201702/22113050_EZIJ.png" title="权限模板" /></p>
+
+<h5>3.5.5 管理员配置管理–配置管理</h5>
+
+<p>配置管理模块又包含以下管理： <br />
+1. 通用设置(重点介绍) <br />
+2. Custom Metrics(自定义指标) <br />
+3. 默认仪表盘</p>
+
+<h6>3.5.5.1 通用配置</h6>
+
+<p>管理的模块有： <br />
+1. Java：配置检查的java源文件及静态代码检查规范检查 <br />
+2. SCM：配置软件控制器。上文已经提到的配置项。比如：svn、git等等 <br />
+3. SonarJs：雷同java文件检查、 <br />
+4. 技术债务： <br />
+5. 授权 <br />
+6. 排除 <br />
+7. 权限 <br />
+8. 通用</p>
+
+<h6>3.5.5.2 通用配置–技术债</h6>
+
+<p>名词解释技术债：</p>
+
+<p>维基百科上的解释：<a href="https://en.wikipedia.org/wiki/Technical_debt" rel="nofollow" target="_blank">维基百科上的解释</a></p>
+
+<p>此处配置决定和影响项目仪表盘显示、影响数据库数据。 <br />
+<img alt="技术债" src="https://static.oschina.net/uploads/img/201702/22113651_vQSa.png" title="技术债" /></p>
+
+<h6>3.5.5.3 通用配置–排除</h6>
+
+<p>可以配置通配符排除一下影响代码项目： <br />
+1. 代码覆盖率 <br />
+2. 检查文件 <br />
+3. 重复行数代码 <br />
+4. issues</p>
+
+<p>具体配置请参考具体配置项目。</p>
+
+<p><img alt="排除4个配置项配置" src="https://static.oschina.net/uploads/img/201702/22113819_Hi8y.png" title="排除4个配置项配置" /></p>
+
+<h6>3.5.5.4 通用配置–通用</h6>
+
+<p>有以下配置项目： <br />
+1. 通用 <br />
+<img alt="通用" src="https://static.oschina.net/uploads/img/201702/22114332_oIG9.png" title="通用" /><br />
+2. 对比视图 <br />
+<img alt="对比视图" src="https://static.oschina.net/uploads/img/201702/22114944_3Pxe.png" title="对比视图" /><br />
+3. 数据库清理器 <br />
+<img alt="数据库清理器" src="https://static.oschina.net/uploads/img/201702/22114434_Ly1h.png" title="数据库清理器" /><br />
+4. 界面外观 <br />
+<img alt="界面外观" src="https://static.oschina.net/uploads/img/201702/22114208_2VoF.png" title="界面外观" /><br />
+5. 邮件 <br />
+<img alt="通用设置邮件" src="https://static.oschina.net/uploads/img/201702/22114048_EG0o.png" title="通用设置邮件" /><br />
+6. 重复 <br />
+交叉项目重复检测 <br />
+7. 问题 <br />
+<img alt="问题" src="https://static.oschina.net/uploads/img/201702/22114707_nzYe.png" title="问题" /></p>
+
+<h3>四 .参考资料</h3>
+
+<ol>
+<li><a href="http://www.ibm.com/developerworks/cn/java/j-lo-sonar/" rel="nofollow" target="_blank">使用 Sonar 进行代码质量管理</a></li>
+<li><a href="https://docs.sonarqube.org/display/SONAR/Documentation" rel="nofollow" target="_blank">SonarQube官方文档</a></li>
+<li><a href="https://docs.sonarqube.org/display/SONAR/Requirements" rel="nofollow" target="_blank">安装最新版本SonarQube环境要求</a></li>
+<li><a href="http://www.cnblogs.com/cicaday/p/5545532.html" rel="nofollow" target="_blank">SonarQube是什么</a></li>
+<li><a href="http://blog.csdn.net/hunterno4/article/details/11687269" rel="nofollow" target="_blank">SonarQube代码质量管理平台安装与使用</a></li>
+<li><a href="https://my.oschina.net/xishuixixia/blog/82156" rel="nofollow" target="_blank">通过sonar了解你的项目</a></li>
+</ol>

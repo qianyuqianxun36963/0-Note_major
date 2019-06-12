@@ -1,0 +1,153 @@
+<h1>springboot 集成 swagger</h1>
+
+<h2>第一步：修改pom.xml</h2>
+
+<p>添加swagger支持</p>
+
+<pre>
+<!-- swagger 配置 -->
+<dependency>
+<groupId>io.springfox</groupId>
+<artifactId>springfox-swagger2</artifactId>
+<version>2.5.0</version>
+</dependency>
+<dependency>
+<groupId>io.springfox</groupId>
+<artifactId>springfox-swagger-ui</artifactId>
+<version>2.5.0</version>
+</dependency></pre>
+
+<h2>第二步：新建配置类</h2>
+
+<p>配置类文件 eg：SwaggerConfig.java</p>
+
+<pre>
+package com.ustc.na.fileservice.config;
+
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.ComponentScan;
+import org.springframework.context.annotation.Configuration;
+
+import springfox.documentation.builders.ApiInfoBuilder;
+import springfox.documentation.builders.PathSelectors;
+import springfox.documentation.builders.RequestHandlerSelectors;
+import springfox.documentation.service.ApiInfo;
+import springfox.documentation.spi.DocumentationType;
+import springfox.documentation.spring.web.plugins.Docket;
+import springfox.documentation.swagger2.annotations.EnableSwagger2;
+
+/**
+* @ClassName SwaggerConfig
+* @Description
+* @Author w00466247
+* @Date 2018/10/18 15:25
+* @Version 1.0
+**/
+
+<strong>@EnableSwagger2
+@ComponentScan(basePackages = {"com.huawei.na.fileservice.controller"})
+@Configuration</strong>
+public class SwaggerConfig {
+@Bean
+public Docket createRestApi() {
+return new Docket(DocumentationType.SWAGGER_2)
+.apiInfo(apiInfo())
+.select()
+<strong>.apis(RequestHandlerSelectors.basePackage("com.huawei.na.fileservice.controller"))</strong>
+.paths(PathSelectors.any())
+.build();
+}
+
+private ApiInfo apiInfo() {
+return new ApiInfoBuilder()
+.title("Spring 中使用Swagger2构建RESTful APIs")
+.termsOfServiceUrl("")
+.version("1.1")
+.build();
+}
+}</pre>
+
+<h3>注释解释：</h3>
+
+<p>@Configuration 配置注解，自动在本类上下文加载一些环境变量信息  <br />
+@EnableWebMvc   <br />
+@EnableSwagger2 使swagger2生效  <br />
+@ComponentScan("com.myapp.packages") 需要扫描的包路径  </p>
+
+<p>到此，swagger配置就已经全部完成了。接下来就是使用swagger了。</p>
+
+<h2>第三步：配置controller类</h2>
+
+<p>package com.ustc.na.fileservice.controller;  <br />
+  <br />
+import java.util.ArrayList;  <br />
+import java.util.Collections;  <br />
+import java.util.HashMap;  <br />
+import java.util.List;  <br />
+import java.util.Map;  <br />
+  <br />
+import org.springframework.web.bind.annotation.<strong>PathVariable</strong>;  <br />
+import org.springframework.web.bind.annotation.<strong>RequestBody</strong>;  <br />
+import org.springframework.web.bind.annotation.<strong>RequestMapping</strong>;  <br />
+import org.springframework.web.bind.annotation.<strong>RequestMethod</strong>;  <br />
+import org.springframework.web.bind.annotation.<strong>RestController</strong>;  <br />
+  <br />
+import io.swagger.annotations.ApiImplicitParam;  <br />
+import io.swagger.annotations.ApiImplicitParams;  <br />
+import io.swagger.annotations.<strong>ApiOperation</strong>;  <br />
+  <br />
+@RestController  <br />
+@RequestMapping(value = "/users") // 通过这里配置使下面的映射都在/users下，可去除  <br />
+public class UserController {  <br />
+  <br />
+    static Map<Long, User> users = Collections.synchronizedMap(new HashMap<Long, User>());  <br />
+  <br />
+    <strong>@ApiOperation(value = "获取用户列表", notes = "")  <br />
+    @RequestMapping(value = { "" }, method = RequestMethod.GET)  </strong><br />
+    public List<User> getUserList() {  <br />
+        List<User> r = new ArrayList<User>(users.values());  <br />
+        return r;  <br />
+    }  <br />
+  <br />
+    @ApiOperation(value = "创建用户", notes = "根据User对象创建用户")  <br />
+<strong>    @ApiImplicitParam(name = "user", value = "用户详细实体user", required = true, dataType = "User")  </strong><br />
+    @RequestMapping(value = "", method = RequestMethod.POST)  <br />
+    public String postUser(@RequestBody User user) {  <br />
+        users.put(user.getId(), user);  <br />
+        return "success";  <br />
+    }  <br />
+  <br />
+    @ApiOperation(value = "获取用户详细信息", notes = "根据url的id来获取用户详细信息")  <br />
+    @ApiImplicitParam(name = "id", value = "用户ID", required = true, dataType = "Long")  <br />
+    @RequestMapping(value = "/{id}", method = RequestMethod.GET)  <br />
+    public User getUser(@PathVariable Long id) {  <br />
+        return users.get(id);  <br />
+    }  <br />
+  <br />
+    @ApiOperation(value = "更新用户详细信息", notes = "根据url的id来指定更新对象，并根据传过来的user信息来更新用户详细信息")  <br />
+   <strong> @ApiImplicitParams({ @ApiImplicitParam(name = "id", value = "用户ID", required = true, dataType = "Long"),  <br />
+            @ApiImplicitParam(name = "user", value = "用户详细实体user", required = true, dataType = "User") })  </strong><br />
+    @RequestMapping(value = "/{id}", method = RequestMethod.PUT)  <br />
+    public String putUser(@PathVariable Long id, @RequestBody User user) {  <br />
+        User u = users.get(id);  <br />
+        u.setName(user.getName());  <br />
+        u.setAge(user.getAge());  <br />
+        users.put(id, u);  <br />
+        return "success";  <br />
+    }  <br />
+  <br />
+    @ApiOperation(value = "删除用户", notes = "根据url的id来指定删除对象")  <br />
+    @ApiImplicitParam(name = "id", value = "用户ID", required = true, dataType = "Long")  <br />
+    @RequestMapping(value = "/{id}", method = RequestMethod.DELETE)  <br />
+    public String deleteUser(@PathVariable Long id) {  <br />
+        users.remove(id);  <br />
+        return "success";  <br />
+    }  <br />
+}  </p>
+
+<h2>第四步：验证</h2>
+
+<p>Restful API 访问路径:  <br />
+* http://IP:port/{context-path}/swagger-ui.html  </p>
+
+<p>例如：<strong>http://localhost:8080/swagger-ui.html</strong></p>

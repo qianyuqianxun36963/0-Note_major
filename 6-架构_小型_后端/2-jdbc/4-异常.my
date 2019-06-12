@@ -1,0 +1,75 @@
+<h1>异常（Exceptions）</h1>
+<h2>SQLException</h2>
+<p>一个SQLException实例异常抛出 当和数据源交互的过程中出现错误时，该异常包含以下信息：</p>
+<ul>
+<li>描绘错误的原文： String 包含了 描绘异常的信息 当调用 SQLException.getMessage 方法时</li>
+<li>SQL 状态：Srtring 包含了SQL 状态，当调用 SQLException.getSQLState 方法时</li>
+<li>错误码：这是一个标志错误的 integer 类型的值，它的值是依赖于特的的实现的，也可能是底层数据源返回的实际错误代码，错误代码可以使用SQLException.getErrorCode方法检索</li>
+<li>原因：这是一种人为的抛出导致 SQLException 发生</li>
+<li>异常链：如果发生多个错误，则可以通过引用异常链，所有的异常链都可以通过 SQLException.getNextException 去获得，假如没有更多的异常链了 则 getNextException 方法返回 null</li>
+</ul>
+<h2>对于java SE支持链式execeptions</h2>
+<p>SqlException类及其子类已增强为java SE支持链式异常能力，支持此功能的更改如下：</p>
+<ul>
+<li>添加四个构造函数以提供原因参数的支持</li>
+<li>getCause 方法 除了 返回 SQLExceptions 还可能返回 Non-SQLExceptions</li>
+</ul>
+<p>有关附加信息，请参阅JDBC API规范</p>
+<h2>导航 SQLException</h2>
+<p>在执行SQL语句时可能会出现一个或多个异常，每个异常都有各自潜在的因果关系。这就意味着当一个JDBC应用捕获一个SQLException，有一种可能性，可能会有额外的SQLException拴在原抛出SQLException。访问附加链接的SQLException，申请将递归调用getnextexception直到返回空值</p>
+<p>一个 SQLException 可能会出现因果关系 ，由一个或多个 SQLException 抛出造成的。你可以递归调用sqlexception.getcause 方法，直到返回空值，</p>
+<p>下面的代码演示了应用程序如何浏览sqlexception及其原因：</p>
+<blockquote>
+<p>catch(SQLException ex) {<br />
+while(ex != null) {<br />
+System.out.println("SQLState:" + ex.getSQLState());<br />
+System.out.println("Error Code:" + ex.getErrorCode());<br />
+System.out.println("Message:" + ex.getMessage());<br />
+Throwable t = ex.getCause();<br />
+while(t != null) {<br />
+System.out.println("Cause:" + t);<br />
+t = t.getCause();<br />
+}<br />
+ex = ex.getNextException();<br />
+}<br />
+}</p>
+</blockquote>
+<h2>使用 For-Each 循环 对于 SQLException</h2>
+<p>JDBC 异常可能会使用 JavaSE For-Each 循环 来导航 SQLException 以及 它们之间的关系</p>
+<blockquote>
+<p>catch(SQLException ex) {<br />
+for(Throwable e : ex ) {<br />
+System.out.println("Error encountered: " + e);<br />
+}<br />
+}</p>
+</blockquote>
+<h2>SQLWarning</h2>
+<p>SQLWarning 是 SQLException 的子类，下面的接口方法将产生一个sqlwarning对象如果他们遇到一个数据库访问的警告：</p>
+<ul>
+<li>Connection</li>
+<li>DataSet</li>
+<li>Statement</li>
+<li>ResultSet</li>
+</ul>
+<p>当一个方法产生一个sqlwarning对象，调用者不了解数据访问的警告。该方法必须调用适当getWarnings对象检索SQLWarning对象。然而，对sqlwarning的datatruncation子类可以被扔在某些情况下，见8.3节“datatruncation”页上的8-46详情</p>
+<p>如果多个数据访问的警告时，它们会是在第一个，可以通过递归调用sqlwarning.getnextwarning方法检索。如果有链中没有更多的警告，getnextwarning返回null</p>
+<h2>数据截断</h2>
+<p>DataTruncation 是 SQLWarning 的子类，提供信息当数据截断的时候，当数据源写入数据时发生数据截断，一个 DataTruncation 对象会被抛出，即使已经生成警告，已截断的数据值也已写入数据源。从数据源读取数据时发生截断，会报告一个 SQLWarning<br />
+一个datatruncation对象包含以下信息：</p>
+<ul>
+<li>描绘的字符串 "Data truncation"</li>
+<li>SQLState "01004" 当 从数据源读取数据时发生截断</li>
+<li>SQLState "22001" 当数据源写入数据时发生数据截断</li>
+<li>一个 boolean 指示值是否截断为参数值或列值。</li>
+<li>给出截断的列或参数的索引的int 类型值，如果列的索引值或参数是未知的，该方法datatruncation.getindex返回-1，如果索引是未知的，会返回值datatruncation.getparameter和datatruncation.getread 是未定义 的</li>
+<li>一个布尔值，用来指示截断是在读还是写操作上发生的。如果datatruncation.getread截断发生在读,则返回 true,如果datatruncation.getread截断发生在写,则返回 false</li>
+<li>方法datatruncation.getdatasize返回int，表示数据应该已经传送的字节数。如果数据转换正在执行，这个数字可能是近似的。如果大小未知，则值可能是1</li>
+<li>方法datatruncation.gettransfersize返回实际转换的字节 或 如果字节数为-1 则是未知的</li>
+</ul>
+<h2>静止的截断（Silent Truncation）</h2>
+<p>statement.setmaxfieldsize方法允许的最大大小（以字节为单位）是集。此限制仅适用于二进制、varbinary、LONGVARBINARY、CHAR、LONGVARCHAR、nchar、nvarchar varchar数据类型，和LONGNVARCHAR</p>
+<p>如果使用setmaxfieldsize设定了最大限制，试图去读取超过限制的数据时，由于超过规定的极限，任何截断不会报道</p>
+<h2>BatchUpdateException</h2>
+<p>一个batchupdateexception对象提供有关发生在批处理语句被执行的错误信息。这个异常的行为在第14章“批处理更新”中描述</p>
+<h2>SQLClientinfoException</h2>
+<p>SQLClientInfoException 会抛出通过Connection.setClientInfo 方法 发生在 设置一个 或更多个 指定 的客户端 properties 失败时，sqlclientinfoexception包含信息指示客户端properties 属性没有设置。</p>

@@ -1,75 +1,59 @@
 <h1>quartz使用</h1>
-
 <h2>代码简述</h2>
-
 <h3>名词解释</h3>
-
-<p>Schedule ：&nbsp;vt. 安排，计划；编制目录；将&hellip;&hellip;列入计划表&nbsp; n. 时间表；计划表；一览表</p>
-
-<p>trigger ：&nbsp;vt. 引发，引起；触发&nbsp;&nbsp;n. 扳机；[电子] 触发器；制滑机</p>
-
+<p>Schedule ： vt. 安排，计划；编制目录；将……列入计划表  n. 时间表；计划表；一览表</p>
+<p>trigger ： vt. 引发，引起；触发  n. 扳机；[电子] 触发器；制滑机</p>
 <h3>核心代码</h3>
-
-<p>&nbsp; &nbsp; &nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp; //创建job信息<br />
-&nbsp; &nbsp; &nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp; JobDetail jobDetail = JobBuilder.newJob(ScheduleJob.class).withIdentity(getJobKey(scheduleJob.getJobId())).build();<br />
-&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;//创建表达式构建器<br />
-&nbsp; &nbsp; &nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp; CronScheduleBuilder scheduleBuilder = CronScheduleBuilder.cronSchedule(scheduleJob.getCronExpression()).withMisfireHandlingInstructionDoNothing();<br />
-&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;//根据新的cronExpression表达式创建一个新的trigger<br />
-&nbsp; &nbsp; &nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp; CronTrigger trigger = TriggerBuilder.newTrigger().withIdentity(getTriggerKey(scheduleJob.getJobId())).withSchedule(scheduleBuilder).build();<br />
-&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;jobDetail.getJobDataMap().put(ScheduleJobEntity.JOB_PARAM_KEY, scheduleJob);<br />
-&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;scheduler.scheduleJob(jobDetail,trigger);</p>
-
+<p>             //创建job信息<br />
+             JobDetail jobDetail = JobBuilder.newJob(ScheduleJob.class).withIdentity(getJobKey(scheduleJob.getJobId())).build();<br />
+             //创建表达式构建器<br />
+             CronScheduleBuilder scheduleBuilder = CronScheduleBuilder.cronSchedule(scheduleJob.getCronExpression()).withMisfireHandlingInstructionDoNothing();<br />
+             //根据新的cronExpression表达式创建一个新的trigger<br />
+             CronTrigger trigger = TriggerBuilder.newTrigger().withIdentity(getTriggerKey(scheduleJob.getJobId())).withSchedule(scheduleBuilder).build();<br />
+             jobDetail.getJobDataMap().put(ScheduleJobEntity.JOB_PARAM_KEY, scheduleJob);<br />
+             scheduler.scheduleJob(jobDetail,trigger);</p>
 <h3>controller层</h3>
-
 <p>controller层就不说了，就job记录的增删改查，然后是job的启动、暂停和重启。调用的是server层几个方法。</p>
-
-<p>&nbsp;&nbsp; &nbsp;/**<br />
-&nbsp;&nbsp; &nbsp; * 立即执行任务<br />
-&nbsp;&nbsp; &nbsp; */<br />
-&nbsp;&nbsp; &nbsp;@RequestMapping(&quot;/run&quot;)<br />
-&nbsp;&nbsp; &nbsp;@ResponseBody<br />
-&nbsp;&nbsp; &nbsp;public Object run(@RequestBody String[] jobIds){<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;Map&lt;String,Object&gt; data = new HashMap&lt;String,Object&gt;();<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;try{<br />
-&nbsp; &nbsp; &nbsp;&nbsp; &nbsp; &nbsp; &nbsp;scheduleJobService.run(jobIds);<br />
-&nbsp; &nbsp; &nbsp;&nbsp; &nbsp; &nbsp; data.put(&quot;status&quot;, &quot;success&quot;);<br />
-&nbsp; &nbsp; &nbsp;&nbsp; &nbsp; &nbsp; data.put(&quot;msg&quot;, &quot;启动定时任务成功!&quot;);<br />
-&nbsp; &nbsp; &nbsp; &nbsp;}catch(Exception e){<br />
-&nbsp; &nbsp; &nbsp;&nbsp; &nbsp; &nbsp; data.put(&quot;status&quot;, &quot;error&quot;);<br />
-&nbsp; &nbsp; &nbsp;&nbsp; &nbsp; &nbsp; data.put(&quot;msg&quot;, &quot;启动定时任务异常!&quot;);<br />
-&nbsp;&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; logger.error(&quot;[启动定时任务异常-ErrorMsg:]&quot;, e);<br />
-&nbsp; &nbsp; &nbsp; &nbsp;}<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;return data;<br />
-&nbsp;&nbsp; &nbsp;}</p>
-
+<p>    /**<br />
+     * 立即执行任务<br />
+     */<br />
+    @RequestMapping("/run")<br />
+    @ResponseBody<br />
+    public Object run(@RequestBody String[] jobIds){<br />
+        Map<String,Object> data = new HashMap<String,Object>();<br />
+        try{<br />
+            scheduleJobService.run(jobIds);<br />
+           data.put("status", "success");<br />
+           data.put("msg", "启动定时任务成功!");<br />
+       }catch(Exception e){<br />
+           data.put("status", "error");<br />
+           data.put("msg", "启动定时任务异常!");<br />
+           logger.error("[启动定时任务异常-ErrorMsg:]", e);<br />
+       }<br />
+        <br />
+        return data;<br />
+    }</p>
 <h3>service层</h3>
-
 <p>job运行相关的方法，主要也就三四个，入参都为jobids，所有job相关的信息，这里不体现，就是循环，然后根据每个id，调用ScheduleUtils里的方法。</p>
-
-<p>&nbsp;&nbsp; &nbsp;@Override<br />
-&nbsp;&nbsp; &nbsp;@Transactional<br />
-&nbsp;&nbsp; &nbsp;public void run(String[] jobIds) throws SchedulerException {<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;for(String jobId : jobIds) {<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;ScheduleUtils.run(scheduler, queryScheduleJobByJobId(jobId));<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;}<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;Map&lt;String,Object&gt; map = new HashMap&lt;String,Object&gt;();<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;map.put(&quot;list&quot;, jobIds);<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;map.put(&quot;status&quot;, GlobalConstant.ScheduleStatus.NORMAL.getValue());<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;updateScheduleJobEntityBatch(map);<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;<br />
-&nbsp;&nbsp; &nbsp;}</p>
-
-<p>&nbsp;&nbsp; &nbsp;@Override<br />
-&nbsp;&nbsp; &nbsp;public ScheduleJobEntity queryScheduleJobByJobId(String jobId) {<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;return scheduleJobMapper.queryScheduleJobByJobId(jobId);<br />
-&nbsp;&nbsp; &nbsp;}</p>
-
+<p>    @Override<br />
+    @Transactional<br />
+    public void run(String[] jobIds) throws SchedulerException {<br />
+        for(String jobId : jobIds) {<br />
+            ScheduleUtils.run(scheduler, queryScheduleJobByJobId(jobId));<br />
+        }<br />
+        Map<String,Object> map = new HashMap<String,Object>();<br />
+        map.put("list", jobIds);<br />
+        map.put("status", GlobalConstant.ScheduleStatus.NORMAL.getValue());<br />
+        <br />
+        updateScheduleJobEntityBatch(map);<br />
+        <br />
+    }</p>
+<p>    @Override<br />
+    public ScheduleJobEntity queryScheduleJobByJobId(String jobId) {<br />
+        return scheduleJobMapper.queryScheduleJobByJobId(jobId);<br />
+    }</p>
 <h3>ScheduleUtils工具类</h3>
-
 <p>这个工具类是实现几个功能的主要类</p>
-
 <p>import org.quartz.CronScheduleBuilder;<br />
 import org.quartz.CronTrigger;<br />
 import org.quartz.JobBuilder;<br />
@@ -80,29 +64,22 @@ import org.quartz.Scheduler;<br />
 import org.quartz.SchedulerException;<br />
 import org.quartz.TriggerBuilder;<br />
 import org.quartz.TriggerKey;</p>
-
 <p>import com.ustc.wang.model.job.ScheduleJobEntity;</p>
-
-<p>&nbsp; &nbsp; &nbsp;public static void run(Scheduler scheduler,ScheduleJobEntity scheduleJob) throws SchedulerException{<br />
-&nbsp; &nbsp; &nbsp;&nbsp; &nbsp; try{<br />
-&nbsp; &nbsp; &nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp; JobDataMap jobDataMap = new JobDataMap();<br />
-&nbsp; &nbsp; &nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp; jobDataMap.put(ScheduleJobEntity.JOB_PARAM_KEY, scheduleJob);<br />
-&nbsp; &nbsp; &nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp; <strong>scheduler.triggerJob(getJobKey(scheduleJob.getJobId()), jobDataMap);</strong><br />
-&nbsp; &nbsp; &nbsp;&nbsp; &nbsp; } catch (SchedulerException e) {<br />
-&nbsp; &nbsp; &nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp; throw new SchedulerException(&quot;执行定时任务失败&quot;,e);<br />
-&nbsp; &nbsp; &nbsp;&nbsp; &nbsp; }<br />
-&nbsp; &nbsp; &nbsp;}</p>
-
+<p>     public static void run(Scheduler scheduler,ScheduleJobEntity scheduleJob) throws SchedulerException{<br />
+         try{<br />
+             JobDataMap jobDataMap = new JobDataMap();<br />
+             jobDataMap.put(ScheduleJobEntity.JOB_PARAM_KEY, scheduleJob);<br />
+             <strong>scheduler.triggerJob(getJobKey(scheduleJob.getJobId()), jobDataMap);</strong><br />
+         } catch (SchedulerException e) {<br />
+             throw new SchedulerException("执行定时任务失败",e);<br />
+         }<br />
+     }</p>
 <h2>controller层</h2>
-
 <p>package com.ustc.wang.controller.job;</p>
-
 <p>import java.util.HashMap;<br />
 import java.util.Map;</p>
-
 <p>import javax.servlet.http.HttpServletRequest;<br />
 import javax.servlet.http.HttpServletResponse;</p>
-
 <p>import org.springframework.beans.factory.annotation.Autowired;<br />
 import org.springframework.stereotype.Controller;<br />
 import org.springframework.web.bind.annotation.PathVariable;<br />
@@ -110,7 +87,6 @@ import org.springframework.web.bind.annotation.RequestBody;<br />
 import org.springframework.web.bind.annotation.RequestMapping;<br />
 import org.springframework.web.bind.annotation.RequestMethod;<br />
 import org.springframework.web.bind.annotation.ResponseBody;</p>
-
 <p>import com.alibaba.fastjson.JSONObject;<br />
 import com.ustc.wang.base.controller.BaseController;<br />
 import com.ustc.wang.base.utils.DatatableUtil;<br />
@@ -119,301 +95,279 @@ import com.ustc.wang.model.dataTableUtils.DataTableModel;<br />
 import com.ustc.wang.model.dataTableUtils.DataTableParam;<br />
 import com.ustc.wang.model.job.ScheduleJobEntity;<br />
 import com.ustc.wang.service.job.IScheduleJobService;</p>
-
 <p>@Controller<br />
-@RequestMapping(&quot;/sys/schedule&quot;)<br />
-@SuppressWarnings(&quot;all&quot;)<br />
+@RequestMapping("/sys/schedule")<br />
+@SuppressWarnings("all")<br />
 public class ScheduleJobController extends BaseController{</p>
-
-<p>&nbsp;&nbsp; &nbsp;@Autowired<br />
-&nbsp;&nbsp; &nbsp;private IScheduleJobService scheduleJobService;<br />
-&nbsp;&nbsp; &nbsp;<br />
-&nbsp; &nbsp; @RequestMapping(value = &quot;/toScheduleJobContent&quot;, method = RequestMethod.POST)<br />
-&nbsp; &nbsp; public String toScheduleJobContent(HttpServletRequest request,<br />
-&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; HttpServletResponse response) {<br />
-&nbsp; &nbsp; &nbsp; &nbsp; return &quot;sys/job/scheduleJob.ftl&quot;;<br />
-&nbsp; &nbsp; }<br />
-&nbsp; &nbsp;&nbsp;<br />
-&nbsp;&nbsp; &nbsp;@RequestMapping(&quot;/jobList&quot;)<br />
-&nbsp;&nbsp; &nbsp;@ResponseBody<br />
-&nbsp;&nbsp; &nbsp;public Object list(HttpServletRequest request,HttpServletResponse response, @RequestBody DataTableParam[] dataTableParams){<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp; DataTableModel dataTableModel = new DataTableModel();<br />
-&nbsp; &nbsp; &nbsp; &nbsp; &nbsp;Map&lt;String, String&gt; dataTableMap = DatatableUtil.convertToMap(dataTableParams);<br />
-&nbsp; &nbsp; &nbsp; &nbsp; &nbsp;JSONObject json = new JSONObject();<br />
-&nbsp; &nbsp; &nbsp; &nbsp; &nbsp;try {<br />
-&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; dataTableModel = scheduleJobService.queryScheduleJobList(dataTableMap);<br />
-&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; json.put(&quot;status&quot;, &quot;success&quot;);<br />
-&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; json.put(&quot;jobsData&quot;, dataTableModel);<br />
-&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; } catch(Exception e) {<br />
-&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; json.put(&quot;status&quot;, &quot;error&quot;);<br />
-&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; json.put(&quot;msg&quot;, &quot;查询定时任务列表信息异常!&quot;);<br />
-&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; logger.error(&quot;[获取定时任务列表异常-ErrorMsg:]&quot;, e);<br />
-&nbsp; &nbsp; &nbsp; &nbsp; &nbsp;}<br />
-&nbsp; &nbsp; &nbsp; &nbsp; &nbsp;return json;<br />
-&nbsp;&nbsp; &nbsp;}<br />
-&nbsp;&nbsp; &nbsp;<br />
-&nbsp;&nbsp; &nbsp;/**<br />
-&nbsp;&nbsp; &nbsp; * 获取定时任务信息<br />
-&nbsp;&nbsp; &nbsp; * @param jobId<br />
-&nbsp;&nbsp; &nbsp; * @return<br />
-&nbsp;&nbsp; &nbsp; */<br />
-&nbsp;&nbsp; &nbsp;@RequestMapping(&quot;/info/{jobId}&quot;)<br />
-&nbsp;&nbsp; &nbsp;@ResponseBody<br />
-&nbsp;&nbsp; &nbsp;public Object info(@PathVariable(&quot;jobId&quot;) String jobId){<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;Map&lt;String,Object&gt; data = new HashMap&lt;String,Object&gt;();<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;try{<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;ScheduleJobEntity scheduleJob = scheduleJobService.queryScheduleJobByJobId(jobId);<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;data.put(&quot;status&quot;, &quot;success&quot;);<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;data.put(&quot;scheduleJob&quot;, scheduleJob);<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;}catch(Exception e){<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;data.put(&quot;status&quot;, &quot;error&quot;);<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;data.put(&quot;msg&quot;, &quot;查询定时任务信息异常!&quot;);<br />
-&nbsp;&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;logger.error(&quot;[获取定时任务异常-ErrorMsg:]&quot;, e);<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;}<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;return data;<br />
-&nbsp;&nbsp; &nbsp;}<br />
-&nbsp;&nbsp; &nbsp;<br />
-&nbsp;&nbsp; &nbsp;/**<br />
-&nbsp;&nbsp; &nbsp; * 保存定时任务<br />
-&nbsp;&nbsp; &nbsp; */<br />
-&nbsp;&nbsp; &nbsp;@RequestMapping(value=&quot;/save&quot;,method=RequestMethod.POST)<br />
-&nbsp;&nbsp; &nbsp;@ResponseBody<br />
-&nbsp;&nbsp; &nbsp;public Object save(@RequestBody ScheduleJobEntity scheduleJob){<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;Map&lt;String,Object&gt; data = new HashMap&lt;String,Object&gt;();<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;try{<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp; &nbsp; scheduleJob.setJobId(StringUtils.getUUId());<br />
-&nbsp; &nbsp; &nbsp;&nbsp; &nbsp; &nbsp; int retCount = scheduleJobService.addScheduleJobEntity(scheduleJob);<br />
-&nbsp; &nbsp; &nbsp;&nbsp; &nbsp; &nbsp; data.put(&quot;status&quot;, &quot;success&quot;);<br />
-&nbsp; &nbsp; &nbsp;&nbsp; &nbsp; &nbsp; data.put(&quot;msg&quot;, &quot;保存成功&quot;);<br />
-&nbsp; &nbsp; &nbsp;&nbsp; &nbsp; &nbsp; if(retCount &lt;= 0) {<br />
-&nbsp; &nbsp; &nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp; &nbsp; data.put(&quot;status&quot;, &quot;fail&quot;);<br />
-&nbsp; &nbsp; &nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp; &nbsp; data.put(&quot;msg&quot;, &quot;保存失败&quot;);<br />
-&nbsp; &nbsp; &nbsp;&nbsp; &nbsp; &nbsp; }<br />
-&nbsp; &nbsp; &nbsp; &nbsp;}catch(Exception e){<br />
-&nbsp; &nbsp; &nbsp;&nbsp; &nbsp; &nbsp; data.put(&quot;status&quot;, &quot;error&quot;);<br />
-&nbsp; &nbsp; &nbsp;&nbsp; &nbsp; &nbsp; data.put(&quot;msg&quot;, &quot;新增定时任务异常!&quot;);<br />
-&nbsp;&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; logger.error(&quot;[新增定时任务异常-ErrorMsg:]&quot;, e);<br />
-&nbsp; &nbsp; &nbsp; &nbsp;}<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;return data;<br />
-&nbsp;&nbsp; &nbsp;}<br />
-&nbsp;&nbsp; &nbsp;<br />
-&nbsp;&nbsp; &nbsp;/**<br />
-&nbsp;&nbsp; &nbsp; * 修改定时任务<br />
-&nbsp;&nbsp; &nbsp; */<br />
-&nbsp;&nbsp; &nbsp;@RequestMapping(&quot;/update&quot;)<br />
-&nbsp;&nbsp; &nbsp;@ResponseBody<br />
-&nbsp;&nbsp; &nbsp;public Object update(@RequestBody ScheduleJobEntity scheduleJob){<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;Map&lt;String,Object&gt; data = new HashMap&lt;String,Object&gt;();<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;try{<br />
-&nbsp; &nbsp; &nbsp;&nbsp; &nbsp; &nbsp; int retCount = scheduleJobService.updateScheduleJobEntity(scheduleJob);<br />
-&nbsp; &nbsp; &nbsp;&nbsp; &nbsp; &nbsp; data.put(&quot;status&quot;, &quot;success&quot;);<br />
-&nbsp; &nbsp; &nbsp;&nbsp; &nbsp; &nbsp; data.put(&quot;msg&quot;, &quot;保存成功&quot;);<br />
-&nbsp; &nbsp; &nbsp;&nbsp; &nbsp; &nbsp; if(retCount &lt;= 0) {<br />
-&nbsp; &nbsp; &nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp; &nbsp; data.put(&quot;status&quot;, &quot;fail&quot;);<br />
-&nbsp; &nbsp; &nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp; &nbsp; data.put(&quot;msg&quot;, &quot;保存失败&quot;);<br />
-&nbsp; &nbsp; &nbsp;&nbsp; &nbsp; &nbsp; }<br />
-&nbsp; &nbsp; &nbsp; &nbsp;}catch(Exception e){<br />
-&nbsp; &nbsp; &nbsp;&nbsp; &nbsp; &nbsp; data.put(&quot;status&quot;, &quot;error&quot;);<br />
-&nbsp; &nbsp; &nbsp;&nbsp; &nbsp; &nbsp; data.put(&quot;msg&quot;, &quot;修改定时任务异常!&quot;);<br />
-&nbsp;&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; logger.error(&quot;[修改定时任务异常-ErrorMsg:]&quot;, e);<br />
-&nbsp; &nbsp; &nbsp; &nbsp;}<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;return data;<br />
-&nbsp;&nbsp; &nbsp;}<br />
-&nbsp;&nbsp; &nbsp;<br />
-&nbsp;&nbsp; &nbsp;/**<br />
-&nbsp;&nbsp; &nbsp; * 删除定时任务<br />
-&nbsp;&nbsp; &nbsp; */<br />
-&nbsp;&nbsp; &nbsp;@RequestMapping(&quot;/delete&quot;)<br />
-&nbsp;&nbsp; &nbsp;@ResponseBody<br />
-&nbsp;&nbsp; &nbsp;public Object delete(@RequestBody String[] jobIds){<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;Map&lt;String,Object&gt; data = new HashMap&lt;String,Object&gt;();<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;try{<br />
-&nbsp; &nbsp; &nbsp;&nbsp; &nbsp; &nbsp; &nbsp;scheduleJobService.deleteScheduleJobEntityBatch(jobIds);<br />
-&nbsp; &nbsp; &nbsp;&nbsp; &nbsp; &nbsp; data.put(&quot;status&quot;, &quot;success&quot;);<br />
-&nbsp; &nbsp; &nbsp;&nbsp; &nbsp; &nbsp; data.put(&quot;msg&quot;, &quot;删除定时任务成功!&quot;);<br />
-&nbsp; &nbsp; &nbsp; &nbsp;}catch(Exception e){<br />
-&nbsp; &nbsp; &nbsp;&nbsp; &nbsp; &nbsp; data.put(&quot;status&quot;, &quot;error&quot;);<br />
-&nbsp; &nbsp; &nbsp;&nbsp; &nbsp; &nbsp; data.put(&quot;msg&quot;, &quot;删除定时任务异常!&quot;);<br />
-&nbsp;&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; logger.error(&quot;[删除定时任务异常-ErrorMsg:]&quot;, e);<br />
-&nbsp; &nbsp; &nbsp; &nbsp;}<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;return data;<br />
-&nbsp;&nbsp; &nbsp;}</p>
-
-<p>&nbsp; &nbsp; /**</p>
-
+<p>    @Autowired<br />
+    private IScheduleJobService scheduleJobService;<br />
+    <br />
+    @RequestMapping(value = "/toScheduleJobContent", method = RequestMethod.POST)<br />
+    public String toScheduleJobContent(HttpServletRequest request,<br />
+            HttpServletResponse response) {<br />
+        return "sys/job/scheduleJob.ftl";<br />
+    }<br />
+    <br />
+    @RequestMapping("/jobList")<br />
+    @ResponseBody<br />
+    public Object list(HttpServletRequest request,HttpServletResponse response, @RequestBody DataTableParam[] dataTableParams){<br />
+         DataTableModel dataTableModel = new DataTableModel();<br />
+         Map<String, String> dataTableMap = DatatableUtil.convertToMap(dataTableParams);<br />
+         JSONObject json = new JSONObject();<br />
+         try {<br />
+            dataTableModel = scheduleJobService.queryScheduleJobList(dataTableMap);<br />
+            json.put("status", "success");<br />
+            json.put("jobsData", dataTableModel);<br />
+          } catch(Exception e) {<br />
+            json.put("status", "error");<br />
+            json.put("msg", "查询定时任务列表信息异常!");<br />
+            logger.error("[获取定时任务列表异常-ErrorMsg:]", e);<br />
+         }<br />
+         return json;<br />
+    }<br />
+    <br />
+    /**<br />
+     * 获取定时任务信息<br />
+     * @param jobId<br />
+     * @return<br />
+     */<br />
+    @RequestMapping("/info/{jobId}")<br />
+    @ResponseBody<br />
+    public Object info(@PathVariable("jobId") String jobId){<br />
+        Map<String,Object> data = new HashMap<String,Object>();<br />
+        try{<br />
+            ScheduleJobEntity scheduleJob = scheduleJobService.queryScheduleJobByJobId(jobId);<br />
+            <br />
+            data.put("status", "success");<br />
+            data.put("scheduleJob", scheduleJob);<br />
+        }catch(Exception e){<br />
+            data.put("status", "error");<br />
+            data.put("msg", "查询定时任务信息异常!");<br />
+            logger.error("[获取定时任务异常-ErrorMsg:]", e);<br />
+        }<br />
+        <br />
+        return data;<br />
+    }<br />
+    <br />
+    /**<br />
+     * 保存定时任务<br />
+     */<br />
+    @RequestMapping(value="/save",method=RequestMethod.POST)<br />
+    @ResponseBody<br />
+    public Object save(@RequestBody ScheduleJobEntity scheduleJob){<br />
+        Map<String,Object> data = new HashMap<String,Object>();<br />
+        try{<br />
+           scheduleJob.setJobId(StringUtils.getUUId());<br />
+           int retCount = scheduleJobService.addScheduleJobEntity(scheduleJob);<br />
+           data.put("status", "success");<br />
+           data.put("msg", "保存成功");<br />
+           if(retCount <= 0) {<br />
+               data.put("status", "fail");<br />
+               data.put("msg", "保存失败");<br />
+           }<br />
+       }catch(Exception e){<br />
+           data.put("status", "error");<br />
+           data.put("msg", "新增定时任务异常!");<br />
+           logger.error("[新增定时任务异常-ErrorMsg:]", e);<br />
+       }<br />
+        <br />
+        return data;<br />
+    }<br />
+    <br />
+    /**<br />
+     * 修改定时任务<br />
+     */<br />
+    @RequestMapping("/update")<br />
+    @ResponseBody<br />
+    public Object update(@RequestBody ScheduleJobEntity scheduleJob){<br />
+        Map<String,Object> data = new HashMap<String,Object>();<br />
+        try{<br />
+           int retCount = scheduleJobService.updateScheduleJobEntity(scheduleJob);<br />
+           data.put("status", "success");<br />
+           data.put("msg", "保存成功");<br />
+           if(retCount <= 0) {<br />
+               data.put("status", "fail");<br />
+               data.put("msg", "保存失败");<br />
+           }<br />
+       }catch(Exception e){<br />
+           data.put("status", "error");<br />
+           data.put("msg", "修改定时任务异常!");<br />
+           logger.error("[修改定时任务异常-ErrorMsg:]", e);<br />
+       }<br />
+        <br />
+        return data;<br />
+    }<br />
+    <br />
+    /**<br />
+     * 删除定时任务<br />
+     */<br />
+    @RequestMapping("/delete")<br />
+    @ResponseBody<br />
+    public Object delete(@RequestBody String[] jobIds){<br />
+        Map<String,Object> data = new HashMap<String,Object>();<br />
+        try{<br />
+            scheduleJobService.deleteScheduleJobEntityBatch(jobIds);<br />
+           data.put("status", "success");<br />
+           data.put("msg", "删除定时任务成功!");<br />
+       }catch(Exception e){<br />
+           data.put("status", "error");<br />
+           data.put("msg", "删除定时任务异常!");<br />
+           logger.error("[删除定时任务异常-ErrorMsg:]", e);<br />
+       }<br />
+        <br />
+        return data;<br />
+    }</p>
+<p>    /**</p>
 <h3>立即执行任务</h3>
-
-<p>&nbsp; &nbsp; &nbsp;*/<br />
-&nbsp;&nbsp; &nbsp;@RequestMapping(&quot;/run&quot;)<br />
-&nbsp;&nbsp; &nbsp;@ResponseBody<br />
-&nbsp;&nbsp; &nbsp;public Object run(@RequestBody String[] jobIds){<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;Map&lt;String,Object&gt; data = new HashMap&lt;String,Object&gt;();<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;try{<br />
-&nbsp; &nbsp; &nbsp;&nbsp; &nbsp; &nbsp; &nbsp;scheduleJobService.run(jobIds);<br />
-&nbsp; &nbsp; &nbsp;&nbsp; &nbsp; &nbsp; data.put(&quot;status&quot;, &quot;success&quot;);<br />
-&nbsp; &nbsp; &nbsp;&nbsp; &nbsp; &nbsp; data.put(&quot;msg&quot;, &quot;启动定时任务成功!&quot;);<br />
-&nbsp; &nbsp; &nbsp; &nbsp;}catch(Exception e){<br />
-&nbsp; &nbsp; &nbsp;&nbsp; &nbsp; &nbsp; data.put(&quot;status&quot;, &quot;error&quot;);<br />
-&nbsp; &nbsp; &nbsp;&nbsp; &nbsp; &nbsp; data.put(&quot;msg&quot;, &quot;启动定时任务异常!&quot;);<br />
-&nbsp;&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; logger.error(&quot;[启动定时任务异常-ErrorMsg:]&quot;, e);<br />
-&nbsp; &nbsp; &nbsp; &nbsp;}<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;return data;<br />
-&nbsp;&nbsp; &nbsp;}<br />
-&nbsp;&nbsp; &nbsp;<br />
-&nbsp;&nbsp; &nbsp;/**</p>
-
+<p>     */<br />
+    @RequestMapping("/run")<br />
+    @ResponseBody<br />
+    public Object run(@RequestBody String[] jobIds){<br />
+        Map<String,Object> data = new HashMap<String,Object>();<br />
+        try{<br />
+            scheduleJobService.run(jobIds);<br />
+           data.put("status", "success");<br />
+           data.put("msg", "启动定时任务成功!");<br />
+       }catch(Exception e){<br />
+           data.put("status", "error");<br />
+           data.put("msg", "启动定时任务异常!");<br />
+           logger.error("[启动定时任务异常-ErrorMsg:]", e);<br />
+       }<br />
+        <br />
+        return data;<br />
+    }<br />
+    <br />
+    /**</p>
 <h3>暂停定时任务</h3>
-
-<p>&nbsp; &nbsp; &nbsp;*/<br />
-&nbsp;&nbsp; &nbsp;@RequestMapping(&quot;/pause&quot;)<br />
-&nbsp;&nbsp; &nbsp;@ResponseBody<br />
-&nbsp;&nbsp; &nbsp;public Object pause(@RequestBody String[] jobIds){<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;Map&lt;String,Object&gt; data = new HashMap&lt;String,Object&gt;();<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;try{<br />
-&nbsp; &nbsp; &nbsp;&nbsp; &nbsp; &nbsp; &nbsp;scheduleJobService.pause(jobIds);<br />
-&nbsp; &nbsp; &nbsp;&nbsp; &nbsp; &nbsp; data.put(&quot;status&quot;, &quot;success&quot;);<br />
-&nbsp; &nbsp; &nbsp;&nbsp; &nbsp; &nbsp; data.put(&quot;msg&quot;, &quot;暂停定时任务成功!&quot;);<br />
-&nbsp; &nbsp; &nbsp; &nbsp;}catch(Exception e){<br />
-&nbsp; &nbsp; &nbsp;&nbsp; &nbsp; &nbsp; data.put(&quot;status&quot;, &quot;error&quot;);<br />
-&nbsp; &nbsp; &nbsp;&nbsp; &nbsp; &nbsp; data.put(&quot;msg&quot;, &quot;暂停定时任务异常!&quot;);<br />
-&nbsp;&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; logger.error(&quot;[暂停定时任务异常-ErrorMsg:]&quot;, e);<br />
-&nbsp; &nbsp; &nbsp; &nbsp;}<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;return data;<br />
-&nbsp;&nbsp; &nbsp;}<br />
-&nbsp;&nbsp; &nbsp;<br />
-&nbsp;&nbsp; &nbsp;/**</p>
-
+<p>     */<br />
+    @RequestMapping("/pause")<br />
+    @ResponseBody<br />
+    public Object pause(@RequestBody String[] jobIds){<br />
+        Map<String,Object> data = new HashMap<String,Object>();<br />
+        try{<br />
+            scheduleJobService.pause(jobIds);<br />
+           data.put("status", "success");<br />
+           data.put("msg", "暂停定时任务成功!");<br />
+       }catch(Exception e){<br />
+           data.put("status", "error");<br />
+           data.put("msg", "暂停定时任务异常!");<br />
+           logger.error("[暂停定时任务异常-ErrorMsg:]", e);<br />
+       }<br />
+        <br />
+        return data;<br />
+    }<br />
+    <br />
+    /**</p>
 <h3>恢复定时任务</h3>
-
-<p>&nbsp; &nbsp; &nbsp;*/<br />
-&nbsp;&nbsp; &nbsp;@RequestMapping(&quot;/resume&quot;)<br />
-&nbsp;&nbsp; &nbsp;@ResponseBody<br />
-&nbsp;&nbsp; &nbsp;public Object resume(@RequestBody String[] jobIds){<br />
-&nbsp;&nbsp; &nbsp; &nbsp; Map&lt;String,Object&gt; data = new HashMap&lt;String,Object&gt;();<br />
-&nbsp;&nbsp; &nbsp; &nbsp; try{<br />
-&nbsp; &nbsp; &nbsp;&nbsp; &nbsp; &nbsp; &nbsp;scheduleJobService.resume(jobIds);<br />
-&nbsp; &nbsp; &nbsp;&nbsp; &nbsp; &nbsp; &nbsp;data.put(&quot;status&quot;, &quot;success&quot;);<br />
-&nbsp; &nbsp; &nbsp;&nbsp; &nbsp; &nbsp; &nbsp;data.put(&quot;msg&quot;, &quot;恢复定时任务成功!&quot;);<br />
-&nbsp; &nbsp; &nbsp; &nbsp;}catch(Exception e){<br />
-&nbsp; &nbsp; &nbsp;&nbsp; &nbsp; &nbsp; data.put(&quot;status&quot;, &quot;error&quot;);<br />
-&nbsp; &nbsp; &nbsp;&nbsp; &nbsp; &nbsp; data.put(&quot;msg&quot;, &quot;恢复定时任务异常!&quot;);<br />
-&nbsp;&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; logger.error(&quot;[恢复定时任务异常-ErrorMsg:]&quot;, e);<br />
-&nbsp; &nbsp; &nbsp; &nbsp;}<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;<br />
-&nbsp;&nbsp; &nbsp; &nbsp; return data;<br />
-&nbsp;&nbsp; &nbsp;}<br />
-&nbsp;&nbsp; &nbsp;<br />
+<p>     */<br />
+    @RequestMapping("/resume")<br />
+    @ResponseBody<br />
+    public Object resume(@RequestBody String[] jobIds){<br />
+       Map<String,Object> data = new HashMap<String,Object>();<br />
+       try{<br />
+            scheduleJobService.resume(jobIds);<br />
+            data.put("status", "success");<br />
+            data.put("msg", "恢复定时任务成功!");<br />
+       }catch(Exception e){<br />
+           data.put("status", "error");<br />
+           data.put("msg", "恢复定时任务异常!");<br />
+           logger.error("[恢复定时任务异常-ErrorMsg:]", e);<br />
+       }<br />
+        <br />
+       return data;<br />
+    }<br />
+    <br />
 }</p>
-
 <h2>service接口层</h2>
-
 <p>package com.ustc.wang.service.job;</p>
-
 <p>import java.util.Map;</p>
-
 <p>import org.quartz.SchedulerException;</p>
-
 <p>import com.ustc.wang.model.dataTableUtils.DataTableModel;<br />
 import com.ustc.wang.model.job.ScheduleJobEntity;<br />
-@SuppressWarnings(&quot;all&quot;)<br />
+@SuppressWarnings("all")<br />
 public interface IScheduleJobService {</p>
-
-<p>&nbsp;&nbsp; &nbsp;/**<br />
-&nbsp;&nbsp; &nbsp; * 跟jobId查询任务信息<br />
-&nbsp;&nbsp; &nbsp; * @param jobId<br />
-&nbsp;&nbsp; &nbsp; * @return<br />
-&nbsp;&nbsp; &nbsp; */<br />
-&nbsp; &nbsp; ScheduleJobEntity queryScheduleJobByJobId(String jobId);<br />
-&nbsp; &nbsp;&nbsp;<br />
-&nbsp; &nbsp; /**<br />
-&nbsp; &nbsp; &nbsp;* 分页查询任务列表<br />
-&nbsp; &nbsp; &nbsp;* @param page<br />
-&nbsp; &nbsp; &nbsp;* @return<br />
-&nbsp; &nbsp; &nbsp;*/<br />
-&nbsp; &nbsp; DataTableModel queryScheduleJobList(Map&lt;String, String&gt; dataTableMap);<br />
-&nbsp; &nbsp;&nbsp;<br />
-&nbsp; &nbsp;<br />
-&nbsp; &nbsp; /**<br />
-&nbsp; &nbsp; &nbsp;* 新增任务<br />
-&nbsp; &nbsp; &nbsp;* @param scheduleJobEntity<br />
-&nbsp; &nbsp; &nbsp;* @return<br />
-&nbsp; &nbsp; &nbsp;* @throws SchedulerException&nbsp;<br />
-&nbsp; &nbsp; &nbsp;*/<br />
-&nbsp; &nbsp; int addScheduleJobEntity(ScheduleJobEntity scheduleJob) throws SchedulerException;<br />
-&nbsp; &nbsp;&nbsp;<br />
-&nbsp; &nbsp; /**<br />
-&nbsp; &nbsp; &nbsp;* 修改任务<br />
-&nbsp; &nbsp; &nbsp;* @param scheduleJobEntity<br />
-&nbsp; &nbsp; &nbsp;* @return<br />
-&nbsp; &nbsp; &nbsp;* @throws SchedulerException&nbsp;<br />
-&nbsp; &nbsp; &nbsp;*/<br />
-&nbsp; &nbsp; int updateScheduleJobEntity(ScheduleJobEntity scheduleJob) throws SchedulerException;<br />
-&nbsp; &nbsp;&nbsp;<br />
-&nbsp; &nbsp; /**<br />
-&nbsp; &nbsp; &nbsp;* 批量更新任务<br />
-&nbsp; &nbsp; &nbsp;* @param map<br />
-&nbsp; &nbsp; &nbsp;* @return<br />
-&nbsp; &nbsp; &nbsp;*/<br />
-&nbsp;&nbsp; &nbsp;int updateScheduleJobEntityBatch(Map&lt;String, Object&gt; map);<br />
-&nbsp; &nbsp;&nbsp;<br />
-&nbsp;&nbsp; &nbsp;/**<br />
-&nbsp;&nbsp; &nbsp; * 批量删除任务<br />
-&nbsp;&nbsp; &nbsp; * @param jobIds<br />
-&nbsp;&nbsp; &nbsp; * @return<br />
-&nbsp;&nbsp; &nbsp; * @throws SchedulerException&nbsp;<br />
-&nbsp;&nbsp; &nbsp; */<br />
-&nbsp;&nbsp; &nbsp;void deleteScheduleJobEntityBatch(String[] jobIds) throws SchedulerException;<br />
-&nbsp;&nbsp; &nbsp;<br />
-&nbsp;&nbsp; &nbsp;/**<br />
-&nbsp;&nbsp; &nbsp; * 执行任务<br />
-&nbsp;&nbsp; &nbsp; * @param jobIds<br />
-&nbsp;&nbsp; &nbsp; * @throws SchedulerException&nbsp;<br />
-&nbsp;&nbsp; &nbsp; */<br />
-&nbsp;&nbsp; &nbsp;void run(String[] jobIds) throws SchedulerException;<br />
-&nbsp;&nbsp; &nbsp;<br />
-&nbsp;&nbsp; &nbsp;/**<br />
-&nbsp;&nbsp; &nbsp; * 暂停任务<br />
-&nbsp;&nbsp; &nbsp; * @param jobIds<br />
-&nbsp;&nbsp; &nbsp; */<br />
-&nbsp;&nbsp; &nbsp;void pause(String[] jobIds)throws SchedulerException;<br />
-&nbsp;&nbsp; &nbsp;<br />
-&nbsp;&nbsp; &nbsp;/**<br />
-&nbsp;&nbsp; &nbsp; * 恢复任务<br />
-&nbsp;&nbsp; &nbsp; * @param jobIds<br />
-&nbsp;&nbsp; &nbsp; */<br />
-&nbsp;&nbsp; &nbsp;void resume(String[] jobIds)throws SchedulerException;<br />
-&nbsp;&nbsp; &nbsp;<br />
-&nbsp;&nbsp; &nbsp;void runByMethodName(String methodName)throws SchedulerException;<br />
+<p>    /**<br />
+     * 跟jobId查询任务信息<br />
+     * @param jobId<br />
+     * @return<br />
+     */<br />
+    ScheduleJobEntity queryScheduleJobByJobId(String jobId);<br />
+    <br />
+    /**<br />
+     * 分页查询任务列表<br />
+     * @param page<br />
+     * @return<br />
+     */<br />
+    DataTableModel queryScheduleJobList(Map<String, String> dataTableMap);<br />
+    <br />
+   <br />
+    /**<br />
+     * 新增任务<br />
+     * @param scheduleJobEntity<br />
+     * @return<br />
+     * @throws SchedulerException <br />
+     */<br />
+    int addScheduleJobEntity(ScheduleJobEntity scheduleJob) throws SchedulerException;<br />
+    <br />
+    /**<br />
+     * 修改任务<br />
+     * @param scheduleJobEntity<br />
+     * @return<br />
+     * @throws SchedulerException <br />
+     */<br />
+    int updateScheduleJobEntity(ScheduleJobEntity scheduleJob) throws SchedulerException;<br />
+    <br />
+    /**<br />
+     * 批量更新任务<br />
+     * @param map<br />
+     * @return<br />
+     */<br />
+    int updateScheduleJobEntityBatch(Map<String, Object> map);<br />
+    <br />
+    /**<br />
+     * 批量删除任务<br />
+     * @param jobIds<br />
+     * @return<br />
+     * @throws SchedulerException <br />
+     */<br />
+    void deleteScheduleJobEntityBatch(String[] jobIds) throws SchedulerException;<br />
+    <br />
+    /**<br />
+     * 执行任务<br />
+     * @param jobIds<br />
+     * @throws SchedulerException <br />
+     */<br />
+    void run(String[] jobIds) throws SchedulerException;<br />
+    <br />
+    /**<br />
+     * 暂停任务<br />
+     * @param jobIds<br />
+     */<br />
+    void pause(String[] jobIds)throws SchedulerException;<br />
+    <br />
+    /**<br />
+     * 恢复任务<br />
+     * @param jobIds<br />
+     */<br />
+    void resume(String[] jobIds)throws SchedulerException;<br />
+    <br />
+    void runByMethodName(String methodName)throws SchedulerException;<br />
 }<br />
-&nbsp;</p>
-
-<p>&nbsp;</p>
-
+ </p>
+<p> </p>
 <h2>service实现层</h2>
-
 <p>package com.ustc.wang.service.Impl.job;</p>
-
 <p>import java.util.Date;<br />
 import java.util.HashMap;<br />
 import java.util.List;<br />
 import java.util.Map;</p>
-
 <p>import javax.annotation.PostConstruct;</p>
-
 <p>import org.quartz.CronTrigger;<br />
 import org.quartz.Scheduler;<br />
 import org.quartz.SchedulerException;<br />
 import org.springframework.beans.factory.annotation.Autowired;<br />
 import org.springframework.stereotype.Service;<br />
 import org.springframework.transaction.annotation.Transactional;</p>
-
 <p>import com.ustc.wang.base.utils.GlobalConstant;<br />
 import com.ustc.wang.base.utils.ScheduleUtils;<br />
 import com.ustc.wang.base.utils.XSSFilterUtils;<br />
@@ -423,183 +377,158 @@ import com.ustc.wang.model.dataTableUtils.DataTableModel;<br />
 import com.ustc.wang.model.job.ScheduleJobEntity;<br />
 import com.ustc.wang.service.job.IScheduleJobService;<br />
 import com.ustc.wang.tools.PaginationUtil;</p>
-
-<p>@Service(&quot;scheduleJobService&quot;)<br />
-@SuppressWarnings(&quot;all&quot;)<br />
+<p>@Service("scheduleJobService")<br />
+@SuppressWarnings("all")<br />
 public class ScheduleJobServiceImpl implements IScheduleJobService{</p>
-
-<p>&nbsp;&nbsp; &nbsp;@Autowired<br />
-&nbsp;&nbsp; &nbsp;private Scheduler scheduler;<br />
-&nbsp;&nbsp; &nbsp;<br />
-&nbsp;&nbsp; &nbsp;@Autowired<br />
-&nbsp;&nbsp; &nbsp;private ScheduleJobMapper scheduleJobMapper;<br />
-&nbsp;&nbsp; &nbsp;<br />
-&nbsp;&nbsp; &nbsp;@PostConstruct<br />
-&nbsp;&nbsp; &nbsp;public void init(){<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;List&lt;ScheduleJobEntity&gt; scheduleJobList = scheduleJobMapper.queryAllScheduleJob();<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;for(ScheduleJobEntity scheduleJob : scheduleJobList) {<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;try {<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;CronTrigger cronTrigger = ScheduleUtils.getCronTrigger(scheduler, scheduleJob.getJobId());<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;if(cronTrigger == null){<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;ScheduleUtils.buildScheduleJob(scheduler, scheduleJob);<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;} else {<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;ScheduleUtils.updateScheduleJob(scheduler, scheduleJob);<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;}<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;} catch (SchedulerException e) {<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;// TODO Auto-generated catch block<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;e.printStackTrace();<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;}<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;}<br />
-&nbsp;&nbsp; &nbsp;}<br />
-&nbsp;&nbsp; &nbsp;<br />
-&nbsp;&nbsp; &nbsp;@Override<br />
-&nbsp;&nbsp; &nbsp;public ScheduleJobEntity queryScheduleJobByJobId(String jobId) {<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;return scheduleJobMapper.queryScheduleJobByJobId(jobId);<br />
-&nbsp;&nbsp; &nbsp;}</p>
-
-<p>&nbsp;&nbsp; &nbsp;@Override<br />
-&nbsp;&nbsp; &nbsp;public DataTableModel queryScheduleJobList(Map&lt;String, String&gt; dataTableMap) {<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;DataTableModel dataTableModel = new DataTableModel();<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;Map&lt;String, Object&gt; paramMap = new HashMap&lt;String, Object&gt;();<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;String sEcho = dataTableMap.get(&quot;sEcho&quot;);<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;int start = Integer.parseInt(dataTableMap.get(&quot;iDisplayStart&quot;));<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;int length = Integer.parseInt(dataTableMap.get(&quot;iDisplayLength&quot;));<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;int currentPage = start / length + 1;<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;paramMap.put(&quot;beanName&quot;, XSSFilterUtils.SQLEncode(dataTableMap.get(&quot;beanName&quot;).trim()));<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;paramMap.put(&quot;methodName&quot;, XSSFilterUtils.SQLEncode(dataTableMap.get(&quot;methodName&quot;).trim()));<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;paramMap.put(&quot;remark&quot;, XSSFilterUtils.SQLEncode(dataTableMap.get(&quot;remark&quot;).trim()));<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;paramMap.put(&quot;orderStr&quot;, dataTableMap.get(&quot;orderStr&quot;));<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;Page&lt;Map&lt;String, Object&gt;&gt; page = PaginationUtil.setPageInfoStart(paramMap, currentPage, length);</p>
-
-<p>&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;List&lt;Map&lt;String, Object&gt;&gt; resList = scheduleJobMapper.queryScheduleJobList(page);<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;Integer count = scheduleJobMapper.queryScheduleJobCount(paramMap);<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;dataTableModel.setiTotalDisplayRecords(count);<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;dataTableModel.setiTotalRecords(count);<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;dataTableModel.setsEcho(Integer.valueOf(sEcho));<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;dataTableModel.setAaData(resList);<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;return dataTableModel;<br />
-&nbsp;&nbsp; &nbsp;}</p>
-
-<p>&nbsp;&nbsp; &nbsp;@Override<br />
-&nbsp;&nbsp; &nbsp;@Transactional<br />
-&nbsp;&nbsp; &nbsp;public int addScheduleJobEntity(ScheduleJobEntity scheduleJob) throws SchedulerException {<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;scheduleJob.setCreateTime(new Date());<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;scheduleJob.setStatus(GlobalConstant.ScheduleStatus.NORMAL.getValue());<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;int retCount = scheduleJobMapper.addScheduleJobEntity(scheduleJob);<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;<br />
-&nbsp;&nbsp; &nbsp; &nbsp; &nbsp;ScheduleUtils.buildScheduleJob(scheduler, scheduleJob);<br />
-&nbsp;&nbsp; &nbsp; &nbsp; &nbsp;<br />
-&nbsp;&nbsp; &nbsp; &nbsp; &nbsp;return retCount;<br />
-&nbsp;&nbsp; &nbsp;}</p>
-
-<p>&nbsp;&nbsp; &nbsp;@Override<br />
-&nbsp;&nbsp; &nbsp;@Transactional<br />
-&nbsp;&nbsp; &nbsp;public int updateScheduleJobEntity(ScheduleJobEntity scheduleJob) throws SchedulerException {<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;ScheduleJobEntity tempScheduleJobEntity = queryScheduleJobByJobId(scheduleJob.getJobId());<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;scheduleJob.setStatus(tempScheduleJobEntity.getStatus());<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;scheduleJob.setCreateTime(tempScheduleJobEntity.getCreateTime());<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;ScheduleUtils.updateScheduleJob(scheduler, scheduleJob);<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;return scheduleJobMapper.updateScheduleJobEntity(scheduleJob);<br />
-&nbsp;&nbsp; &nbsp;}</p>
-
-<p>&nbsp;&nbsp; &nbsp;@Override<br />
-&nbsp;&nbsp; &nbsp;public int updateScheduleJobEntityBatch(Map&lt;String, Object&gt; map) {<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;return scheduleJobMapper.updateScheduleJobEntityBatch(map);<br />
-&nbsp;&nbsp; &nbsp;}</p>
-
-<p>&nbsp;&nbsp; &nbsp;@Override<br />
-&nbsp;&nbsp; &nbsp;@Transactional<br />
-&nbsp;&nbsp; &nbsp;public void deleteScheduleJobEntityBatch(String[] jobIds) throws SchedulerException {<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;for(String jobId : jobIds) {<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;ScheduleUtils.deleteJob(scheduler, jobId);<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;}<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;scheduleJobMapper.deleteScheduleJobEntityBatch(jobIds);<br />
-&nbsp;&nbsp; &nbsp;}</p>
-
-<p>&nbsp;&nbsp; &nbsp;/**</p>
-
+<p>    @Autowired<br />
+    private Scheduler scheduler;<br />
+    <br />
+    @Autowired<br />
+    private ScheduleJobMapper scheduleJobMapper;<br />
+    <br />
+    @PostConstruct<br />
+    public void init(){<br />
+        List<ScheduleJobEntity> scheduleJobList = scheduleJobMapper.queryAllScheduleJob();<br />
+        for(ScheduleJobEntity scheduleJob : scheduleJobList) {<br />
+            try {<br />
+                CronTrigger cronTrigger = ScheduleUtils.getCronTrigger(scheduler, scheduleJob.getJobId());<br />
+                if(cronTrigger == null){<br />
+                    ScheduleUtils.buildScheduleJob(scheduler, scheduleJob);<br />
+                } else {<br />
+                    ScheduleUtils.updateScheduleJob(scheduler, scheduleJob);<br />
+                }<br />
+            } catch (SchedulerException e) {<br />
+                // TODO Auto-generated catch block<br />
+                e.printStackTrace();<br />
+            }<br />
+        }<br />
+    }<br />
+    <br />
+    @Override<br />
+    public ScheduleJobEntity queryScheduleJobByJobId(String jobId) {<br />
+        return scheduleJobMapper.queryScheduleJobByJobId(jobId);<br />
+    }</p>
+<p>    @Override<br />
+    public DataTableModel queryScheduleJobList(Map<String, String> dataTableMap) {<br />
+        DataTableModel dataTableModel = new DataTableModel();<br />
+        Map<String, Object> paramMap = new HashMap<String, Object>();<br />
+        String sEcho = dataTableMap.get("sEcho");<br />
+        int start = Integer.parseInt(dataTableMap.get("iDisplayStart"));<br />
+        int length = Integer.parseInt(dataTableMap.get("iDisplayLength"));<br />
+        int currentPage = start / length + 1;<br />
+        <br />
+        paramMap.put("beanName", XSSFilterUtils.SQLEncode(dataTableMap.get("beanName").trim()));<br />
+        paramMap.put("methodName", XSSFilterUtils.SQLEncode(dataTableMap.get("methodName").trim()));<br />
+        paramMap.put("remark", XSSFilterUtils.SQLEncode(dataTableMap.get("remark").trim()));<br />
+        paramMap.put("orderStr", dataTableMap.get("orderStr"));<br />
+        Page<Map<String, Object>> page = PaginationUtil.setPageInfoStart(paramMap, currentPage, length);</p>
+<p>        List<Map<String, Object>> resList = scheduleJobMapper.queryScheduleJobList(page);<br />
+        Integer count = scheduleJobMapper.queryScheduleJobCount(paramMap);<br />
+        dataTableModel.setiTotalDisplayRecords(count);<br />
+        dataTableModel.setiTotalRecords(count);<br />
+        dataTableModel.setsEcho(Integer.valueOf(sEcho));<br />
+        dataTableModel.setAaData(resList);<br />
+        return dataTableModel;<br />
+    }</p>
+<p>    @Override<br />
+    @Transactional<br />
+    public int addScheduleJobEntity(ScheduleJobEntity scheduleJob) throws SchedulerException {<br />
+        scheduleJob.setCreateTime(new Date());<br />
+        scheduleJob.setStatus(GlobalConstant.ScheduleStatus.NORMAL.getValue());<br />
+        int retCount = scheduleJobMapper.addScheduleJobEntity(scheduleJob);<br />
+        <br />
+        ScheduleUtils.buildScheduleJob(scheduler, scheduleJob);<br />
+        <br />
+        return retCount;<br />
+    }</p>
+<p>    @Override<br />
+    @Transactional<br />
+    public int updateScheduleJobEntity(ScheduleJobEntity scheduleJob) throws SchedulerException {<br />
+        ScheduleJobEntity tempScheduleJobEntity = queryScheduleJobByJobId(scheduleJob.getJobId());<br />
+        scheduleJob.setStatus(tempScheduleJobEntity.getStatus());<br />
+        scheduleJob.setCreateTime(tempScheduleJobEntity.getCreateTime());<br />
+        ScheduleUtils.updateScheduleJob(scheduler, scheduleJob);<br />
+        <br />
+        return scheduleJobMapper.updateScheduleJobEntity(scheduleJob);<br />
+    }</p>
+<p>    @Override<br />
+    public int updateScheduleJobEntityBatch(Map<String, Object> map) {<br />
+        return scheduleJobMapper.updateScheduleJobEntityBatch(map);<br />
+    }</p>
+<p>    @Override<br />
+    @Transactional<br />
+    public void deleteScheduleJobEntityBatch(String[] jobIds) throws SchedulerException {<br />
+        for(String jobId : jobIds) {<br />
+            ScheduleUtils.deleteJob(scheduler, jobId);<br />
+        }<br />
+        scheduleJobMapper.deleteScheduleJobEntityBatch(jobIds);<br />
+    }</p>
+<p>    /**</p>
 <h3>执行定时任务</h3>
-
-<p>&nbsp; &nbsp; &nbsp;*/</p>
-
-<p>&nbsp;&nbsp; &nbsp;@Override<br />
-&nbsp;&nbsp; &nbsp;@Transactional<br />
-&nbsp;&nbsp; &nbsp;public void run(String[] jobIds) throws SchedulerException {<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;for(String jobId : jobIds) {<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;ScheduleUtils.run(scheduler, queryScheduleJobByJobId(jobId));<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;}<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;Map&lt;String,Object&gt; map = new HashMap&lt;String,Object&gt;();<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;map.put(&quot;list&quot;, jobIds);<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;map.put(&quot;status&quot;, GlobalConstant.ScheduleStatus.NORMAL.getValue());<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;updateScheduleJobEntityBatch(map);<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;<br />
-&nbsp;&nbsp; &nbsp;}</p>
-
-<p>&nbsp;&nbsp; &nbsp;@Override<br />
-&nbsp;&nbsp; &nbsp;@Transactional<br />
-&nbsp;&nbsp; &nbsp;public void runByMethodName(String methodName) throws SchedulerException {<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;String jobIdByName = scheduleJobMapper.queryJobIdByMethodName(methodName);<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;String[] jobIds = {jobIdByName};<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;for(String jobId : jobIds) {<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;ScheduleUtils.run(scheduler, queryScheduleJobByJobId(jobId));<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;}<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;Map&lt;String,Object&gt; map = new HashMap&lt;String,Object&gt;();<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;map.put(&quot;list&quot;, jobIds);<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;map.put(&quot;status&quot;, GlobalConstant.ScheduleStatus.NORMAL.getValue());<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;updateScheduleJobEntityBatch(map);<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;<br />
-&nbsp;&nbsp; &nbsp;}</p>
-
-<p>&nbsp;&nbsp; &nbsp;/**</p>
-
+<p>     */</p>
+<p>    @Override<br />
+    @Transactional<br />
+    public void run(String[] jobIds) throws SchedulerException {<br />
+        for(String jobId : jobIds) {<br />
+            ScheduleUtils.run(scheduler, queryScheduleJobByJobId(jobId));<br />
+        }<br />
+        Map<String,Object> map = new HashMap<String,Object>();<br />
+        map.put("list", jobIds);<br />
+        map.put("status", GlobalConstant.ScheduleStatus.NORMAL.getValue());<br />
+        <br />
+        updateScheduleJobEntityBatch(map);<br />
+        <br />
+    }</p>
+<p>    @Override<br />
+    @Transactional<br />
+    public void runByMethodName(String methodName) throws SchedulerException {<br />
+        String jobIdByName = scheduleJobMapper.queryJobIdByMethodName(methodName);<br />
+        String[] jobIds = {jobIdByName};<br />
+        for(String jobId : jobIds) {<br />
+            ScheduleUtils.run(scheduler, queryScheduleJobByJobId(jobId));<br />
+        }<br />
+        Map<String,Object> map = new HashMap<String,Object>();<br />
+        map.put("list", jobIds);<br />
+        map.put("status", GlobalConstant.ScheduleStatus.NORMAL.getValue());<br />
+        <br />
+        updateScheduleJobEntityBatch(map);<br />
+        <br />
+    }</p>
+<p>    /**</p>
 <h3>暂停定时任务</h3>
-
-<p>&nbsp; &nbsp; &nbsp;*/</p>
-
-<p>&nbsp;&nbsp; &nbsp;@Override<br />
-&nbsp;&nbsp; &nbsp;@Transactional<br />
-&nbsp;&nbsp; &nbsp;public void pause(String[] jobIds) throws SchedulerException {<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;for(String jobId : jobIds) {<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;ScheduleUtils.pauseJob(scheduler, jobId);<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;}<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;Map&lt;String,Object&gt; map = new HashMap&lt;String,Object&gt;();<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;map.put(&quot;list&quot;, jobIds);<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;map.put(&quot;status&quot;, GlobalConstant.ScheduleStatus.PAUSE.getValue());<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;updateScheduleJobEntityBatch(map);<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;<br />
-&nbsp;&nbsp; &nbsp;}</p>
-
-<p>&nbsp;&nbsp; &nbsp;/**</p>
-
+<p>     */</p>
+<p>    @Override<br />
+    @Transactional<br />
+    public void pause(String[] jobIds) throws SchedulerException {<br />
+        for(String jobId : jobIds) {<br />
+            ScheduleUtils.pauseJob(scheduler, jobId);<br />
+        }<br />
+        Map<String,Object> map = new HashMap<String,Object>();<br />
+        map.put("list", jobIds);<br />
+        map.put("status", GlobalConstant.ScheduleStatus.PAUSE.getValue());<br />
+        <br />
+        updateScheduleJobEntityBatch(map);<br />
+        <br />
+    }</p>
+<p>    /**</p>
 <h3>恢复定时任务</h3>
-
-<p>&nbsp; &nbsp; &nbsp;*/</p>
-
-<p>&nbsp;&nbsp; &nbsp;@Override<br />
-&nbsp;&nbsp; &nbsp;@Transactional<br />
-&nbsp;&nbsp; &nbsp;public void resume(String[] jobIds) throws SchedulerException {<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;for(String jobId : jobIds) {<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;ScheduleUtils.resumeJob(scheduler, jobId);<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;}<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;Map&lt;String,Object&gt; map = new HashMap&lt;String,Object&gt;();<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;map.put(&quot;list&quot;, jobIds);<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;map.put(&quot;status&quot;, GlobalConstant.ScheduleStatus.NORMAL.getValue());<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;updateScheduleJobEntityBatch(map);<br />
-&nbsp;&nbsp; &nbsp;}</p>
-
+<p>     */</p>
+<p>    @Override<br />
+    @Transactional<br />
+    public void resume(String[] jobIds) throws SchedulerException {<br />
+        <br />
+        for(String jobId : jobIds) {<br />
+            ScheduleUtils.resumeJob(scheduler, jobId);<br />
+        }<br />
+        Map<String,Object> map = new HashMap<String,Object>();<br />
+        map.put("list", jobIds);<br />
+        map.put("status", GlobalConstant.ScheduleStatus.NORMAL.getValue());<br />
+        <br />
+        updateScheduleJobEntityBatch(map);<br />
+    }</p>
 <p>}</p>
-
 <h2>工具类-ScheduleUtils</h2>
-
 <p>package com.ustc.wang.base.utils;</p>
-
 <p>import org.quartz.CronScheduleBuilder;<br />
 import org.quartz.CronTrigger;<br />
 import org.quartz.JobBuilder;<br />
@@ -610,178 +539,160 @@ import org.quartz.Scheduler;<br />
 import org.quartz.SchedulerException;<br />
 import org.quartz.TriggerBuilder;<br />
 import org.quartz.TriggerKey;</p>
-
 <p>import com.ustc.wang.model.job.ScheduleJobEntity;</p>
-
 <p>public class ScheduleUtils {<br />
-&nbsp; &nbsp; &nbsp;private final static String JOB_NAME_PRE = &quot;EAS_TASK_&quot;;<br />
-&nbsp; &nbsp; &nbsp;<br />
-&nbsp; &nbsp; &nbsp;/**<br />
-&nbsp; &nbsp; &nbsp; * 获取触发器key<br />
-&nbsp; &nbsp; &nbsp; * @param jobId<br />
-&nbsp; &nbsp; &nbsp; * @return<br />
-&nbsp; &nbsp; &nbsp; */<br />
-&nbsp; &nbsp; &nbsp;public static TriggerKey getTriggerKey(String jobId) {<br />
-&nbsp; &nbsp; &nbsp;&nbsp; &nbsp; return TriggerKey.triggerKey(JOB_NAME_PRE + jobId);&nbsp;<br />
-&nbsp; &nbsp; &nbsp;}<br />
-&nbsp; &nbsp; &nbsp;<br />
-&nbsp; &nbsp; &nbsp;/**<br />
-&nbsp; &nbsp; &nbsp; * 获取jobkey<br />
-&nbsp; &nbsp; &nbsp; * @param jobId<br />
-&nbsp; &nbsp; &nbsp; * @return<br />
-&nbsp; &nbsp; &nbsp; */<br />
-&nbsp; &nbsp; &nbsp;public static JobKey getJobKey(String jobId) {<br />
-&nbsp; &nbsp; &nbsp;&nbsp; &nbsp; return JobKey.jobKey(JOB_NAME_PRE + jobId);<br />
-&nbsp; &nbsp; &nbsp;}<br />
-&nbsp; &nbsp; &nbsp;<br />
-&nbsp; &nbsp; &nbsp;/**<br />
-&nbsp; &nbsp; &nbsp; * 获取表达式触发器<br />
-&nbsp; &nbsp; &nbsp; * @param scheduler<br />
-&nbsp; &nbsp; &nbsp; * @param jobId<br />
-&nbsp; &nbsp; &nbsp; * @return<br />
-&nbsp; &nbsp; &nbsp; * @throws SchedulerException<br />
-&nbsp; &nbsp; &nbsp; */<br />
-&nbsp; &nbsp; &nbsp;public static CronTrigger getCronTrigger(Scheduler scheduler,String jobId) throws SchedulerException {<br />
-&nbsp; &nbsp; &nbsp;&nbsp; &nbsp; try{<br />
-&nbsp; &nbsp; &nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;return (CronTrigger) scheduler.getTrigger(getTriggerKey(jobId));&nbsp;<br />
-&nbsp; &nbsp; &nbsp;&nbsp; &nbsp; }catch(SchedulerException e) {<br />
-&nbsp; &nbsp; &nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;throw new SchedulerException(&quot;获取定时任务CornTrigger出现异常&quot;,e);<br />
-&nbsp; &nbsp; &nbsp;&nbsp; &nbsp; }<br />
-&nbsp; &nbsp; &nbsp;}<br />
-&nbsp; &nbsp; &nbsp;<br />
-&nbsp; &nbsp; &nbsp;/**</p>
-
+     private final static String JOB_NAME_PRE = "EAS_TASK_";<br />
+     <br />
+     /**<br />
+      * 获取触发器key<br />
+      * @param jobId<br />
+      * @return<br />
+      */<br />
+     public static TriggerKey getTriggerKey(String jobId) {<br />
+         return TriggerKey.triggerKey(JOB_NAME_PRE + jobId); <br />
+     }<br />
+     <br />
+     /**<br />
+      * 获取jobkey<br />
+      * @param jobId<br />
+      * @return<br />
+      */<br />
+     public static JobKey getJobKey(String jobId) {<br />
+         return JobKey.jobKey(JOB_NAME_PRE + jobId);<br />
+     }<br />
+     <br />
+     /**<br />
+      * 获取表达式触发器<br />
+      * @param scheduler<br />
+      * @param jobId<br />
+      * @return<br />
+      * @throws SchedulerException<br />
+      */<br />
+     public static CronTrigger getCronTrigger(Scheduler scheduler,String jobId) throws SchedulerException {<br />
+         try{<br />
+            return (CronTrigger) scheduler.getTrigger(getTriggerKey(jobId)); <br />
+         }catch(SchedulerException e) {<br />
+            throw new SchedulerException("获取定时任务CornTrigger出现异常",e);<br />
+         }<br />
+     }<br />
+     <br />
+     /**</p>
 <h3>创建定时任务</h3>
-
-<p>&nbsp; &nbsp; &nbsp; * @param scheduler<br />
-&nbsp; &nbsp; &nbsp; * @param scheduleJob<br />
-&nbsp; &nbsp; &nbsp;* @throws SchedulerException&nbsp;<br />
-&nbsp; &nbsp; &nbsp; */<br />
-&nbsp; &nbsp; &nbsp;public static void buildScheduleJob(Scheduler scheduler,ScheduleJobEntity scheduleJob) throws SchedulerException {<br />
-&nbsp; &nbsp; &nbsp;&nbsp; &nbsp; try{<br />
-&nbsp; &nbsp; &nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp; //创建job信息<br />
-&nbsp; &nbsp; &nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp; JobDetail jobDetail = JobBuilder.newJob(ScheduleJob.class).withIdentity(getJobKey(scheduleJob.getJobId())).build();<br />
-&nbsp; &nbsp; &nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;<br />
-&nbsp; &nbsp; &nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp; //创建表达式构建器<br />
-&nbsp; &nbsp; &nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp; CronScheduleBuilder scheduleBuilder = CronScheduleBuilder.cronSchedule(scheduleJob.getCronExpression()).withMisfireHandlingInstructionDoNothing();<br />
-&nbsp; &nbsp; &nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;<br />
-&nbsp; &nbsp; &nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp; //根据新的cronExpression表达式创建一个新的trigger<br />
-&nbsp; &nbsp; &nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp; CronTrigger trigger = TriggerBuilder.newTrigger().withIdentity(getTriggerKey(scheduleJob.getJobId())).withSchedule(scheduleBuilder).build();<br />
-&nbsp; &nbsp; &nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;<br />
-&nbsp; &nbsp; &nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp; jobDetail.getJobDataMap().put(ScheduleJobEntity.JOB_PARAM_KEY, scheduleJob);<br />
-&nbsp; &nbsp; &nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;<br />
-&nbsp; &nbsp; &nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp; scheduler.scheduleJob(jobDetail,trigger);<br />
-&nbsp; &nbsp; &nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;<br />
-&nbsp; &nbsp; &nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp; if(scheduleJob.getStatus() == GlobalConstant.ScheduleStatus.PAUSE.getValue()) {<br />
-&nbsp; &nbsp; &nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp; pauseJob(scheduler,scheduleJob.getJobId());<br />
-&nbsp; &nbsp; &nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp; }<br />
-&nbsp; &nbsp; &nbsp;&nbsp; &nbsp; } catch (SchedulerException e) {<br />
-&nbsp; &nbsp; &nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp; throw new SchedulerException(&quot;创建定时任务失败&quot;,e);<br />
-&nbsp; &nbsp; &nbsp;&nbsp; &nbsp; }<br />
-&nbsp; &nbsp; &nbsp;}<br />
-&nbsp; &nbsp; &nbsp;<br />
-&nbsp; &nbsp; &nbsp;/**</p>
-
+<p>      * @param scheduler<br />
+      * @param scheduleJob<br />
+     * @throws SchedulerException <br />
+      */<br />
+     public static void buildScheduleJob(Scheduler scheduler,ScheduleJobEntity scheduleJob) throws SchedulerException {<br />
+         try{<br />
+             //创建job信息<br />
+             JobDetail jobDetail = JobBuilder.newJob(ScheduleJob.class).withIdentity(getJobKey(scheduleJob.getJobId())).build();<br />
+             <br />
+             //创建表达式构建器<br />
+             CronScheduleBuilder scheduleBuilder = CronScheduleBuilder.cronSchedule(scheduleJob.getCronExpression()).withMisfireHandlingInstructionDoNothing();<br />
+             <br />
+             //根据新的cronExpression表达式创建一个新的trigger<br />
+             CronTrigger trigger = TriggerBuilder.newTrigger().withIdentity(getTriggerKey(scheduleJob.getJobId())).withSchedule(scheduleBuilder).build();<br />
+             <br />
+             jobDetail.getJobDataMap().put(ScheduleJobEntity.JOB_PARAM_KEY, scheduleJob);<br />
+             <br />
+             scheduler.scheduleJob(jobDetail,trigger);<br />
+             <br />
+             if(scheduleJob.getStatus() == GlobalConstant.ScheduleStatus.PAUSE.getValue()) {<br />
+                 pauseJob(scheduler,scheduleJob.getJobId());<br />
+             }<br />
+         } catch (SchedulerException e) {<br />
+             throw new SchedulerException("创建定时任务失败",e);<br />
+         }<br />
+     }<br />
+     <br />
+     /**</p>
 <h3>暂停任务</h3>
-
-<p>&nbsp; &nbsp; &nbsp; * @param scheduler<br />
-&nbsp; &nbsp; &nbsp; * @param jobId<br />
-&nbsp; &nbsp; &nbsp; * @throws SchedulerException<br />
-&nbsp; &nbsp; &nbsp; */<br />
-&nbsp; &nbsp; &nbsp;public static void pauseJob(Scheduler scheduler,String jobId) throws SchedulerException {<br />
-&nbsp; &nbsp; &nbsp;&nbsp; &nbsp; try{<br />
-&nbsp; &nbsp; &nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp; scheduler.pauseJob(getJobKey(jobId));<br />
-&nbsp; &nbsp; &nbsp;&nbsp; &nbsp; }catch(SchedulerException e) {<br />
-&nbsp; &nbsp; &nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp; throw new SchedulerException(&quot;暂停定时任务失败&quot;,e);<br />
-&nbsp; &nbsp; &nbsp;&nbsp; &nbsp; }<br />
-&nbsp; &nbsp; &nbsp;}<br />
-&nbsp; &nbsp; &nbsp;<br />
-&nbsp; &nbsp; &nbsp;/**</p>
-
+<p>      * @param scheduler<br />
+      * @param jobId<br />
+      * @throws SchedulerException<br />
+      */<br />
+     public static void pauseJob(Scheduler scheduler,String jobId) throws SchedulerException {<br />
+         try{<br />
+             scheduler.pauseJob(getJobKey(jobId));<br />
+         }catch(SchedulerException e) {<br />
+             throw new SchedulerException("暂停定时任务失败",e);<br />
+         }<br />
+     }<br />
+     <br />
+     /**</p>
 <h3>更新定时任务</h3>
-
-<p>&nbsp; &nbsp; &nbsp; * @param scheduler<br />
-&nbsp; &nbsp; &nbsp; * @param scheduleJob<br />
-&nbsp; &nbsp; &nbsp; * @throws SchedulerException<br />
-&nbsp; &nbsp; &nbsp; */<br />
-&nbsp; &nbsp; &nbsp;public static void updateScheduleJob(Scheduler scheduler,ScheduleJobEntity scheduleJob) throws SchedulerException{<br />
-&nbsp; &nbsp; &nbsp;&nbsp; &nbsp; try{<br />
-&nbsp; &nbsp; &nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp; TriggerKey triggerKey = getTriggerKey(scheduleJob.getJobId());<br />
-&nbsp; &nbsp; &nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;<br />
-&nbsp; &nbsp; &nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp; //表达式调度构建器<br />
-&nbsp; &nbsp; &nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp; CronScheduleBuilder scheduleBuilder = CronScheduleBuilder.cronSchedule(scheduleJob.getCronExpression()).withMisfireHandlingInstructionDoNothing();<br />
-&nbsp; &nbsp; &nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;<br />
-&nbsp; &nbsp; &nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp; CronTrigger trigger = getCronTrigger(scheduler,scheduleJob.getJobId());<br />
-&nbsp; &nbsp; &nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;<br />
-&nbsp; &nbsp; &nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp; trigger = trigger.getTriggerBuilder().withIdentity(triggerKey).withSchedule(scheduleBuilder).build();<br />
-&nbsp; &nbsp; &nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;<br />
-&nbsp; &nbsp; &nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp; trigger.getJobDataMap().put(ScheduleJobEntity.JOB_PARAM_KEY, scheduleJob);<br />
-&nbsp; &nbsp; &nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;<br />
-&nbsp; &nbsp; &nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp; scheduler.rescheduleJob(triggerKey, trigger);<br />
-&nbsp; &nbsp; &nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp; if(scheduleJob.getStatus() == GlobalConstant.ScheduleStatus.PAUSE.getValue()) {<br />
-&nbsp; &nbsp; &nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp; pauseJob(scheduler,scheduleJob.getJobId());<br />
-&nbsp; &nbsp; &nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp; }<br />
-&nbsp; &nbsp; &nbsp;&nbsp; &nbsp; }catch(SchedulerException e) {<br />
-&nbsp; &nbsp; &nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp; throw new SchedulerException(&quot;更新定时任务失败&quot;,e);<br />
-&nbsp; &nbsp; &nbsp;&nbsp; &nbsp; }<br />
-&nbsp; &nbsp; }<br />
-&nbsp; &nbsp; &nbsp;<br />
-&nbsp; &nbsp; &nbsp;/**</p>
-
+<p>      * @param scheduler<br />
+      * @param scheduleJob<br />
+      * @throws SchedulerException<br />
+      */<br />
+     public static void updateScheduleJob(Scheduler scheduler,ScheduleJobEntity scheduleJob) throws SchedulerException{<br />
+         try{<br />
+             TriggerKey triggerKey = getTriggerKey(scheduleJob.getJobId());<br />
+             <br />
+             //表达式调度构建器<br />
+             CronScheduleBuilder scheduleBuilder = CronScheduleBuilder.cronSchedule(scheduleJob.getCronExpression()).withMisfireHandlingInstructionDoNothing();<br />
+             <br />
+             CronTrigger trigger = getCronTrigger(scheduler,scheduleJob.getJobId());<br />
+             <br />
+             trigger = trigger.getTriggerBuilder().withIdentity(triggerKey).withSchedule(scheduleBuilder).build();<br />
+             <br />
+             trigger.getJobDataMap().put(ScheduleJobEntity.JOB_PARAM_KEY, scheduleJob);<br />
+             <br />
+             scheduler.rescheduleJob(triggerKey, trigger);<br />
+             if(scheduleJob.getStatus() == GlobalConstant.ScheduleStatus.PAUSE.getValue()) {<br />
+                 pauseJob(scheduler,scheduleJob.getJobId());<br />
+             }<br />
+         }catch(SchedulerException e) {<br />
+             throw new SchedulerException("更新定时任务失败",e);<br />
+         }<br />
+    }<br />
+     <br />
+     /**</p>
 <h3>执行任务</h3>
-
-<p>&nbsp; &nbsp; &nbsp; * @param scheduler<br />
-&nbsp; &nbsp; &nbsp; * @param scheduleJob<br />
-&nbsp; &nbsp; &nbsp; * @throws SchedulerException<br />
-&nbsp; &nbsp; &nbsp; */<br />
-&nbsp; &nbsp; &nbsp;public static void run(Scheduler scheduler,ScheduleJobEntity scheduleJob) throws SchedulerException{<br />
-&nbsp; &nbsp; &nbsp;&nbsp; &nbsp; try{<br />
-&nbsp; &nbsp; &nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp; JobDataMap jobDataMap = new JobDataMap();<br />
-&nbsp; &nbsp; &nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp; jobDataMap.put(ScheduleJobEntity.JOB_PARAM_KEY, scheduleJob);<br />
-&nbsp; &nbsp; &nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp; scheduler.triggerJob(getJobKey(scheduleJob.getJobId()), jobDataMap);<br />
-&nbsp; &nbsp; &nbsp;&nbsp; &nbsp; } catch (SchedulerException e) {<br />
-&nbsp; &nbsp; &nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp; throw new SchedulerException(&quot;执行定时任务失败&quot;,e);<br />
-&nbsp; &nbsp; &nbsp;&nbsp; &nbsp; }<br />
-&nbsp; &nbsp; &nbsp;}<br />
-&nbsp; &nbsp; &nbsp;<br />
-&nbsp; &nbsp; &nbsp;/**</p>
-
+<p>      * @param scheduler<br />
+      * @param scheduleJob<br />
+      * @throws SchedulerException<br />
+      */<br />
+     public static void run(Scheduler scheduler,ScheduleJobEntity scheduleJob) throws SchedulerException{<br />
+         try{<br />
+             JobDataMap jobDataMap = new JobDataMap();<br />
+             jobDataMap.put(ScheduleJobEntity.JOB_PARAM_KEY, scheduleJob);<br />
+             scheduler.triggerJob(getJobKey(scheduleJob.getJobId()), jobDataMap);<br />
+         } catch (SchedulerException e) {<br />
+             throw new SchedulerException("执行定时任务失败",e);<br />
+         }<br />
+     }<br />
+     <br />
+     /**</p>
 <h3>恢复定时任务失败</h3>
-
-<p>&nbsp; &nbsp; &nbsp; * @param scheduler<br />
-&nbsp; &nbsp; &nbsp; * @param jobId<br />
-&nbsp; &nbsp; &nbsp; */<br />
-&nbsp; &nbsp; &nbsp;public static void resumeJob(Scheduler scheduler,String jobId) throws SchedulerException{<br />
-&nbsp; &nbsp; &nbsp;&nbsp; &nbsp; try{<br />
-&nbsp; &nbsp; &nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;scheduler.resumeJob(getJobKey(jobId));&nbsp;<br />
-&nbsp; &nbsp; &nbsp;&nbsp; &nbsp; }catch( SchedulerException e) {<br />
-&nbsp; &nbsp; &nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp; throw new SchedulerException(&quot;恢复定时任务失败&quot;,e);&nbsp;<br />
-&nbsp; &nbsp; &nbsp;&nbsp; &nbsp; }<br />
-&nbsp; &nbsp; &nbsp;}<br />
-&nbsp; &nbsp; &nbsp;<br />
-&nbsp; &nbsp; &nbsp;/**</p>
-
+<p>      * @param scheduler<br />
+      * @param jobId<br />
+      */<br />
+     public static void resumeJob(Scheduler scheduler,String jobId) throws SchedulerException{<br />
+         try{<br />
+            scheduler.resumeJob(getJobKey(jobId)); <br />
+         }catch( SchedulerException e) {<br />
+             throw new SchedulerException("恢复定时任务失败",e); <br />
+         }<br />
+     }<br />
+     <br />
+     /**</p>
 <h3>删除定时任务</h3>
-
-<p>&nbsp; &nbsp; &nbsp; * @param scheduler<br />
-&nbsp; &nbsp; &nbsp; * @param jobId<br />
-&nbsp; &nbsp; &nbsp; * @throws SchedulerException<br />
-&nbsp; &nbsp; &nbsp; */<br />
-&nbsp; &nbsp; &nbsp;public static void deleteJob(Scheduler scheduler,String jobId) throws SchedulerException{<br />
-&nbsp; &nbsp; &nbsp;&nbsp; &nbsp; try{<br />
-&nbsp; &nbsp; &nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp; scheduler.deleteJob(getJobKey(jobId));<br />
-&nbsp; &nbsp; &nbsp;&nbsp; &nbsp; }catch( SchedulerException e) {<br />
-&nbsp; &nbsp; &nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp; throw new SchedulerException(&quot;删除定时任务失败&quot;,e);&nbsp;<br />
-&nbsp; &nbsp; &nbsp;&nbsp; &nbsp; }<br />
-&nbsp; &nbsp; &nbsp;}<br />
+<p>      * @param scheduler<br />
+      * @param jobId<br />
+      * @throws SchedulerException<br />
+      */<br />
+     public static void deleteJob(Scheduler scheduler,String jobId) throws SchedulerException{<br />
+         try{<br />
+             scheduler.deleteJob(getJobKey(jobId));<br />
+         }catch( SchedulerException e) {<br />
+             throw new SchedulerException("删除定时任务失败",e); <br />
+         }<br />
+     }<br />
 }</p>
-
 <h2>工具类基础-ScheduleJob</h2>
-
-<h3><strong>这里需要重载&nbsp;executeInternal 方法</strong></h3>
-
+<h3><strong>这里需要重载 executeInternal 方法</strong></h3>
 <p>package com.wh.eas.manage.base.utils;</p>
-
 <p>import java.util.concurrent.ArrayBlockingQueue;<br />
 import java.util.concurrent.ExecutorService;<br />
 import java.util.concurrent.Executors;<br />
@@ -790,438 +701,379 @@ import java.util.concurrent.ThreadFactory;<br />
 import java.util.concurrent.ThreadPoolExecutor;<br />
 import java.util.concurrent.TimeUnit;<br />
 import java.util.concurrent.atomic.AtomicInteger;</p>
-
 <p>import org.apache.logging.log4j.LogManager;<br />
 import org.apache.logging.log4j.Logger;<br />
 import org.quartz.JobExecutionContext;<br />
 import org.quartz.JobExecutionException;<br />
 import org.springframework.scheduling.quartz.QuartzJobBean;</p>
-
 <p>import com.wh.eas.manage.model.job.ScheduleJobEntity;<br />
 import com.wh.eas.manage.model.job.ScheduleJobLogEntity;<br />
 import com.wh.eas.manage.service.job.IScheduleJobLogService;</p>
-
 <p>public class ScheduleJob extends QuartzJobBean{<br />
-&nbsp;&nbsp; &nbsp;//核心线程数 默认1<br />
-&nbsp;&nbsp; &nbsp;//private static final int corPoolSize = 10;<br />
-&nbsp;&nbsp; &nbsp;//最大线程数 默认Integer.MAX_VALUE<br />
-&nbsp;&nbsp; &nbsp;//private static final int maxPoolSize = 50;<br />
-&nbsp;&nbsp; &nbsp;//线程池维护线程所允许的空闲时间 默认60s<br />
-&nbsp;&nbsp; &nbsp;//private static final int keepAliveSeconds = 60;<br />
-&nbsp;&nbsp; &nbsp;//队列最大长度，默认Integer.MAX_VALUE<br />
-&nbsp;&nbsp; &nbsp;//private static final int queueCapacity = 1000;<br />
-&nbsp; &nbsp; private &nbsp;Logger logger = LogManager.getLogger(ScheduleJob.class);<br />
-/* &nbsp; &nbsp;private static ThreadFactory factory = new ThreadFactory(){<br />
-&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; final AtomicInteger threadNumber = new AtomicInteger(1);<br />
-&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; public Thread newThread(Runnable r) {<br />
-&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; Thread thread = new Thread(Thread.currentThread().getThreadGroup(), r,<br />
-&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &quot;pool-job-thread-&quot; + threadNumber.getAndIncrement(),<br />
-&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; 0);<br />
-&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; thread.setDaemon(true);<br />
-&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; if (thread.getPriority() != Thread.NORM_PRIORITY){<br />
-&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;&nbsp; &nbsp;thread.setPriority(Thread.NORM_PRIORITY);<br />
-&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; }<br />
-&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; return thread;<br />
-&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; }<br />
-&nbsp; &nbsp; };*/<br />
-&nbsp; &nbsp; private ExecutorService service = Executors.newSingleThreadExecutor();<br />
-&nbsp; &nbsp;// private ThreadPoolExecutor threadPool = new ThreadPoolExecutor(corPoolSize,maxPoolSize,keepAliveSeconds,TimeUnit.SECONDS,new ArrayBlockingQueue&lt;Runnable&gt;(queueCapacity),factory,new ThreadPoolExecutor.DiscardOldestPolicy());<br />
-<strong>&nbsp;&nbsp; &nbsp;@Override<br />
-&nbsp;&nbsp; &nbsp;protected void executeInternal(JobExecutionContext context)</strong><br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;throws JobExecutionException {<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;ScheduleJobEntity scheduleJob = (ScheduleJobEntity) context.getMergedJobDataMap()<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;.get(ScheduleJobEntity.JOB_PARAM_KEY);<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;IScheduleJobLogService scheduleJobLogService = (IScheduleJobLogService) SpringContextUtils.getBean(&quot;scheduleJobLogService&quot;);<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;ScheduleJobLogEntity log = new ScheduleJobLogEntity();<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;log.setJobId(scheduleJob.getJobId());<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;log.setBeanName(scheduleJob.getBeanName());<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;log.setMethodName(scheduleJob.getMethodName());<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;log.setParams(scheduleJob.getParams());<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;log.setCreateTime(scheduleJob.getCreateTime());<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;long startTime = System.currentTimeMillis();<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;try{<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;logger.info(&quot;准备执行任务，任务ID：&quot; + scheduleJob.getJobId());<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;<strong>ScheduleRunnable task = new ScheduleRunnable(scheduleJob.getBeanName(),scheduleJob.getMethodName(),scheduleJob.getParams());</strong><br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;Future&lt;?&gt; future = service.submit(task);<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;future.get();<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;long times = System.currentTimeMillis() - startTime;<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;log.setTimes(times);<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;//任务状态，0成功，1失败<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;log.setStatus(0);<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;logger.info(&quot;任务执行完毕，任务ID：&quot; + scheduleJob.getJobId() + &quot;总耗时：&quot;+times+&quot;毫秒&quot;);<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;scheduleJobLogService.addScheduleJobLog(log);<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;}catch(Exception e){<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;logger.error(&quot;任务执行失败，任务ID：&quot;+scheduleJob.getJobId(), e);<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;long times = System.currentTimeMillis() - startTime;<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;log.setTimes(times);<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;//任务状态，0成功，1失败<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;log.setStatus(1);<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;log.setError(StringUtils.substring(e.toString(), 0,2000));<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;scheduleJobLogService.addScheduleJobLog(log);<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;}&nbsp;<br />
-&nbsp;&nbsp; &nbsp;}</p>
-
+    //核心线程数 默认1<br />
+    //private static final int corPoolSize = 10;<br />
+    //最大线程数 默认Integer.MAX_VALUE<br />
+    //private static final int maxPoolSize = 50;<br />
+    //线程池维护线程所允许的空闲时间 默认60s<br />
+    //private static final int keepAliveSeconds = 60;<br />
+    //队列最大长度，默认Integer.MAX_VALUE<br />
+    //private static final int queueCapacity = 1000;<br />
+    private  Logger logger = LogManager.getLogger(ScheduleJob.class);<br />
+/*    private static ThreadFactory factory = new ThreadFactory(){<br />
+            final AtomicInteger threadNumber = new AtomicInteger(1);<br />
+            public Thread newThread(Runnable r) {<br />
+                Thread thread = new Thread(Thread.currentThread().getThreadGroup(), r,<br />
+                                      "pool-job-thread-" + threadNumber.getAndIncrement(),<br />
+                                      0);<br />
+                thread.setDaemon(true);<br />
+                if (thread.getPriority() != Thread.NORM_PRIORITY){<br />
+                    thread.setPriority(Thread.NORM_PRIORITY);<br />
+                }<br />
+                return thread;<br />
+            }<br />
+    };*/<br />
+    private ExecutorService service = Executors.newSingleThreadExecutor();<br />
+   // private ThreadPoolExecutor threadPool = new ThreadPoolExecutor(corPoolSize,maxPoolSize,keepAliveSeconds,TimeUnit.SECONDS,new ArrayBlockingQueue<Runnable>(queueCapacity),factory,new ThreadPoolExecutor.DiscardOldestPolicy());<br />
+<strong>    @Override<br />
+    protected void executeInternal(JobExecutionContext context)</strong><br />
+            throws JobExecutionException {<br />
+        ScheduleJobEntity scheduleJob = (ScheduleJobEntity) context.getMergedJobDataMap()<br />
+                .get(ScheduleJobEntity.JOB_PARAM_KEY);<br />
+        IScheduleJobLogService scheduleJobLogService = (IScheduleJobLogService) SpringContextUtils.getBean("scheduleJobLogService");<br />
+        ScheduleJobLogEntity log = new ScheduleJobLogEntity();<br />
+        log.setJobId(scheduleJob.getJobId());<br />
+        log.setBeanName(scheduleJob.getBeanName());<br />
+        log.setMethodName(scheduleJob.getMethodName());<br />
+        log.setParams(scheduleJob.getParams());<br />
+        log.setCreateTime(scheduleJob.getCreateTime());<br />
+        <br />
+        long startTime = System.currentTimeMillis();<br />
+        <br />
+        try{<br />
+            logger.info("准备执行任务，任务ID：" + scheduleJob.getJobId());<br />
+            <br />
+            <strong>ScheduleRunnable task = new ScheduleRunnable(scheduleJob.getBeanName(),scheduleJob.getMethodName(),scheduleJob.getParams());</strong><br />
+            Future<?> future = service.submit(task);<br />
+            future.get();<br />
+            <br />
+            long times = System.currentTimeMillis() - startTime;<br />
+            log.setTimes(times);<br />
+            //任务状态，0成功，1失败<br />
+            log.setStatus(0);<br />
+            logger.info("任务执行完毕，任务ID：" + scheduleJob.getJobId() + "总耗时："+times+"毫秒");<br />
+            scheduleJobLogService.addScheduleJobLog(log);<br />
+        }catch(Exception e){<br />
+            logger.error("任务执行失败，任务ID："+scheduleJob.getJobId(), e);<br />
+            <br />
+            long times = System.currentTimeMillis() - startTime;<br />
+            log.setTimes(times);<br />
+            //任务状态，0成功，1失败<br />
+            log.setStatus(1);<br />
+            log.setError(StringUtils.substring(e.toString(), 0,2000));<br />
+            scheduleJobLogService.addScheduleJobLog(log);<br />
+        } <br />
+    }</p>
 <p>}<br />
-&nbsp;</p>
-
+ </p>
 <h2>执行器-ScheduleRunnable</h2>
-
 <p>package com.wh.eas.manage.base.utils;</p>
-
 <p>import java.lang.reflect.Method;</p>
-
 <p>import org.apache.logging.log4j.LogManager;<br />
 import org.apache.logging.log4j.Logger;<br />
 import org.springframework.util.ReflectionUtils;</p>
-
 <p>public class ScheduleRunnable implements Runnable{<br />
-&nbsp; &nbsp; private &nbsp;Logger logger = LogManager.getLogger(ScheduleRunnable.class);<br />
-&nbsp;&nbsp; &nbsp;private String params;<br />
-&nbsp;&nbsp; &nbsp;private Method method;<br />
-&nbsp;&nbsp; &nbsp;private Object target;<br />
-&nbsp;&nbsp; &nbsp;<br />
-&nbsp;&nbsp; &nbsp;public ScheduleRunnable(String beanName,String methodName,String params)&nbsp;<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;throws NoSuchMethodException,SecurityException{<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;this.target = SpringContextUtils.getBean(beanName);<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;this.params = params;<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;if(StringUtils.isNotBlank(params)) {<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;this.method = this.target.getClass().getDeclaredMethod(methodName, String.class);<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;} else {<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;this.method = this.target.getClass().getDeclaredMethod(methodName);<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;}<br />
-&nbsp;&nbsp; &nbsp;}<br />
-&nbsp;&nbsp; &nbsp;<br />
-&nbsp;&nbsp; &nbsp;@Override<br />
-&nbsp;&nbsp; &nbsp;<strong>public void run() {</strong><br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;try{<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;ReflectionUtils.makeAccessible(method);<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;if(StringUtils.isNotBlank(params)) {<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;method.invoke(target, params);<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;} else {<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;method.invoke(target);<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;}<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;}catch(Exception e) {<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;logger.error(&quot;执行定时任务失败&quot;, e);<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;}<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;<br />
-&nbsp;&nbsp; &nbsp;}</p>
-
-<p>&nbsp;&nbsp; &nbsp;public String getParams() {<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;return params;<br />
-&nbsp;&nbsp; &nbsp;}</p>
-
-<p>&nbsp;&nbsp; &nbsp;public void setParams(String params) {<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;this.params = params;<br />
-&nbsp;&nbsp; &nbsp;}</p>
-
-<p>&nbsp;&nbsp; &nbsp;public Method getMethod() {<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;return method;<br />
-&nbsp;&nbsp; &nbsp;}</p>
-
-<p>&nbsp;&nbsp; &nbsp;public void setMethod(Method method) {<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;this.method = method;<br />
-&nbsp;&nbsp; &nbsp;}</p>
-
-<p>&nbsp;&nbsp; &nbsp;public Object getTarget() {<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;return target;<br />
-&nbsp;&nbsp; &nbsp;}</p>
-
-<p>&nbsp;&nbsp; &nbsp;public void setTarget(Object target) {<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;this.target = target;<br />
-&nbsp;&nbsp; &nbsp;}</p>
-
+    private  Logger logger = LogManager.getLogger(ScheduleRunnable.class);<br />
+    private String params;<br />
+    private Method method;<br />
+    private Object target;<br />
+    <br />
+    public ScheduleRunnable(String beanName,String methodName,String params) <br />
+            throws NoSuchMethodException,SecurityException{<br />
+        this.target = SpringContextUtils.getBean(beanName);<br />
+        this.params = params;<br />
+        <br />
+        if(StringUtils.isNotBlank(params)) {<br />
+            this.method = this.target.getClass().getDeclaredMethod(methodName, String.class);<br />
+        } else {<br />
+            this.method = this.target.getClass().getDeclaredMethod(methodName);<br />
+        }<br />
+    }<br />
+    <br />
+    @Override<br />
+    <strong>public void run() {</strong><br />
+        try{<br />
+            ReflectionUtils.makeAccessible(method);<br />
+            if(StringUtils.isNotBlank(params)) {<br />
+                method.invoke(target, params);<br />
+            } else {<br />
+                method.invoke(target);<br />
+            }<br />
+        }catch(Exception e) {<br />
+            logger.error("执行定时任务失败", e);<br />
+        }<br />
+        <br />
+    }</p>
+<p>    public String getParams() {<br />
+        return params;<br />
+    }</p>
+<p>    public void setParams(String params) {<br />
+        this.params = params;<br />
+    }</p>
+<p>    public Method getMethod() {<br />
+        return method;<br />
+    }</p>
+<p>    public void setMethod(Method method) {<br />
+        this.method = method;<br />
+    }</p>
+<p>    public Object getTarget() {<br />
+        return target;<br />
+    }</p>
+<p>    public void setTarget(Object target) {<br />
+        this.target = target;<br />
+    }</p>
 <p>}<br />
-&nbsp;</p>
-
+ </p>
 <h2>dao层</h2>
-
 <p>package com.ustc.wang.dao.job;</p>
-
 <p>import java.util.List;<br />
 import java.util.Map;</p>
-
 <p>import org.apache.ibatis.annotations.Param;</p>
-
 <p>import com.ustc.wang.model.Page;<br />
 import com.ustc.wang.model.job.ScheduleJobEntity;</p>
-
 <p>public interface ScheduleJobMapper {<br />
-&nbsp;&nbsp; &nbsp;/**<br />
-&nbsp;&nbsp; &nbsp; * 跟jobId查询任务信息<br />
-&nbsp;&nbsp; &nbsp; * @param jobId<br />
-&nbsp;&nbsp; &nbsp; * @return<br />
-&nbsp;&nbsp; &nbsp; */<br />
-&nbsp; &nbsp; ScheduleJobEntity queryScheduleJobByJobId(@Param(&quot;jobId&quot;)String jobId);<br />
-&nbsp; &nbsp;<br />
-&nbsp; &nbsp; /**<br />
-&nbsp; &nbsp; &nbsp;* 获取所有任务列表<br />
-&nbsp; &nbsp; &nbsp;* @return<br />
-&nbsp; &nbsp; &nbsp;*/<br />
-&nbsp; &nbsp; List&lt;ScheduleJobEntity&gt; queryAllScheduleJob();<br />
-&nbsp; &nbsp;&nbsp;<br />
-&nbsp; &nbsp; /**<br />
-&nbsp; &nbsp; &nbsp;* 分页查询任务列表<br />
-&nbsp; &nbsp; &nbsp;* @param page<br />
-&nbsp; &nbsp; &nbsp;* @return<br />
-&nbsp; &nbsp; &nbsp;*/<br />
-&nbsp; &nbsp; List&lt;Map&lt;String,Object&gt;&gt; queryScheduleJobList(Page&lt;Map&lt;String, Object&gt;&gt; page);<br />
-&nbsp; &nbsp;&nbsp;<br />
-&nbsp; &nbsp; /**<br />
-&nbsp; &nbsp; &nbsp;* 查询任务总数<br />
-&nbsp; &nbsp; &nbsp;* @param paramMap<br />
-&nbsp; &nbsp; &nbsp;* @return<br />
-&nbsp; &nbsp; &nbsp;*/<br />
-&nbsp; &nbsp; Integer queryScheduleJobCount(Map&lt;String, Object&gt; paramMap);<br />
-&nbsp; &nbsp;<br />
-&nbsp; &nbsp; /**<br />
-&nbsp; &nbsp; &nbsp;* 新增任务<br />
-&nbsp; &nbsp; &nbsp;* @param scheduleJobEntity<br />
-&nbsp; &nbsp; &nbsp;* @return<br />
-&nbsp; &nbsp; &nbsp;*/<br />
-&nbsp; &nbsp; int addScheduleJobEntity(ScheduleJobEntity scheduleJobEntity);<br />
-&nbsp; &nbsp;&nbsp;<br />
-&nbsp; &nbsp; /**<br />
-&nbsp; &nbsp; &nbsp;* 修改任务<br />
-&nbsp; &nbsp; &nbsp;* @param scheduleJobEntity<br />
-&nbsp; &nbsp; &nbsp;* @return<br />
-&nbsp; &nbsp; &nbsp;*/<br />
-&nbsp; &nbsp; int updateScheduleJobEntity(ScheduleJobEntity scheduleJobEntity);<br />
-&nbsp; &nbsp;&nbsp;<br />
-&nbsp; &nbsp; /**<br />
-&nbsp; &nbsp; &nbsp;* 批量更新任务<br />
-&nbsp; &nbsp; &nbsp;* @param map<br />
-&nbsp; &nbsp; &nbsp;* @return<br />
-&nbsp; &nbsp; &nbsp;*/<br />
-&nbsp;&nbsp; &nbsp;int updateScheduleJobEntityBatch(Map&lt;String, Object&gt; map);<br />
-&nbsp; &nbsp;&nbsp;<br />
-&nbsp;&nbsp; &nbsp;/**<br />
-&nbsp;&nbsp; &nbsp; * 批量删除任务<br />
-&nbsp;&nbsp; &nbsp; * @param jobIds<br />
-&nbsp;&nbsp; &nbsp; * @return<br />
-&nbsp;&nbsp; &nbsp; */<br />
-&nbsp;&nbsp; &nbsp;int deleteScheduleJobEntityBatch(String[] jobIds);<br />
-&nbsp; &nbsp;&nbsp;<br />
-&nbsp;&nbsp; &nbsp;/**<br />
-&nbsp;&nbsp; &nbsp; * 获取任务ID通过BeanName<br />
-&nbsp;&nbsp; &nbsp; * @param methodName<br />
-&nbsp;&nbsp; &nbsp; * @return<br />
-&nbsp;&nbsp; &nbsp; */<br />
-&nbsp;&nbsp; &nbsp;String queryJobIdByMethodName(String methodName);<br />
+    /**<br />
+     * 跟jobId查询任务信息<br />
+     * @param jobId<br />
+     * @return<br />
+     */<br />
+    ScheduleJobEntity queryScheduleJobByJobId(@Param("jobId")String jobId);<br />
+   <br />
+    /**<br />
+     * 获取所有任务列表<br />
+     * @return<br />
+     */<br />
+    List<ScheduleJobEntity> queryAllScheduleJob();<br />
+    <br />
+    /**<br />
+     * 分页查询任务列表<br />
+     * @param page<br />
+     * @return<br />
+     */<br />
+    List<Map<String,Object>> queryScheduleJobList(Page<Map<String, Object>> page);<br />
+    <br />
+    /**<br />
+     * 查询任务总数<br />
+     * @param paramMap<br />
+     * @return<br />
+     */<br />
+    Integer queryScheduleJobCount(Map<String, Object> paramMap);<br />
+   <br />
+    /**<br />
+     * 新增任务<br />
+     * @param scheduleJobEntity<br />
+     * @return<br />
+     */<br />
+    int addScheduleJobEntity(ScheduleJobEntity scheduleJobEntity);<br />
+    <br />
+    /**<br />
+     * 修改任务<br />
+     * @param scheduleJobEntity<br />
+     * @return<br />
+     */<br />
+    int updateScheduleJobEntity(ScheduleJobEntity scheduleJobEntity);<br />
+    <br />
+    /**<br />
+     * 批量更新任务<br />
+     * @param map<br />
+     * @return<br />
+     */<br />
+    int updateScheduleJobEntityBatch(Map<String, Object> map);<br />
+    <br />
+    /**<br />
+     * 批量删除任务<br />
+     * @param jobIds<br />
+     * @return<br />
+     */<br />
+    int deleteScheduleJobEntityBatch(String[] jobIds);<br />
+    <br />
+    /**<br />
+     * 获取任务ID通过BeanName<br />
+     * @param methodName<br />
+     * @return<br />
+     */<br />
+    String queryJobIdByMethodName(String methodName);<br />
 }<br />
-&nbsp;</p>
-
+ </p>
 <h2>实体层</h2>
-
 <p>package com.ustc.wang.model.job;</p>
-
 <p>import java.io.Serializable;<br />
 import java.util.Date;</p>
-
 <p>import org.hibernate.validator.constraints.NotBlank;</p>
-
 <p>public class ScheduleJobEntity implements Serializable{</p>
-
-<p>&nbsp;&nbsp; &nbsp;/**<br />
-&nbsp;&nbsp; &nbsp; *&nbsp;<br />
-&nbsp;&nbsp; &nbsp; */<br />
-&nbsp;&nbsp; &nbsp;private static final long serialVersionUID = -579222341638101205L;<br />
-&nbsp;&nbsp;<br />
-&nbsp;&nbsp; &nbsp;public static final String JOB_PARAM_KEY = &quot;JOB_PARAM_KEY&quot;;<br />
-&nbsp;&nbsp; &nbsp;/**<br />
-&nbsp;&nbsp; &nbsp; * 任务id<br />
-&nbsp;&nbsp; &nbsp; */<br />
-&nbsp;&nbsp; &nbsp;private String jobId;<br />
-&nbsp;&nbsp; &nbsp;<br />
-&nbsp;&nbsp; &nbsp;/**<br />
-&nbsp;&nbsp; &nbsp; * 方法名<br />
-&nbsp;&nbsp; &nbsp; */<br />
-&nbsp;&nbsp; &nbsp;@NotBlank(message=&quot;bean名称不能为空&quot;)<br />
-&nbsp;&nbsp; &nbsp;private String beanName;<br />
-&nbsp;&nbsp; &nbsp;<br />
-&nbsp;&nbsp; &nbsp;/**<br />
-&nbsp;&nbsp; &nbsp; * 方法名<br />
-&nbsp;&nbsp; &nbsp; */<br />
-&nbsp;&nbsp; &nbsp;@NotBlank(message=&quot;方法名称不能为空&quot;)<br />
-&nbsp;&nbsp; &nbsp;private String methodName;<br />
-&nbsp;&nbsp; &nbsp;<br />
-&nbsp;&nbsp; &nbsp;/**<br />
-&nbsp;&nbsp; &nbsp; * 参数<br />
-&nbsp;&nbsp; &nbsp; */<br />
-&nbsp;&nbsp; &nbsp;private String params;<br />
-&nbsp;&nbsp; &nbsp;</p>
-
-<p>&nbsp;&nbsp; &nbsp;/**<br />
-&nbsp;&nbsp; &nbsp; * corn表达式<br />
-&nbsp;&nbsp; &nbsp; */<br />
-&nbsp;&nbsp; &nbsp;@NotBlank(message=&quot;corn表达式不能为空&quot;)<br />
-&nbsp;&nbsp; &nbsp;private String cronExpression;<br />
-&nbsp;&nbsp; &nbsp;<br />
-&nbsp;&nbsp; &nbsp;/**<br />
-&nbsp;&nbsp; &nbsp; * 任务状态<br />
-&nbsp;&nbsp; &nbsp; */<br />
-&nbsp;&nbsp; &nbsp;private Integer status;<br />
-&nbsp;&nbsp; &nbsp;<br />
-&nbsp;&nbsp; &nbsp;/**<br />
-&nbsp;&nbsp; &nbsp; * 备注<br />
-&nbsp;&nbsp; &nbsp; */<br />
-&nbsp;&nbsp; &nbsp;private String remark;<br />
-&nbsp;&nbsp; &nbsp;<br />
-&nbsp;&nbsp; &nbsp;/**<br />
-&nbsp;&nbsp; &nbsp; * 创建时间<br />
-&nbsp;&nbsp; &nbsp; */<br />
-&nbsp;&nbsp; &nbsp;private Date createTime;</p>
-
-<p>&nbsp;&nbsp; &nbsp;public String getJobId() {<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;return jobId;<br />
-&nbsp;&nbsp; &nbsp;}</p>
-
-<p>&nbsp;&nbsp; &nbsp;public void setJobId(String jobId) {<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;this.jobId = jobId;<br />
-&nbsp;&nbsp; &nbsp;}</p>
-
-<p>&nbsp;&nbsp; &nbsp;public String getBeanName() {<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;return beanName;<br />
-&nbsp;&nbsp; &nbsp;}</p>
-
-<p>&nbsp;&nbsp; &nbsp;public void setBeanName(String beanName) {<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;this.beanName = beanName;<br />
-&nbsp;&nbsp; &nbsp;}</p>
-
-<p>&nbsp;&nbsp; &nbsp;public String getParams() {<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;return params;<br />
-&nbsp;&nbsp; &nbsp;}</p>
-
-<p>&nbsp;&nbsp; &nbsp;public void setParams(String params) {<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;this.params = params;<br />
-&nbsp;&nbsp; &nbsp;}</p>
-
-<p>&nbsp;&nbsp; &nbsp;public String getCronExpression() {<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;return cronExpression;<br />
-&nbsp;&nbsp; &nbsp;}</p>
-
-<p>&nbsp;&nbsp; &nbsp;public void setCronExpression(String cronExpression) {<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;this.cronExpression = cronExpression;<br />
-&nbsp;&nbsp; &nbsp;}</p>
-
-<p>&nbsp;&nbsp; &nbsp;public Integer getStatus() {<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;return status;<br />
-&nbsp;&nbsp; &nbsp;}</p>
-
-<p>&nbsp;&nbsp; &nbsp;public void setStatus(Integer status) {<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;this.status = status;<br />
-&nbsp;&nbsp; &nbsp;}</p>
-
-<p>&nbsp;&nbsp; &nbsp;public String getRemark() {<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;return remark;<br />
-&nbsp;&nbsp; &nbsp;}</p>
-
-<p>&nbsp;&nbsp; &nbsp;public void setRemark(String remark) {<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;this.remark = remark;<br />
-&nbsp;&nbsp; &nbsp;}</p>
-
-<p>&nbsp;&nbsp; &nbsp;public Date getCreateTime() {<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;return createTime;<br />
-&nbsp;&nbsp; &nbsp;}</p>
-
-<p>&nbsp;&nbsp; &nbsp;public void setCreateTime(Date createTime) {<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;this.createTime = createTime;<br />
-&nbsp;&nbsp; &nbsp;}<br />
-&nbsp;&nbsp; &nbsp;<br />
-&nbsp;&nbsp; &nbsp;public String getMethodName() {<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;return methodName;<br />
-&nbsp;&nbsp; &nbsp;}</p>
-
-<p>&nbsp;&nbsp; &nbsp;public void setMethodName(String methodName) {<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;this.methodName = methodName;<br />
-&nbsp;&nbsp; &nbsp;}<br />
+<p>    /**<br />
+     * <br />
+     */<br />
+    private static final long serialVersionUID = -579222341638101205L;<br />
+  <br />
+    public static final String JOB_PARAM_KEY = "JOB_PARAM_KEY";<br />
+    /**<br />
+     * 任务id<br />
+     */<br />
+    private String jobId;<br />
+    <br />
+    /**<br />
+     * 方法名<br />
+     */<br />
+    @NotBlank(message="bean名称不能为空")<br />
+    private String beanName;<br />
+    <br />
+    /**<br />
+     * 方法名<br />
+     */<br />
+    @NotBlank(message="方法名称不能为空")<br />
+    private String methodName;<br />
+    <br />
+    /**<br />
+     * 参数<br />
+     */<br />
+    private String params;<br />
+    </p>
+<p>    /**<br />
+     * corn表达式<br />
+     */<br />
+    @NotBlank(message="corn表达式不能为空")<br />
+    private String cronExpression;<br />
+    <br />
+    /**<br />
+     * 任务状态<br />
+     */<br />
+    private Integer status;<br />
+    <br />
+    /**<br />
+     * 备注<br />
+     */<br />
+    private String remark;<br />
+    <br />
+    /**<br />
+     * 创建时间<br />
+     */<br />
+    private Date createTime;</p>
+<p>    public String getJobId() {<br />
+        return jobId;<br />
+    }</p>
+<p>    public void setJobId(String jobId) {<br />
+        this.jobId = jobId;<br />
+    }</p>
+<p>    public String getBeanName() {<br />
+        return beanName;<br />
+    }</p>
+<p>    public void setBeanName(String beanName) {<br />
+        this.beanName = beanName;<br />
+    }</p>
+<p>    public String getParams() {<br />
+        return params;<br />
+    }</p>
+<p>    public void setParams(String params) {<br />
+        this.params = params;<br />
+    }</p>
+<p>    public String getCronExpression() {<br />
+        return cronExpression;<br />
+    }</p>
+<p>    public void setCronExpression(String cronExpression) {<br />
+        this.cronExpression = cronExpression;<br />
+    }</p>
+<p>    public Integer getStatus() {<br />
+        return status;<br />
+    }</p>
+<p>    public void setStatus(Integer status) {<br />
+        this.status = status;<br />
+    }</p>
+<p>    public String getRemark() {<br />
+        return remark;<br />
+    }</p>
+<p>    public void setRemark(String remark) {<br />
+        this.remark = remark;<br />
+    }</p>
+<p>    public Date getCreateTime() {<br />
+        return createTime;<br />
+    }</p>
+<p>    public void setCreateTime(Date createTime) {<br />
+        this.createTime = createTime;<br />
+    }<br />
+    <br />
+    public String getMethodName() {<br />
+        return methodName;<br />
+    }</p>
+<p>    public void setMethodName(String methodName) {<br />
+        this.methodName = methodName;<br />
+    }<br />
 }</p>
-
 <h2>常量类</h2>
-
 <p>package com.ustc.wang.base.utils;</p>
-
 <p>public class GlobalConstant {<br />
-&nbsp; &nbsp;private GlobalConstant(){<br />
-&nbsp;&nbsp; &nbsp; &nbsp; throw new IllegalAccessError(&quot;工具类不用实例化&quot;);<br />
-&nbsp; &nbsp;}</p>
-
-<p>&nbsp; &nbsp;/**<br />
-&nbsp; &nbsp; * 定时任务状态<br />
-&nbsp; &nbsp; *&nbsp;<br />
-&nbsp; &nbsp; */<br />
-&nbsp; &nbsp;public enum ScheduleStatus {<br />
-&nbsp; &nbsp; &nbsp; &nbsp;/**<br />
-&nbsp; &nbsp; &nbsp; &nbsp; * 正常<br />
-&nbsp; &nbsp; &nbsp; &nbsp; */<br />
-&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;NORMAL(0),<br />
-&nbsp; &nbsp; &nbsp; &nbsp;/**<br />
-&nbsp; &nbsp; &nbsp; &nbsp; * 暂停<br />
-&nbsp; &nbsp; &nbsp; &nbsp; */<br />
-&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;PAUSE(1);</p>
-
-<p>&nbsp; &nbsp; &nbsp; &nbsp;private int value;</p>
-
-<p>&nbsp; &nbsp; &nbsp; &nbsp;private ScheduleStatus(int value) {<br />
-&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;this.value = value;<br />
-&nbsp; &nbsp; &nbsp; &nbsp;}<br />
-&nbsp; &nbsp; &nbsp; &nbsp;<br />
-&nbsp; &nbsp; &nbsp; &nbsp;public int getValue() {<br />
-&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;return value;<br />
-&nbsp; &nbsp; &nbsp; &nbsp;}<br />
-&nbsp; &nbsp;}<br />
+   private GlobalConstant(){<br />
+       throw new IllegalAccessError("工具类不用实例化");<br />
+   }</p>
+<p>   /**<br />
+    * 定时任务状态<br />
+    * <br />
+    */<br />
+   public enum ScheduleStatus {<br />
+       /**<br />
+        * 正常<br />
+        */<br />
+       NORMAL(0),<br />
+       /**<br />
+        * 暂停<br />
+        */<br />
+       PAUSE(1);</p>
+<p>       private int value;</p>
+<p>       private ScheduleStatus(int value) {<br />
+           this.value = value;<br />
+       }<br />
+       <br />
+       public int getValue() {<br />
+           return value;<br />
+       }<br />
+   }<br />
 }<br />
-&nbsp;</p>
-
+ </p>
 <h2>业务类</h2>
-
 <p>这里定义了bean的名字，在初见定时任务的时候，用到了这里的bean名子做唯一标识。</p>
-
 <p>package com.ustc.wang.base.job.task.work;</p>
-
 <p>import org.apache.logging.log4j.LogManager;<br />
 import org.apache.logging.log4j.Logger;<br />
 import org.quartz.DisallowConcurrentExecution;<br />
 import org.springframework.beans.factory.annotation.Autowired;<br />
 import org.springframework.stereotype.Component;</p>
-
 <p>import com.ustc.wang.service.exam.IExamStudentRegisterService;</p>
-
 <p><br />
-@Component(&quot;examTask&quot;)<br />
+@Component("examTask")<br />
 @DisallowConcurrentExecution<br />
 public class ExamTask {<br />
-&nbsp;&nbsp; &nbsp;private Logger logger = LogManager.getLogger(ExamTask.class);<br />
-&nbsp;&nbsp; &nbsp;@Autowired<br />
-&nbsp;&nbsp; &nbsp;private IExamStudentRegisterService examStudentRegisterService;<br />
-&nbsp;&nbsp; &nbsp;<br />
-&nbsp;&nbsp; &nbsp;public void studentRegisterLayOut() {<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;logger.info(&quot;报考编排定时任务开始--------&quot;);<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;examStudentRegisterService.layOutData();<br />
-&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;logger.info(&quot;报考编排定时任务开始--------&quot;);<br />
-&nbsp;&nbsp; &nbsp;}<br />
+    private Logger logger = LogManager.getLogger(ExamTask.class);<br />
+    @Autowired<br />
+    private IExamStudentRegisterService examStudentRegisterService;<br />
+    <br />
+    public void studentRegisterLayOut() {<br />
+        logger.info("报考编排定时任务开始--------");<br />
+        examStudentRegisterService.layOutData();<br />
+        logger.info("报考编排定时任务开始--------");<br />
+    }<br />
 }</p>
-
 <h2>sql 语句</h2>
-
 <p>DROP TABLE IF EXISTS `schedule_job`;<br />
 CREATE TABLE `schedule_job` (<br />
-&nbsp; `job_id` varchar(32) NOT NULL COMMENT &#39;任务id&#39;,<br />
-&nbsp; `bean_name` varchar(255) DEFAULT NULL COMMENT &#39;spring bean 名称&#39;,<br />
-&nbsp; `method_name` varchar(255) DEFAULT NULL COMMENT &#39;方法名称&#39;,<br />
-&nbsp; `params` varchar(2048) DEFAULT NULL COMMENT &#39;入参&#39;,<br />
-&nbsp; `cron_expression` varchar(128) DEFAULT NULL COMMENT &#39;cron表达式&#39;,<br />
-&nbsp; `status` tinyint(2) NOT NULL COMMENT &#39;任务状态,0正常，1暂停&#39;,<br />
-&nbsp; `remark` varchar(255) DEFAULT NULL COMMENT &#39;备注&#39;,<br />
-&nbsp; `create_time` datetime DEFAULT NULL COMMENT &#39;创建时间&#39;,<br />
-&nbsp; PRIMARY KEY (`job_id`)<br />
+  `job_id` varchar(32) NOT NULL COMMENT '任务id',<br />
+  `bean_name` varchar(255) DEFAULT NULL COMMENT 'spring bean 名称',<br />
+  `method_name` varchar(255) DEFAULT NULL COMMENT '方法名称',<br />
+  `params` varchar(2048) DEFAULT NULL COMMENT '入参',<br />
+  `cron_expression` varchar(128) DEFAULT NULL COMMENT 'cron表达式',<br />
+  `status` tinyint(2) NOT NULL COMMENT '任务状态,0正常，1暂停',<br />
+  `remark` varchar(255) DEFAULT NULL COMMENT '备注',<br />
+  `create_time` datetime DEFAULT NULL COMMENT '创建时间',<br />
+  PRIMARY KEY (`job_id`)<br />
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;<br />
-&nbsp;</p>
-
+ </p>
 <p><br />
-&nbsp;</p>
+ </p>

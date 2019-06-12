@@ -1,0 +1,811 @@
+<h1 style="font-style:normal">OpenShift V3 应用发布部署的简单场景演示</h1>
+
+<div class="other-opt" style="padding:0px"><span style="font-family:PingFangSC,"helvetica neue","hiragino sans gb",arial,"microsoft yahei ui","microsoft yahei",simsun,sans-serif; font-size:14px">本文讲的是</span><strong>OpenShift V3 应用发布部署的简单场景演示</strong><span style="font-family:PingFangSC,"helvetica neue","hiragino sans gb",arial,"microsoft yahei ui","microsoft yahei",simsun,sans-serif; font-size:14px">【编者的话】本文是一篇关于OpenShift如何应用在DevOps方面的文章。全文由浅入深，由易到难，通过3种不同场景下的部署，给读者一个对OpenShift功能的全新了解。译者以前和有些做容器开发，部署相关工作的同学认为：OpenShift仅仅是在Kubernetes基础之上架设了自己的WebUI，对API和CLI等接口进行了自己的封装（很多kubectl的命令都被oc继承）。但是在接触了OpenShift 1个月后（翻译本文时，我正好接触OpenShift一个月整），我对OpenShift有了全新的认识，特别是读过此文原文后，让我认识到OpenShift之所以能够作为一个PaaS的真正价值所在。</span></div>
+
+<p><span style="font-size:16px"><span style="font-family:PingFangSC,"helvetica neue","hiragino sans gb",arial,"microsoft yahei ui","microsoft yahei",simsun,sans-serif"><span style="font-size:14px"><span style="font-family:"Helvetica Neue",STHeiti,"Microsoft YaHei",Helvetica,Arial,sans-serif">我以前有幸接触过IBM的Bulemix（CloudFoundry），了解过一些基础概念和它大概的运行原理。这段时间经过我对OpenShift的了解，似乎找到了他们之间都作为PaaS的共通之处，也就是它区别于Kubernetes这种容器编排系统的最主要的地方。</span></span></span></span></p>
+
+<p><span style="font-size:16px"><span style="font-family:PingFangSC,"helvetica neue","hiragino sans gb",arial,"microsoft yahei ui","microsoft yahei",simsun,sans-serif">概览</span></span></p>
+
+<p><span style="font-size:16px"><span style="font-family:PingFangSC,"helvetica neue","hiragino sans gb",arial,"microsoft yahei ui","microsoft yahei",simsun,sans-serif"><span style="font-size:14px"><span style="font-family:"Helvetica Neue",STHeiti,"Microsoft YaHei",Helvetica,Arial,sans-serif">如今，对很多公司来说最困难的事情之一就是发布管理。当然我们有很多的方法、工具和技术，但是如何把它们联系在一起并且跨组织功能的工作呢？一个产品的发布不是一个team的事，它会涉及到公司的每一个人。很多公司挣扎于此但效果并不好。这个问题在过去还可以勉强容忍，但现就在就没那么幸运了。当今的公司赖以生存的不仅是创新的能力，而且还有把创新变成产品的能力。我认为创新是比较容易的部分, 在受控的方式下，提供这些创新的产品和服务才是真正的挑战。</span></span><br />
+<br />
+<span style="font-size:14px"><span style="font-family:"Helvetica Neue",STHeiti,"Microsoft YaHei",Helvetica,Arial,sans-serif">通过转移到微服务（micro-services）架构和基于容器技术例如Docker，可以简化或者合理化很多方面的技术。但在OpenShift以前没有一个平台能把它们结合到一起，OpenShift的出现就像隧道尽头的一束光，它允许开发和运维团队在一起工作，而且仍然让他们维护各自关注和控制的领域。在这篇文章中，我们将会看用OpenShift部署应用程序的三个场景，每个场景都会涉及到开发和运维。并且你会从中得到如何使用OpenShift的启发。这些仅仅是一些基本的场景我们也只是蜻蜓点水般带过，但却可以作为在容器世界里应用程序部署或者发布管理的一个起点。</span></span></span></span></p>
+
+<h3 style="margin-left:0px; margin-right:0px"><span style="font-size:16px"><span style="font-family:PingFangSC,"helvetica neue","hiragino sans gb",arial,"microsoft yahei ui","microsoft yahei",simsun,sans-serif">场景 1：开发团队使用运维团队提供的镜像</span></span></h3>
+
+<p><span style="font-size:16px"><span style="font-family:PingFangSC,"helvetica neue","hiragino sans gb",arial,"microsoft yahei ui","microsoft yahei",simsun,sans-serif"><span style="font-size:14px"><span style="font-family:"Helvetica Neue",STHeiti,"Microsoft YaHei",Helvetica,Arial,sans-serif">大多数的运维团队都想控制应用程序的运行环境。并且确保应用程序的运行环境符合所有的安全规则，提供需要的功能并且定期更新。</span></span><br />
+<br />
+<span style="font-size:14px"><span style="font-family:"Helvetica Neue",STHeiti,"Microsoft YaHei",Helvetica,Arial,sans-serif">开发团队关注于创新通过应用程序的功能性，稳定性和性能。</span></span><br />
+<br />
+<span style="font-size:14px"><span style="font-family:"Helvetica Neue",STHeiti,"Microsoft YaHei",Helvetica,Arial,sans-serif">OpenShift允许在两个团队关注各自核心职责的同时，提供一个方法去整合不同团队的输入和输出，最后提供一个端到端的产品发布流程。</span></span><br />
+<br />
+<span style="font-size:14px"><span style="font-family:"Helvetica Neue",STHeiti,"Microsoft YaHei",Helvetica,Arial,sans-serif">在OpenShift里有很多的方法去整合DevOps（开发运维）团队。一个简单的方法就是把开发和运维分开到不同的项目，并且允许开发的应用程序运行在运维提供的环境中，我们将用一个ruby写的hello-world程序作为例子去说明这种情况。</span></span></span></span></p>
+
+<h4 style="margin-left:0px; margin-right:0px"><span style="font-size:16px"><span style="font-family:PingFangSC,"helvetica neue","hiragino sans gb",arial,"microsoft yahei ui","microsoft yahei",simsun,sans-serif">创建项目</span></span></h4>
+
+<p><span style="font-size:16px"><span style="font-family:PingFangSC,"helvetica neue","hiragino sans gb",arial,"microsoft yahei ui","microsoft yahei",simsun,sans-serif"><span style="font-size:14px"><span style="font-family:"Helvetica Neue",STHeiti,"Microsoft YaHei",Helvetica,Arial,sans-serif">为ruby应用创建开发和运维的项目</span></span></span></span></p>
+
+<pre>
+<span style="font-size:16px"><span style="font-family:PingFangSC,"helvetica neue","hiragino sans gb",arial,"microsoft yahei ui","microsoft yahei",simsun,sans-serif"><span style="font-size:13px"><span style="font-family:Menlo,Monaco,Consolas,"Courier New",monospace"># oc login -u admin
+# oc new-project ruby-ops
+# oc new-project ruby-dev </span></span></span></span>
+</pre>
+
+<h4 style="margin-left:0px; margin-right:0px"><span style="font-size:16px"><span style="font-family:PingFangSC,"helvetica neue","hiragino sans gb",arial,"microsoft yahei ui","microsoft yahei",simsun,sans-serif">创建用户</span></span></h4>
+
+<pre>
+<span style="font-size:16px"><span style="font-family:PingFangSC,"helvetica neue","hiragino sans gb",arial,"microsoft yahei ui","microsoft yahei",simsun,sans-serif"><span style="font-size:13px"><span style="font-family:Menlo,Monaco,Consolas,"Courier New",monospace"># htpasswd /etc/origin/master/htpasswd dev
+# htpasswd /etc/origin/master/htpasswd ops</span></span></span></span>
+</pre>
+
+<h4 style="margin-left:0px; margin-right:0px"><span style="font-size:16px"><span style="font-family:PingFangSC,"helvetica neue","hiragino sans gb",arial,"microsoft yahei ui","microsoft yahei",simsun,sans-serif">设置权限</span></span></h4>
+
+<p><span style="font-size:16px"><span style="font-family:PingFangSC,"helvetica neue","hiragino sans gb",arial,"microsoft yahei ui","microsoft yahei",simsun,sans-serif"><span style="font-size:14px"><span style="font-family:"Helvetica Neue",STHeiti,"Microsoft YaHei",Helvetica,Arial,sans-serif">创建三个组ops-edit、dev-view和dev-edit，授予运维组编辑ruby-ops项目的权限，授予开发查看ruby-ops项目和编辑ruby-dev项目的权限。并且让ruby-dev项目可以从拉取ruby-ops项目拉取images。</span></span><br />
+<span style="font-size:14px"><span style="font-family:"Helvetica Neue",STHeiti,"Microsoft YaHei",Helvetica,Arial,sans-serif">创建用户和其对应的组</span></span></span></span></p>
+
+<pre>
+<span style="font-size:16px"><span style="font-family:PingFangSC,"helvetica neue","hiragino sans gb",arial,"microsoft yahei ui","microsoft yahei",simsun,sans-serif"><span style="font-size:13px"><span style="font-family:Menlo,Monaco,Consolas,"Courier New",monospace"># oadm groups new ops-edit && oadm groups new dev-view && oadm groups new dev-edit
+# oadm groups add-users ops-edit ops && oadm groups add-users dev-view dev && \
+oadm groups add-users dev-edit dev
+</span></span></span></span>
+<span style="font-size:16px"><span style="font-family:PingFangSC,"helvetica neue","hiragino sans gb",arial,"microsoft yahei ui","microsoft yahei",simsun,sans-serif"><span style="font-size:14px"><span style="font-family:"Helvetica Neue",STHeiti,"Microsoft YaHei",Helvetica,Arial,sans-serif">关联组到相关的项目，并授权ruby-dev项目可以从ruby-ops拉取images。</span></span></span></span></pre>
+
+<pre>
+<span style="font-size:16px"><span style="font-family:PingFangSC,"helvetica neue","hiragino sans gb",arial,"microsoft yahei ui","microsoft yahei",simsun,sans-serif"><span style="font-size:13px"><span style="font-family:Menlo,Monaco,Consolas,"Courier New",monospace"># oadm policy add-role-to-group edit ops-edit -n ruby-ops && \
+# oadm policy add-role-to-group view dev-view -n ruby-ops && \
+# oadm policy add-role-to-group edit dev-edit -n ruby-dev && \
+# oadm policy add-role-to-group system:image-puller system:serviceaccounts:ruby-dev -n ruby-ops</span></span></span></span>
+</pre>
+
+<h4 style="margin-left:0px; margin-right:0px"><span style="font-size:16px"><span style="font-family:PingFangSC,"helvetica neue","hiragino sans gb",arial,"microsoft yahei ui","microsoft yahei",simsun,sans-serif">Ruby的运行环境</span></span></h4>
+
+<p><span style="font-size:16px"><span style="font-family:PingFangSC,"helvetica neue","hiragino sans gb",arial,"microsoft yahei ui","microsoft yahei",simsun,sans-serif"><span style="font-size:14px"><span style="font-family:"Helvetica Neue",STHeiti,"Microsoft YaHei",Helvetica,Arial,sans-serif">作为运维用户用测试代码创建ruby运行时的image。</span></span></span></span></p>
+
+<pre>
+<span style="font-size:16px"><span style="font-family:PingFangSC,"helvetica neue","hiragino sans gb",arial,"microsoft yahei ui","microsoft yahei",simsun,sans-serif"><span style="font-size:13px"><span style="font-family:Menlo,Monaco,Consolas,"Courier New",monospace"># oc login -u ops
+# oc project ruby-ops
+# oc new-app centos/ruby-22-centos7~https://github.com/openshift/ruby-hello-world.git 
+</span></span></span></span>
+<span style="font-size:16px"><span style="font-family:PingFangSC,"helvetica neue","hiragino sans gb",arial,"microsoft yahei ui","microsoft yahei",simsun,sans-serif"><span style="font-size:14px"><span style="font-family:"Helvetica Neue",STHeiti,"Microsoft YaHei",Helvetica,Arial,sans-serif">创建应用程序需要的MySQL数据库，并把服务名设置为database。</span></span></span></span></pre>
+
+<pre>
+<span style="font-size:16px"><span style="font-family:PingFangSC,"helvetica neue","hiragino sans gb",arial,"microsoft yahei ui","microsoft yahei",simsun,sans-serif"><span style="font-size:13px"><span style="font-family:Menlo,Monaco,Consolas,"Courier New",monospace"># oc new-app mysql-ephemeral -p DATABASE_SERVICE_NAME=database
+# oc env dc database --list | oc env dc ruby-hello-world -e -
+</span></span></span></span>
+</pre>
+
+<h3 style="margin-left:0px; margin-right:0px"><span style="font-size:16px"><span style="font-family:PingFangSC,"helvetica neue","hiragino sans gb",arial,"microsoft yahei ui","microsoft yahei",simsun,sans-serif">场景 2：生产项目拉取开发项目产生的镜像</span></span></h3>
+
+<p><span style="font-size:16px"><span style="font-family:PingFangSC,"helvetica neue","hiragino sans gb",arial,"microsoft yahei ui","microsoft yahei",simsun,sans-serif"><span style="font-size:14px"><span style="font-family:"Helvetica Neue",STHeiti,"Microsoft YaHei",Helvetica,Arial,sans-serif">如果开发的应用程序根据所需的功能有不同的版本，并且通过了所有的测试，那么就可以部署到其他环境。通常先是质量和测试，然后生成最终的生产版本。在这个简单的例子中，我们用ticket-moster程序，把它从开发环境直接部署到生产环境中。</span></span><br />
+<br />
+<span style="font-size:14px"><span style="font-family:"Helvetica Neue",STHeiti,"Microsoft YaHei",Helvetica,Arial,sans-serif">我们用到了一些场景1中熟悉的概念，这个技术依靠生产环境能够拉取在开发环境中产生的images。在这个场景中我们创建一个了配置并设置一个触发器，它能够在开发更新image之后自动的部署这个带有特定名字或者标签的images到生产环境中。场景1中，这个过程是手动完成的，在场景2中是自动的，在场景3中，我们将看到如何用Jenkins去部署一个比较复杂的，带逐层审批的pipeline流程。</span></span></span></span></p>
+
+<h4 style="margin-left:0px; margin-right:0px"><span style="font-size:16px"><span style="font-family:PingFangSC,"helvetica neue","hiragino sans gb",arial,"microsoft yahei ui","microsoft yahei",simsun,sans-serif">创建项目并设置拉取权限</span></span></h4>
+
+<pre>
+<span style="font-size:16px"><span style="font-family:PingFangSC,"helvetica neue","hiragino sans gb",arial,"microsoft yahei ui","microsoft yahei",simsun,sans-serif"><span style="font-size:13px"><span style="font-family:Menlo,Monaco,Consolas,"Courier New",monospace"># oc new-project ticket-monster-dev
+# oc new-project ticket-monster-prod
+# oc policy add-role-to-group system:image-puller system:serviceaccounts:ticket-monster-prod -n ticket-monster-dev</span></span></span></span>
+</pre>
+
+<h4 style="margin-left:0px; margin-right:0px"><span style="font-size:16px"><span style="font-family:PingFangSC,"helvetica neue","hiragino sans gb",arial,"microsoft yahei ui","microsoft yahei",simsun,sans-serif">创建ticket monster项目的开发环境模板</span></span></h4>
+
+<pre>
+<span style="font-size:16px"><span style="font-family:PingFangSC,"helvetica neue","hiragino sans gb",arial,"microsoft yahei ui","microsoft yahei",simsun,sans-serif"><span style="font-size:13px"><span style="font-family:Menlo,Monaco,Consolas,"Courier New",monospace"># vi monster.yaml
+kind: Template
+apiVersion: v1
+metadata:
+name: monster
+annotations:
+tags: instant-app,javaee
+iconClass: icon-jboss
+description: |
+Ticket Monster is a moderately complex application that demonstrates how
+to build modern applications using JBoss web technologies
+
+parameters:
+- name: GIT_URI
+value: git://github.com/kenthua/ticket-monster-ose
+- name: MYSQL_DATABASE
+value: monster
+- name: MYSQL_USER
+value: monster
+- name: MYSQL_PASSWORD
+from: '[a-zA-Z0-9]{8}'
+generate: expression
+
+
+objects:
+- kind: ImageStream
+apiVersion: v1
+metadata:
+name: monster
+
+-kind: BuildConfig
+apiVersion: v1
+metadata:
+name: monster
+spec:
+triggers:
+- type: Generic
+generic:
+secret: secret
+- type: ImageChange
+- type: ConfigChange
+strategy:
+type: Source
+sourceStrategy:
+from:
+kind: ImageStreamTag
+name: jboss-eap64-openshift:latest
+namespace: openshift
+source:
+type: Git
+git:
+uri: ${GIT_URI}
+ref: master
+output:
+to:
+kind: ImageStreamTag
+name: monster:latest
+
+-kind: DeploymentConfig
+apiVersion: v1
+metadata:
+name: monster
+spec:
+replicas: 1
+selector:
+deploymentConfig: monster
+template:
+metadata:
+labels:
+deploymentConfig: monster
+name: monster
+spec:
+containers:
+- name: monster
+image: monster
+ports:
+- name: http
+containerPort: 8080
+- name: jolokia
+containerPort: 8778
+- name: debug
+containerPort: 8787
+readinessProbe:
+exec:
+command:
+- /bin/bash
+- -c
+- /opt/eap/bin/readinessProbe.sh
+env:
+- name: DB_SERVICE_PREFIX_MAPPING
+value: monster-mysql=DB
+- name: TX_DATABASE_PREFIX_MAPPING
+value: monster-mysql=DB
+- name: DB_JNDI
+value: java:jboss/datasources/MySQLDS
+- name: DB_DATABASE
+value: ${MYSQL_DATABASE}
+- name: DB_USERNAME
+value: ${MYSQL_USER}
+- name: DB_PASSWORD
+value: ${MYSQL_PASSWORD}
+- name: JAVA_OPTS
+value: "-Xmx512m -XX:MaxPermSize=256m -Djava.net.preferIPv4Stack=true -Djboss.modules.system.pkgs=org.jboss.logmanager -Djava.awt.headless=true -Djboss.modules.policy-permissions=true"
+- name: DEBUG
+value: "true"
+triggers:
+- type: ImageChange
+imageChangeParams:
+automatic: true
+containerNames:
+- monster
+from:
+kind: ImageStream
+name: monster
+
+-kind: DeploymentConfig
+apiVersion: v1
+metadata:
+name: monster-mysql
+spec:
+triggers:
+- type: ImageChange
+imageChangeParams:
+automatic: true
+containerNames:
+- monster-mysql
+from:
+kind: ImageStreamTag
+name: mysql:latest
+namespace: openshift
+replicas: 1
+selector:
+deploymentConfig: monster-mysql
+template:
+metadata:
+labels:
+deploymentConfig: monster-mysql
+name: monster-mysql
+spec:
+containers:
+- name: monster-mysql
+image: mysql
+ports:
+- containerPort: 3306
+env:
+- name: MYSQL_USER
+value: ${MYSQL_USER}
+- name: MYSQL_PASSWORD
+value: ${MYSQL_PASSWORD}
+- name: MYSQL_DATABASE
+value: ${MYSQL_DATABASE}
+
+-kind: Service
+apiVersion: v1
+metadata:
+name: monster
+spec:
+ports:
+- name: http
+port: 8080
+selector:
+deploymentConfig: monster
+
+-kind: Service
+apiVersion: v1
+metadata:
+name: monster-mysql
+spec:
+ports:
+- port: 3306
+selector:
+deploymentConfig: monster-mysql
+
+-kind: Route
+apiVersion: v1
+metadata:
+name: monster
+spec:
+to:
+name: monster
+</span></span></span></span></pre>
+
+<p> </p>
+
+<pre>
+<span style="font-size:16px"><span style="font-family:PingFangSC,"helvetica neue","hiragino sans gb",arial,"microsoft yahei ui","microsoft yahei",simsun,sans-serif"><span style="font-size:13px"><span style="font-family:Menlo,Monaco,Consolas,"Courier New",monospace"># oc create -n openshift -f monster.yaml
+</span></span></span></span></pre>
+
+<p> </p>
+
+<h4 style="margin-left:0px; margin-right:0px"><span style="font-size:16px"><span style="font-family:PingFangSC,"helvetica neue","hiragino sans gb",arial,"microsoft yahei ui","microsoft yahei",simsun,sans-serif">创建ticket monster项目的生产环境模板</span></span></h4>
+
+<p><span style="font-size:16px"><span style="font-family:PingFangSC,"helvetica neue","hiragino sans gb",arial,"microsoft yahei ui","microsoft yahei",simsun,sans-serif"><span style="font-size:14px"><span style="font-family:"Helvetica Neue",STHeiti,"Microsoft YaHei",Helvetica,Arial,sans-serif">当开发环境中用monster:prod触发了image stream，下面这个触发器将会把image stream部署到生产环境中。</span></span></span></span></p>
+
+<pre>
+<span style="font-size:16px"><span style="font-family:PingFangSC,"helvetica neue","hiragino sans gb",arial,"microsoft yahei ui","microsoft yahei",simsun,sans-serif"><span style="font-size:13px"><span style="font-family:Menlo,Monaco,Consolas,"Courier New",monospace"># vi monster-prod.yaml
+kind: Template
+apiVersion: v1
+metadata:
+name: monster-prod
+annotations:
+tags: instant-app,javaee
+iconClass: icon-jboss
+description: |
+Ticket Monster is a moderately complex application that demonstrates how
+to build modern applications using JBoss web technologies. This template
+is for "production deployments" of Ticket Monster.
+
+parameters:
+- name: MYSQL_DATABASE
+value: monster
+- name: MYSQL_USER
+value: monster
+- name: MYSQL_PASSWORD
+from: '[a-zA-Z0-9]{8}'
+generate: expression
+
+objects:
+- kind: DeploymentConfig
+apiVersion: v1
+metadata:
+name: monster
+spec:
+replicas: 3
+selector:
+deploymentConfig: monster
+template:
+metadata:
+labels:
+deploymentConfig: monster
+name: monster
+spec:
+containers:
+- name: monster
+image: monster
+ports:
+- name: http
+containerPort: 8080
+- name: jolokia
+containerPort: 8778
+readinessProbe:
+exec:
+command:
+- /bin/bash
+- -c
+- /opt/eap/bin/readinessProbe.sh
+env:
+- name: DB_SERVICE_PREFIX_MAPPING
+value: monster-mysql=DB
+- name: TX_DATABASE_PREFIX_MAPPING
+value: monster-mysql=DB
+- name: DB_JNDI
+value: java:jboss/datasources/MySQLDS
+- name: DB_DATABASE
+value: ${MYSQL_DATABASE}
+- name: DB_USERNAME
+value: ${MYSQL_USER}
+- name: DB_PASSWORD
+value: ${MYSQL_PASSWORD}
+- name: JAVA_OPTS
+value: "-Xmx512m -XX:MaxPermSize=256m -Djava.net.preferIPv4Stack=true -Djboss.modules.system.pkgs=org.jboss.logmanager -Djava.awt.headless=true -Djboss.modules.policy-permissions=true"
+triggers:
+- type: ImageChange
+imageChangeParams:
+automatic: true
+containerNames:
+- monster
+from:
+kind: ImageStreamTag
+name: monster:prod
+namespace: ticket-monster-dev
+
+-kind: DeploymentConfig
+apiVersion: v1
+metadata:
+name: monster-mysql
+spec:
+triggers:
+- type: ImageChange
+imageChangeParams:
+automatic: true
+containerNames:
+- monster-mysql
+from:
+kind: ImageStreamTag
+name: mysql:latest
+namespace: openshift
+replicas: 1
+selector:
+deploymentConfig: monster-mysql
+template:
+metadata:
+labels:
+deploymentConfig: monster-mysql
+name: monster-mysql
+spec:
+containers:
+- name: monster-mysql
+image: mysql
+ports:
+- containerPort: 3306
+env:
+- name: MYSQL_USER
+value: ${MYSQL_USER}
+- name: MYSQL_PASSWORD
+value: ${MYSQL_PASSWORD}
+- name: MYSQL_DATABASE
+value: ${MYSQL_DATABASE}
+
+-kind: Service
+apiVersion: v1
+metadata:
+name: monster
+spec:
+ports:
+- name: http
+port: 8080
+selector:
+deploymentConfig: monster
+
+-kind: Service
+apiVersion: v1
+metadata:
+name: monster-mysql
+spec:
+ports:
+- port: 3306
+selector:
+deploymentConfig: monster-mysql
+
+-kind: Route
+apiVersion: v1
+metadata:
+name: monster
+spec:
+to:
+name: monster
+</span></span></span></span></pre>
+
+<p> </p>
+
+<pre>
+<span style="font-size:16px"><span style="font-family:PingFangSC,"helvetica neue","hiragino sans gb",arial,"microsoft yahei ui","microsoft yahei",simsun,sans-serif"><span style="font-size:13px"><span style="font-family:Menlo,Monaco,Consolas,"Courier New",monospace"># oc create -n openshift -f monster-prod.yaml
+</span></span></span></span></pre>
+
+<p> </p>
+
+<h4 style="margin-left:0px; margin-right:0px"><span style="font-size:16px"><span style="font-family:PingFangSC,"helvetica neue","hiragino sans gb",arial,"microsoft yahei ui","microsoft yahei",simsun,sans-serif">部署ticket-monster开发环境</span></span></h4>
+
+<p><span style="font-size:16px"><span style="font-family:PingFangSC,"helvetica neue","hiragino sans gb",arial,"microsoft yahei ui","microsoft yahei",simsun,sans-serif"><span style="font-size:14px"><span style="font-family:"Helvetica Neue",STHeiti,"Microsoft YaHei",Helvetica,Arial,sans-serif">用WebUI你可以选择monster的模板。</span></span></span></span></p>
+
+<div class="active aw-upload-img-list" style="padding:0px"><span style="font-size:16px"><span style="font-family:PingFangSC,"helvetica neue","hiragino sans gb",arial,"microsoft yahei ui","microsoft yahei",simsun,sans-serif"><span style="font-size:14px"><span style="font-family:"Helvetica Neue",STHeiti,"Microsoft YaHei",Helvetica,Arial,sans-serif"><a href="http://dockerone.com/uploads/article/20170323/61727a159d933d6620536aa4faa6a2b7.jpg" style="box-sizing:border-box; background:0px 0px; color:#155faa; text-decoration:none; transition:color 0.2s ease 0s" target="_blank"><img alt="2.jpg" class="img-polaroid" src="http://dockerone.com/uploads/article/20170323/61727a159d933d6620536aa4faa6a2b7.jpg" style="border:0px; box-sizing:border-box; height:auto; margin-bottom:15px; max-width:100%; vertical-align:middle" title="2.jpg" /></a></span></span></span></span></div>
+
+<p> </p>
+
+<h4 style="margin-left:0px; margin-right:0px"><span style="font-size:16px"><span style="font-family:PingFangSC,"helvetica neue","hiragino sans gb",arial,"microsoft yahei ui","microsoft yahei",simsun,sans-serif">部署ticket-monster到生产环境</span></span></h4>
+
+<p><span style="font-size:16px"><span style="font-family:PingFangSC,"helvetica neue","hiragino sans gb",arial,"microsoft yahei ui","microsoft yahei",simsun,sans-serif"><span style="font-size:14px"><span style="font-family:"Helvetica Neue",STHeiti,"Microsoft YaHei",Helvetica,Arial,sans-serif">部署ticket-monster生产环境模板（monster-prod）。</span></span></span></span></p>
+
+<div class="active aw-upload-img-list" style="padding:0px"><span style="font-size:16px"><span style="font-family:PingFangSC,"helvetica neue","hiragino sans gb",arial,"microsoft yahei ui","microsoft yahei",simsun,sans-serif"><span style="font-size:14px"><span style="font-family:"Helvetica Neue",STHeiti,"Microsoft YaHei",Helvetica,Arial,sans-serif"><a href="http://dockerone.com/uploads/article/20170323/a91a88dba50fdcce357e3ea75f1b17cd.jpg" style="box-sizing:border-box; background:0px 0px; color:#155faa; text-decoration:none; transition:color 0.2s ease 0s" target="_blank"><img alt="3.jpg" class="img-polaroid" src="http://dockerone.com/uploads/article/20170323/a91a88dba50fdcce357e3ea75f1b17cd.jpg" style="border:0px; box-sizing:border-box; height:auto; margin-bottom:15px; max-width:100%; vertical-align:middle" title="3.jpg" /></a></span></span></span></span></div>
+
+<p><br />
+<span style="font-size:16px"><span style="font-family:PingFangSC,"helvetica neue","hiragino sans gb",arial,"microsoft yahei ui","microsoft yahei",simsun,sans-serif"><span style="font-size:14px"><span style="font-family:"Helvetica Neue",STHeiti,"Microsoft YaHei",Helvetica,Arial,sans-serif">你可以看到在开发环境中程序被创建，并且可以通过 </span></span><a href="http://monster-ticket-monster-dev.apps.lab/" style="box-sizing:border-box; background:0px 0px #ffffff; color:#155faa; text-decoration:none; transition:color 0.2s ease 0s; font-family:"Helvetica Neue", STHeiti, "Microsoft YaHei", Helvetica, Arial, sans-serif; font-size:14px" target="_blank">http://monster-ticket-monster-dev.apps.lab</a><span style="font-size:14px"><span style="font-family:"Helvetica Neue",STHeiti,"Microsoft YaHei",Helvetica,Arial,sans-serif">访问到它。</span></span></span></span></p>
+
+<div class="active aw-upload-img-list" style="padding:0px"><span style="font-size:16px"><span style="font-family:PingFangSC,"helvetica neue","hiragino sans gb",arial,"microsoft yahei ui","microsoft yahei",simsun,sans-serif"><span style="font-size:14px"><span style="font-family:"Helvetica Neue",STHeiti,"Microsoft YaHei",Helvetica,Arial,sans-serif"><a href="http://dockerone.com/uploads/article/20170323/393c32181421442ab52bb25ab59dd99a.jpg" style="box-sizing:border-box; background:0px 0px; color:#155faa; text-decoration:none; transition:color 0.2s ease 0s" target="_blank"><img alt="4.jpg" class="img-polaroid" src="http://dockerone.com/uploads/article/20170323/393c32181421442ab52bb25ab59dd99a.jpg" style="border:0px; box-sizing:border-box; height:auto; margin-bottom:15px; max-width:100%; vertical-align:middle" title="4.jpg" /></a></span></span></span></span></div>
+
+<p><br />
+<span style="font-size:16px"><span style="font-family:PingFangSC,"helvetica neue","hiragino sans gb",arial,"microsoft yahei ui","microsoft yahei",simsun,sans-serif"><span style="font-size:14px"><span style="font-family:"Helvetica Neue",STHeiti,"Microsoft YaHei",Helvetica,Arial,sans-serif">你可以看到在生产环境中，虽然数据库已经运行起来了，并且创建了一个服务，但是ticket monster应用却没有启动。这是因为我们创建的生产环境模板会从开发环境中自动拉取这个带有特定名字或者标签images。在开发环境中只部署的规模是1，但是生产环境中部署的规模是4。</span></span></span></span></p>
+
+<h4 style="margin-left:0px; margin-right:0px"><span style="font-size:16px"><span style="font-family:PingFangSC,"helvetica neue","hiragino sans gb",arial,"microsoft yahei ui","microsoft yahei",simsun,sans-serif">部署应用程序的开发版本到生产环境</span></span></h4>
+
+<p><span style="font-size:16px"><span style="font-family:PingFangSC,"helvetica neue","hiragino sans gb",arial,"microsoft yahei ui","microsoft yahei",simsun,sans-serif"><span style="font-size:14px"><span style="font-family:"Helvetica Neue",STHeiti,"Microsoft YaHei",Helvetica,Arial,sans-serif">拉取images stream的spec。</span></span></span></span></p>
+
+<pre>
+<span style="font-size:16px"><span style="font-family:PingFangSC,"helvetica neue","hiragino sans gb",arial,"microsoft yahei ui","microsoft yahei",simsun,sans-serif"><span style="font-size:13px"><span style="font-family:Menlo,Monaco,Consolas,"Courier New",monospace"># oc get is monster -o yaml
+apiVersion: v1
+kind: ImageStream
+metadata:
+annotations:
+openshift.io/image.dockerRepositoryCheck: 2016-08-09T13:37:47Z
+creationTimestamp: 2016-08-09T13:14:53Z
+generation: 7
+name: monster
+namespace: ticket-monster-dev
+resourceVersion: "107170"
+selfLink: /oapi/v1/namespaces/ticket-monster-dev/imagestreams/monster
+uid: 42740a3d-5e33-11e6-aa8d-001a4ae42e01
+spec:
+tags:
+- annotations: null
+from:
+kind: ImageStreamImage
+name: monster@sha256:3a48a056a58f50764953ba856d90eba73dd0dfdee10b8cb6837b0fd9461da7f9
+generation: 7
+importPolicy: {}
+name: prod
+status:
+dockerImageRepository: 172.30.139.50:5000/ticket-monster-dev/monster
+tags:
+- items:
+- created: 2016-08-09T13:26:04Z
+dockerImageReference: 172.30.139.50:5000/ticket-monster-dev/monster@sha256:3a48a056a58f50764953ba856d90eba73dd0dfdee10b8cb6837b0fd9461da7f9
+generation: 1
+image: sha256:3a48a056a58f50764953ba856d90eba73dd0dfdee10b8cb6837b0fd9461da7f9
+tag: latest 
+</span></span></span></span></pre>
+
+<p><br />
+<span style="font-size:16px"><span style="font-family:PingFangSC,"helvetica neue","hiragino sans gb",arial,"microsoft yahei ui","microsoft yahei",simsun,sans-serif"><span style="font-size:14px"><span style="font-family:"Helvetica Neue",STHeiti,"Microsoft YaHei",Helvetica,Arial,sans-serif">一旦你有了一个拉取image stream的说明（就像上面的那个），标记这个images stream为monster:prod。</span></span></span></span></p>
+
+<pre>
+<span style="font-size:16px"><span style="font-family:PingFangSC,"helvetica neue","hiragino sans gb",arial,"microsoft yahei ui","microsoft yahei",simsun,sans-serif"><span style="font-size:13px"><span style="font-family:Menlo,Monaco,Consolas,"Courier New",monospace"># oc tag monster@sha256:3a48a056a58f50764953ba856d90eba73dd0dfdee10b8cb6837b0fd9461da7f9 monster:prod 
+</span></span></span></span></pre>
+
+<p><br />
+<span style="font-size:16px"><span style="font-family:PingFangSC,"helvetica neue","hiragino sans gb",arial,"microsoft yahei ui","microsoft yahei",simsun,sans-serif"><span style="font-size:14px"><span style="font-family:"Helvetica Neue",STHeiti,"Microsoft YaHei",Helvetica,Arial,sans-serif">你可以效验一下这个image stream是否已经生效</span></span></span></span></p>
+
+<pre>
+<span style="font-size:16px"><span style="font-family:PingFangSC,"helvetica neue","hiragino sans gb",arial,"microsoft yahei ui","microsoft yahei",simsun,sans-serif"><span style="font-size:13px"><span style="font-family:Menlo,Monaco,Consolas,"Courier New",monospace"># oc get is
+NAME DOCKER REPO TAGS UPDATED
+monster 172.30.139.50:5000/ticket-monster-dev/monster prod,latest 2 minutes ago
+</span></span></span></span></pre>
+
+<p><br />
+<span style="font-size:16px"><span style="font-family:PingFangSC,"helvetica neue","hiragino sans gb",arial,"microsoft yahei ui","microsoft yahei",simsun,sans-serif"><span style="font-size:14px"><span style="font-family:"Helvetica Neue",STHeiti,"Microsoft YaHei",Helvetica,Arial,sans-serif">只要这个images stream在ticket-monster-dev中被标记成monster:prod，他就会被部署到生产环境中，并且按照上面的描述把部署规模设置成4。</span></span></span></span></p>
+
+<div class="active aw-upload-img-list" style="padding:0px"><span style="font-size:16px"><span style="font-family:PingFangSC,"helvetica neue","hiragino sans gb",arial,"microsoft yahei ui","microsoft yahei",simsun,sans-serif"><span style="font-size:14px"><span style="font-family:"Helvetica Neue",STHeiti,"Microsoft YaHei",Helvetica,Arial,sans-serif"><a href="http://dockerone.com/uploads/article/20170323/dda53376758f81e4fd95bee9020623cb.jpg" style="box-sizing:border-box; background:0px 0px; color:#155faa; text-decoration:none; transition:color 0.2s ease 0s" target="_blank"><img alt="5.jpg" class="img-polaroid" src="http://dockerone.com/uploads/article/20170323/dda53376758f81e4fd95bee9020623cb.jpg" style="border:0px; box-sizing:border-box; height:auto; margin-bottom:15px; max-width:100%; vertical-align:middle" title="5.jpg" /></a></span></span></span></span></div>
+
+<p> </p>
+
+<h3 style="margin-left:0px; margin-right:0px"><span style="font-size:16px"><span style="font-family:PingFangSC,"helvetica neue","hiragino sans gb",arial,"microsoft yahei ui","microsoft yahei",simsun,sans-serif">场景 3：用Jenkins实现AB（应用的名字叫AB）部署</span></span></h3>
+
+<p><span style="font-size:16px"><span style="font-family:PingFangSC,"helvetica neue","hiragino sans gb",arial,"microsoft yahei ui","microsoft yahei",simsun,sans-serif"><span style="font-size:14px"><span style="font-family:"Helvetica Neue",STHeiti,"Microsoft YaHei",Helvetica,Arial,sans-serif">在这个场景中我们将看到如何用Jenkins实现一个简单应用AB的部署。这个场景中用到了在场景1和2中学到的东西。在这个场景中我们会创建一个稍稍有点复杂的三个环境：开发、集成和生产。我们会给应用程序创建2个版本，v1和v2在开发环境里。用Jenkins部属V2版本的应用到集成生产环境。最终我们将在生产环境中展示这个应用从V2版本回滚到V1版本。我很感谢我的同事Torben Jaeger，下面很多内容是他编写的。</span></span></span></span></p>
+
+<h4 style="margin-left:0px; margin-right:0px"><span style="font-size:16px"><span style="font-family:PingFangSC,"helvetica neue","hiragino sans gb",arial,"microsoft yahei ui","microsoft yahei",simsun,sans-serif">创建项目</span></span></h4>
+
+<pre>
+<span style="font-size:16px"><span style="font-family:PingFangSC,"helvetica neue","hiragino sans gb",arial,"microsoft yahei ui","microsoft yahei",simsun,sans-serif"><span style="font-size:13px"><span style="font-family:Menlo,Monaco,Consolas,"Courier New",monospace"># oc new-project dev && \
+oc new-project int && \
+oc new-project prod
+</span></span></span></span></pre>
+
+<p> </p>
+
+<h4 style="margin-left:0px; margin-right:0px"><span style="font-size:16px"><span style="font-family:PingFangSC,"helvetica neue","hiragino sans gb",arial,"microsoft yahei ui","microsoft yahei",simsun,sans-serif">设置拉取（pull）的权限</span></span></h4>
+
+<p><span style="font-size:16px"><span style="font-family:PingFangSC,"helvetica neue","hiragino sans gb",arial,"microsoft yahei ui","microsoft yahei",simsun,sans-serif"><span style="font-size:14px"><span style="font-family:"Helvetica Neue",STHeiti,"Microsoft YaHei",Helvetica,Arial,sans-serif">允许int项目从dev项目中拉取images，并且允许prod项目从dev项目和int项目中拉取images。</span></span></span></span></p>
+
+<pre>
+<span style="font-size:16px"><span style="font-family:PingFangSC,"helvetica neue","hiragino sans gb",arial,"microsoft yahei ui","microsoft yahei",simsun,sans-serif"><span style="font-size:13px"><span style="font-family:Menlo,Monaco,Consolas,"Courier New",monospace"># oc policy add-role-to-group system:image-puller system:serviceaccounts:int -n dev
+</span></span></span></span></pre>
+
+<p> </p>
+
+<pre>
+<span style="font-size:16px"><span style="font-family:PingFangSC,"helvetica neue","hiragino sans gb",arial,"microsoft yahei ui","microsoft yahei",simsun,sans-serif"><span style="font-size:13px"><span style="font-family:Menlo,Monaco,Consolas,"Courier New",monospace"># oc policy add-role-to-group system:image-puller system:serviceaccounts:prod -n int
+</span></span></span></span></pre>
+
+<p> </p>
+
+<pre>
+<span style="font-size:16px"><span style="font-family:PingFangSC,"helvetica neue","hiragino sans gb",arial,"microsoft yahei ui","microsoft yahei",simsun,sans-serif"><span style="font-size:13px"><span style="font-family:Menlo,Monaco,Consolas,"Courier New",monospace"># oc policy add-role-to-group system:image-puller system:serviceaccounts:prod -n dev
+</span></span></span></span></pre>
+
+<p> </p>
+
+<h4 style="margin-left:0px; margin-right:0px"><span style="font-size:16px"><span style="font-family:PingFangSC,"helvetica neue","hiragino sans gb",arial,"microsoft yahei ui","microsoft yahei",simsun,sans-serif">在开发项目中设置Jenkins</span></span></h4>
+
+<p><span style="font-size:16px"><span style="font-family:PingFangSC,"helvetica neue","hiragino sans gb",arial,"microsoft yahei ui","microsoft yahei",simsun,sans-serif"><span style="font-size:14px"><span style="font-family:"Helvetica Neue",STHeiti,"Microsoft YaHei",Helvetica,Arial,sans-serif">在WebUI中进入dev项目，选择添加jenkins-ephemeral。</span></span></span></span></p>
+
+<div class="active aw-upload-img-list" style="padding:0px"><span style="font-size:16px"><span style="font-family:PingFangSC,"helvetica neue","hiragino sans gb",arial,"microsoft yahei ui","microsoft yahei",simsun,sans-serif"><span style="font-size:14px"><span style="font-family:"Helvetica Neue",STHeiti,"Microsoft YaHei",Helvetica,Arial,sans-serif"><a href="http://dockerone.com/uploads/article/20170323/672ec704fc38a55f6b78da1deb97a59a.jpg" style="box-sizing:border-box; background:0px 0px; color:#155faa; text-decoration:none; transition:color 0.2s ease 0s" target="_blank"><img alt="6.jpg" class="img-polaroid" src="http://dockerone.com/uploads/article/20170323/672ec704fc38a55f6b78da1deb97a59a.jpg" style="border:0px; box-sizing:border-box; height:auto; margin-bottom:15px; max-width:100%; vertical-align:middle" title="6.jpg" /></a></span></span></span></span></div>
+
+<p> </p>
+
+<h4 style="margin-left:0px; margin-right:0px"><span style="font-size:16px"><span style="font-family:PingFangSC,"helvetica neue","hiragino sans gb",arial,"microsoft yahei ui","microsoft yahei",simsun,sans-serif">克隆Github的repository</span></span></h4>
+
+<pre>
+<span style="font-size:16px"><span style="font-family:PingFangSC,"helvetica neue","hiragino sans gb",arial,"microsoft yahei ui","microsoft yahei",simsun,sans-serif"><span style="font-size:13px"><span style="font-family:Menlo,Monaco,Consolas,"Courier New",monospace"># git clone https://github.com/ktenzer/openshift-demo.git
+</span></span></span></span></pre>
+
+<p> </p>
+
+<h4 style="margin-left:0px; margin-right:0px"><span style="font-size:16px"><span style="font-family:PingFangSC,"helvetica neue","hiragino sans gb",arial,"microsoft yahei ui","microsoft yahei",simsun,sans-serif">更新Jenkins的认证tokens</span></span></h4>
+
+<p><span style="font-size:16px"><span style="font-family:PingFangSC,"helvetica neue","hiragino sans gb",arial,"microsoft yahei ui","microsoft yahei",simsun,sans-serif"><span style="font-size:14px"><span style="font-family:"Helvetica Neue",STHeiti,"Microsoft YaHei",Helvetica,Arial,sans-serif">从OpenShift命令获得认证token，这个token可以让Jenkins访问OpenShift环境。你需要更新它</span></span></span></span></p>
+
+<pre>
+<span style="font-size:16px"><span style="font-family:PingFangSC,"helvetica neue","hiragino sans gb",arial,"microsoft yahei ui","microsoft yahei",simsun,sans-serif"><span style="font-size:13px"><span style="font-family:Menlo,Monaco,Consolas,"Courier New",monospace"># oc login -u admin
+# oc whoami -t
+DMzhKyEN87DZiDYV6i1d8L8NL2e6gFVFPpT5FnozKtU
+</span></span></span></span></pre>
+
+<p><br />
+<span style="font-size:16px"><span style="font-family:PingFangSC,"helvetica neue","hiragino sans gb",arial,"microsoft yahei ui","microsoft yahei",simsun,sans-serif"><span style="font-size:14px"><span style="font-family:"Helvetica Neue",STHeiti,"Microsoft YaHei",Helvetica,Arial,sans-serif">更新下面的Jenkins任务，并且用上面的token替换其中的authToken和destinationAuthToken</span></span></span></span></p>
+
+<pre>
+<span style="font-size:16px"><span style="font-family:PingFangSC,"helvetica neue","hiragino sans gb",arial,"microsoft yahei ui","microsoft yahei",simsun,sans-serif"><span style="font-size:13px"><span style="font-family:Menlo,Monaco,Consolas,"Courier New",monospace"># ls jenkins-jobs/
+promote-int.xml promote-prod.xml rel-v2.xml rollback-prod.xml
+</span></span></span></span></pre>
+
+<p> </p>
+
+<h4 style="margin-left:0px; margin-right:0px"><span style="font-size:16px"><span style="font-family:PingFangSC,"helvetica neue","hiragino sans gb",arial,"microsoft yahei ui","microsoft yahei",simsun,sans-serif">配置三个环境</span></span></h4>
+
+<p><span style="font-size:16px"><span style="font-family:PingFangSC,"helvetica neue","hiragino sans gb",arial,"microsoft yahei ui","microsoft yahei",simsun,sans-serif"><span style="font-size:14px"><span style="font-family:"Helvetica Neue",STHeiti,"Microsoft YaHei",Helvetica,Arial,sans-serif">用你的token更新三个模板并创建三个环境。</span></span></span></span></p>
+
+<pre>
+<span style="font-size:16px"><span style="font-family:PingFangSC,"helvetica neue","hiragino sans gb",arial,"microsoft yahei ui","microsoft yahei",simsun,sans-serif"><span style="font-size:13px"><span style="font-family:Menlo,Monaco,Consolas,"Courier New",monospace"># cd openshift-demo
+</span></span></span></span></pre>
+
+<p> </p>
+
+<pre>
+<span style="font-size:16px"><span style="font-family:PingFangSC,"helvetica neue","hiragino sans gb",arial,"microsoft yahei ui","microsoft yahei",simsun,sans-serif"><span style="font-size:13px"><span style="font-family:Menlo,Monaco,Consolas,"Courier New",monospace"># oc create -f template.json -n dev
+</span></span></span></span></pre>
+
+<p> </p>
+
+<pre>
+<span style="font-size:16px"><span style="font-family:PingFangSC,"helvetica neue","hiragino sans gb",arial,"microsoft yahei ui","microsoft yahei",simsun,sans-serif"><span style="font-size:13px"><span style="font-family:Menlo,Monaco,Consolas,"Courier New",monospace"># oc create -f acceptance.template.json -n int
+</span></span></span></span></pre>
+
+<p> </p>
+
+<pre>
+<span style="font-size:16px"><span style="font-family:PingFangSC,"helvetica neue","hiragino sans gb",arial,"microsoft yahei ui","microsoft yahei",simsun,sans-serif"><span style="font-size:13px"><span style="font-family:Menlo,Monaco,Consolas,"Courier New",monospace"># oc create -f production.template.json -n prod
+</span></span></span></span></pre>
+
+<p> </p>
+
+<h4 style="margin-left:0px; margin-right:0px"><span style="font-size:16px"><span style="font-family:PingFangSC,"helvetica neue","hiragino sans gb",arial,"microsoft yahei ui","microsoft yahei",simsun,sans-serif">在开发项目中部署nodejs 的hello-world应用</span></span></h4>
+
+<p><span style="font-size:16px"><span style="font-family:PingFangSC,"helvetica neue","hiragino sans gb",arial,"microsoft yahei ui","microsoft yahei",simsun,sans-serif"><span style="font-size:14px"><span style="font-family:"Helvetica Neue",STHeiti,"Microsoft YaHei",Helvetica,Arial,sans-serif">把环境</span></span></span></span></p>
+
+<pre>
+<span style="font-size:16px"><span style="font-family:PingFangSC,"helvetica neue","hiragino sans gb",arial,"microsoft yahei ui","microsoft yahei",simsun,sans-serif"><span style="font-size:13px"><span style="font-family:Menlo,Monaco,Consolas,"Courier New",monospace"># oc new-app -f template.json -n dev
+</span></span></span></span></pre>
+
+<p><br />
+<span style="font-size:16px"><span style="font-family:PingFangSC,"helvetica neue","hiragino sans gb",arial,"microsoft yahei ui","microsoft yahei",simsun,sans-serif"><span style="font-size:14px"><span style="font-family:"Helvetica Neue",STHeiti,"Microsoft YaHei",Helvetica,Arial,sans-serif">这个模板创建了两个版本的应用v1-ab和v2-ab。</span></span></span></span></p>
+
+<div class="active aw-upload-img-list" style="padding:0px"><span style="font-size:16px"><span style="font-family:PingFangSC,"helvetica neue","hiragino sans gb",arial,"microsoft yahei ui","microsoft yahei",simsun,sans-serif"><span style="font-size:14px"><span style="font-family:"Helvetica Neue",STHeiti,"Microsoft YaHei",Helvetica,Arial,sans-serif"><a href="http://dockerone.com/uploads/article/20170323/28bdd8423256e6f00a5c846b0079a930.jpg" style="box-sizing:border-box; background:0px 0px; color:#155faa; text-decoration:none; transition:color 0.2s ease 0s" target="_blank"><img alt="7.jpg" class="img-polaroid" src="http://dockerone.com/uploads/article/20170323/28bdd8423256e6f00a5c846b0079a930.jpg" style="border:0px; box-sizing:border-box; height:auto; margin-bottom:15px; max-width:100%; vertical-align:middle" title="7.jpg" /></a></span></span></span></span></div>
+
+<p> </p>
+
+<h4 style="margin-left:0px; margin-right:0px"><span style="font-size:16px"><span style="font-family:PingFangSC,"helvetica neue","hiragino sans gb",arial,"microsoft yahei ui","microsoft yahei",simsun,sans-serif">在开发项目中测试应用程序</span></span></h4>
+
+<p><span style="font-size:16px"><span style="font-family:PingFangSC,"helvetica neue","hiragino sans gb",arial,"microsoft yahei ui","microsoft yahei",simsun,sans-serif"><span style="font-size:14px"><span style="font-family:"Helvetica Neue",STHeiti,"Microsoft YaHei",Helvetica,Arial,sans-serif">通过http或者curl工具去连接v1-ab因该可以打印出“hello World！”。如果连接v2-ab可以打印出”hello World,welcome to Frankfurt!“。</span></span></span></span></p>
+
+<h4 style="margin-left:0px; margin-right:0px"><span style="font-size:16px"><span style="font-family:PingFangSC,"helvetica neue","hiragino sans gb",arial,"microsoft yahei ui","microsoft yahei",simsun,sans-serif">把V1从开发项目部署到集成项目</span></span></h4>
+
+<p><span style="font-size:16px"><span style="font-family:PingFangSC,"helvetica neue","hiragino sans gb",arial,"microsoft yahei ui","microsoft yahei",simsun,sans-serif"><span style="font-size:14px"><span style="font-family:"Helvetica Neue",STHeiti,"Microsoft YaHei",Helvetica,Arial,sans-serif">把v1的image打一个标记（tag）部署到集成项目。当镜像acceptance:lastest被更新时触发器会部署它到集成项目里。你会看到v1版本的pod被启动并运行起来。</span></span></span></span></p>
+
+<pre>
+<span style="font-size:16px"><span style="font-family:PingFangSC,"helvetica neue","hiragino sans gb",arial,"microsoft yahei ui","microsoft yahei",simsun,sans-serif"><span style="font-size:13px"><span style="font-family:Menlo,Monaco,Consolas,"Courier New",monospace">oc tag v1:latest v1:1.0 -n dev
+oc tag dev/v1:1.0 acceptance:v1 -n int
+oc tag acceptance:v1 acceptance:latest -n int
+</span></span></span></span></pre>
+
+<p> </p>
+
+<h4 style="margin-left:0px; margin-right:0px"><span style="font-size:16px"><span style="font-family:PingFangSC,"helvetica neue","hiragino sans gb",arial,"microsoft yahei ui","microsoft yahei",simsun,sans-serif">把v1从集成项目部署到生产项目</span></span></h4>
+
+<p><span style="font-size:16px"><span style="font-family:PingFangSC,"helvetica neue","hiragino sans gb",arial,"microsoft yahei ui","microsoft yahei",simsun,sans-serif"><span style="font-size:14px"><span style="font-family:"Helvetica Neue",STHeiti,"Microsoft YaHei",Helvetica,Arial,sans-serif">把v1打一个标记（tag）部署到生产项目。当镜像production:latest被更新时生产环境中的触发器会部署它到生产项目中。</span></span></span></span></p>
+
+<pre>
+<span style="font-size:16px"><span style="font-family:PingFangSC,"helvetica neue","hiragino sans gb",arial,"microsoft yahei ui","microsoft yahei",simsun,sans-serif"><span style="font-size:13px"><span style="font-family:Menlo,Monaco,Consolas,"Courier New",monospace">oc tag int/acceptance:v1 production:v1 -n prod
+oc tag production:v1 production:latest -n prod
+</span></span></span></span></pre>
+
+<p><br />
+<span style="font-size:16px"><span style="font-family:PingFangSC,"helvetica neue","hiragino sans gb",arial,"microsoft yahei ui","microsoft yahei",simsun,sans-serif"><span style="font-size:14px"><span style="font-family:"Helvetica Neue",STHeiti,"Microsoft YaHei",Helvetica,Arial,sans-serif">注意应用被署了4个pod并且代码版本是v1。再次说明一下，这里所有的定义都来自之前的模板。</span></span></span></span></p>
+
+<div class="active aw-upload-img-list" style="padding:0px"><span style="font-size:16px"><span style="font-family:PingFangSC,"helvetica neue","hiragino sans gb",arial,"microsoft yahei ui","microsoft yahei",simsun,sans-serif"><span style="font-size:14px"><span style="font-family:"Helvetica Neue",STHeiti,"Microsoft YaHei",Helvetica,Arial,sans-serif"><a href="http://dockerone.com/uploads/article/20170323/413b3e68338123e5db2702251908d6c2.jpg" style="box-sizing:border-box; background:0px 0px; color:#155faa; text-decoration:none; transition:color 0.2s ease 0s" target="_blank"><img alt="8.jpg" class="img-polaroid" src="http://dockerone.com/uploads/article/20170323/413b3e68338123e5db2702251908d6c2.jpg" style="border:0px; box-sizing:border-box; height:auto; margin-bottom:15px; max-width:100%; vertical-align:middle" title="8.jpg" /></a></span></span></span></span></div>
+
+<p> </p>
+
+<h4 style="margin-left:0px; margin-right:0px"><span style="font-size:16px"><span style="font-family:PingFangSC,"helvetica neue","hiragino sans gb",arial,"microsoft yahei ui","microsoft yahei",simsun,sans-serif">配置Jenkins</span></span></h4>
+
+<p><span style="font-size:16px"><span style="font-family:PingFangSC,"helvetica neue","hiragino sans gb",arial,"microsoft yahei ui","microsoft yahei",simsun,sans-serif"><span style="font-size:14px"><span style="font-family:"Helvetica Neue",STHeiti,"Microsoft YaHei",Helvetica,Arial,sans-serif">你已经知道了如何手动的，用打标记和设置触发器的方法去部署一个应用程序。下面我们来一点复杂的，通过在jenkins里安装OpenShift的插件去从新编排一下刚才的任务。这次我们将部署v2版本到集成项目和开发项目</span></span><br />
+<br />
+<span style="font-size:14px"><span style="font-family:"Helvetica Neue",STHeiti,"Microsoft YaHei",Helvetica,Arial,sans-serif">这里可以得到jenkins中的4个job：第一个的作用是创建v2版的应用程序，第二个用来从开发部署集成，第三个实现了从集成到生产，第四个可以在生产项目中把应用从v2回滚到v1。</span></span></span></span></p>
+
+<pre>
+<span style="font-size:16px"><span style="font-family:PingFangSC,"helvetica neue","hiragino sans gb",arial,"microsoft yahei ui","microsoft yahei",simsun,sans-serif"><span style="font-size:13px"><span style="font-family:Menlo,Monaco,Consolas,"Courier New",monospace"># curl -k -u admin:password -XPOST -d @jenkins-jobs/rel-v2.xml 'https://jenkins-dev.apps.lab/createItem?name=rel-v2' -H "Content-Type: application/xml"
+# curl -k -u admin:password -XPOST -d @jenkins-jobs/promote-int.xml 'https://jenkins-dev.apps.lab/createItem?name=promote-int' -H "Content-Type: application/xml"
+# curl -k -u admin:password -XPOST -d @jenkins-jobs/promote-prod.xml 'https://jenkins-dev.apps.lab/createItem?name=promote-prod' -H "Content-Type: application/xml"
+# curl -k -u admin:password -XPOST -d @jenkins-jobs/rollback-prod.xml 'https://jenkins-dev.apps.lab/createItem?name=rollback-prod' -H "Content-Type: application/xml"
+</span></span></span></span></pre>
+
+<p><br />
+<span style="font-size:16px"><span style="font-family:PingFangSC,"helvetica neue","hiragino sans gb",arial,"microsoft yahei ui","microsoft yahei",simsun,sans-serif"><span style="font-size:14px"><span style="font-family:"Helvetica Neue",STHeiti,"Microsoft YaHei",Helvetica,Arial,sans-serif">创建4个job，并且登陆到Jenkins，用户名和密码是：admin和password。</span></span></span></span></p>
+
+<div class="active aw-upload-img-list" style="padding:0px"><span style="font-size:16px"><span style="font-family:PingFangSC,"helvetica neue","hiragino sans gb",arial,"microsoft yahei ui","microsoft yahei",simsun,sans-serif"><span style="font-size:14px"><span style="font-family:"Helvetica Neue",STHeiti,"Microsoft YaHei",Helvetica,Arial,sans-serif"><a href="http://dockerone.com/uploads/article/20170323/0e6fd03a85ede918ab92f09be3b95c44.jpg" style="box-sizing:border-box; background:0px 0px; color:#155faa; text-decoration:none; transition:color 0.2s ease 0s" target="_blank"><img alt="9.jpg" class="img-polaroid" src="http://dockerone.com/uploads/article/20170323/0e6fd03a85ede918ab92f09be3b95c44.jpg" style="border:0px; box-sizing:border-box; height:auto; margin-bottom:15px; max-width:100%; vertical-align:middle" title="9.jpg" /></a></span></span></span></span></div>
+
+<p> </p>
+
+<h4 style="margin-left:0px; margin-right:0px"><span style="font-size:16px"><span style="font-family:PingFangSC,"helvetica neue","hiragino sans gb",arial,"microsoft yahei ui","microsoft yahei",simsun,sans-serif">这里可以修改一点v2的代码并且开始build</span></span></h4>
+
+<p><span style="font-size:16px"><span style="font-family:PingFangSC,"helvetica neue","hiragino sans gb",arial,"microsoft yahei ui","microsoft yahei",simsun,sans-serif"><span style="font-size:14px"><span style="font-family:"Helvetica Neue",STHeiti,"Microsoft YaHei",Helvetica,Arial,sans-serif">为了让这个代码工作，你需要在Github上fork一个nodejs-ex项目到你自己的账户下，并且更新template.json文件，然后用这个文件从新部署一下开发环境。</span></span></span></span></p>
+
+<pre>
+<span style="font-size:16px"><span style="font-family:PingFangSC,"helvetica neue","hiragino sans gb",arial,"microsoft yahei ui","microsoft yahei",simsun,sans-serif"><span style="font-size:13px"><span style="font-family:Menlo,Monaco,Consolas,"Courier New",monospace">"source": {
+"type": "Git",
+"git": {
+"uri": "https://github.com/ktenzer/nodejs-ex.git",
+"ref": "master"
+}, 
+</span></span></span></span></pre>
+
+<p> </p>
+
+<pre>
+<span style="font-size:16px"><span style="font-family:PingFangSC,"helvetica neue","hiragino sans gb",arial,"microsoft yahei ui","microsoft yahei",simsun,sans-serif"><span style="font-size:13px"><span style="font-family:Menlo,Monaco,Consolas,"Courier New",monospace"># git clone https://github.com/ktenzer/nodejs-ex
+</span></span></span></span></pre>
+
+<p> </p>
+
+<pre>
+<span style="font-size:16px"><span style="font-family:PingFangSC,"helvetica neue","hiragino sans gb",arial,"microsoft yahei ui","microsoft yahei",simsun,sans-serif"><span style="font-size:13px"><span style="font-family:Menlo,Monaco,Consolas,"Courier New",monospace"># cd nodejs-ex
+</span></span></span></span></pre>
+
+<p> </p>
+
+<h4 style="margin-left:0px; margin-right:0px"><span style="font-size:16px"><span style="font-family:PingFangSC,"helvetica neue","hiragino sans gb",arial,"microsoft yahei ui","microsoft yahei",simsun,sans-serif">Checkout到v2的branch并且commit</span></span></h4>
+
+<pre>
+<span style="font-size:16px"><span style="font-family:PingFangSC,"helvetica neue","hiragino sans gb",arial,"microsoft yahei ui","microsoft yahei",simsun,sans-serif"><span style="font-size:13px"><span style="font-family:Menlo,Monaco,Consolas,"Courier New",monospace"># git checkout v2
+# vi index.html
+Hello World, welcome to Munich!
+</span></span></span></span></pre>
+
+<p> </p>
+
+<h4 style="margin-left:0px; margin-right:0px"><span style="font-size:16px"><span style="font-family:PingFangSC,"helvetica neue","hiragino sans gb",arial,"microsoft yahei ui","microsoft yahei",simsun,sans-serif">提交修改</span></span></h4>
+
+<pre>
+<span style="font-size:16px"><span style="font-family:PingFangSC,"helvetica neue","hiragino sans gb",arial,"microsoft yahei ui","microsoft yahei",simsun,sans-serif"><span style="font-size:13px"><span style="font-family:Menlo,Monaco,Consolas,"Courier New",monospace"># git commit -a -m "updated to munich"
+# git push origin v2
+</span></span></span></span></pre>
+
+<p><br />
+<span style="font-size:16px"><span style="font-family:PingFangSC,"helvetica neue","hiragino sans gb",arial,"microsoft yahei ui","microsoft yahei",simsun,sans-serif"><span style="font-size:14px"><span style="font-family:"Helvetica Neue",STHeiti,"Microsoft YaHei",Helvetica,Arial,sans-serif">在Jenkins里运行rhel-v2这个build。</span></span></span></span></p>
+
+<div class="active aw-upload-img-list" style="padding:0px"><span style="font-size:16px"><span style="font-family:PingFangSC,"helvetica neue","hiragino sans gb",arial,"microsoft yahei ui","microsoft yahei",simsun,sans-serif"><span style="font-size:14px"><span style="font-family:"Helvetica Neue",STHeiti,"Microsoft YaHei",Helvetica,Arial,sans-serif"><a href="http://dockerone.com/uploads/article/20170323/90ae755dbf6760ec744c119c5edf3906.jpg" style="box-sizing:border-box; background:0px 0px; color:#155faa; text-decoration:none; transition:color 0.2s ease 0s" target="_blank"><img alt="10.jpg" class="img-polaroid" src="http://dockerone.com/uploads/article/20170323/90ae755dbf6760ec744c119c5edf3906.jpg" style="border:0px; box-sizing:border-box; height:auto; margin-bottom:15px; max-width:100%; vertical-align:middle" title="10.jpg" /></a></span></span></span></span></div>
+
+<p><br />
+<span style="font-size:16px"><span style="font-family:PingFangSC,"helvetica neue","hiragino sans gb",arial,"microsoft yahei ui","microsoft yahei",simsun,sans-serif"><span style="font-size:14px"><span style="font-family:"Helvetica Neue",STHeiti,"Microsoft YaHei",Helvetica,Arial,sans-serif">如果你克隆了nodejs-ex的repository，这时你可以通过URL看到你的修改已经生效了。</span></span></span></span></p>
+
+<h4 style="margin-left:0px; margin-right:0px"><span style="font-size:16px"><span style="font-family:PingFangSC,"helvetica neue","hiragino sans gb",arial,"microsoft yahei ui","microsoft yahei",simsun,sans-serif">把v2从开发项目部署到集成项目</span></span></h4>
+
+<p><span style="font-size:16px"><span style="font-family:PingFangSC,"helvetica neue","hiragino sans gb",arial,"microsoft yahei ui","microsoft yahei",simsun,sans-serif"><span style="font-size:14px"><span style="font-family:"Helvetica Neue",STHeiti,"Microsoft YaHei",Helvetica,Arial,sans-serif">在Jenkins里运行promote-int这个build，你会看到有一个v2版本的pod在v1版本后启动。</span></span></span></span></p>
+
+<div class="active aw-upload-img-list" style="padding:0px"><span style="font-size:16px"><span style="font-family:PingFangSC,"helvetica neue","hiragino sans gb",arial,"microsoft yahei ui","microsoft yahei",simsun,sans-serif"><span style="font-size:14px"><span style="font-family:"Helvetica Neue",STHeiti,"Microsoft YaHei",Helvetica,Arial,sans-serif"><a href="http://dockerone.com/uploads/article/20170323/050ef4aedd00903dac306b12f656692f.jpg" style="box-sizing:border-box; background:0px 0px; color:#155faa; text-decoration:none; transition:color 0.2s ease 0s" target="_blank"><img alt="11.jpg" class="img-polaroid" src="http://dockerone.com/uploads/article/20170323/050ef4aedd00903dac306b12f656692f.jpg" style="border:0px; box-sizing:border-box; height:auto; margin-bottom:15px; max-width:100%; vertical-align:middle" title="11.jpg" /></a></span></span></span></span></div>
+
+<p> </p>
+
+<h4 style="margin-left:0px; margin-right:0px"><span style="font-size:16px"><span style="font-family:PingFangSC,"helvetica neue","hiragino sans gb",arial,"microsoft yahei ui","microsoft yahei",simsun,sans-serif">从集成环境部署v2到生产环境</span></span></h4>
+
+<p><span style="font-size:16px"><span style="font-family:PingFangSC,"helvetica neue","hiragino sans gb",arial,"microsoft yahei ui","microsoft yahei",simsun,sans-serif"><span style="font-size:14px"><span style="font-family:"Helvetica Neue",STHeiti,"Microsoft YaHei",Helvetica,Arial,sans-serif">我们在这里深入的看一下在hood的后面实际发生了些什么。</span></span><br />
+<br />
+<span style="font-size:14px"><span style="font-family:"Helvetica Neue",STHeiti,"Microsoft YaHei",Helvetica,Arial,sans-serif">可以用curl观察到应用程序是如何从v1切换到v2的。</span></span></span></span></p>
+
+<pre>
+<span style="font-size:16px"><span style="font-family:PingFangSC,"helvetica neue","hiragino sans gb",arial,"microsoft yahei ui","microsoft yahei",simsun,sans-serif"><span style="font-size:13px"><span style="font-family:Menlo,Monaco,Consolas,"Courier New",monospace"># for i in {1..10000};do curl prod-ab.apps.lab; sleep 1;done
+</span></span></span></span></pre>
+
+<p><br />
+<span style="font-size:16px"><span style="font-family:PingFangSC,"helvetica neue","hiragino sans gb",arial,"microsoft yahei ui","microsoft yahei",simsun,sans-serif"><span style="font-size:14px"><span style="font-family:"Helvetica Neue",STHeiti,"Microsoft YaHei",Helvetica,Arial,sans-serif">在Jenkins里运行promote-prod这个build。</span></span></span></span></p>
+
+<div class="active aw-upload-img-list" style="padding:0px"><span style="font-size:16px"><span style="font-family:PingFangSC,"helvetica neue","hiragino sans gb",arial,"microsoft yahei ui","microsoft yahei",simsun,sans-serif"><span style="font-size:14px"><span style="font-family:"Helvetica Neue",STHeiti,"Microsoft YaHei",Helvetica,Arial,sans-serif"><a href="http://dockerone.com/uploads/article/20170323/91520aa473536d4411714f14e5786879.jpg" style="box-sizing:border-box; background:0px 0px; color:#155faa; text-decoration:none; transition:color 0.2s ease 0s" target="_blank"><img alt="12.jpg" class="img-polaroid" src="http://dockerone.com/uploads/article/20170323/91520aa473536d4411714f14e5786879.jpg" style="border:0px; box-sizing:border-box; height:auto; margin-bottom:15px; max-width:100%; vertical-align:middle" title="12.jpg" /></a></span></span></span></span></div>
+
+<p><br />
+<span style="font-size:16px"><span style="font-family:PingFangSC,"helvetica neue","hiragino sans gb",arial,"microsoft yahei ui","microsoft yahei",simsun,sans-serif"><span style="font-size:14px"><span style="font-family:"Helvetica Neue",STHeiti,"Microsoft YaHei",Helvetica,Arial,sans-serif">部署已经开始了，v2版本在v1版本之后启动。此时应用的服务仍然还是v1。</span></span></span></span></p>
+
+<div class="active aw-upload-img-list" style="padding:0px"><span style="font-size:16px"><span style="font-family:PingFangSC,"helvetica neue","hiragino sans gb",arial,"microsoft yahei ui","microsoft yahei",simsun,sans-serif"><span style="font-size:14px"><span style="font-family:"Helvetica Neue",STHeiti,"Microsoft YaHei",Helvetica,Arial,sans-serif"><a href="http://dockerone.com/uploads/article/20170323/9735ed237c6836e7b876d521f207f5a6.jpg" style="box-sizing:border-box; background:0px 0px; color:#155faa; text-decoration:none; transition:color 0.2s ease 0s" target="_blank"><img alt="13.jpg" class="img-polaroid" src="http://dockerone.com/uploads/article/20170323/9735ed237c6836e7b876d521f207f5a6.jpg" style="border:0px; box-sizing:border-box; height:auto; margin-bottom:15px; max-width:100%; vertical-align:middle" title="13.jpg" /></a></span></span></span></span></div>
+
+<p><br />
+<span style="font-size:16px"><span style="font-family:PingFangSC,"helvetica neue","hiragino sans gb",arial,"microsoft yahei ui","microsoft yahei",simsun,sans-serif"><span style="font-size:14px"><span style="font-family:"Helvetica Neue",STHeiti,"Microsoft YaHei",Helvetica,Arial,sans-serif">两个v2版本的pod运行起来了，探针（readiness）会去检查这两个pod，以确保v2应用提供的服务可用。然后把v1的pod逐个关闭。</span></span></span></span></p>
+
+<div class="active aw-upload-img-list" style="padding:0px"><span style="font-size:16px"><span style="font-family:PingFangSC,"helvetica neue","hiragino sans gb",arial,"microsoft yahei ui","microsoft yahei",simsun,sans-serif"><span style="font-size:14px"><span style="font-family:"Helvetica Neue",STHeiti,"Microsoft YaHei",Helvetica,Arial,sans-serif"><a href="http://dockerone.com/uploads/article/20170323/7b430f5df2fd2fc57ab9d38185413bc2.jpg" style="box-sizing:border-box; background:0px 0px; color:#155faa; text-decoration:none; transition:color 0.2s ease 0s" target="_blank"><img alt="14.jpg" class="img-polaroid" src="http://dockerone.com/uploads/article/20170323/7b430f5df2fd2fc57ab9d38185413bc2.jpg" style="border:0px; box-sizing:border-box; height:auto; margin-bottom:15px; max-width:100%; vertical-align:middle" title="14.jpg" /></a></span></span></span></span></div>
+
+<p><br />
+<span style="font-size:16px"><span style="font-family:PingFangSC,"helvetica neue","hiragino sans gb",arial,"microsoft yahei ui","microsoft yahei",simsun,sans-serif"><span style="font-size:14px"><span style="font-family:"Helvetica Neue",STHeiti,"Microsoft YaHei",Helvetica,Arial,sans-serif">当v2版本的4个pod都运行起来的时候，v1版本的pod的数量是0。在这个过程中我们可以看到有一段时间，v1和v2是同时响应请求的。</span></span></span></span></p>
+
+<div class="active aw-upload-img-list" style="padding:0px"><span style="font-size:16px"><span style="font-family:PingFangSC,"helvetica neue","hiragino sans gb",arial,"microsoft yahei ui","microsoft yahei",simsun,sans-serif"><span style="font-size:14px"><span style="font-family:"Helvetica Neue",STHeiti,"Microsoft YaHei",Helvetica,Arial,sans-serif"><a href="http://dockerone.com/uploads/article/20170323/9ea22e48bdf1751680b10c0288618352.jpg" style="box-sizing:border-box; background:0px 0px; color:#155faa; text-decoration:none; transition:color 0.2s ease 0s" target="_blank"><img alt="15.jpg" class="img-polaroid" src="http://dockerone.com/uploads/article/20170323/9ea22e48bdf1751680b10c0288618352.jpg" style="border:0px; box-sizing:border-box; height:auto; margin-bottom:15px; max-width:100%; vertical-align:middle" title="15.jpg" /></a></span></span></span></span></div>
+
+<p><br />
+<span style="font-size:16px"><span style="font-family:PingFangSC,"helvetica neue","hiragino sans gb",arial,"microsoft yahei ui","microsoft yahei",simsun,sans-serif"><span style="font-size:14px"><span style="font-family:"Helvetica Neue",STHeiti,"Microsoft YaHei",Helvetica,Arial,sans-serif">现在只有v2版本的pod在运行了，同时AB的部署也完成了。</span></span></span></span></p>
+
+<div class="active aw-upload-img-list" style="padding:0px"><span style="font-size:16px"><span style="font-family:PingFangSC,"helvetica neue","hiragino sans gb",arial,"microsoft yahei ui","microsoft yahei",simsun,sans-serif"><span style="font-size:14px"><span style="font-family:"Helvetica Neue",STHeiti,"Microsoft YaHei",Helvetica,Arial,sans-serif"><a href="http://dockerone.com/uploads/article/20170323/fa41176d66ce849d68dfcdee2c89465a.jpg" style="box-sizing:border-box; background:0px 0px; color:#155faa; text-decoration:none; transition:color 0.2s ease 0s" target="_blank"><img alt="16.jpg" class="img-polaroid" src="http://dockerone.com/uploads/article/20170323/fa41176d66ce849d68dfcdee2c89465a.jpg" style="border:0px; box-sizing:border-box; height:auto; margin-bottom:15px; max-width:100%; vertical-align:middle" title="16.jpg" /></a></span></span></span></span></div>
+
+<p> </p>
+
+<h4 style="margin-left:0px; margin-right:0px"><span style="font-size:16px"><span style="font-family:PingFangSC,"helvetica neue","hiragino sans gb",arial,"microsoft yahei ui","microsoft yahei",simsun,sans-serif">回滚</span></span></h4>
+
+<p><span style="font-size:16px"><span style="font-family:PingFangSC,"helvetica neue","hiragino sans gb",arial,"microsoft yahei ui","microsoft yahei",simsun,sans-serif"><span style="font-size:14px"><span style="font-family:"Helvetica Neue",STHeiti,"Microsoft YaHei",Helvetica,Arial,sans-serif">现在假设我们不满意v2版本，想回到旧的v1版本去。</span></span><br />
+<br />
+<span style="font-size:14px"><span style="font-family:"Helvetica Neue",STHeiti,"Microsoft YaHei",Helvetica,Arial,sans-serif">在Jenkins里运行rollback-prod这个build。</span></span></span></span></p>
+
+<div class="active aw-upload-img-list" style="padding:0px"><span style="font-size:16px"><span style="font-family:PingFangSC,"helvetica neue","hiragino sans gb",arial,"microsoft yahei ui","microsoft yahei",simsun,sans-serif"><span style="font-size:14px"><span style="font-family:"Helvetica Neue",STHeiti,"Microsoft YaHei",Helvetica,Arial,sans-serif"><a href="http://dockerone.com/uploads/article/20170323/6114ff7f5258399bac72689118388a14.jpg" style="box-sizing:border-box; background:0px 0px; color:#155faa; text-decoration:none; transition:color 0.2s ease 0s" target="_blank"><img alt="17.jpg" class="img-polaroid" src="http://dockerone.com/uploads/article/20170323/6114ff7f5258399bac72689118388a14.jpg" style="border:0px; box-sizing:border-box; height:auto; margin-bottom:15px; max-width:100%; vertical-align:middle" title="17.jpg" /></a></span></span></span></span></div>
+
+<p><br />
+<span style="font-size:16px"><span style="font-family:PingFangSC,"helvetica neue","hiragino sans gb",arial,"microsoft yahei ui","microsoft yahei",simsun,sans-serif"><span style="font-size:14px"><span style="font-family:"Helvetica Neue",STHeiti,"Microsoft YaHei",Helvetica,Arial,sans-serif">现在我们观察到了同样的事情，只不过是v2切换到了v1。</span></span></span></span></p>
+
+<div class="active aw-upload-img-list" style="padding:0px"><span style="font-size:16px"><span style="font-family:PingFangSC,"helvetica neue","hiragino sans gb",arial,"microsoft yahei ui","microsoft yahei",simsun,sans-serif"><span style="font-size:14px"><span style="font-family:"Helvetica Neue",STHeiti,"Microsoft YaHei",Helvetica,Arial,sans-serif"><a href="http://dockerone.com/uploads/article/20170323/10b0ffbdd02d7b68e6502755d68f37ae.jpg" style="box-sizing:border-box; background:0px 0px; color:#155faa; text-decoration:none; transition:color 0.2s ease 0s" target="_blank"><img alt="18.jpg" class="img-polaroid" src="http://dockerone.com/uploads/article/20170323/10b0ffbdd02d7b68e6502755d68f37ae.jpg" style="border:0px; box-sizing:border-box; height:auto; margin-bottom:15px; max-width:100%; vertical-align:middle" title="18.jpg" /></a></span></span></span></span></div>
+
+<p><br />
+<span style="font-size:16px"><span style="font-family:PingFangSC,"helvetica neue","hiragino sans gb",arial,"microsoft yahei ui","microsoft yahei",simsun,sans-serif"><span style="font-size:14px"><span style="font-family:"Helvetica Neue",STHeiti,"Microsoft YaHei",Helvetica,Arial,sans-serif">可以用下面的命令把集成环境中的v2回滚到v1。</span></span></span></span></p>
+
+<pre>
+<span style="font-size:16px"><span style="font-family:PingFangSC,"helvetica neue","hiragino sans gb",arial,"microsoft yahei ui","microsoft yahei",simsun,sans-serif"><span style="font-size:13px"><span style="font-family:Menlo,Monaco,Consolas,"Courier New",monospace"># oc tag dev/v1:latest acceptance:latest -n int
+</span></span></span></span></pre>
+
+<p> </p>
+
+<h3 style="margin-left:0px; margin-right:0px"><span style="font-size:16px"><span style="font-family:PingFangSC,"helvetica neue","hiragino sans gb",arial,"microsoft yahei ui","microsoft yahei",simsun,sans-serif">总结</span></span></h3>
+
+<p><span style="font-size:16px"><span style="font-family:PingFangSC,"helvetica neue","hiragino sans gb",arial,"microsoft yahei ui","microsoft yahei",simsun,sans-serif"><span style="font-size:14px"><span style="font-family:"Helvetica Neue",STHeiti,"Microsoft YaHei",Helvetica,Arial,sans-serif">在这片文章中我们学到了如何在OpenShift中部署一个简单的应用程序并且和Jenkins集成去管理应用的发布。OpenShift有很多的功能值得你使用它，我们紧紧是用了其中的一小部分。使用Jenkins你可以创建一个非常复杂的build pipelines，它能让你不仅能够控制而且可以看到应用部署的过程。我们看到了一种典型的部署方式就是部署应用AB，但还有很多其他的方式比如blue-green或者canary。在以后的文章中我会演示OpenShift中其他的部署模式。请分享你的经验和成果。我希望这篇文章能够帮到你。</span></span></span></span></p>

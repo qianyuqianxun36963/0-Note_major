@@ -1,0 +1,192 @@
+<h1>Spring Data Jpa 复杂查询总结 (多表关联 以及 自定义分页 )</h1>
+<p>只是做一个总结所以就不多说废话了 <br />
+实体类</p>
+<pre>
+<code>@Entity
+@Table(name = "t_hotel")
+@Data
+public class THotel {
+@Id
+private int id;
+private String name;
+private String address;
+/**
+* 城市id
+*/
+private String city;
+}</code></pre>
+<pre>
+<code>@Entity
+@Table(name = "t_city")
+@Data
+public class TCity {
+@Id
+private int id;
+private String name;
+private String state;
+private String country;
+private String map;
+}</code></pre>
+<p>在启动SpringBoot的时候 SpringDataJpa会自动的在数据库中生成表结构. <br />
+为了查询要求,我随便的增加了一些数据,如下图所示</p>
+<p>新建接口</p>
+<pre>
+<code>public interface TCityRepository extends JpaRepository<TCity, Integer>, JpaSpecificationExecutor<TCity> {
+}
+</code></pre>
+<p>单元测试类</p>
+<pre>
+<code>@RunWith(SpringRunner.class)
+@SpringBootTest
+public class TCityRepositoryTest{
+@Autowired
+private TCityRepository tCityRepository;
+}</code></pre>
+<h5>1.查找出Id小于3,并且名称带有<code>shanghai</code>的记录.</h5>
+<pre>
+<code>
+/**
+* 查找出Id小于3,并且名称带有`shanghai`的记录.
+*
+* @param id id
+* @param name 城市名称
+* @return 城市列表
+*/
+List<TCity> findByIdLessThanAndNameLike(int id, String name);
+</code></pre>
+<p>单元测试</p>
+<pre>
+<code>
+@Test
+public void findByIdLessThanAndNameLike() throws Exception {
+List<TCity> shanghai = tCityRepository.findByIdLessThanAndNameLike(3, "%shanghai%");
+Assert.assertTrue(shanghai.size() > 0);
+}
+</code></pre>
+<h5>2.通过旅店名称分页查询旅店以及城市的所有信息</h5>
+<pre>
+<code>
+/**
+* 通过旅店名称分页查询旅店以及城市的信息
+*
+* @param name 旅店名称
+* @param pageable 分页信息
+* @return Page<Object[]>
+*/
+@Query(value = "select t1.name as cityName,t2.name as hotelName\n" +
+"from t_city t1\n" +
+" left join t_hotel t2 on t2.city = t1.id\n" +
+"where t2.name = :name",
+countQuery = "select count(*)" +
+"from t_city t1 \n" +
+" left join t_hotel t2 on t2.city = t1.id\n" +
+"where t2.name = :name"
+, nativeQuery = true)
+Page<Object[]> findCityAndHotel(@Param("name") String name, Pageable pageable);
+</code></pre>
+<p>为了节约时间 我只在select 与 from 之间 分别查询了城市的名称以及旅店的名称如果要查所有的信息,可以换成 <br />
+t1.* , <br />
+t2.*</p>
+<p>单元测试</p>
+<pre>
+<code>
+@Test
+public void findCityAndHotel() throws Exception {
+Page<Object[]> cityAndHotel = tCityRepository.findCityAndHotel("酒店", new PageRequest(0, 10));
+Assert.assertTrue(cityAndHotel.getTotalElements() > 0);
+} 
+</code></pre>
+<p>关于把List</p>
+<h5>3.HQL通过旅店名称查询旅店以及城市的所有信息</h5>
+<p>3和2其实是一样的,为了方便我就不作出分页查询了</p>
+<p>HQL可以用map来接受返回的参数,具体的用法如下所示:</p>
+<pre>
+<code>
+/**
+* HQL通过旅店名称查询旅店以及城市的所有信息
+*
+* @return
+*/
+@Query(value = "select new map(t1,t2) from TCity t1 left join THotel t2 on t1.id=t2.city where t2.name =:name")
+List<Map<String, Object>> findCityAndHotelByHQL(@Param("name") String name);
+</code></pre>
+<p>测试方法和2是差不多的 我就不粘贴了</p>
+<p>Map</p>
+<h5>4.HQL通过旅店名称查询旅店以及城市的所有信息 直接返回实体类</h5>
+<pre>
+<code>/**
+* 关联查询
+*
+* @return
+*/
+@Query(value = "select new pers.zpw.domain.CityHohel(t1.name AS cityName,t2.name AS hotelName) from TCity t1 left join THotel t2 on t1.id=t2.city where t2.name =:name")
+List<CityHohel> findCityAndHotelByHQLResultObj(@Param("name") String name);
+</code></pre>
+<p>为了方便CityHohel我只封装了2个属性,这和HQL查询的字段是完全一致的,也必须要保持一致.</p>
+<pre>
+<code>/**
+* Created by ZhuPengWei on 2018/5/12.
+*/
+@Data
+public class CityHohel {
+private String cityName;
+private String hotelName;
+public CityHohel(String cityName, String hotelName) {
+this.cityName = cityName;
+this.hotelName = hotelName;
+}
+}</code></pre>
+<p>当然这个带参的构造方法是必须要写的,否则会抛出转换实体的异常</p>
+<p>单元测试</p>
+<pre>
+<code>@Test
+public void findCityAndHotelByHQLResultObj() throws Exception {
+List<CityHohel> cityAndHotelByHQLResultObj = tCityRepository.findCityAndHotelByHQLResultObj("酒店");
+Assert.assertTrue(cityAndHotelByHQLResultObj.size() > 0);
+}
+</code></pre>
+<h5>4.HQL通过旅店名称分页查询旅店以及城市的所有信息 直接返回实体类</h5>
+<pre>
+<code>/**
+* 关联查询
+*
+* @return
+*/
+@Query(value = "select new pers.zpw.domain.CityHohel(t1.name AS cityName,t2.name AS hotelName) from TCity t1 left join THotel t2 on t1.id=t2.city where t2.name =:name",
+countQuery = "select count(*) from TCity t1 left join THotel t2 on t1.id=t2.city where t2.name =:name")
+Page<CityHohel> findCityAndHotelAllSelf(@Param("name") String name, Pageable pageable);
+</code></pre>
+<pre>
+<code> @Test
+public void findCityAndHotelAllSelf() throws Exception {
+Page<CityHohel> cityAndHotelAllSelf = tCityRepository.findCityAndHotelAllSelf("酒店", new PageRequest(0, 10));
+Assert.assertTrue(cityAndHotelAllSelf.getTotalElements() > 0);
+}
+</code></pre>
+<h5>5.动态查询旅店以及城市的所有信息 直接返回实体类</h5>
+<p>如果是动态查询的话当然首先得构造一条sql去查询了,当然如果不是自定义实体对象的话这样的网上<a href="https://www.baidu.com/s?wd=%E4%B8%80%E5%A4%A7&tn=24004469_oem_dg&rsv_dl=gh_pl_sl_csd" target="_blank">一大</a>堆我就不写了.</p>
+<p>直接走测试</p>
+<pre>
+<code>@Autowired
+@PersistenceContext
+private EntityManager entityManager;
+@Test
+public void testDynamic() throws Exception {
+String sql = "select new pers.zpw.domain.CityHohel(t1.name AS cityName,t2.name AS hotelName) from TCity t1 left join THotel t2 on t1.id=t2.city where t2.name ='酒店'";
+Query query = entityManager.createQuery(sql);
+List resultList = query.getResultList();
+Assert.assertTrue(resultList.size() > 0);
+}</code></pre>
+<p>这样测试是通过的,因此可以知道在业务层的方法中我们可以动态的构造SQL语句. 比如说可以在接口中这样子来定义一个方法</p>
+<pre>
+<code> /**
+* 自定义查询
+* @param sql
+* @param entityManager
+* @return
+*/
+default List customQuery(String sql, EntityManager entityManager) {
+return entityManager.createQuery(sql).getResultList();
+}
+</code></pre>
+<p>然后在测试类中动态的根据条件去拼接SQL语句去调用</p>

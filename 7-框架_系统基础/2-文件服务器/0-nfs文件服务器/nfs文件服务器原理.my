@@ -1,0 +1,1378 @@
+<h1>NFS原理详解</h1>
+
+<h2><strong>一、NFS介绍</strong></h2>
+
+<h3><strong>1）什么是NFS</strong></h3>
+
+<p>它的主要功能是通过网络让不同的机器系统之间可以彼此共享文件和目录。NFS服务器可以允许NFS客户端将远端NFS服务器端的共享目录挂载到本地的NFS客户端中。在本地的NFS客户端的机器看来，NFS服务器端共享的目录就好像自己的磁盘分区和目录一样。一般客户端挂载到本地目录的名字可以随便，但为方便管理，我们要和服务器端一样比较好。</p>
+
+<p>NFS一般用来存储共享视频，图片等静态数据。</p>
+
+<p>《什么是NFS》</p>
+
+<p>   就是通过网络共享目录，让网络上的其他服务器能够挂载访问共享目录内的数据。（一般共享视频，图片等静态数据）</p>
+
+<p>   这个再往简单点，就相当于windows里面共享文件，然后其他主机把这个共享文件映射成了本地盘使用一样。接下来我们会学习两部分：NFS原理(共享原理）、服务端如何架NFS（怎么共享）、客户端怎么挂载（怎么映射网盘）</p>
+
+<p><strong>挂载结构图</strong></p>
+
+<p><a href="http://img1.51cto.com/attachment/201312/101739501.png"><img alt="101739501.png" src="http://img1.51cto.com/attachment/201312/101739501.png" style="height:420px; width:500px" title="NFS结构图.png" /></a></p>
+
+<h3><strong>2）NFS挂载原理介绍</strong></h3>
+
+<p>如上图，当我们在nfs服务器设置好一个共享目录/data后，其他的有权访问NFS服务器的NFS客户端就可以将这个目录挂载到本地。并且能够看到服务端/data的所有数据。因为挂载在本地的/data目录，其实就是服务器端的/data目录。如果服务器端配置的客户端只读，那么客户端就只能够只读。如果配置读写，客户端就能够进行读写。挂载后，NFS客户端查看磁盘信息命令：#df –h</p>
+
+<p>NFS是通过网络来进行服务端和客户端之间的数据传输。两者之间要传输数据就要有想对应的网络端口来进行传输。NFS服务器到底使用什么网络端口来传输数据的，NFS服务器端其实是随机选择端口来进行数据传输。那NFS客户端又是如何知道NFS服务器端到底使用的是哪个端口呢？其实NFS服务器时通过远程过程调用（remote procedure call 简称RPC）协议/服务来实现的。也就是说RPC服务会统一管理NFS的端口，客户端和服务端通过RPC来先沟通NFS使用了哪些端口，之后再利用这些端口（小于1024）来进行数据的传输。</p>
+
+<p><em>PS:哦，原来是RPC管理服务端的NFS端口分配，客户端要传数据，那客户端的RPC会先跟服务端的RPC去要服务器的端口，要到端口后再建立连接，然后传输数据。</em></p>
+
+<p><strong>《rpc</strong><strong>与nfs</strong><strong>》</strong></p>
+
+<p>   pc（portmap）就是用来统一管理NFS端口的服务，并且统一对外的端口是111。NFS服务端需要先启动rpc，再启动NFS，这样NFS才能够到RPC去注册端口信息。客户端的RPC可以通过向服务端的RPC请求获取服务端的NFS端口信息。当获取到了NFS端口信息后，就会以实际端口进行数据的传输。（由于NFS端口为随机的。）</p>
+
+<p><strong>《RPC和NFS如何通讯》</strong></p>
+
+<p>因为NFS有很多功能，不同的功能需要使用不同的端口。因此NFS无法固定端口。而RPC会记录NFS端口的信息，这样我们就能够通过RPC实现服务端和客户端的RPC来沟通端口信息。</p>
+
+<p>那RPC和NFS之间又是如何之间相互通讯的？</p>
+
+<p>首先当NFS启动后，就会随机的使用一些端口，然后NFS就会向RPC去注册这些端口。RPC就会记录下这些端口。并且RPC会开机111端口，等待客户端RPC的请求，如果客户端有请求，那服务端的RPC就会将记录的NFS端口信息告知客户端。</p>
+
+<table border="1" style="width:693px">
+<tbody>
+<tr>
+<td>
+<p>提示：在启动NFS SERVER之前，首先要启动RPC服务（即portmap服务，下同）否则NFS SERVER就无法向RPC服务区注册，另外，如果RPC服务重新启动，原来已经注册好的NFS端口数据就会全部丢失。因此此时RPC服务管理的NFS程序也要重新启动以重新向RPC注册。特别注意：一般修改NFS配置文档后，是不需要重启NFS的，直接在命令执行/etc/init.d/nfs  reload或exportfs –rv即可使修改的/etc/exports生效。</p>
+</td>
+</tr>
+</tbody>
+</table>
+
+<p>PS:这里有个启动顺序的点，先给大家讲清楚。因为NFS要想RPC注册端口信息。所以RPC一定要先于NFS早启动。我给大家比喻一个左手叠右手的游戏，此时就是一定要确保NFS的手掌（左）在RPC手掌（右）的上面。正常顺序是要RPC先叠上去，然后NFS再叠上去。如果RPC重启了，就相当于手掌抽出来了，然后重新叠上去。这样RPC就在NFS上面了，所以不行。此时我们的NFS就需要再重新启动一次。这样NFS抽出来然后再叠上去之后，NFS就在RPC上面了。如果NFS修改了配置，就直接reload就好了</p>
+
+<p><strong>《客户端NFS和服务端NFS通讯过程》</strong></p>
+
+<p>1）首先服务器端启动RPC服务，并开启111端口</p>
+
+<p>2）启动NFS服务，并向RPC注册端口信息</p>
+
+<p>3）客户端启动RPC（portmap服务），向服务端的RPC(portmap)服务请求服务端的NFS端口</p>
+
+<p>4）服务端的RPC(portmap)服务反馈NFS端口信息给客户端。</p>
+
+<p>5）客户端通过获取的NFS端口来建立和服务端的NFS连接并进行数据的传输。</p>
+
+<p><strong><a href="http://img1.51cto.com/attachment/201312/105354821.png"><img alt="105354821.png" src="http://img1.51cto.com/attachment/201312/105354821.png" style="height:303px; width:500px" title="NFS工作原理简图.png" /></a></strong></p>
+
+<p>------------------------------------小结-------------------------------------------------</p>
+
+<p>NFS的原理结构其实还是挺简单啊哦，NFS就是网络共享目录，就是共享文件.服务端共享，客户端挂载使用。挂载流程原理，就是上面提到的5个流程。并且为什么是这个流程也讲了。因为NFS要向RPC去注册端口信息。因为NFS的端口是随机获取的。</p>
+
+<p>----------------------------------------------------------------------------------------</p>
+
+<h2><strong>二、NFS部署</strong></h2>
+
+<p><strong>客户端</strong></p>
+
+<p>直接安装下portmap软件和NFS软件，具体怎么按照参照服务器端。</p>
+
+<p><strong>服务器端</strong></p>
+
+<h3><strong>1）查看系统系信息</strong></h3>
+
+<p>#uname  -r查看系统内核版本</p>
+
+<p>[root@CT5_6-32-220-NFS01 ~]# cat/etc/redhat-release</p>
+
+<p>CentOS release 5.6 (Final)</p>
+
+<p>[root@CT5_6-32-220-NFS01 ~]# uname  -r  </p>
+
+<p>2.6.18-238.el5</p>
+
+<p>要养成一个习惯，就是先查看系统版本和内核参数。同一个软件在不同版本，内核之间是有差异的，所以部署的方法也不一样，不要因为这个而造成不必要的错误。在做应用迁移之前也要对环境系统做一个完整的登记，并且新环境中的一些参数要和旧的环境一模一样避免错误。</p>
+
+<p>#uname   -a查看操作系统信息</p>
+
+<p>[root@CT56-32-220-NFS01 ~]# uname -a</p>
+
+<p>Linux CT56-32-220-NFS01 2.6.18-238.el5 #1 SMP ThuJan 13 16:24:47 EST 2011 i686 i686 i386 GNU/Linux</p>
+
+<h3><strong>2）NFS软件安装</strong></h3>
+
+<p>要部署NFS服务，必须安装下面两个软件包:Nfs-utils:NFS主程序、Portmap:RPC主程序</p>
+
+<p><strong>NFS服务器端和client端都需要安装这两个软件。</strong></p>
+
+<p> </p>
+
+<p>《NFS软件包》</p>
+
+<p>1、nfs-utils：NFS的主程序，包含rpc.nfsd  rpc.mount两个deamons</p>
+
+<p>2、portmap：RPC主程序，可以将NFS视为RPC下的一个子程序</p>
+
+<p> </p>
+
+<p>2.1)查看NFS软件包</p>
+
+<p>[root@CT5_6-32-220-NFS01 ~]# rpm  -qa | egrep "nfs|portmap"   ####可以看到系统默认已经安装了。</p>
+
+<p>portmap-4.0-65.2.2.1</p>
+
+<p>nfs-utils-lib-1.0.8-7.6.el5</p>
+
+<p>nfs-utils-1.0.9-50.el5</p>
+
+<p>如果没有安装的话，可以使用yum Install nfs-utils portmap安装包名称来安装。</p>
+
+<h3><strong>3）NFS启动</strong></h3>
+
+<p>因为NFS及其辅助程序都是基于RPC协议（使用RPC的111端口来进行请求的监听）所以首先要确保系统中运行了portmap服务。客户端和服务端都要启动portmap服务，客户端不用启动nfs服务，而服务端需要启动nfs服务。</p>
+
+<p><strong>portmap启动命令：</strong></p>
+
+<p>#/etc/init.d/portmap start</p>
+
+<p>[root@CT5_6-32-220-NFS01 ~]# /etc/init.d/portmapstart</p>
+
+<p>Starting portmap: [ OK  ]  ##服务已经正常启动了</p>
+
+<p>#netstat–lnt来查看系统中启用的端口</p>
+
+<p>[root@CT56-32-220-NFS01 ~]# netstat  -lnt</p>
+
+<p>Active Internet connections (only servers)</p>
+
+<p>Proto Recv-Q Send-Q Local Address               Foreign Address             State      </p>
+
+<p>tcp       0      0 0.0.0.0:111                 0.0.0.0:*                   LISTEN      ###可以看到多了一个111端口，这个端口就是RPC的监听端口。</p>
+
+<p>tcp       0      0 0.0.0.0:22                  0.0.0.0:*                   LISTEN      </p>
+
+<p>tcp       0      0 0.0.0.0:823                 0.0.0.0:*                   LISTEN      </p>
+
+<p>tcp       0      0 127.0.0.1:25                0.0.0.0:*                   LISTEN    </p>
+
+<p>提示：如果portmap服务没有启动，我们通过rpcinfo –p（rpc informationRPC信息）Localhost检查时，会报错。</p>
+
+<p>[root@CT56-32-220-NFS01 ~]# rpcinfo  -p  ##正常的显示信息</p>
+
+<p>programvers proto   port</p>
+
+<p>100000    2   tcp   111  portmapper</p>
+
+<p>100000    2   udp   111  portmapper</p>
+
+<p>100024    1   udp   820  status</p>
+
+<p>[root@CT56-32-220-NFS01 ~]# rpcinfo –p  ##出错的信息</p>
+
+<p>rpcinfo: can't contact portmapper: RPC: Remotesystem error - Connection refused</p>
+
+<p>Rpfinfo 就是用来查看在rpc注册的端口信息。如果nfs系统服务启动后，就会像rpc去注册信息，此时就能够差查看到注册了哪些信息。</p>
+
+<p>-------------</p>
+
+<p><strong>NFS启动命令：</strong></p>
+
+<p><strong>------------</strong></p>
+
+<p>#/etc/init.d/nfs   start</p>
+
+<p>#/etc/init.d/nfs   status</p>
+
+<p>[root@CT56-32-220-NFS01 ~]# /etc/init.d/nfs status  ####我们这里查看nfs的状态，这里却显示了3个程序的状态，那是因为NFS包含了mountd挂载，quotad配额的管理机制的程序。</p>
+
+<p>rpc.mountd is stopped-->管理client端是否能够登入的问题</p>
+
+<p>nfsd is stopped###这个是主程序->管理client端能够取得的权限</p>
+
+<p>rpc.rquotad is stopped</p>
+
+<p>说明：从NFS服务启动的信息中我们可以看到NFS默认需要启动的进程有rpc，mountd，nfsd,rpc,rquotad,rpc,idmapd。NFS服务器启动时最少需要两个daemons，一个管理client端是否能够登入的问题，另一个管理client端能够取得的权限。如果还需要管理quota的话，NFS还要加载rpc.rquotad程序。</p>
+
+<p>[root@CT5_6-32-220-NFS01 ~]# /etc/init.d/nfs status</p>
+
+<p>rpc.mountd (pid 12920) is running...</p>
+
+<p>nfsd (pid 12917 12916 12915 12914 12913 12912 12911 12910) isrunning...</p>
+
+<p>rpc.rquotad (pid 12892) is running...</p>
+
+<p>1、nfsd(rpc.conf)</p>
+
+<p>这个daemon的主要功能就是管理client端是否能够登入主机，其中还包含登入者的ID判别。</p>
+
+<p>2、rpc.mount</p>
+
+<p>这个daemon主要功能则是管理NFS的文件系统。当client端顺利通过rpc.nfsd登入主机后，在它可以使用NFS服务器提供规定文件之前，还会经过文件使用权限的认证程序。它会去读取NFS的配置文件/etc/exports来对比客户端的权限，当通过这一关之后，client端也就取得使用NFS文件的权限。这就是为什么单单在/etc/exports中设置NFS的权限是不够的。</p>
+
+<hr />
+<p> </p>
+
+<table border="1" style="width:693px">
+<tbody>
+<tr>
+<td>
+<p><strong>NFS启动&信息查看</strong></p>
+
+<p>/etc/init.d/portmap start</p>
+
+<p>rpcinfo –p</p>
+
+<p>/etc/init.d/nfs status</p>
+
+<p>/etc/init.d/nfs start</p>
+</td>
+<td>
+<p><strong>RPC</strong><strong>主程序的是三个进程</strong></p>
+
+<p>rpc.mountd  #nfs挂载程序</p>
+
+<p>nfsd  nfs   #主程序</p>
+
+<p>rpc.rqutod  #配额</p>
+</td>
+</tr>
+</tbody>
+</table>
+
+<p><strong><strong>------------<strong>------------</strong></strong></strong></p>
+
+<p><strong>配置NFS开机启动</strong></p>
+
+<p><strong><strong>------------<strong>------------</strong></strong></strong></p>
+
+<p>#chkconfig  nfs  on</p>
+
+<p>#chkconfig  protmap on</p>
+
+<p>(客户端只需要portmap自启动就可以了)</p>
+
+<p>[root@CT5_6-32-220-NFS01 ~]# chkconfig portmapon  </p>
+
+<p>[root@CT5_6-32-220-NFS01 ~]# chkconfig nfs on  </p>
+
+<p>[root@CT5_6-32-220-NFS01 ~]# chkconfig --list  | egrep "nfs|port"  ####注意|两边不能加上空格要不会查询不到。</p>
+
+<p>nfs            0:off   1:off   2:on   3:on    4:on    5:on   6:off</p>
+
+<p>nfslock        0:off   1:off  2:off   3:on    4:on   5:on    6:off</p>
+
+<p>portmap        0:off   1:off   2:on   3:on    4:on    5:on   6:off</p>
+
+<p> </p>
+
+<h2>三、配置NFS服务</h2>
+
+<h3><strong>NFS</strong><strong>配置文件的路径</strong></h3>
+
+<p>#/etc/exports 默认这个里面的内容是空的，这个就是nfs的配置文件。</p>
+
+<p><strong>格式</strong>：NFS共享目录  客户端地址1（参1，参2只读还是可写） 客户端地址2（参1，参2）</p>
+
+<p>参数选项说明：</p>
+
+<p><strong>共享目录：</strong>存在于我们本机上的目录，我们想共享给网络上的其他主机使用。如我要共享/tmp/data目录，那么此选项可以就直接写/tmp/data目录。</p>
+
+<p><strong>客户端地址1</strong><strong>（参数1</strong><strong>，参数2</strong><strong>）：</strong>客户端地址能够设置一个网络，也可以设置单个主机。参数：如读写权限rw,同步更新sync,压缩来访账号all_squash，压缩后的匿名账号anonuid=uid，anongid=gid等等</p>
+
+<p><strong>客户端地址选项说明：</strong></p>
+
+<table cellpadding="0" cellspacing="0">
+<tbody>
+<tr>
+<td>
+<p>客户端地址</p>
+</td>
+<td>
+<p>具体地址例子</p>
+</td>
+<td>
+<p>说明</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>授权单一客户端访问NFS</p>
+</td>
+<td>
+<p>10.0.0.30</p>
+</td>
+<td>
+<p>一般情况下，生产环境中此配置不多</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>授权整个网段可访问NFS</p>
+</td>
+<td>
+<p>10.0.0.0/24</p>
+</td>
+<td>
+<p>其中的/24表示掩码为255.255.255.0.在生产环境中最常见的配置。</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>授权整个网段</p>
+</td>
+<td>
+<p>10.0.0.*</p>
+</td>
+<td>
+<p>指定网段的另外写法（需要验证）</p>
+</td>
+</tr>
+</tbody>
+</table>
+
+<p><strong>生产环境常见配置实例：</strong></p>
+
+<table cellpadding="0" cellspacing="0" style="width:613px">
+<tbody>
+<tr>
+<td>
+<p>常用格式说明</p>
+</td>
+<td>
+<p>要共享的目录客户端ip地址或IP段（参1，参2）黄色区域是没有空格的</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>配置实例1</p>
+</td>
+<td>
+<p>/tmp/share  10.0.0.0/24(rw,sync)  </p>
+
+<p>###红色部门不能有空格 sync表示同步更新到磁盘，同步将内存内的文件写入到磁盘空间，保证数据不丢失，但会影响性能。</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>配置实例2</p>
+</td>
+<td>
+<p>/home/ryan  10.0.0.0/24(rw,sync,all_squash,anonuid=2000,anongid=2000)</p>
+
+<p>###生产环境中常用的一种配置，适合多客户端共享一个NFS目录。All_squash 也就是说不管客户端是以什么样的身份来进行访问的，都会被压缩成为all_squash后面所接的用户和群组身份。这边用anonuid、anongid编号来标示。</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>配置实例3</p>
+</td>
+<td>
+<p>/home/atong 10.0.0.0/24(ro)  </p>
+</td>
+</tr>
+</tbody>
+</table>
+
+<h3><strong>NFS权限设置</strong></h3>
+
+<p>NFS配置权限设置，即/etc/exports文件配置格式中小括号（）里的参数集。</p>
+
+<table cellpadding="0" cellspacing="0" style="width:612px">
+<tbody>
+<tr>
+<td>
+<p><strong>参数命令</strong></p>
+</td>
+<td>
+<p><strong>参数用途</strong></p>
+</td>
+</tr>
+<tr>
+<td>
+<p>rw</p>
+
+<p>***</p>
+</td>
+<td>
+<p>表示可读写</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>ro</p>
+</td>
+<td>
+<p>Read-only表示只能读权限</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>Sync</p>
+
+<p>***</p>
+</td>
+<td>
+<p>请求或者写入数据时，数据同步写入到NFS server的硬盘中后才会返回</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>no_root_squas</p>
+</td>
+<td>
+<p>访问nfs server共享目录的用户如果是root的话，它对该目录具有root权限。这个配置原本为无盘用户准备的。用户应避免使用！</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>root_squash</p>
+</td>
+<td>
+<p>对于访问NFS server共享目录的用户，如果是root的话会被压缩成为nobody用户身份。</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>all_squash</p>
+
+<p>***</p>
+</td>
+<td>
+<p>不管访问nfs server共享目录的用户身份如何包括root，它的权限都将被压缩成为匿名用户，同时他们的udi和gid都会变成nobody或nfsnobody账户的uid，gid。在多个nfs客户端同时读写nfs server数据时，这个参数很有用***可以确保大家写入的数据的权限是一样的。</p>
+
+<p>但不同系统有可能匿名用户的uid，gid不同。因为此处我们需要服务端和客户端之间的用户是一样的。比如说：服务端指定匿名用户的UID为2000，那么客户端也一定要存在2000这个账号才可以</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>anonuid</p>
+</td>
+<td>
+<p>anonuid就是匿名的uid和gid。说明客户端以什么权限来访问服务端，在默认情况下是nfsnobody。Uid65534.</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>anongid</p>
+</td>
+<td>
+<p>同anongid，就是把uid换成gid而已。</p>
+</td>
+</tr>
+</tbody>
+</table>
+
+<p>提示：</p>
+
+<p>1、另外可以通过man exports查阅exports参数说明。</p>
+
+<p>2、当我们nfs配置好之后，我们可以通过cat /var/lib/nfs/etab来查看,nfs配置的参数。并且这个目录很重要。/var/lib/nfs/rmtab从这个文件中我们可以看到，有哪些客户端挂载了nfs共享目录。这个两个文件是比较重要的。</p>
+
+<p>----------------------</p>
+
+<p><strong>服务器共享配置格式：</strong></p>
+
+<p>1）基本格式：共享目录 ip/24（共享属性）  ->注意无空格</p>
+
+<p>2）共享权限设置：</p>
+
+<p>rw读写属性</p>
+
+<p>sync文件实际写入磁盘后才返回</p>
+
+<p>all_squash:所有访问用户均被压缩成后续接的用户。</p>
+
+<p>anonuid:默认压缩的用户</p>
+
+<p>anongid：默认压缩的用户组</p>
+
+<p><strong>----------------------</strong></p>
+
+<p><strong>客户端以什么身份来访问？</strong></p>
+
+<p>客户端访问服务端默认是使用nfsnobody这个用户来进行访问的。uid和gid为65534。服务器默认共享时，也是加上了all_squash这个参数。并制定anonuid为65534（也就是nfsnobayd用户）。当然如果系统中nfsnobody是其他的uid，那么就有可能造成访问权限出现问题。所以最好我们可以通过一设置一个用户来访问，统一UID、GID。</p>
+
+<p><strong>挂载情况怎样呢？</strong></p>
+
+<p>有两个重要的文件，能够解决这个疑问。/var/lib/nfs/etab、/var/lib/nfs/rmtab这两个文件就能够查看服务器上共享了什么目录，到底有多少客户端挂载了共享，能查看到客户端挂载的具体信息。</p>
+
+<p>1、etab这个文件能看到服务器上共享了哪些目录，执行哪些人可以使用，并且设定的参数为何。</p>
+
+<p>2、rmtab这个文件就是能够查看到共享目录被挂载的情况。</p>
+
+<h2><strong>四、NFS配置实例</strong></h2>
+
+<p><strong>实例1、共享/atong  目录给10.0.0.0/24这个网段。</strong></p>
+
+<h3><strong>服务器端操作：</strong></h3>
+
+<p>1）检查，启动portmap</p>
+
+<p>[root@CT5_6-32-220-NFS01 /]# /etc/init.d/portmapstatus</p>
+
+<p>portmap (pid 2506) is running...</p>
+
+<p>root@CT5_6-32-220-NFS01 /]# rpcinfo-p</p>
+
+<p>-bash: rpcinfo-p: command not found</p>
+
+<p>[root@CT5_6-32-220-NFS01 /]# rpcinfo –p  ###查看RPC记录的信息。哇，这么多不过可以看到有nfs  rquotad，mount这些信息说明nfs有来注册信息。</p>
+
+<p>programvers proto   port</p>
+
+<p>100000    2   tcp   111  portmapper</p>
+
+<p>100000    2   udp   111  portmapper</p>
+
+<p>100024    1   udp   601  status</p>
+
+<p>100024    1  tcp    604  status</p>
+
+<p>100011   1   udp    773 rquotad rquotad</p>
+
+<p>100011    2   udp   773  rquotad</p>
+
+<p>100011    1   tcp   776  rquotad</p>
+
+<p>100011    2   tcp   776  rquotad</p>
+
+<p>100003    2   udp  2049  nfs</p>
+
+<p>100003    3   udp  2049  nfs</p>
+
+<p>100003    4  udp   2049  nfs</p>
+
+<p>100005   1   tcp    803 mountd</p>
+
+<p>100005    2   udp   800  mountd</p>
+
+<p>100005    2   tcp   803  mountd</p>
+
+<p>100005    3   udp   800  mountd</p>
+
+<p>100005    3   tcp   803  mountd</p>
+
+<p>2）查看NFS的运行状态</p>
+
+<p>[root@CT5_6-32-220-NFS01 /]# /etc/init.d/nfs status</p>
+
+<p>rpc.mountd (pid 12920) is running...</p>
+
+<p>nfsd (pid 12917 12916 12915 12914 12913 12912 1291112910) is running...</p>
+
+<p>rpc.rquotad (pid 12892) is running...</p>
+
+<p>3）创建目录</p>
+
+<p>[root@CT5_6-32-220-NFS01 /]# mkdir atong</p>
+
+<p>[root@CT5_6-32-220-NFS01 /]# ls -d atong</p>
+
+<p>atong</p>
+
+<p>[root@CT5_6-32-220-NFS01 /]# ll -d atong</p>
+
+<p>drwxr-xr-x 2 root root 4096 May 27 17:22 oldbo ####注意现在共享的目录的权限为只有root才有写权限。</p>
+
+<p>4）配置/etc/exports(NFS配置文件)</p>
+
+<p>修改完配置之后要重新reload一下。/etc/init.d/nfs reload</p>
+
+<p>[root@CT5_6-32-220-NFS01 /]# cat  /etc/exports</p>
+
+<p>[root@CT5_6-32-220-NFS01 /]# cat /etc/exports</p>
+
+<p>/atong 192.168.40.0/22(rw.sync)</p>
+
+<p>[root@CT5_6-32-220-NFS01 /]# /etc/init.d/nfs reload</p>
+
+<p>exportfs: /etc/exports:1: unknown keyword "rw.sync"###roload的时候提示错误，重新编写了一下配置文件，就又正确了。以后要养成好的编写配置要备份的习惯。</p>
+
+<p>[root@CT5_6-32-220-NFS01 /]# vi /etc/exports</p>
+
+<p>/atong   192.168.41.0/22(rw,sync)</p>
+
+<p>[root@CT5_6-32-220-NFS01 /]# /etc/init.d/nfs reload   重新reload就成功了。</p>
+
+<p>到此NFS已经算是共享了目录，及设置了相应的权限。</p>
+
+<h3><strong>客户端操作：</strong></h3>
+
+<p>----------------------------------------------------------------------------------------</p>
+
+<p>现在我们的服务器端在配置文件上已经设置了共享，并在配置文件中设置了权限rw。但其实服务器端的目录文件的rwxr-xr-x权限是还没有开放的。这个跟我们的windows共享也是很像的，不仅要共享权限有，目录本地安全权限也要有。现在就是让客户端来进行挂载就可以了。</p>
+
+<p>----------------------------------------------------------------------------------------</p>
+
+<p>1）查看portmap是否正常启动</p>
+
+<p>[root@CT56-32-220-NFS01 ~]# /etc/init.d/portmap status</p>
+
+<p>portmap (pid 2725) is running...</p>
+
+<p>2）查看服务器端的共享信息。</p>
+
+<p>Showmount –e192.168.1.1 来查看服务端给我们提供的有哪些共享。</p>
+
+<p>[root@CT56-32-220-NFS01 ~]# showmount  -e 192.168.41.220</p>
+
+<p>Export list for 192.168.41.220:</p>
+
+<p>/atong  192.168.41.0/22  ----》看到已经有这个共享了。</p>
+
+<p>3）在客户端挂载服务器共享出来的目录。</p>
+
+<p>#mount -t nfs 192.168.1.1:/atong  /mnt（本地目录）我们可以自己新建一个要挂载的目录。</p>
+
+<p>[root@CT56-32-220-NFS01 ~]# mount -t nfs  192.168.41.220:/atong  /atong  </p>
+
+<p>#mount 命令格式如下：</p>
+
+<p>####mount -t  类型   device   localedir(本地目录）</p>
+
+<p>#以上这个命令device=192.168.41.220:/atong</p>
+
+<p>[root@CT56-32-220-NFS01 ~]# df</p>
+
+<p>Filesystem          1K-blocks      Used Available Use%Mounted on</p>
+
+<p>/dev/sda3              7765136   1655612  5708704  23% /    </p>
+
+<p>/dev/sda1               101086     11601    84266  13% /boot</p>
+
+<p>tmpfs                    62532         0    62532   0% /dev/shm</p>
+
+<p>192.168.41.220:/atong   7765152   1655296  5709024  23% /atong</p>
+
+<p>[root@CT56-32-220-NFS01 ~]# touch  /atong/test.txt</p>
+
+<p>touch: cannot touch `/atong/test.txt': Permissiondenied---》发现没有现在是没有权限的，因为我们服务器的本地的rwx权限没有开启来。</p>
+
+<p>[root@CT56-32-220-NFS01 ~]# ll /atong/</p>
+
+<p>total 4</p>
+
+<p>-rw-r--r-- 1 root root    0 May 28 08:14 test1</p>
+
+<p>drwxr-xr-x 2 root root 4096 May 28 08:15 test-dir1</p>
+
+<p>##### 在服务器端创建了目录，要过段时间才能同步到客户端。额，这样的情况有办法解决没有？</p>
+
+<p>4）查看挂载和共享的文件是否一致。</p>
+
+<p>#df  来查看一下我们系统中的文件系统情况。</p>
+
+<p>[root@CT56-32-220-NFS01~]# df</p>
+
+<p>Filesystem           1K-blocks      Used Available Use% Mounted on</p>
+
+<p>/dev/sda3              7765136   1655612  5708704  23% /</p>
+
+<p>/dev/sda1               101086     11601    84266  13% /boot</p>
+
+<p>tmpfs                    62532         0    62532   0% /dev/shm</p>
+
+<p>192.168.41.220:/atong   7765152   1655296  5709024  23% /atong</p>
+
+<p>检查客户端中挂载的内容是否和服务端的目录一样。</p>
+
+<p>5）在客户端执行写操作。</p>
+
+<p>权限说明：当我们在/etc/exports中给了NFS  rw权限。但为什么客户端还是写不了。因为如果我们仅在NFS配置文件中配置了rw权限。只表明了网络端的主机能够有权限去服务器端去写文件，但还需要通过服务器端的本地目录的权限。那么也就是说客户端需要通过两层的权限来控制的。NFS配置文件—>共享目录文件的权限。并且客户端往服务端去写文件，的用户身份是nfsnobody、nfsnobody UID=65534。</p>
+
+<p><strong>《错误提示》</strong></p>
+
+<p>[atong@LiWenTong ~]$/etc/init.d/portmap stauts    --->portmap没有启动</p>
+
+<p>Networking  not configured – exiting</p>
+
+<p><strong>客户端NFS挂载参数</strong></p>
+
+<p>   我们客户端挂载NFS也可以设置很多参数的，就跟windows映射盘一样，也是可以设置参数的。客户端挂载可以设置：不可执行、读写权限、断开后RPC呼叫方式、读写区块大小等。一般来说当nfs服务器提供的只是普通数据（图片html，css，jss，视频等）应该不需要执行suid，exec等权限，由于是共享目录不存在设备所以也不存在挂载设备dev，因此在客户端挂载的时候，可以加上给你这几个命令挂载。</p>
+
+<p>#mount –t  nfs -o  nosuid,noexec,nodev,rw 192.168.1.1:/share  /local/mnt</p>
+
+<p><strong>可使用挂载参数表：</strong></p>
+
+<table cellpadding="0" cellspacing="0" style="width:612px">
+<tbody>
+<tr>
+<td>
+<p><strong>参数</strong></p>
+</td>
+<td>
+<p><strong>              参数意义</strong></p>
+</td>
+<td>
+<p><strong>系统默认值</strong></p>
+</td>
+</tr>
+<tr>
+<td>
+<p>suid</p>
+
+<p>nosuid</p>
+</td>
+<td>
+<p>允许设置suid</p>
+
+<p>不允许在共享文件系统中设置suid                                            </p>
+</td>
+<td>
+<p>Suid</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>rw</p>
+
+<p>ro</p>
+</td>
+<td>
+<p>读写权限，或者是只读。</p>
+</td>
+<td> </td>
+</tr>
+<tr>
+<td>
+<p>dev</p>
+
+<p>nodev</p>
+</td>
+<td>
+<p>解释设备上的设备</p>
+
+<p>不解释字符或块特殊文件系统上的设备</p>
+</td>
+<td> </td>
+</tr>
+<tr>
+<td>
+<p>exec</p>
+
+<p>noexec</p>
+</td>
+<td>
+<p>不允许在共享文件系统中直接执行任何二进制文件。</p>
+</td>
+<td> </td>
+</tr>
+<tr>
+<td>
+<p>user</p>
+
+<p>nouser</p>
+</td>
+<td>
+<p>允许用户去挂载和卸载这个共享目录。并且这个选项也意味着noexec,  nosuid, and nodev这个选项，除非后面有覆盖指定。</p>
+</td>
+<td> </td>
+</tr>
+<tr>
+<td>
+<p>auto</p>
+
+<p>noauto</p>
+</td>
+<td> </td>
+<td> </td>
+</tr>
+</tbody>
+</table>
+
+<p>另外还有一些NFS挂载的额外参数可用。如果NFS是用在高速运行的环境中的话，那么建议加上这些参数，这样当这台NFS服务器因为某些原因离线，NFS客户端可以继续在后台重复呼叫，直到NFS服务器再度连上线为止。</p>
+
+<p>针对一些高并发的情况，还有一些可以进行优化的参数：</p>
+
+<table cellpadding="0" cellspacing="0" style="width:612px">
+<tbody>
+<tr>
+<td>
+<p><strong> 参数</strong></p>
+</td>
+<td>
+<p><strong>              参数功能</strong></p>
+</td>
+<td>
+<p><strong>默认参数</strong></p>
+</td>
+</tr>
+<tr>
+<td>
+<p>fg</p>
+
+<p>bg</p>
+</td>
+<td>
+<p>当执行挂载时，该挂载行为是在前台（fg）还是在后台（bg）执行。若在前台执行，则mount会持续尝试链接，直到成功或time  out为止。若为在后台执行，则mount会在后台持续多次进行mount，而不会影响到前台的程序操作。如果网络联机不稳定，或是服务器常常需要开关机。建议使用bg比较妥当。</p>
+</td>
+<td>
+<p>Fg</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>soft</p>
+
+<p>hard</p>
+</td>
+<td>
+<p>使用挂载时会使用RPC呼叫。如果是hard的情况，那么当两者之间有任何一台主机离线，那RPC会持续呼叫，直到对方恢复联机为止。而soft，只是在RPC time out后重复呼叫。而非持续呼叫。因此系统的延迟会不这么明显，如果服务器经常开开关关的话，建议使用soft。在生产环境中推荐使用hard,intr这样的方式来挂载。</p>
+</td>
+<td>
+<p>Hard</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>intr</p>
+</td>
+<td>
+<p>当使用hard方式挂载时，若加上intr参数，则RPC的持续呼叫是可以被中断的</p>
+</td>
+<td>
+<p>没有</p>
+</td>
+</tr>
+<tr>
+<td>
+<p>rsize</p>
+
+<p>wsize</p>
+
+<p>**</p>
+</td>
+<td>
+<p>读出（rsize）和写入（wsize）的区块大小。这个设置值可以影响客户端与服务器端传输数据的缓冲存储容量。一般来说，如果在局域网内（LAN），并且客户端与服务器都具有足够的内存，这个值可以设置大一点，比如说32768，提升缓冲区块将可提升NFS文件系统的传输能力。但设置的值也不要太大，最好是实现网络能够传输的最大值为限。</p>
+</td>
+<td>
+<p>rsize=1024</p>
+
+<p>wsize=1024</p>
+</td>
+</tr>
+</tbody>
+</table>
+
+<p>命令格式如下：mount –t nfs –o nosuid,noexec,nodev,rw,hard,intr,rsize=32768,wsize=32768  192.168.1.1:/share   /local/dir</p>
+
+<h3><strong>NFS</strong><strong>客户端如何挂载才最佳</strong></h3>
+
+<p>1)noexec,nosuid,nodev,因为共享存放的是简单资料，不需要suid位不需要执行，没有设备文件。</p>
+
+<p>2）hard,intr,bg 当NFS链接断了之后会一直去监测服务端的NFS服务直到恢复之后重新连接。</p>
+
+<p>3)rsize=32768 wsize=32768 调优NFS传输的区块大小。</p>
+
+<p>4）基本参数：rw 读写权限。</p>
+
+<h3><strong>挂载完成后客户端的常见操作</strong></h3>
+
+<p>1）挂载后重启设备后的反应。</p>
+
+<p>[root@CT56-32-221-NFS02 ~]# mount -t nfs192.168.41.220:/atong /atong/</p>
+
+<p>[root@CT56-32-221-NFS02 ~]# df</p>
+
+<p>Filesystem          1K-blocks      Used Available Use%Mounted on</p>
+
+<p>/dev/sda3              7765136   1634308  5730008  23% /</p>
+
+<p>/dev/sda1               101086     11601    84266  13% /boot</p>
+
+<p>tmpfs                    62532         0    62532   0% /dev/shm</p>
+
+<p>192.168.41.220:/atong   7765152   1655296  5709024  23% /atong</p>
+
+<p>[root@CT56-32-221-NFS02 ~]# ll /atong/####当我们挂载了服务器端的共享目录到本地目录之后，原本地目录的内容会被替换成为远端服务器的内容。</p>
+
+<p>total 4</p>
+
+<p>-rw-r--r-- 1 root root    0 May 28 08:14 test1</p>
+
+<p>drwxr-xr-x 2 root root 4096 May 28 08:15 test-dir1</p>
+
+<p>[root@CT56-32-221-NFS02 ~]# umount /atong</p>
+
+<p>[root@CT56-32-221-NFS02 ~]# df</p>
+
+<p>Filesystem          1K-blocks      Used Available Use%Mounted on</p>
+
+<p>/dev/sda3              7765136   1634308  5730008  23% /</p>
+
+<p>/dev/sda1               101086     11601    84266  13% /boot</p>
+
+<p>tmpfs                    62532         0    62532   0% /dev/shm</p>
+
+<p>[root@CT56-32-221-NFS02 ~]# ll  /atong/ ####当我们将挂载的目录重新卸载之后，原目录的内容就又都能够看见了。</p>
+
+<p>total 0</p>
+
+<p>-rw-r--r-- 1 root root 0 May 28 08:27 test1</p>
+
+<p>-rw-r--r-- 1 root root 0 May 28 08:28 test2</p>
+
+<p>2)如何设置开机自动挂载</p>
+
+<p>特别说明：我们重新启动客户端之后，我们要重新去挂载nfs,我们可以有两种方式来实现。</p>
+
+<p><1>通过把mount–t  nfs 192.168.1.1：/atong   /mnt这条命令写到/etc/rc.local中，让它开机就执行。</p>
+
+<p><2>在/etc/fstab（系统开机启动分区加载项）添加我们的NFS配置：</p>
+
+<p>10.0.0.161:/atong      /atong/video   nfs  defaults  1  1 。</p>
+
+<p>但在生产环境中，对于共享的NFS目录，一般不会配置到/etc/fstab里。因为在客户端主机重启时如果由于网络等原因连接不上nfs server时，就会导致客户机无法启动的厄运发生。一般是通过把mount -t  nfs  10.10.10.1:/atong  /local/dir命令放到rc.local中来实现开机自动挂载NFS。</p>
+
+<h3><strong>nfs</strong><strong>的开机自动挂载</strong></h3>
+
+<p>有两种方式实现开机自动挂载1、将mount命令写在rc.local文件中。2、在/etc/fstab中写入具体的配置系想你。</p>
+
+<p>但这里建议采用第一种，如果因为网络原因没有连接到NFSserver那么第二中有可能会导致系统无法启动的故障。</p>
+
+<p>3）卸载挂载点</p>
+
+<p><1>正常卸载</p>
+
+<p>#umount /local/dir   正常的卸载命令来卸载。</p>
+
+<p><2>umoutn提示busy错误</p>
+
+<p>如何卸载nfs挂载点通过umount  /local/dir来进行卸载。如果本地中有用户还在这个挂载点中，那么会提示这个挂载点繁忙busy。我们需要先让本地退出这个挂载点，然后再重新进行卸载。而如果有其他用户在使用，同样也是需要用户退出之后这个挂载目录才能进行卸载。</p>
+
+<p>或者进行强制卸载：umount –lf   /local/dir 来进行强制卸载。</p>
+
+<h3><strong>简述一次完整的NFS挂载过程</strong></h3>
+
+<p>1）确认portmap、nfs已经启动。并且是nfs比portmap后启动的。</p>
+
+<p>通过chkconfig来配置开机启动，portmap的默认开启顺序一也是比nfs来得早。</p>
+
+<p>2）vi  /etc/export 配置nfs服务的共享目录及权限。</p>
+
+<p>  #/etc/init.d/nfs  reload 重新加载</p>
+
+<p>  确认服务器端要共享的目录已经存在，并且权限正确。</p>
+
+<p>3）客户端的portmap的启动，并加入开机自启动中。通过showmount来查看服务器端是否已经提供了共享的NFS目录。通过rpfinfo命令来查看服务器端的rpc信息。当本地端要挂载的时候也要确认本地挂载的目录，没有别占用。</p>
+
+<p>3.1）当客户端不能够写入的时候，需要去判断服务器端的/etc/exports中权限是否正确，服务端共享的目录的本地目录权限是否正确。如果不正确，那么我们可以通过把目录的属主改成nfsnobody以达到让客户端能够写入的权限。当重客户端写完之后，可以查看一下写入之后的档案的所有者和权限。可以发现只要是从客户端去创建的文档，文件的属主和用户组都是nfsnobody。如果加上all_squash之后。</p>
+
+<p>（但要确定是所有的客户端具有同一个uidnfsnobody。当我们的系统都是32位的时候，可以确定匿名用户的uid都是65534.而64位的操作系统，那么就是一串其他的数字。）</p>
+
+<p>3.2）所有系统都是64位系统时。我们要共享时，可以在我们服务器端做一个修改：在all_squash，anonuid=2000,anongid=2000</p>
+
+<p>3.3)不必查看系统时32还是64位</p>
+
+<p>在网络中的所有机器上创建一个新的用户及用户组。然后配置/etc/exports  all_squash,anonuid=1207,anongid=1207</p>
+
+<p>4)配置客户端的默认开机启动挂载。</p>
+
+<p>将mount –t nfs   192.68..1.1：/share/dir   /local/dir 命令写入rc.local中。</p>
+
+<p>------------------------------后续自我小结-----------------------------------------------</p>
+
+<p>   NFS就是网络共享文件系统，道理很简单那，就是服务器共享文件，客户端挂载服务端共享的文件。共享文件，需要配置/etc/exports,添加相应的共享目录及共享的目标网络及权限配置，开启共享文件的本地权限。然后客户端进行有参数的挂载，设置读写权限rw,nodev,noexec,nouser,hard,intr,rsize，wsize等挂载参数。然后就是开始挂载使用。</p>
+
+<p>   在启动顺序上我们要注意portmap一定要先于NFS启动，客户端的NFS开机挂载最好是将命令加载/etc/rc.local里面。</p>
+
+<p>----------------------------------------------------------------------------------------</p>
+
+<h2><strong>常见问题补充：</strong></h2>
+
+<h3>1）服务器端网络故障或者是网络断开时。</h3>
+
+<p>当把服务器的网络断开后，客户端df查看本地分区信息的时候一直在等待中，有时会卡死。</p>
+
+<p>[root@CT56-32-221-NFS02 atong]# df</p>
+
+<p>Filesystem          1K-blocks      Used Available Use%Mounted on</p>
+
+<p>/dev/sda3              7765136   1635964  5728352  23% /</p>
+
+<p>/dev/sda1               101086     11601    84266  13% /boot</p>
+
+<p>tmpfs                    62532         0    62532   0% /dev/shm</p>
+
+<p>…一直在等待中……</p>
+
+<p>[root@CT56-32-222-NFS03 ~]# cd /atong</p>
+
+<p>…一直等待中….连我们原本/atong的目录都进不去因为现在是挂载的。</p>
+
+<p>[root@CT56-32-221-NFS02 ~]# umount  /atong ###通过umount /atong也不能进行卸载。</p>
+
+<p>umount.nfs: 192.168.41.220:/atong: not found /mounted or server not reachable</p>
+
+<p>[root@CT56-32-221-NFS02 ~]# umount -lf /atong  ####通过-lf进行强制卸载，就能够进行卸载了。</p>
+
+<p>[root@CT56-32-221-NFS02 ~]# df</p>
+
+<p>Filesystem          1K-blocks      Used Available Use%Mounted on</p>
+
+<p>/dev/sda3              7765136   1635976  5728340  23% /</p>
+
+<p>/dev/sda1               101086     11601    84266  13% /boot</p>
+
+<p>tmpfs                    62532         0    62532   0% /dev/shm</p>
+
+<p>当服务器网络恢复正常后，df就可以查看到信息了。</p>
+
+<p>[root@CT56-32-222-NFS03 ~]# df</p>
+
+<p>Filesystem          1K-blocks      Used Available Use%Mounted on</p>
+
+<p>/dev/sda3              7765136   1636016  5728300  23% /</p>
+
+<p>/dev/sda1               101086     11601    84266  13% /boot</p>
+
+<p>tmpfs                    62532         0    62532   0% /dev/shm</p>
+
+<p>192.168.41.220:/atong    7765152   1655360  5708992  23% /atong</p>
+
+<h3>2）修改服务器NFS配置，停用共享,不reload nfs服务。</h3>
+
+<p>[root@CT56-32-221-NFS02 ~]# showmount  -e 192.168.41.220</p>
+
+<p>Export list for 192.168.41.220:</p>
+
+<p>/atong 192.168.41.0/22</p>
+
+<p>[root@CT56-32-222-NFS03 atong]# touch nfs4</p>
+
+<p>[root@CT56-32-222-NFS03 atong]# ll  </p>
+
+<p>total 4</p>
+
+<p>-rw-r--r-- 1 nfsnobody nfsnobody    0 May 28 13:24 nfs2</p>
+
+<p>-rw-r--r-- 1 nfsnobody nfsnobody    0 May 28 14:05 nfs3</p>
+
+<p>-rw-r--r-- 1 nfsnobody nfsnobody    0 May 28 14:05 nfs4</p>
+
+<p>###只要没有reload就没有任何的影响，因为服务器的RPC还是记住了NFS原有旧的信息。所以客户端不会受影响。</p>
+
+<p>[root@CT56-32-221-NFS02 ~]# df  </p>
+
+<p>Filesystem          1K-blocks      Used Available Use%Mounted on</p>
+
+<p>/dev/sda3             7765136   1635976  5728340    23% /</p>
+
+<p>/dev/sda1               101086     11601    84266   13% /boot</p>
+
+<p>tmpfs                    62532         0    62532   0% /dev/shm</p>
+
+<p>df: `/atong':Permission denied</p>
+
+<p>###当服务器修改完配置重新reload之后，原本挂载的目录就会出现权限限制。原因就是reload之后会重新加载配置文件，就会重新按照新的配置文件来生效。重新配置，重新reload之后，客户端就又能够重新进行挂载了。</p>
+
+<h3>3）客户端网络中断</h3>
+
+<p>客户端网络中断的话，那么所有的连接就完全断开的，就不必多多说了。之后网络恢复后，就又可以使用了。</p>
+
+<h3>4）客户端portmap服务被停止</h3>
+
+<p>[root@CT56-32-222-NFS03 atong]# /etc/init.d/portmapstatus</p>
+
+<p>portmap (pid 2726) is running...</p>
+
+<p>[root@CT56-32-222-NFS03 atong]# /etc/init.d/portmapstop</p>
+
+<p>Stopping portmap: [ OK  ]</p>
+
+<p>[root@CT56-32-222-NFS03 atong]# ll</p>
+
+<p>total 4</p>
+
+<p>-rw-r--r-- 1 nfsnobody nfsnobody    0 May 28 13:24 nfs2</p>
+
+<p>-rw-r--r-- 1 nfsnobody nfsnobody    0 May 28 14:05 nfs3</p>
+
+<p>-rw-r--r-- 1 nfsnobody nfsnobody    0 May 28 14:05 nfs4</p>
+
+<p>-rwxrwxrwx 1 root      root         0 May 28 08:14 test1</p>
+
+<p>drwxrwxrwx 2 root      root     4096 May 28 08:15 test-dir1</p>
+
+<p>[root@CT56-32-222-NFS03 atong]# touch nfs5</p>
+
+<p>[root@CT56-32-222-NFS03 atong]# ll --》能正常使用</p>
+
+<p>-rw-r--r-- 1 nfsnobody nfsnobody    0 May 28 14:39 nfs5</p>
+
+<p>[root@CT56-32-222-NFS03 /]# df</p>
+
+<p>Filesystem          1K-blocks      Used Available Use%Mounted on</p>
+
+<p>/dev/sda3              7765136   1636016  5728300  23% /</p>
+
+<p>/dev/sda1               101086     11601    84266  13% /boot</p>
+
+<p>tmpfs                    62532         0    62532   0% /dev/shm</p>
+
+<p>192.168.41.220:/atong  7765152   1655360  5708992  23% /atong</p>
+
+<p>[root@CT56-32-222-NFS03 /]# showmount -e  192.168.41.220</p>
+
+<p>Export list for 192.168.41.220:  ---》能查看原有NFS服务器的挂载信息</p>
+
+<p>/atong 192.168.41.0/22</p>
+
+<p>#####客户端的portmap被停止后，原挂载的nfs仍然能够进行工作。并且能和服务器进行同步。</p>
+
+<p>[root@CT56-32-222-NFS03 /]# umount /atong</p>
+
+<p>[root@CT56-32-222-NFS03 /]# df</p>
+
+<p>Filesystem          1K-blocks      Used Available Use%Mounted on</p>
+
+<p>/dev/sda3              7765136   1636020  5728296  23% /</p>
+
+<p>/dev/sda1              101086     11601    84266  13% /boot</p>
+
+<p>tmpfs                    62532         0    62532   0% /dev/shm</p>
+
+<p>[root@CT56-32-222-NFS03 /]# showmount -e  192.168.41.220</p>
+
+<p>Export list for 192.168.41.220:</p>
+
+<p>/atong 192.168.41.0/22</p>
+
+<p>[root@CT56-32-222-NFS03 /]# mount -t nfs 192.168.41.220:/atong  /atong</p>
+
+<p>mount.nfs:Input/output error</p>
+
+<p>####卸载原有的挂载之后，重新挂载就会出现挂载不了的错误。恢复portmap启动后就又可以使用了。</p>
+
+<h3>5）当服务器端的NFS进程被停止后。</h3>
+
+<p>服务器端终止NFS进程</p>
+
+<p>[root@CT5_6-32-220-NFS01 ~]# /etc/init.d/nfs stop</p>
+
+<p>Shutting down NFS mountd: [  OK  ]</p>
+
+<p>Shutting down NFS daemon: [  OK  ]</p>
+
+<p>Shutting down NFS quotas: [  OK  ]</p>
+
+<p>Shutting down NFS services:  [ OK  ]</p>
+
+<p>[root@CT5_6-32-220-NFS01 ~]# cat /var/lib/nfs/etab</p>
+
+<p>[root@CT5_6-32-220-NFS01 ~]# cat /var/lib/nfs/rmtab</p>
+
+<p>192.168.41.221:/atong:0x00000003</p>
+
+<p>192.168.41.222:/atong:0x00000002</p>
+
+<p>[root@CT5_6-32-220-NFS01 ~]# /etc/init.d/nfs status</p>
+
+<p>rpc.mountd is stopped</p>
+
+<p>nfsd is stopped</p>
+
+<p>rpc.rquotad is stopped</p>
+
+<p>###客户端立马就会出现连接不上，因为NFS才是切切相关需要时刻运行的进程。###</p>
+
+<p>[root@CT56-32-222-NFS03 /]# df</p>
+
+<p>Filesystem          1K-blocks      Used Available Use%Mounted on</p>
+
+<p>/dev/sda3              7765136   1636028  5728288  23% /</p>
+
+<p>/dev/sda1               101086     11601    84266  13% /boot</p>
+
+<p>tmpfs                    62532         0    62532   0%</p>
+
+<p>###服务器端重新启动NFS之后，客户端就能够重新挂载。</p>
+
+<p>[root@CT56-32-221-NFS02 ~]# mount -t nfs 192.168.41.220:/atong  /atong</p>
+
+<p>[root@CT56-32-221-NFS02 ~]# df</p>
+
+<p>Filesystem          1K-blocks      Used Available Use%Mounted on</p>
+
+<p>/dev/sda3              7765136   1634396  5729920  23% /</p>
+
+<p>/dev/sda1               101086     11601    84266  13% /boot</p>
+
+<p>tmpfs                    62532         0    62532   0% /dev/shm</p>
+
+<p>192.168.41.220:/atong    7765152   1655360  5708992  23% /oldbo</p>
+
+<p><strong>《NFS</strong><strong>的三个进程》</strong></p>
+
+<p>nfsd这个就是nfs的主程序，如果这个被停了，那就表示nfs完全的瘫掉不能工作，当然就连接不上了</p>
+
+<p>rpc.mountd 这个属于管理共享的挂载机制</p>
+
+<p>rpc.quotad 管理共享配额</p>
+
+<h3>6）服务器端的portmap被停止。</h3>
+
+<p><strong>------</strong>理论推导<strong>----------------</strong></p>
+
+<p>   其实我们故障问题演示进行到这里已经大概可以知道其实用原理推一下就知道，表现会是什么。然后可以再用实验去验证我们的推论是否正确。</p>
+
+<p>服务器的portmap是关系到NFS的端口注册，而客户端只要跟服务器简历起来NFS的连接之后就不会再去询问portmap NFS的端口信息。那现在portmap停掉了，客户端旧的NFS不会被影响。但是如果要再建立挂载就不行咯。而服务器要创建新的共享目录也是不能够成功的，因为新的NFS共享就要去portmap注册信息。好咯推导完后，以下就来验证咯：</p>
+
+<p>   插播：其实我们应该要学会的就是这样，理论推导现象的能力。以后要进行故障排除是很重要的能力。至少我自己在网络方面这么久就是这样做的。</p>
+
+<p>--------------------------------</p>
+
+<p>服务器端停止portmap服务后，原有的nfs共享目录，操作正常。</p>
+
+<p>[root@CT5_6-32-220-NFS01 ~]# /etc/init.d/portmapstop</p>
+
+<p>Stopping portmap: [ OK  ]</p>
+
+<p>[root@CT5_6-32-220-NFS01 ~]# cd /atong/</p>
+
+<p>[root@CT5_6-32-220-NFS01 atong]# ll  </p>
+
+<p>-rw-r--r-- 1 nfsnobody nfsnobody    0 May 28 13:24 nfs2</p>
+
+<p>-rw-r--r-- 1 nfsnobody nfsnobody    0 May 28 14:05 nfs3</p>
+
+<p>-rw-r--r-- 1 nfsnobody nfsnobody    0 May 28 14:05 nfs4</p>
+
+<p>-rw-r--r-- 1 nfsnobody nfsnobody    0 May 28 14:39 nfs5</p>
+
+<p>###新的客户端就不能查看挂载信息，也不能挂载</p>
+
+<p>[root@CT56-32-222-NFS03 ~]# showmount -e192.168.41.220</p>
+
+<p>mount clntudp_create: RPC: Port mapper failure -RPC: Unable to receive</p>
+
+<p>##原有旧的挂载没问题，但想重新查询挂载信息也是失败的。似乎是NFS端口信息沟通过1次就能够记得住。而如果需要重新挂载新的共享或者去查询共享，就必须去想服务器的portmap重新去请求，而此时服务器的111端口已经被停掉了。所以更本就无法去请求到新的端口对应数据。</p>
+
+<p>[root@CT56-32-221-NFS02 atong]# showmount  -e 192.168.41.220</p>
+
+<p>mount clntudp_create: RPC: Port mapper failure -RPC: Unable to receive</p>
+
+<h3>7）服务端portmap重启或NFS先于portmap之前启动</h3>
+
+<p>------理论推导---------------------------------------------------------------------------</p>
+
+<p>   哈哈，再推导一次。portmap重启，原本的注册信息没有了。而且NFS没有重启，所以portmap里面的信息是空的。但是原本旧的NFS挂载已经有了，而且进行建立起来就不会受到影响咯。但是有新的挂载就不行咯。而且服务器要建立一个新的NFS共享也是不行，如果是修改了配置之后reload一下，那是可以创建新的共享的，因为这样就相当于重新去portmap注册信息咯。</p>
+
+<p>   哈哈，其实这个都是我在写博文的时候，马上推的还得看实验是否正的就是如此呢。</p>
+
+<p>-----------------------------------------------------------------------------------------</p>
+
+<p>[root@CT56-32-221-NFS02 atong]# touch  sdfasd</p>
+
+<p>[root@CT56-32-221-NFS02 atong]# ll</p>
+
+<p>-rw-r--r-- 1 nfsnobody nfsnobody    0 May 28 13:24 nfs2</p>
+
+<p>-rw-r--r-- 1 nfsnobody nfsnobody    0 May 28 14:05 nfs3</p>
+
+<p>-rw-r--r-- 1 nfsnobody nfsnobody    0 May28 14:05 nfs4</p>
+
+<p>-rw-r--r-- 1 nfsnobody nfsnobody    0 May 28 14:39 nfs5</p>
+
+<p>-rw-r--r-- 1 nfsnobody nfsnobody    0 May 28 15:01 nfs6</p>
+
+<p>-rw-r--r-- 1 root      root         0 May 28 15:02 nfs7</p>
+
+<p>-rw-r--r-- 1 nfsnobody nfsnobody    0 May 28 16:00 sdfasd</p>
+
+<p>-rwxrwxrwx 1 root      root         0 May 28 08:14 test1</p>
+
+<p>drwxrwxrwx 2 root      root     4096 May 28 08:15 test-dir1</p>
+
+<p>[root@CT56-32-221-NFS02 atong]# showmount  -e 192.168.41.220</p>
+
+<p>mountclntudp_create: RPC: Program not registered</p>
+
+<p>#####客户端原有的共享挂载不会受到影响。但如果要重新挂载或者任何需要与portmap进行通讯的操作，都会提示RPC没有注册信息。</p>
+
+<p>[root@CT5_6-32-220-NFS01 atong]# rpcinfo -p   --》查看portmap信息，是全新的！符合推导。</p>
+
+<p>  programvers proto   port</p>
+
+<p>  100000    2   tcp   111  portmapper</p>
+
+<p>  100000   2   udp    111 portmappe</p>
+
+<p>###此时的portmap只记录了111这个端口信息。</p>
+
+<p>[root@CT5_6-32-220-NFS01 atong]# /etc/init.d/nfs  restart  重新注册信息</p>
+
+<p>Shutting down NFS mountd: [  OK  ]</p>
+
+<p>Shutting down NFS daemon: [  OK  ]</p>
+
+<p>Shutting down NFS quotas: [  OK  ]</p>
+
+<p>Shutting down NFS services:  [ OK  ]</p>
+
+<p>Starting NFS services:  [ OK  ]</p>
+
+<p>Starting NFS quotas: [  OK  ]</p>
+
+<p>Starting NFS daemon: [  OK  ]</p>
+
+<p>Starting NFS mountd: [  OK  ]</p>
+
+<p>[root@CT5_6-32-220-NFS01 atong]# rpcinfo -p</p>
+
+<p>programvers proto   port</p>
+
+<p>100000    2   tcp   111  portmapper</p>
+
+<p>100000    2   udp   111  portmapper</p>
+
+<p>100011    1   udp   660  rquotad</p>
+
+<p>100011    2   udp   660  rquotad</p>
+
+<p>100011    1   tcp   663  rquotad</p>
+
+<p>100011   2   tcp    663 rq</p>
+
+<p>###服务器端NFS重新启动完之后就能够注册信息了。</p>
+
+<p>-----------------------------------小结--------------------------------------------------</p>
+
+<p>1）portmap故障</p>
+
+<p>服务端portmap故障：原有已挂载的不会受到任何影响。所有客户端如果是要挂载本服务器的共享，或者是重新执行已经挂载本服务器的共享的操作（卸载，重新挂载）均会出现错误。因为此时还需要去向portmap去请求端口信息。新的挂载或服务端新的共享均出错。</p>
+
+<p>客户端portmap故障：原有已挂载的不会受到任何影响。本客户端如果要重新挂载，卸载任何服务器的共享均会报错。新的挂载出错.</p>
+
+<p>2）服务端NFS故障</p>
+
+<p>服务器NFS故障：NFS是提供挂载的主程序，如果出现故障，那么挂载本服务器的共享的客户端均会出现故障。主程序都出错了，结果可想而知嘛。就像车子发动机都不动了，还怎么开。</p>
+
+<p>3）网络故障</p>
+
+<p>网络故障：网络是提供网络服务的最基础条件，如果出现故障，那么基于网络以上的服务都会出现故障。</p>
+
+<p>-----------------------------------------------------------------------------------------</p>
+
+<h2><strong>NFS</strong><strong>优点</strong></h2>
+
+<p>1、简单容易掌握</p>
+
+<p>2、方便快速部署简单维护容易</p>
+
+<p>3、可靠—从软件层面上看，数据可靠性高，经久耐用</p>
+
+<h2><strong>NFS局限</strong></h2>
+
+<p>1、局限性是存在单点故障，如果NFSserver宕机了所有客户端都不能访问共享目录，#####我们可以通过rsync来进行数据的同步。或者是通过负载均衡的高可用方案。######</p>
+
+<p>2、在高并发的场合，NFS效率性能有限（一般几千万以下pv的网站不是瓶颈，除非网站架构太差。）</p>
+
+<p>3、服务器共享文件的客户端认证是基于IP和主机名的安全性一般（但用于内网则问题不大）</p>
+
+<p>4、NFS数据是明文的，对数据完整性不做验证（一般是存放于内网，提供内网的服务器使用。所以安全性相对不是一个问题）</p>
+
+<p>5、多机器挂载服务器时，连接管理维护麻烦。尤其NFS服务端出问题后，所有客户端都挂掉状态（可使用autofs自动挂载解决。）</p>
+
+<p><strong>生产应用场景</strong></p>
+
+<p>   中小型网站（2000万pv以下）线上应用，都有用武之地。门户网站也会有其他方面的应用，。因为门户网站的并发量是超级的大。所以有更加会用专业的存储来做这件事情。</p>

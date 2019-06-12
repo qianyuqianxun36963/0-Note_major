@@ -1,0 +1,242 @@
+<h1>实际使用</h1>
+
+<h2>Robo 3t 客户端使用</h2>
+
+<p>在数据记录上面右击，然后可CRUD基本操作。还是比较方便的。</p>
+
+<h2>实际使用中的一些总结</h2>
+
+<p>在使用Java进行mongodb的操作时，会经常涉及到结果集的映射，所以mongodb里面的字段命令最好按驼峰方式命名得了。</p>
+
+<p>mongodb里面的数据库名，最好也是与Java类名对应，然后大写的类名，首字母转小写。如果不这样，也可以用下面方式：</p>
+
+<h2>MongoDB 实体映射</h2>
+
+<p><strong>@Id</strong><br />
+主键，不可重复，自带索引，可以在定义的列名上标注，需要自己生成并维护不重复的约束。如果自己不设置@Id主键，mongo会自动生成一个唯一主键，并且插入时效率远高于自己设置主键。在实际业务中不建议自己设置主键，应交给mongo自己生成，自己可以设置一个业务id，如int型字段，用自己设置的业务id来维护相关联的表。</p>
+
+<p><strong>@Document 指定类与collection的映射关系</strong><br />
+标注在实体类上，类似于hibernate的entity注解，标明由mongo来维护该表<br />
+// 若未加 @Document ，该 bean save 到 mongo 的 user collection<br />
+// 若添加 @Document ，则 save 到 reUser collection  <br />
+<strong>@Document(collection="reUser") <br />
+public class User{</strong><br />
+}</p>
+
+<p><strong>@Indexed</strong><br />
+声明该字段需要加索引，加索引后以该字段为条件检索将大大提高速度。<br />
+唯一索引的话是@Indexed(unique = true)。<br />
+也可以对数组进行索引，如果被索引的列是数组时，MongoDB会索引这个数组中的每一个元素。<br />
+也可以对整个Document进行索引，排序是预定义的按插入BSON数据的先后升序排列。<br />
+也可以对关联的对象的字段进行索引</p>
+
+<p><strong>@CompoundIndex</strong><br />
+复合索引，加复合索引后通过复合索引字段查询将大大提高速度。<br />
+@Document<br />
+@CompoundIndexes({<br />
+@CompoundIndex(name = "age_idx", def = "{'lastName': 1, 'age': -1}")<br />
+})<br />
+public class Person<T extends Address> {<br />
+}<br />
+写法如上，lastName和age将作为复合索引，数字参数指定索引的方向，1为正序，-1为倒序。方向对单键索引和随机存不要紧，但如果你要执行分组和排序操作的时候，它就非常重要了。</p>
+
+<p><strong>@Field  指定类熟悉与collection节点对应关系</strong><br />
+代表一个字段，可以不加，不加的话默认以参数名为列名。<br />
+给映射存储到 mongodb 的字段取别名<br />
+在 java bean 中字段名为 firstName，存储到 mongo 中 key 为 fName<br />
+@Field("fName")<br />
+private String firstName;</p>
+
+<p><strong>@Transient</strong><br />
+被该注解标注的，将不会被录入到数据库中。只作为普通的javaBean属性。</p>
+
+<p><strong>@DBRef</strong><br />
+关联另一个document对象。类似于mysql的表关联，但并不一样，mongo不会做级联的操作。</p>
+
+<h2>实体类示例</h2>
+
+<h3>1、用单个类文件</h3>
+
+<p>结果集由多个类组成的话，可以在一个java文件里写。</p>
+
+<pre>
+package com.ustc.wang.echo.entity.mongo;
+
+import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.mapping.Document;
+import org.springframework.data.mongodb.core.mapping.Field;
+
+import java.io.Serializable;
+import java.util.ArrayList;
+import java.util.List;
+
+<strong>@Document(collection="current_map")</strong>
+public class MatchResult {
+<strong>@Id</strong>
+public String id;
+
+<strong>@Field("scene_id")</strong>
+private String sceneId;
+
+@Field("task_id")
+private String taskId;
+
+@Field("client_scene_name")
+private String clientSceneName;
+
+@Field("match_result")
+private String result;
+
+<strong>private List<Dut> duts = new ArrayList<>();</strong>
+
+public MatchResult() { }
+
+public MatchResult(String sceneId, String taskId, String clientSceneName, String result, List<Dut> duts) {
+this.sceneId = sceneId;
+  ...
+}
+
+public String getId() {
+return id;
+}
+...
+}
+
+class Dut implements Serializable {
+
+@Field("ne_name")
+private String neName;
+
+<strong>private List<Link> links = new ArrayList<>();</strong>
+
+public Dut(){ }
+
+public Dut(String neName, String neRemark, String dutName, String dutIp, List<Link> links){
+this.neName = neName;
+...
+}
+
+public String getNeName() {
+return neName;
+}
+...
+}
+
+class Link implements Serializable{
+@Field("link_name")
+private String linkName;
+
+public Link(){}
+
+public Link(String linkName, String vlan, String srcPortName, String srcPortType, String src_port_num, String dstPortName, String dstPortPid){
+this.linkName = linkName;
+...
+}
+
+public void setLinkName(String linkName) {
+this.linkName = linkName;
+}
+...
+}</pre>
+
+<h3>2、用分开的类文件</h3>
+
+<p>也可以在多个java文件里写，注释也还是可用的！！</p>
+
+<h4>MatchResult.java</h4>
+
+<pre>
+package com.ustc.wang.echo.entity.mongo;
+
+import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.mapping.Document;
+import org.springframework.data.mongodb.core.mapping.Field;
+
+import java.io.Serializable;
+import java.util.ArrayList;
+import java.util.List;
+
+@Document(collection="current_map")
+public class MatchResult {
+@Id
+public String id;
+
+@Field("scene_id")
+private String sceneId;
+
+private List<Dut> duts = new ArrayList<>();
+
+public MatchResult() { }
+
+public MatchResult(String sceneId, String taskId, String clientSceneName, String result, List<Dut> duts) {
+this.sceneId = sceneId;
+...
+}
+
+public String getId() {
+return id;
+}
+...
+}
+</pre>
+
+<h4>Dut.java</h4>
+
+<pre>
+package com.ustc.wang.echo.entity.mongo;
+
+import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.mapping.Document;
+import org.springframework.data.mongodb.core.mapping.Field;
+
+import java.io.Serializable;
+import java.util.ArrayList;
+import java.util.List;
+
+public class Dut implements Serializable {
+
+@Field("ne_name")
+private String neName;
+
+public Dut(){ }
+
+public Dut(String neName, String neRemark, String dutName, String dutIp, List<Link> links){
+this.neName = neName;
+...
+}
+
+public String getNeName() {
+return neName;
+}
+...
+}</pre>
+
+<h4>Link.java</h4>
+
+<pre>
+package com.ustc.wang.echo.entity.mongo;
+
+import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.mapping.Document;
+import org.springframework.data.mongodb.core.mapping.Field;
+
+import java.io.Serializable;
+import java.util.ArrayList;
+import java.util.List;
+
+public class Link implements Serializable{
+@Field("link_name")
+private String linkName;
+
+public Link(){}
+
+public Link(String linkName, String vlan, String srcPortName, String srcPortType, String src_port_num, String dstPortName, String dstPortPid){
+this.linkName = linkName;
+...
+}
+
+public String getLinkName() {
+return linkName;
+}
+...
+}</pre>

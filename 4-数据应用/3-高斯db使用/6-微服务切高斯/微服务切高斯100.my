@@ -1,0 +1,225 @@
+<h3> </h3>
+
+<p>GaussDB切换  </p>
+
+<p>[ 您没有编辑权限 ]</p>
+
+<p><a href="http://3ms.huawei.com/hi/group/3573493/wiki_5455237.html#" id="section" name="section">目录</a></p>
+
+<ul>
+<li><a href="http://3ms.huawei.com/hi/group/3573493/wiki_5455237.html#1"> 一、环境安装</a></li>
+<li><a href="http://3ms.huawei.com/hi/group/3573493/wiki_5455237.html#2">二、工具使用</a></li>
+<li><a href="http://3ms.huawei.com/hi/group/3573493/wiki_5455237.html#3">三、DDL语句导出</a></li>
+<li><a href="http://3ms.huawei.com/hi/group/3573493/wiki_5455237.html#4">四、DML语句整改 </a></li>
+<li><a href="http://3ms.huawei.com/hi/group/3573493/wiki_5455237.html#5">五、微服务适配整改</a></li>
+</ul>
+
+<h4><a href="javascript:void(0);" id="fullsection" onclick="fullsection1();">[显示全部]</a></h4>
+
+<p>  <a href="javascript:void(0)" onclick="returnToSection()">[ 回目录 ]</a> 一、环境安装   </p>
+
+<p>  安装参考附件中的Gauss100 OLTP V300R001C00用户指南（单机） 02.pdf 第二章节</p>
+
+<p> </p>
+
+<p>  部分环境需要调整shmmax 参数，具体如下：</p>
+
+<p><img alt="wiki" lang="wiki" src="http://image.huawei.com/tiny-lts/v1/images/e026225f8b872d2169cb_354x107.png@900-0-90-f.png" title="wiki" /></p>
+
+<p>   </p>
+
+<p>   8.44.77.58已经安装了gaussDB的环境，admin/Huawei12#$<br />
+ </p>
+
+<p>  <a href="javascript:void(0)" onclick="returnToSection()">[ 回目录 ]</a>二、工具使用   </p>
+
+<p> </p>
+
+<p>官方有Data Studio 工具，支持常用的数据库操作。附件会附上安装包以及操作手册:Data Studio 用户手册.pdf。</p>
+
+<p> </p>
+
+<p>附上工具截图</p>
+
+<p><img src="http://image.huawei.com/tiny-lts/v1/images/258dd25f8b8cb38906fc_1908x1034.png@900-0-90-f.png" /></p>
+
+<p> </p>
+
+<p> 注意：默认的sys用户远程连接有问题，请创建一个用户，并且开启远程连接权限后，用新创建的用户进行操作。具体参考附件：Gauss100 OLTP V300R001C00用户指南（单机） 02.pdf  3.7.1 配置客户端接入认证的配置</p>
+
+<p>  启动数据库：</p>
+
+<p>     常用命令：<br />
+        切换为gaussdba，启动数据库服务。<br />
+        su - gaussdba<br />
+        进入工具所在文件夹。<br />
+<br />
+        cd /home/gaussdba/app/bin<br />
+        python zctl.py -t start<br />
+        以数据库管理员身份，使用zsql连接数据库。<br />
+        zsql SYS/Changeme_123@127.0.0.1:1888</p>
+
+<p>        创建用户并且授权：</p>
+
+<p>            create user gaussdba identified by Huawei12#$;<br />
+<br />
+            Grant dba to gaussdba;<br />
+<br />
+        密码需要转义使用 "\" 或者密码使用""包裹<br />
+            zsql gaussdba/Huawei12#\$@127.0.0.1:1888;<br />
+<br />
+        配置用户可以远程访问：</p>
+
+<p>                   置IP 白名单和IP 黑名单：</p>
+
+<p>                   SELECT VALUE FROM V$PARAMETER WHERE NAME = 'TCP_INVITED_NODES';<br />
+                   SELECT VALUE FROM V$PARAMETER WHERE NAME = 'TCP_EXCLUDED_NODES';</p>
+
+<p>         配置黑白名单：</p>
+
+<p>                   配置IP白名单。<br />
+                        ALTER SYSTEM SET TCP_INVITED_NODES = '(127.0.0.1,192.168.1.1, 192.168.2.*)';<br />
+                  配置IP黑名单。<br />
+                        ALTER SYSTEM SET TCP_EXCLUDED_NODES = '(192.168.10.*, 192.168.2.225)';</p>
+
+<p>          </p>
+
+<p>          开启IP白名单检测功能。<br />
+        Gauss100 OLTP支持使用如下两种方式开启IP白名单检测功能。<br />
+        l 运行时通过ALTER SYSTEM SET语句在线开启IP白名单检测功能。该配置立即生<br />
+        效，无需重启数据库。<br />
+        ALTER SYSTEM SET TCP_VALID_NODE_CHECKING = true;<br />
+                l 在zengine.ini配置文件中通过修改参数TCP_VALID_NODE_CHECKING的值开启IP<br />
+                白名单检测功能。zengine.ini文件的存储路径为{GSDB_DATA}/cfg/zengine.ini。该<br />
+                配置重启数据库后生效。<br />
+                TCP_VALID_NODE_CHECKING=TRUE<br />
+                配置后可以执行如下命令检查：<br />
+                SELECT NAME, VALUE FROM V$PARAMETER WHERE NAME = 'TCP_VALID_NODE_CHECKING';<br />
+                NAME VALUE<br />
+                ---------------------------------------------------------------- --------------------<br />
+                TCP_VALID_NODE_CHECKING TRUE </p>
+
+<p>        <br />
+具体的参考：Gauss100 OLTP V300R001C00用户指南（单机） 02.pdf    3.7.1 配置客户端接入认证</p>
+
+<p> </p>
+
+<p>  <a href="javascript:void(0)" onclick="returnToSection()">[ 回目录 ]</a>三、DDL语句导出   </p>
+
+<p> </p>
+
+<p> mysql数据库支持语法兼容导出模式，GaussDB数据库90%兼容Oracle的语法，故我们导出Mysql数据未Oracle语法。具体如下：</p>
+
+<p> </p>
+
+<p>  导出lightdc_user数据库的所有表结构的语句为：</p>
+
+<p>      /usr/bin/mysqldump --skip-opt --compatible=oracle --compact --no-data --default-character-set=utf8 --skip-dump-date -u mysql_admin -p lightdc_user > lightdc_user.sql</p>
+
+<p> 导出之后的DDL语句绝大多数语法都已经兼容GaussDB，但是有一下问题需要修复：</p>
+
+<p>      1、DDL语句全部统一用大写，禁止用小写。可以使用此网站的转换工具：<a href="http://tool.lanrentuku.com/daxiaoxie/" target="_blank">http://tool.lanrentuku.com/daxiaoxie/</a><br />
+      2、LONGTEXT类型不支持，需要统一调整为Varchar类型，长度自行掌控，最大支持8000</p>
+
+<p>      3、Int 类型不支持 需要调整为：BINARY_INTEGER。例如："ID" INT("13") 替换为："ID" BINARY_INTEGER NOT NULL</p>
+
+<p>      4、联合主键语法不同，</p>
+
+<p>                单列：</p>
+
+<p>                mysql UNIQUE (Id_P) 对应的 oracle语法： Id_P int NOT NULL UNIQUE。</p>
+
+<p>                多列：</p>
+
+<p>                  CONSTRAINT uc_PersonID UNIQUE (Id_P,LastName)</p>
+
+<p>      5、索引不同。</p>
+
+<p>               mysql：KEY "datetime"  ("datetime")  对应的oracle语法为:CREATE INDEX datetime ON ldc_log_operation_log_t(datetime)  </p>
+
+<p>       </p>
+
+<p>  <a href="javascript:void(0)" onclick="returnToSection()">[ 回目录 ]</a>四、DML语句整改    </p>
+
+<p>                 导出数据库的DML语句：/usr/bin/mysqldump --skip-opt --compatible=oracle --compact --no-create-info --default-character-set=utf8 --skip-comments --skip-dump-date --skip-dump-date -u mysql_admin -p lightdc_user > lightdc_user_data.sql<br />
+<br />
+                1.DATEDIFF 函数不支持<br />
+                          天：<br />
+                        ROUND(TO_NUMBER(END_DATE - START_DATE))<br />
+                        小时：<br />
+                        ROUND(TO_NUMBER(END_DATE - START_DATE) * 24)<br />
+                        分钟：<br />
+                        ROUND(TO_NUMBER(END_DATE - START_DATE) * 24 * 60)<br />
+                        秒：<br />
+                        ROUND(TO_NUMBER(END_DATE - START_DATE) * 24 * 60 * 60)<br />
+                        毫秒：<br />
+                        ROUND(TO_NUMBER(END_DATE - START_DATE) * 24 * 60 * 60 * 60)<br />
+                        或者写函数<br />
+                2.now() 函数不支持--SELECT sysdate FROM DUAL 代替<br />
+                3.mapper 的SQL后缀不能有 “;”<br />
+                <selectid="isNeedChangPwd"parameterType="string"resultType="string"><br />
+                selectcount(1)asresultfromldc_user_info_tt<br />
+                wheret.user_id=#{userId,jdbcType=VARCHAR}<br />
+                andt.is_org_pwd=1;<br />
+                </select><br />
+                4.别名不能用user 需要替换<br />
+                  例如：from lightdc_user user 改为 userTmp<br />
+                5.mapper里面的表名称不能加上'',解析的时候回解析成小写。<br />
+                例如：SELECT * FROM `robo_backupstrategy`; 去掉mapper 里面去掉' 就好。<br />
+                6.sysdate() 改为 sysdate<br />
+                7.date_format 函数没有，要用：TO_CHAR 函数 、to_date 函数<br />
+<br />
+                date_format(sysdate(),'%Y%m%d%H%i%s') 调整为：TO_CHAR(sysdate,'yyyyMMddHH24miss')<br />
+                8.mapper如下的要干掉：<br />
+                param_value as paraValue,<br />
+                param_type as paraType,<br />
+                comments as comments<br />
+                from lightdc_user.ldc_sys_param_t, 去掉 lightdc_user</p>
+
+<p> </p>
+
+<p> 注意：上述问题是框架改造过程中遇到的问题，其他各个业务组还需要根据具体的场景进行语法兼容适配。</p>
+
+<p> </p>
+
+<p>  <a href="javascript:void(0)" onclick="returnToSection()">[ 回目录 ]</a>五、微服务适配整改   </p>
+
+<p>     </p>
+
+<p>      1、maven 添加jar包的依赖。坐标如下：</p>
+
+<p>                   <dependency><br />
+                <groupId>com.huawei.robo</groupId><br />
+                <artifactId>ZenithDriver</artifactId><br />
+                <version>V300R001C00B510</version><br />
+        </dependency></p>
+
+<p>      2、启动参数修改</p>
+
+<p>              微服务都有四个跟数据库强相关的属性，具体如下：</p>
+
+<p>             spring.datasource.driverClassName=com.huawei.gauss.jdbc.ZenithDriver（这个值是固定的）</p>
+
+<p>             spring.datasource.url=jdbc:zenith:@8.44.77.58:1888(此环境是测试环境的值，后续安全加固后，还会增加参数)</p>
+
+<p>             spring.datasource.username=admin（注意：GaussDB都是挂载在某一个用户下面，所以这里连接的用户下需要有对应的表结构以及数据）</p>
+
+<p>             spring.datasource.password=Huawei12#$</p>
+
+<p>    3、重启微服务</p>
+
+<p> </p>
+
+<p>  <a href="javascript:void(0)" onclick="returnToSection()">[ 回目录 ]</a>六、错误码参考   </p>
+
+<p>        </p>
+
+<p> </p>
+
+<p>             错误码可以参考：Gauss100 OLTP V300R001C00研发支持文档（单机） 02.pdf  章节：5 错误码参考。</p>
+
+<p>  <a href="javascript:void(0)" onclick="returnToSection()">[ 回目录 ]</a>七、遗留问题   </p>
+
+<p>        1、GaussDB安全加固</p>
+
+<p>        2、安装大包需要考虑适配GaussDB语法。</p>

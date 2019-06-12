@@ -1,0 +1,283 @@
+<h1>websocket使用案例及原理</h1>
+
+<h2>1、简介</h2>
+
+<p>WebSocket协议是基于TCP的一种新的网络协议。它实现了浏览器与服务器全双工(full-duplex)通信——允许服务器主动发送信息给客户端。</p>
+
+<h2>2、特点</h2>
+
+<p>（1）建立在 TCP 协议之上，服务器端的实现比较容易。<br />
+（2）与 HTTP 协议有着良好的兼容性。默认端口也是80和443，并且握手阶段采用 HTTP 协议，因此握手时不容易屏蔽，能通过各种 HTTP 代理服务器。<br />
+（3）数据格式比较轻量，性能开销小，通信高效。<br />
+（4）可以发送文本，也可以发送二进制数据，支持双向通信，实时性更强。<br />
+（5）没有同源限制，客户端可以与任意服务器通信。</p>
+
+<p>（6）协议标识符是ws（如果加密，则为wss），服务器网址就是 URL。</p>
+
+<h2>3、方案比较</h2>
+
+<p>ajax轮询<br />
+ajax轮询的原理非常简单，让浏览器隔个几秒就发送一次请求，询问服务器是否有新信息。<br />
+long poll<br />
+long poll 其实原理跟 ajax轮询 差不多，都是采用轮询的方式，不过采取的是阻塞模型（一直打电话，没收到就不挂电话），也就是说，客户端发起连接后，如果没消息，就一直不返回Response给客户端。直到有消息才返回，返回完之后，客户端再次建立连接，周而复始。</p>
+
+<h2>4、应用场景</h2>
+
+<p>后台服务端有事件主动上报，客户端只需接受，而不是轮询机制。</p>
+
+<h2>5、案例使用：</h2>
+
+<h3>5.1、客户端</h3>
+
+<blockquote>
+<p>var websocket = null;<br />
+ <br />
+//判断当前浏览器是否支持WebSocket<br />
+if ('WebSocket' in window) {<br />
+    //websocket = new WebSocket("ws://192.168.1.58:8080/plant/servlet/PushMessage");<br />
+    websocket = new WebSocket("ws://" + $("#webSocketIp").val() + ":" + $("#webSocketPort").val() + "/plant/servlet/PushMessage");<br />
+}<br />
+else {<br />
+    alert('Not support websocket')<br />
+}<br />
+ <br />
+//连接发生错误的回调方法<br />
+websocket.onerror = function () {<br />
+ <br />
+};<br />
+ <br />
+//连接成功建立的回调方法<br />
+websocket.onopen = function (event) {<br />
+ <br />
+};<br />
+ <br />
+//接收到消息的回调方法<br />
+websocket.onmessage = function (event) {<br />
+    var message = eval("(" + event.data + ")");//转换后的JSON对象<br />
+    //  alert(obj.name);//json name<br />
+    var url = window.location.href;<br />
+    switch (message.header) {<br />
+        case "nodeOffline":<br />
+            if (message.concentId == $("#concentId").val()) {<br />
+                $("#onlineState").attr("src", "images/photos/offline.png");<br />
+            }<br />
+            updateConcentLogs(message);<br />
+            break;<br />
+        case "nodeOnline":<br />
+            if (message.concentId == $("#concentId").val()) {<br />
+                $("#onlineState").attr("src", "images/photos/online.png");<br />
+            }<br />
+            updateConcentLogs(message);<br />
+            break;<br />
+        case "sensorAlarm":<br />
+            if (message.regionId == regionId) {<br />
+                updateSensorAlarm(message);<br />
+            }<br />
+            break;<br />
+        case "sensorCurrentData":<br />
+            if (message.schemeId == schemeId) {<br />
+                if(url.indexOf("main")>0){<br />
+                    drawCurrentData(message);<br />
+                }<br />
+                if(url.indexOf("monitor")>0){<br />
+                    changeCurrentData(message);<br />
+                }<br />
+ <br />
+            }<br />
+            break;<br />
+        case "deviceSwitchOperate":<br />
+            //ionic对设备开关操作的推送<br />
+            if (nodeId == message.nodeId) {<br />
+                //如果当前显示界面显示的为推送过来的设备的开关状态，则改变其状态<br />
+                switchState = message.switchState;<br />
+                $("#deviceRow img").attr("src", switchState ? "images/photos/switchOn.png" : "images/photos/switchOff.png");<br />
+            }<br />
+            break;<br />
+        case "lampSwitchOperate":<br />
+            //ionic对植物灯开关操作的推送<br />
+            if (nodeId == message.nodeId) {<br />
+                //如果当前显示界面显示的为推送过来的植物灯的开关状态，则改变其状态<br />
+                switchState = message.switchState;<br />
+                $("#lampRow img").attr("src", switchState ? "images/photos/switchOn.png" : "images/photos/switchOff.png");<br />
+            }<br />
+            break;<br />
+    }<br />
+}<br />
+ <br />
+//连接关闭的回调方法<br />
+websocket.onclose = function () {<br />
+ <br />
+}<br />
+ <br />
+//监听窗口关闭事件，当窗口关闭时，主动去关闭websocket连接，防止连接还没断开就关闭窗口，server端会抛异常。<br />
+window.onbeforeunload = function () {<br />
+    websocket.close();<br />
+}<br />
+ <br />
+ <br />
+//关闭连接<br />
+function closeWebSocket() {<br />
+    websocket.close();<br />
+}<br />
+ <br />
+//发送消息<br />
+function send() {<br />
+    var message = document.getElementById('text').value;<br />
+    websocket.send(message);<br />
+}<br />
+ <br />
+function formatEventType(concentEventType) {<br />
+    var eventType = '';<br />
+    switch (concentEventType) {<br />
+        case "ON_LINE":<br />
+            eventType = "上线";<br />
+            break;<br />
+        case "OFF_LINE":<br />
+            eventType = "下线";<br />
+            break;<br />
+    }<br />
+    return eventType;<br />
+}<br />
+ <br />
+function updateConcentLogs(message) {<br />
+    var timeItems = $("#concentLogs").find("div[class='time-item']");<br />
+    if (timeItems.length > 0) {<br />
+        var newFirst = "" +<br />
+            "<div class='time-item' >" +<br />
+            "<div class='item-info'>" +<br />
+            "<small class='text-muted'>" +<br />
+            message.createTime +<br />
+            "</small> " +<br />
+            "<p><strong><a href='#' class='text-info'>" + message.concentName + "</a></strong>" +<br />
+            formatEventType(message.concentEventType) +<br />
+            "</p> " +<br />
+            "</div>" +<br />
+            "</div>";<br />
+        $(timeItems[0]).before(newFirst);<br />
+        $(timeItems[timeItems.length - 1]).remove();<br />
+    }<br />
+}<br />
+ <br />
+function updateSensorAlarm(message) {<br />
+    var timeItems = $("#sensorAlarm a");<br />
+    if (timeItems.length > 0) {<br />
+        var newFirst = "<a href='#' class='dropdown-item notify-item'>" +<br />
+            "<div class='notify-icon bg-success'><i class='icon-notebook'></i></div>" +<br />
+            "<p class='notify-details'>" + message.content +<br />
+            "<small class='text-muted'>" + message.createTime + "</small>" +<br />
+            "</p>" +<br />
+            "</a>";<br />
+        $(timeItems[0]).before(newFirst);<br />
+        $(timeItems[timeItems.length - 1]).remove();<br />
+    }<br />
+    $("#alarmNotice").removeAttr("hidden")<br />
+}<br />
+ </p>
+</blockquote>
+
+<p>5.2 服务端：</p>
+
+<blockquote>package net.microlinktech.plant.web.servlet;<br />
+ <br />
+import org.apache.log4j.Logger;<br />
+ <br />
+import javax.websocket.*;<br />
+import javax.websocket.server.ServerEndpoint;<br />
+import java.util.concurrent.CopyOnWriteArraySet;<br />
+ <br />
+ <br />
+@ServerEndpoint("/servlet/PushMessage")<br />
+public class PushWebSocketServlet {<br />
+ <br />
+    private static Logger logger = Logger.getLogger(PushWebSocketServlet.class);<br />
+ <br />
+    // 静态变量，用来记录当前在线连接数。<br />
+    private static volatile int onlineCount = 0;<br />
+ <br />
+    // concurrent包的线程安全Set，用来存放每个客户端对应的MyWebSocket对象。<br />
+    private static CopyOnWriteArraySet<PushWebSocketServlet> webSocketSet = new CopyOnWriteArraySet<>();<br />
+ <br />
+    // 与某个客户端的连接会话，需要通过它来给客户端发送数据<br />
+    private Session session;<br />
+ <br />
+    /**<br />
+     * 连接建立成功调用的方法<br />
+     *<br />
+     * @param session 可选的参数。session为与某个客户端的连接会话，需要通过它来给客户端发送数据<br />
+     */<br />
+    @OnOpen<br />
+    public void onOpen(Session session) {<br />
+        this.session = session;<br />
+        webSocketSet.add(this);     //加入set中<br />
+        addOnlineCount();           //在线数加1<br />
+        logger.info("有新连接加入！当前在线客户端为" + getOnlineCount());<br />
+    }<br />
+ <br />
+    /**<br />
+     * 连接关闭调用的方法<br />
+     */<br />
+    @OnClose<br />
+    public void onClose() {<br />
+        webSocketSet.remove(this);  //从set中删除<br />
+        subOnlineCount();           //在线数减1<br />
+ <br />
+        logger.info("有一连接关闭！当前在线客户端为" + getOnlineCount());<br />
+    }<br />
+ <br />
+    @OnMessage<br />
+    public void onMessage (String txt, Session session) {<br />
+        System.out.println("onMessage: " + txt.toUpperCase());<br />
+    }<br />
+ <br />
+    /**<br />
+     * 发生错误时调用<br />
+     *<br />
+     * @param session<br />
+     * @param error<br />
+     */<br />
+    @OnError<br />
+    public void onError(Session session, Throwable error) {<br />
+        logger.error("发生错误", error);<br />
+    }<br />
+ <br />
+    /**<br />
+     * 发送消息到客户端<br />
+     *<br />
+     * @param message<br />
+     */<br />
+    public void sendMessage(String message) {<br />
+//        this.session.getBasicRemote().sendText(message);<br />
+        this.session.getAsyncRemote().sendText(message);<br />
+    }<br />
+ <br />
+    /**<br />
+     * 群发消息<br />
+     *<br />
+     * @param message<br />
+     */<br />
+    public static void pushMessage(String message) {<br />
+        for (PushWebSocketServlet item : webSocketSet) {<br />
+            item.sendMessage(message);<br />
+        }<br />
+    }<br />
+ <br />
+    public static synchronized int getOnlineCount() {<br />
+        return onlineCount;<br />
+    }<br />
+ <br />
+    public static synchronized void addOnlineCount() {<br />
+        onlineCount++;<br />
+    }<br />
+ <br />
+    public static synchronized void subOnlineCount() {<br />
+        onlineCount--;<br />
+    }<br />
+}</blockquote>
+
+<h3>5.3 需要加入的jar包</h3>
+
+<p>javax.websocket:javax.websocket-api:1.1</p>
+
+<h2>6、注意点</h2>
+
+<p>有些浏览器客户端不支持websocket技术，Web Sockets 目前在各个浏览器到终端支持性并不好， 只有IE 10+， FF 34+， Chrome 31+， Safari 7.1+， Android Browser 4.4+ 才得到支持。<a href="https://caniuse.com/#search=websockets" rel="nofollow" target="_blank">详情见这里</a></p>

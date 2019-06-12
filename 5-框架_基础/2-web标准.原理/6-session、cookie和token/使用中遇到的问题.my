@@ -1,0 +1,129 @@
+<h1>跨域访问sessionid不一致问题</h1>
+
+<p>在开发过程中遇到这么一个问题，让我花了一个下午的大好时光才解决。但是解决玩之后，发现那么的容易。就是查找资料的时候很费劲。这里把问题记录一下。</p>
+
+<h2>问题的产生</h2>
+
+<ul>
+<li>流程是这样的，要做一个用户登录的接口。在登录页面，前端先请求验证码，然后输入用户名密码和验证码之后，请求登录接口。</li>
+<li>这里存在两个接口，验证码接口和登录接口。在验证码接口中我用session保存验证码，在登录接口中我从session取出验证码进行校验。 <br />
+两个接口的代码如下:</li>
+</ul>
+
+<pre>
+<code>@RequestMapping("/getImageCode")
+public void getImageCode(HttpServletRequest request,
+HttpServletResponse response) throws IOException {
+response.setDateHeader("Expires", 0);
+response.setHeader("Cache-Control",
+"no-store, no-cache, must-revalidate");
+response.addHeader("Cache-Control", "post-check=0, pre-check=0");
+response.setHeader("Pragma", "no-cache");
+response.setContentType("image/jpeg");
+
+String capText = captchaProducer.createText();
+request.getSession().setAttribute(Constants.KAPTCHA_SESSION_KEY,capText);
+logger.info("code is "+capText+" session id is "+request.getSession().getId());
+BufferedImage bi = captchaProducer.createImage(capText);
+ServletOutputStream out = response.getOutputStream();
+ImageIO.write(bi, "jpg", out);
+try {
+out.flush();
+} finally {
+out.close();
+}
+}
+@RequestMapping(value = "/login",method = RequestMethod.POST)
+public ModelMap login(HttpServletRequest request){
+ModelMapHelper helper = new ModelMapHelper();
+String userName = request.getParameter("userName");
+String password = request.getParameter("password");
+String imgCode = request.getParameter("imageCode");
+String sessionCode = (String) request.getSession().getAttribute(Constants.KAPTCHA_SESSION_KEY);
+logger.info("input code is "+imgCode+" session id is "+request.getSession().getId());
+if(StringUtils.isEmpty(imgCode)){
+helper.setErrorMap("验证码不能为空");
+return helper;
+}
+if(!imgCode.equals(sessionCode)){
+helper.setErrorMap("验证码不正确");
+return helper;
+}
+try {
+User user = userService.checkLogin(userName, password);
+if (user == null) {
+helper.setErrorMap("用户名或密码错误");
+return helper;
+}
+helper.setSuccessMap("登录成功");
+helper.setData(user);
+request.getSession().setAttribute("user",user);
+}catch (GeneralException g){
+g.printStackTrace();
+logger.warn(g.getMessage(),g);
+helper.setErrorMap(g.getMessage());
+}catch (Exception e){
+e.printStackTrace();
+logger.error("查询失败",e);
+helper.setInternalErrorMap();
+}
+return helper;
+}</code></pre>
+
+<p>*经过postman工具简单的接口测试之后，没有问题。但是与前端进行接口联调的时候发现了问题。 <br />
+<strong>两次获取的sessionid不一致，导致在登录时候，没有获取session中的验证码！</strong> <br />
+<img alt="问题" src="https://img-blog.csdn.net/20170702184532951?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQvdTAxMTUyMTg5MA==/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70/gravity/SouthEast" title="" /></p>
+
+<h2>查找原因</h2>
+
+<p>百思不得其解！为什么用postman测试是正常的呢？而与前端联调就有这种问题。 <br />
+原来后台是做了一个跨域访问的设置</p>
+
+<pre>
+<code>@Configuration
+public class WebMvcConfig extends WebMvcConfigurerAdapter {
+
+@Override
+public void addResourceHandlers(ResourceHandlerRegistry registry) {
+registry.addResourceHandler("/static/**").addResourceLocations("classpath:/static/");
+}
+
+// 设置跨域访问
+@Override
+public void addCorsMappings(CorsRegistry registry) {
+registry.addMapping("/**")
+.allowedOrigins("*")
+.allowedMethods("GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "TRACE")
+.allowCredentials(true);
+}
+}</code></pre>
+
+<p>主要解释如下： <br />
+registry.allowedOrigins(“<em>“)设置跨域访问的域名，如果是</em>，默认都可以访问。 <br />
+<strong>这个方法是后来找到问题后，自己加上去的</strong> <br />
+registry.allowCredentials(true)设置是否允许客户端发送cookie信息。默认是false <br />
+具体关于这些头信息的解释可以参考： <br />
+<a href="http://www.ruanyifeng.com/blog/2016/04/cors.html" rel="nofollow" target="_blank">http://www.ruanyifeng.com/blog/2016/04/cors.html</a></p>
+
+<h2>解决问题</h2>
+
+<p>其实最后就做了两件事情， <br />
+1. 服务端设置可以接收cookie信息</p>
+
+<pre>
+<code>registry.allowCredentials(true)</code></pre>
+
+<p>在ajax请求中设置发送cookie信息</p>
+
+<pre>
+<code> $.ajax({
+url: a_cross_domain_url,
+xhrFields: {
+withCredentials: true
+}
+});</code></pre>
+
+<p>看看结果，sessionid就一致了。 <br />
+<img alt="这里写图片描述" src="https://img-blog.csdn.net/20170702190823441?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQvdTAxMTUyMTg5MA==/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70/gravity/SouthEast" title="" /><br />
+参考的博客： <br />
+<a href="https://segmentfault.com/q/1010000002905817" rel="nofollow" target="_blank">https://segmentfault.com/q/1010000002905817</a></p>

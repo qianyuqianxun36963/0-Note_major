@@ -1,0 +1,84 @@
+<h1>Oracle - 数据库名、实例名、服务名、ORACLE_SID 的说明和区别</h1>
+
+<p><strong>一、数据库名（db_name）</strong><br />
+    数据库名就是一个数据库的标识，就像人的身份证号一样。它用参数DB_NAME表示，被写入参数文件之中（dbhome_1/dbs/init.ora）<br />
+    数据库名是在安装数据库、创建新的数据库、创建数据库控制文件、修改数据结构、备份与恢复数据库时都需要使用到的</p>
+
+<ol>
+<li>
+<p><code>-- 查询当前数据名 </code></p>
+</li>
+<li>
+<p><code>select name from v$database;</code></p>
+</li>
+</ol>
+
+<p><strong>二、数据库实例名(instance_name)</strong><br />
+    数据库实例名是用于和操作系统进行联系的标识，就是说数据库和操作系统之间的交互用的是数据库实例名。实例名也被写入参数文件中，该参数为instance_name<br />
+    在一般情况下，数据库名和实例名是一对一的关系，但如果在oracle并行服务器架构(即oracle实时应用集群)中，数据库名和实例名是一对多的关系</p>
+
+<ol>
+<li>
+<p><code>-- 查询当前数据库实例名 </code></p>
+</li>
+<li>
+<p><code>select instance_name from v$instance;</code></p>
+</li>
+</ol>
+
+<p><strong>三、ORACLE_SID</strong><br />
+    ORACLE_SID也是标识oracle实例，但是instance_name是oracle数据库参数。而ORACLE_SID是操作系统的环境变量。ORACLD_SID用于与操作系统交互，从操作系统的角度访问实例名，必须通过ORACLE_SID<br />
+    且ORACLE_SID必须与instance_name的值一致，否则，你将会收到一个错误，在unix平台，是“ORACLE not available”,在winnt平台，是“TNS:协议适配器错误”</p>
+
+<ol>
+<li>
+<p><code># 查看当前系统的SID </code></p>
+</li>
+<li>
+<p><code>[root@xl ~]# echo $ORACLE_SID</code></p>
+</li>
+</ol>
+
+<p><strong>四、数据库域名</strong><br />
+    分布工数据库系统中，不同版本的数据库服务器之间，不论运行的操作系统是unix或是windows，各服务器之间都可以通过数据库链路进行远程复制，数据库域名主要用于oracle分布式环境中的复制.数据库域名在存在于参数文件中，他的参数是db_domain<br />
+    全局数据库名=数据库名+数据库域名</p>
+
+<ol>
+<li>
+<p><code>-- 查询数据库域名 </code></p>
+</li>
+<li>
+<p><code>select value from v$parameter where name = 'db_domain';</code></p>
+</li>
+</ol>
+
+<p><strong>五、数据库服务名</strong></p>
+
+<p>    如果数据库有域名，则数据库服务名就是全局数据库名；否则，数据库服务名与数据库名相同。参数名是SERVICE_NAME</p>
+
+<ol>
+<li>
+<p><code>--查询数据库服务名</code></p>
+</li>
+<li>
+<p><code>select value from v$parameter where name = 'service_name';</code></p>
+</li>
+</ol>
+
+<h1>Oracle JDBC通过服务名、SID和tnsnames.ora配置连接数据库的三种方式</h1>
+
+<p>昨天，领导安排去新服务器上部署项目，给了我数据库地址，服务名称，端口，用户名和密码。结果数据库一直连接不上，日志中的错误提示是监听未找到SID，我才明白原来我jdbc.properties中需要的是SID，但我把服务名当作SID给配进去了，但是数据库管理员只给我了服务名，但没给我SID，当时搜了各种解决方案，网上说Oracle JDBC连接一共有三种方式，分别是：服务名、SID、TNSName的方式，但试过当时都没连上（后来发现是我写得格式不正确），最终只好联系数据库管理员要SID，才把项目部署完。</p>
+
+<p>          今天回到公司，就像继续验证一下这些配置方式，结果发现都成功了，在此分享一下我的配置过程，例如数据库服务名net_grid,SID是netgrid</p>
+
+<p>一、通过plsql链接数据库,配置的时候分别使用SERVICE_NAME和SID，都可以链接成功</p>
+
+<p>二、jdbc配置，以下三中方式都可以成功连接数据库</p>
+
+<p>1.使用service_name,配置方式：jdbc:oracle:thin:@//<host>:1521/net_grid  </p>
+
+<p>2.使用SID，配置方式：jdbc:oracle:thin:@//<host>:1521/netgrid</p>
+
+<p>3.使用SID，配置方式：jdbc:oracle:thin:@<host>:1521:netgrid</p>
+
+<p>比较：1和2中当@后边有双斜杠，端口号后边有单斜杠时，用服务名和实例名都可以链接成功，3中@后边没有双斜杠，端口号后边是冒号而不是斜杠的时候只能用实例名，当时笔者配置错误的时候是 jdbc:oracle:thin:@//<host>:1521:netgrid ,端口号后直接用了冒号。</p>

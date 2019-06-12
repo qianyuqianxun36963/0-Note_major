@@ -1,0 +1,166 @@
+<h1>多线程之Future模式</h1>
+<p>详细参见葛一名老师的《Java程序性能优化》</p>
+<p>Futrue模式:对于多线程，如果线程A要等待线程B的结果，那么线程A没必要等待B，直到B有结果，可以先拿到一个未来的Future，等B有结果是再取真实的结果。</p>
+<p>　在多线程中经常举的一个例子就是：网络图片的下载，刚开始是通过模糊的图片来代替最后的图片，等下载图片的线程下载完图片后在替换。而在这个过程中可以做一些其他的事情。</p>
+<p><img alt="" src="https://images0.cnblogs.com/blog2015/544748/201506/132115526917151.png" style="height:308px; width:505px" /></p>
+<p>　　首先客户端向服务器请求RealSubject，但是这个资源的创建是非常耗时的，怎么办呢？这种情况下，首先返回Client一个FutureSubject,以满足客户端的需求，于此同时呢，Future会通过另外一个Thread 去构造一个真正的资源，资源准备完毕之后，在给future一个通知。如果客户端急于获取这个真正的资源，那么就会阻塞客户端的其他所有线程，等待资源准备完毕。</p>
+<p>　　公共数据接口，FutureData和RealData都要实现。</p>
+<pre>
+1 public interface Data { 
+2 public abstract String getContent(); 
+3 } </pre>
+<p>FutureData,当有线程想要获取RealData的时候，程序会被阻塞。等到RealData被注入才会使用getReal()方法。</p>
+<pre>
+1 package com.volshell.future;
+2 
+3 public class FutureData implements Data {
+4 
+5 protected RealData realData = null;
+6 protected boolean isReady = false;
+7 
+8 @Override
+9 public synchronized String getResult() {
+10 // TODO Auto-generated method stub
+11 while (!isReady) {
+12 try {
+13 wait();
+14 } catch (Exception e) {
+15 // TODO: handle exception
+16 }
+17 }
+18 return realData.result;
+19 }
+20 
+21 public synchronized void setRealData(RealData realData) {
+22 if (isReady)
+23 return;
+24 this.realData = realData;
+25 isReady = true;
+26 notifyAll();
+27 }
+28 }</pre>
+<p>真实数据RealData</p>
+<pre>
+1 package com.volshell.future;
+2 
+3 public class RealData implements Data {
+4 protected String result;
+5 
+6 public RealData(String para) {
+7 StringBuffer sb = new StringBuffer();
+8 for (int i = 0; i < 10; i++) {
+9 sb.append(para);
+10 try {
+11 Thread.sleep(100);
+12 } catch (Exception e) {
+13 // TODO: handle exception
+14 }
+15 result = sb.toString();
+16 }
+17 }
+18 
+19 @Override
+20 public String getResult() {
+21 // TODO Auto-generated method stub
+22 return result;
+23 }
+24 
+25 }</pre>
+<p>客户端程序：</p>
+<pre>
+1 package com.volshell.future;
+2 
+3 public class Client {
+4 public Data request(final String request){
+5 final FutureData future = new FutureData();
+6 new Thread(){
+7 public void run() {
+8 
+9 RealData reaData = new RealData(request);
+10 future.setRealData(reaData);
+11 };
+12 }.start();
+13 return future;
+14 }
+15 }</pre>
+<p>调用者：</p>
+<pre>
+1 package com.volshell.future;
+2 
+3 public class Main {
+4 public static void main(String[] args) {
+5 Client client = new Client();
+6 Data data = client.request("name");
+7 System.out.println("请求完毕!!");
+8 try {
+9 Thread.sleep(2000);
+10 } catch (Exception e) {
+11 // TODO: handle exception
+12 }
+13 System.out.println("获取的数据:" +data.getResult());
+14 }
+15 }</pre>
+<p>　　调用者请求资源，client.request("name"); 完成对数据的准备</p>
+<p>　　当要获取资源的时候，data.getResult() ，如果资源没有准备好isReady = false;那么就会阻塞该线程。直到资源获取然后该线程被唤醒。</p>
+<p>　　今天又重新了解了future模式。</p>
+<pre>
+1 package com.volshell.future2;
+2 
+3 import java.util.ArrayList;
+4 import java.util.List;
+5 import java.util.concurrent.Callable;
+6 import java.util.concurrent.ExecutionException;
+7 import java.util.concurrent.ExecutorService;
+8 import java.util.concurrent.Executors;
+9 import java.util.concurrent.Future;
+10 
+11 public class FutureTest2 {
+12 private static class Task implements Callable<String> {
+13 @Override
+14 public String call() throws Exception {
+15 // 模拟真实事务的处理过程，这个过程是非常耗时的。
+16 Thread.sleep(5000);
+17 return "call return ";
+18 }
+19 }
+20 
+21 public static void main(String[] args) throws InterruptedException,
+22 ExecutionException {
+23 List<Future<String>> futures = new ArrayList<Future<String>>();
+24 ExecutorService executorService = Executors.newCachedThreadPool();
+25 
+26 System.out.println("已经提交资源申请");
+27 for (int i = 0; i < 10; i++) {
+28 futures.add(executorService.submit(new Task()));
+29 }
+30 
+31 for (Future<String> future : futures) {
+32 // 判断资源是不是已经准备完毕，准备完毕直接获取。
+33 if (!future.isDone()) {
+34 System.out.println("资源还没有准备好");
+35 }
+36 System.out.println(future.get());
+37 }
+38 executorService.shutdown();
+39 }
+40 }</pre>
+<p>其中的核心就是Callable中的call方法，这个和Runnable中的run 非常类似。</p>
+<p><strong>Runnable和Callable都是接口</strong><br />
+不同之处：<br />
+1.<strong>Callable可以返回一个类型V，而Runnable不可以</strong><br />
+2.<strong>Callable能够抛出checked exception,而Runnable不可以</strong>。<br />
+3.Runnable是自从java1.1就有了，而Callable是1.5之后才加上去的<br />
+4.<strong>Callable和Runnable都可以应用于executors。而Thread类只支持Runnable</strong>.<br />
+上面只是简单的不同，其实这两个接口在用起来差别还是很大的。Callable与executors联合在一起，在任务完成时可立刻获得一个更新了的Future。而Runable却要自己处理</p>
+<p>Future接口，一般都是取回Callable执行的状态用的。其中的主要方法：</p>
+<ul>
+<li><strong>cancel，取消Callable的执行，当Callable还没有完成时</strong></li>
+<li><strong>get，获得Callable的返回值</strong></li>
+<li><strong>isCanceled，判断是否取消了</strong></li>
+<li><strong>isDone，判断是否完成</strong></li>
+</ul>
+<p>用Executor来构建线程池，应该要做的事：</p>
+<p>1).调用Executors类中的静态方法newCachedThreadPool(必要时创建新 线程，空闲线程会被保留60秒)或newFixedThreadPool(包含固定数量的线程池)等，返回的是一个实现了ExecutorService 接口的ThreadPoolExecutor类或者是一个实现了ScheduledExecutorServiece接口的类对象。</p>
+<p>2).调用submit提交Runnable或Callable对象。</p>
+<p>3).如果想要取消一个任务，或如果提交Callable对象，那就要保存好返回的Future对象。</p>
+<p>4).<strong>当不再提交任何任务时，调用shutdown方法</strong>。</p>

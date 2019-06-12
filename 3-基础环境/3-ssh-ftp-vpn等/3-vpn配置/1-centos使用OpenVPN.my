@@ -1,0 +1,80 @@
+<h1>CentOS使用OpenVPN访问实验室小网</h1>
+
+<h3>1、安装openvpn</h3>
+
+<p>有两种安装方式，配置公司内网镜像源（包括CentOS和EPEL）之后，直接使用yum安装：</p>
+
+<p>yum install -y openvpn</p>
+
+<p>另一种方式是下载rpm包安装，<a href="http://wiki.inhuawei.com/download/attachments/32151110/openvpn-2.3.8.rar?version=1&modificationDate=1553070451000&api=v2">openvpn-2.3.8.rar</a>，下载后传到机器上，解压缩，使用rpm安装：</p>
+
+<p><code>rpm -ivh libpkcs11-helper1-</code><code>1.11</code><code>-</code><code>5.3</code><code>.x86_64.rpm --nodeps --force</code></p>
+
+<p><code>rpm -ivh pkcs11-helper-</code><code>1.11</code><code>-</code><code>5.3</code><code>.x86_64.rpm</code></p>
+
+<p><code>rpm -ivh openvpn-</code><code>2.3</code><code>.</code><code>8</code><code>-</code><code>12.1</code><code>.x86_64.rpm</code></p>
+
+<p>2、配置openvpn</p>
+
+<p>在Windows下使用过VpnClient之后会有每个实验室的vpn证书文件和openvpn配置的，在OpenVPN安装目录的config文件夹下，例如：</p>
+
+<p><img src="http://wiki.inhuawei.com/download/attachments/32151110/image2019-3-20_16-6-31.png?version=1&modificationDate=1553070451000&api=v2" /></p>
+
+<p>Linux上配置文件按约定放在/etc目录下，所以我们在/etc/openvpn/client下创建一个文件夹nanjing/lab105-lsw：</p>
+
+<p> </p>
+
+<p>cd /etc/openvpn/client</p>
+
+<p>mkdir -p nanjing/lab105-lsw</p>
+
+<p>cd nanjing/lab105-lsw</p>
+
+<p>然后要对client.ovpn进行一点修改，把dev-node那一行注释掉，再把ca、cert和key这三个路径补成完整路径：使用sftp或者rz将那四个文件传到机器上。</p>
+
+<p><img src="http://wiki.inhuawei.com/download/attachments/32151110/image2019-3-20_16-40-7.png?version=1&modificationDate=1553071301965&api=v2" /></p>
+
+<h3>3、启动openvpn</h3>
+
+<p>使用下面的命令启动openvpn（设备重启后需要重新执行该命令进行拨号）：</p>
+
+<p>openvpn --cd /etc/openvpn/client/nanjing/lab105-lsw/ --config /etc/openvpn/client/nanjing/lab105-lsw/client.ovpn --daemon</p>
+
+<p>根据提示输入域账号用户名和密码：</p>
+
+<p><img src="http://wiki.inhuawei.com/download/attachments/32151110/image2019-3-20_16-35-46.png?version=1&modificationDate=1553071020826&api=v2" /></p>
+
+<p>启动之后等几秒，可以发现多了一个tap0网卡：</p>
+
+<p><img src="http://wiki.inhuawei.com/download/attachments/32151110/image2019-3-20_16-39-18.png?version=1&modificationDate=1553071249731&api=v2" /></p>
+
+<p>但是现在tap0网卡还没有小网地址，那么就dhcp给它分配一个：</p>
+
+<p> </p>
+
+<p>ifconfig tap0 up</p>
+
+<p>dhclient tap0</p>
+
+<p>是就能看到tap0有小网地址了：</p>
+
+<p><img src="http://wiki.inhuawei.com/download/attachments/32151110/image2019-3-20_16-40-57.png?version=1&modificationDate=1553071353887&api=v2" /></p>
+
+<p>ping一个小网地址检验一下吧：</p>
+
+<p><img src="http://wiki.inhuawei.com/download/attachments/32151110/image2019-3-20_16-41-47.png?version=1&modificationDate=1553071408074&api=v2" /></p>
+
+<p>如果需要连接多个实验室时就把每个实验室的openvpn那四个文件放在单独的文件夹里，然后跟上面类似的方式启动openvpn。</p>
+
+<p>4、关闭openvpn</p>
+
+<p>要关闭的话直接找到openvpn启动的那个进程，然后kill掉：</p>
+
+<p><img src="http://wiki.inhuawei.com/download/attachments/32151110/image2019-3-20_16-46-34.png?version=1&modificationDate=1553071671000&api=v2" /></p>
+
+<hr />
+<p>参考资料：</p>
+
+<p><a href="http://3ms.huawei.com/km/blogs/details/5814839" rel="nofollow">http://3ms.huawei.com/km/blogs/details/5814839</a></p>
+
+<p><a href="http://3ms.huawei.com/hi/group/9211/wiki_4714563.html" rel="nofollow">http://3ms.huawei.com/hi/group/9211/wiki_4714563.html</a></p>

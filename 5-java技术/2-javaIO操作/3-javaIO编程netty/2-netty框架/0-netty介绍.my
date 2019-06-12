@@ -1,0 +1,163 @@
+<h1><strong>Netty简介</strong></h1>
+<p>Netty是基于Java NIO client-server的网络应用框架，使用Netty可以快速开发网络应用，例如服务器和客户端协议。Netty提供了一种新的方式来开发网络应用程序，这种新的方式使它很容易使用和具有很强的扩展性。Netty的内部实现是很复杂的，但是Netty提供了简单易用的API从网络处理代码中解耦业务逻辑。Netty是完全基于NIO实现的，所以整个Netty都是异步的。</p>
+<p>网络应用程序通常需要有较高的可扩展性，无论是Netty还是其他的基于Java Nio的框架，都会提供可扩展性的解决方案。Netty中一个关键组成部分是它的异步特性，本片文章将讨论同步（阻塞）和异步（非阻塞）的IO来说明为什么使用异步代码解决扩展性问题以及如何使用异步。</p>
+<h2><strong>1、Netty架构组成</strong></h2>
+<p><img alt="" src="https://img-blog.csdn.net/20161120202329059" /></p>
+<p><a href="http://www.importnew.com/15656.html" target="_blank">Netty实现原理浅析</a>，写的很不错，感兴趣的可以看一下。</p>
+<h2><strong>2.Helloworld入门</strong></h2>
+<p>在学习Netty之前，先来回顾一下NIO的通信步骤：</p>
+<p>①创建ServerSocketChannel，为其配置非阻塞模式。</p>
+<p>②绑定监听，配置TCP参数，录入backlog大小等。</p>
+<p>③创建一个独立的IO线程，用于轮询多路复用器Selector。</p>
+<p>④创建Selector，将之前创建的ServerSocketChannel注册到Selector上，并设置监听标识位SelectionKey.OP_ACCEPT。</p>
+<p>⑤启动IO线程，在循环体中执行Selector.select()方法，轮询就绪的通道。</p>
+<p>⑥当轮询到处于就绪状态的通道时，需要进行操作位判断，如果是ACCEPT状态，说明是新的客户端接入，则调用accept方法接收新的客户端。</p>
+<p>⑦设置新接入客户端的一些参数，如非阻塞，并将其继续注册到Selector上，设置监听标识位等。</p>
+<p>⑧如果轮询的通道标识位是READ，则进行读取，构造Buffer对象等。</p>
+<p>⑨更细节的问题还有数据没发送完成继续发送的问题......</p>
+<p>好啦，开始学习Netty了。先去http://netty.io/上下载所有的Netty包。</p>
+<p>Netty通信的步骤：</p>
+<p>①创建两个NIO线程组，一个专门用于网络事件处理（接受客户端的连接），另一个则进行网络通信的读写。</p>
+<p>②创建一个ServerBootstrap对象，配置Netty的一系列参数，例如接受传出数据的缓存大小等。</p>
+<p>③创建一个用于实际处理数据的类ChannelInitializer，进行初始化的准备工作，比如设置接受传出数据的字符集、格式以及实际处理数据的接口。</p>
+<p>④绑定端口，执行同步阻塞方法等待服务器端启动即可。</p>
+<p>强烈推荐读一读<a href="http://ifeve.com/netty5-user-guide/" target="_blank">Netty官方翻译文档</a>。</p>
+<p>好了，说了那么多，下面就来HelloWorld入门吧！</p>
+<h3>服务器端：</h3>
+<ol start="1">
+<li>public class Server {  </li>
+<li>  </li>
+<li>    private int port;  </li>
+<li>  </li>
+<li>    public Server(int port) {  </li>
+<li>        this.port = port;  </li>
+<li>    }  </li>
+<li>  </li>
+<li>    public void run() {  </li>
+<li>        EventLoopGroup bossGroup = new NioEventLoopGroup(); //用于处理服务器端接收客户端连接  </li>
+<li>        EventLoopGroup workerGroup = new NioEventLoopGroup(); //进行网络通信（读写）  </li>
+<li>        try {  </li>
+<li>            ServerBootstrap bootstrap = new ServerBootstrap(); //辅助工具类，用于服务器通道的一系列配置  </li>
+<li>            bootstrap.group(bossGroup, workerGroup) //绑定两个线程组  </li>
+<li>                    .channel(NioServerSocketChannel.class) //指定NIO的模式  </li>
+<li>                    .childHandler(new ChannelInitializer<SocketChannel>() { //配置具体的数据处理方式  </li>
+<li>                        @Override  </li>
+<li>                        protected void initChannel(SocketChannel socketChannel) throws Exception {  </li>
+<li>                            socketChannel.pipeline().addLast(new ServerHandler());  </li>
+<li>                        }  </li>
+<li>                    })  </li>
+<li>                    /** </li>
+<li>                     * 对于ChannelOption.SO_BACKLOG的解释： </li>
+<li>                     * 服务器端TCP内核维护有两个队列，我们称之为A、B队列。客户端向服务器端connect时，会发送带有SYN标志的包（第一次握手），服务器端 </li>
+<li>                     * 接收到客户端发送的SYN时，向客户端发送SYN ACK确认（第二次握手），此时TCP内核模块把客户端连接加入到A队列中，然后服务器接收到 </li>
+<li>                     * 客户端发送的ACK时（第三次握手），TCP内核模块把客户端连接从A队列移动到B队列，连接完成，应用程序的accept会返回。也就是说accept </li>
+<li>                     * 从B队列中取出完成了三次握手的连接。 </li>
+<li>                     * A队列和B队列的长度之和就是backlog。当A、B队列的长度之和大于ChannelOption.SO_BACKLOG时，新的连接将会被TCP内核拒绝。 </li>
+<li>                     * 所以，如果backlog过小，可能会出现accept速度跟不上，A、B队列满了，导致新的客户端无法连接。要注意的是，backlog对程序支持的 </li>
+<li>                     * 连接数并无影响，backlog影响的只是还没有被accept取出的连接 </li>
+<li>                     */  </li>
+<li>                    .option(ChannelOption.SO_BACKLOG, 128) //设置TCP缓冲区  </li>
+<li>                    .option(ChannelOption.SO_SNDBUF, 32 * 1024) //设置发送数据缓冲大小  </li>
+<li>                    .option(ChannelOption.SO_RCVBUF, 32 * 1024) //设置接受数据缓冲大小  </li>
+<li>                    .childOption(ChannelOption.SO_KEEPALIVE, true); //保持连接  </li>
+<li>            ChannelFuture future = bootstrap.bind(port).sync();  </li>
+<li>            future.channel().closeFuture().sync();  </li>
+<li>        } catch (Exception e) {  </li>
+<li>            e.printStackTrace();  </li>
+<li>        } finally {  </li>
+<li>            workerGroup.shutdownGracefully();  </li>
+<li>            bossGroup.shutdownGracefully();  </li>
+<li>        }  </li>
+<li>    }  </li>
+<li>  </li>
+<li>    public static void main(String[] args) {  </li>
+<li>        new Server(8379).run();  </li>
+<li>    }  </li>
+<li>}  </li>
+</ol>
+<p>ServerHandler类：</p>
+<ol start="1">
+<li>public class ServerHandler  extends ChannelHandlerAdapter {  </li>
+<li>  </li>
+<li>    @Override  </li>
+<li>    public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {  </li>
+<li>      </li>
+<li>            //do something msg  </li>
+<li>            ByteBuf buf = (ByteBuf)msg;  </li>
+<li>            byte[] data = new byte[buf.readableBytes()];  </li>
+<li>            buf.readBytes(data);  </li>
+<li>            String request = new String(data, "utf-8");  </li>
+<li>            System.out.println("Server: " + request);  </li>
+<li>            //写给客户端  </li>
+<li>            String response = "我是反馈的信息";  </li>
+<li>            ctx.writeAndFlush(Unpooled.copiedBuffer("888".getBytes()));  </li>
+<li>            //.addListener(ChannelFutureListener.CLOSE);  </li>
+<li>              </li>
+<li>  </li>
+<li>    }  </li>
+<li>  </li>
+<li>    @Override  </li>
+<li>    public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {  </li>
+<li>        cause.printStackTrace();  </li>
+<li>        ctx.close();  </li>
+<li>    }  </li>
+<li>  </li>
+<li>}  </li>
+</ol>
+<p> </p>
+<h3>客户端：</h3>
+<ol start="1">
+<li>public class Client {  </li>
+<li>  </li>
+<li>    public static void main(String[] args) throws InterruptedException {  </li>
+<li>        EventLoopGroup workerGroup = new NioEventLoopGroup();  </li>
+<li>        Bootstrap bootstrap = new Bootstrap();  </li>
+<li>        bootstrap.group(workerGroup)  </li>
+<li>                .channel(NioSocketChannel.class)  </li>
+<li>                .handler(new ChannelInitializer<SocketChannel>() {  </li>
+<li>                    @Override  </li>
+<li>                    protected void initChannel(SocketChannel socketChannel) throws Exception {  </li>
+<li>                        socketChannel.pipeline().addLast(new ClientHandler());  </li>
+<li>                    }  </li>
+<li>                });  </li>
+<li>        ChannelFuture future = bootstrap.connect("127.0.0.1", 8379).sync();  </li>
+<li>        future.channel().writeAndFlush(Unpooled.copiedBuffer("777".getBytes()));  </li>
+<li>        future.channel().closeFuture().sync();  </li>
+<li>        workerGroup.shutdownGracefully();  </li>
+<li>    }  </li>
+<li>  </li>
+<li>}  </li>
+</ol>
+<p> </p>
+<p> </p>
+<p>ClientHandler类：</p>
+<p><strong>[java]</strong> <a href="https://blog.csdn.net/haoyuyang/article/details/53243785#" onclick="dp.sh.Toolbar.Command('ViewSource',this);return false;" target="_self" title="view plain">view plain</a> <a href="https://blog.csdn.net/haoyuyang/article/details/53243785#" onclick="dp.sh.Toolbar.Command('CopyToClipboard',this);return false;" target="_self" title="copy">copy</a></p>
+<p><embed allowscriptaccess="always" bgcolor="#ffffff" height="16" pluginspage="http://www.macromedia.com/go/getflashplayer" quality="best" src="https://csdnimg.cn/public/highlighter/ZeroClipboard.swf" type="application/x-shockwave-flash" width="16" wmode="transparent"></embed></p>
+<ol start="1">
+<li>public class ClientHandler extends ChannelHandlerAdapter {  </li>
+<li>  </li>
+<li>    @Override  </li>
+<li>    public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {  </li>
+<li>        try {  </li>
+<li>            ByteBuf buf = (ByteBuf) msg;  </li>
+<li>            byte[] data = new byte[buf.readableBytes()];  </li>
+<li>            buf.readBytes(data);  </li>
+<li>            System.out.println("Client：" + new String(data).trim());  </li>
+<li>        } finally {  </li>
+<li>            ReferenceCountUtil.release(msg);  </li>
+<li>        }  </li>
+<li>    }  </li>
+<li>  </li>
+<li>  </li>
+<li>    @Override  </li>
+<li>    public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {  </li>
+<li>        cause.printStackTrace();  </li>
+<li>        ctx.close();  </li>
+<li>    }  </li>
+<li>  </li>
+<li>}  </li>
+</ol>
+<p> </p>
+<p>运行结果：</p>
+<p><img alt="" src="https://img-blog.csdn.net/20161121220301596" /></p>
+<p><img alt="" src="https://img-blog.csdn.net/20161121220336909" /></p>

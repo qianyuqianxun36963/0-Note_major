@@ -1,0 +1,530 @@
+<h1>Java Runtime.exec()的使用</h1>
+
+<p>Sun的doc里其实说明还有其他的用法：</p>
+
+<pre>
+exec(String[] cmdarray, String[] envp, File dir)
+
+Executes the specified command and arguments in a separate process with the specified environment and working directory.</pre>
+
+<p>那个dir就是调用的程序的工作目录，这句其实还是很有用的。</p>
+
+<p>Windows下调用程序</p>
+
+<pre>
+Process proc =Runtime.getRuntime().exec("exefile");</pre>
+
+<p>Linux下调用程序就要改成下面的格式</p>
+
+<pre>
+Process proc =Runtime.getRuntime().exec("./exefile");</pre>
+
+<p>Windows下调用系统命令</p>
+
+<pre>
+String [] cmd={"cmd","/C","copy exe1 exe2"}; 
+Process proc =Runtime.getRuntime().exec(cmd);</pre>
+
+<p>Linux下调用系统命令就要改成下面的格式</p>
+
+<pre>
+String [] cmd={"/bin/sh","-c","ln -s exe1 exe2"}; 
+Process proc =Runtime.getRuntime().exec(cmd);</pre>
+
+<p>Windows下调用系统命令并弹出命令行窗口</p>
+
+<pre>
+String [] cmd={"cmd","/C","start copy exe1 exe2"}; 
+Process proc =Runtime.getRuntime().exec(cmd);</pre>
+
+<p>Linux下调用系统命令并弹出终端窗口就要改成下面的格式</p>
+
+<pre>
+String [] cmd={"/bin/sh","-c","xterm -e ln -s exe1 exe2"};
+Process proc =Runtime.getRuntime().exec(cmd);</pre>
+
+<p>还有要设置调用程序的工作目录就要</p>
+
+<pre>
+Process proc =Runtime.getRuntime().exec("exeflie",null, new File("workpath"));</pre>
+
+<p>当然最好的执行系统命令的方法就是写个bat文件或是shell脚本。然后调用，那样修改和实现就简点多了。</p>
+
+<p>还有在<a href="http://iccyx.cn/2007/04/21/java-console-text-area-input-stream/">在Java程序中截获控制台输出[转]</a>这篇文章中有详细的如何在JTextArea中显示拦截的控制台输出。</p>
+
+<p>JAVA现在执行外部命令，主要的方式，还是通过调用所以平台的SHELL去完成，WINDOWS下面就用CMD，LINUX或者是UNIX下面就用SHELL，下面演示一个对BAT文件的调用，并把结果回显到控制台上，其它的应用程序类。  说明：  一个调用SHELL执行外部  取得外部程序的输出流，采用适当的READER读回来，并显示出来就OK了  下面是源程序：</p>
+
+<pre>
+import java.io.BufferedReader; 
+import java.io.IOException; 
+import java.io.InputStream; 
+import java.io.InputStreamReader; 
+
+public class JavaExeBat 
+{ 
+public static void main(String[] args) 
+{ 
+Process p; 
+//test.bat中的命令是ipconfig/all 
+String cmd="c:\\test\\test.bat"; 
+
+try 
+{ 
+//执行命令 
+p = Runtime.getRuntime().exec(cmd); 
+//取得命令结果的输出流 
+InputStream fis=p.getInputStream(); 
+//用一个读输出流类去读 
+InputStreamReader isr=new InputStreamReader(fis); 
+//用缓冲器读行 
+BufferedReader br=new BufferedReader(isr); 
+String line=null; 
+//直到读完为止 
+while((line=br.readLine())!=null) 
+{ 
+System.out.println(line); 
+} 
+} 
+catch (IOException e) 
+{ 
+e.printStackTrace(); 
+} 
+} 
+}</pre>
+
+<p> 执行结果如下： </p>
+
+<pre>
+Windows IP Configuration 
+
+Host Name . . . . . . . . . . . . : Mickey 
+
+Primary Dns Suffix . . . . . . . : 
+
+Node Type . . . . . . . . . . . . : Unknown 
+
+IP Routing Enabled. . . . . . . . : No 
+
+WINS Proxy Enabled. . . . . . . . : No 
+
+DNS Suffix Search List. . . . . . : domain 
+Ethernet adapter 本地连接: 
+
+Connection-specific DNS Suffix . : domain 
+
+Description . . . . . . . . . . . : Broadcom NetXtreme Gigabit Ethernet 
+</pre>
+
+<p> </p>
+
+<p>那就首先说点Runtime类吧，他是一个与JVM运行时环境有关的类，这个类是Singleton的。我说几个自己觉得重要的地方。</p>
+
+<p>1、Runtime.getRuntime()可以取得当前JVM的运行时环境，这也是在Java中唯一一个得到运行时环境的方法。</p>
+
+<p>2、Runtime上其他大部分的方法都是实例方法，也就是说每次进行运行时调用时都要用到getRuntime方法。</p>
+
+<p>3、 Runtime中的exit方法是退出当前JVM的方法，估计也是唯一的一个吧，因为我看到System类中的exit实际上也是通过调用 Runtime.exit()来退出JVM的，这里说明一下Java对Runtime返回值的一般规则（后边也提到了），0代表正常退出，非0代表异常中 止，这只是Java的规则，在各个操作系统中总会发生一些小的混淆。</p>
+
+<p>4、Runtime.addShutdownHook()方法可以注册一个hook在JVM执行shutdown的过程中，方法的参数只要是一个初始化过但是没有执行的Thread实例就可以。（注意，Java中的Thread都是执行过了就不值钱的哦）</p>
+
+<p>5、 说到addShutdownHook这个方法就要说一下JVM运行环境是在什么情况下shutdown或者abort的。文档上是这样写的，当最后一个非 精灵进程退出或者收到了一个用户中断信号、用户登出、系统shutdown、Runtime的exit方法被调用时JVM会启动shutdown的过程， 在这个过程开始后，他会并行启动所有登记的shutdown hook（注意是并行启动，这就需要线程安全和防止死锁）。当shutdown过程启动后，只有通过调用halt方法才能中止shutdown的过程并退 出JVM。</p>
+
+<p>那 什么时候JVM会abort退出那？首先说明一下，abort退出时JVM就是停止运行但并不一定进行shutdown。这只有JVM在遇到 SIGKILL信号或者windows中止进程的信号、本地方法发生类似于访问非法地址一类的内部错误时会出现。这种情况下并不能保证shutdown hook是否被执行。</p>
+
+<p>现在开始看这篇文章，呵呵。</p>
+
+<p>首先讲的是<strong>Runtime.exec</strong>() 方法的所有重载。这里要注意的有一点，就是public Process exec(String [] cmdArray, String [] envp);这个方法中cmdArray是一个执行的命令和参数的字符串数组，数组的第一个元素是要执行的命令往后依次都是命令的参数，envp我个人感 觉应该和C中的execve中的环境变量是一样的，envp中使用的是name=value的方式。</p>
+
+<p><!---->1、 <!---->一个很糟糕的调用程序，代码如下，这个程序用exec调用了一个外部命令之后马上使用exitValue就对其返回值进行检查，让我们看看会出现什么问题。</p>
+
+<pre>
+import java.util.*;
+import java.io.*;
+
+public class BadExecJavac {
+public static void main(String args[]) {
+try {
+Runtime rt = Runtime.getRuntime();
+Process proc = rt.exec("javac");
+int exitVal = proc.exitValue();
+System.out.println("Process exitValue: " + exitVal);
+} catch (Throwable t) {
+t.printStackTrace();
+}
+}
+}
+</pre>
+
+<pre>
+A run of BadExecJavac produces:
+
+E:classescomjavaworldjpitfallsarticle2>java BadExecJavac java.lang.IllegalThreadStateException: 
+　process has not exited at java.lang.Win32Process.exitValue(Native Method) at BadExecJavac.main(BadExecJavac.java:13)</pre>
+
+<p> </p>
+
+<p>这 里看原文就可以了解，这里主要的问题就是错误的调用了exitValue来取得外部命令的返回值（呵呵，这个错误我也曾经犯过），因为exitValue 这个方法是不阻塞的，程序在调用这个方法时外部命令并没有返回所以造成了异常的出现，这里是由另外的方法来等待外部命令执行完毕的，就是waitFor方 法，这个方法会一直阻塞直到外部命令执行结束，然后返回外部命令执行的结果，作者在这里一顿批评设计者的思路有问题，呵呵，反正我是无所谓阿，能用就可以 拉。但是作者在这里有一个说明，就是exitValue也是有好多用途的。因为当你在一个Process上调用waitFor方法时，当前线程是阻塞的， 如果外部命令无法执行结束，那么你的线程就会一直阻塞下去，这种意外会影响我们程序的执行。所以在我们不能判断外部命令什么时候执行完毕而我们的程序还需 要继续执行的情况下，我们就应该循环的使用exitValue来取得外部命令的返回状态，并在外部命令返回时作出相应的处理。</p>
+
+<p>2、对exitValue处改进了的程序</p>
+
+<pre>
+import java.util.*;
+import java.io.*;
+
+public class BadExecJavac2 {
+public static void main(String args[]) {
+try {
+Runtime rt = Runtime.getRuntime();
+Process proc = rt.exec("javac");
+int exitVal = proc.waitFor();
+System.out.println("Process exitValue: " + exitVal);
+} catch (Throwable t) {
+t.printStackTrace();
+}
+}
+}
+</pre>
+
+<p> 不幸的是，这个程序也无法执行完成，它没有输出但却一直悬在那里，这是为什么那？</p>
+
+<p>JDK文档中对此有如此的解释：因为本地的系统对标准输入和输出所提供的缓冲池有效，所以错误的对标准输出快速的写入和从标准输入快速的读入都有可能造成子进程的锁，甚至死锁。</p>
+
+<p>文 档引述完了，作者又开始批评了，他说JDK仅仅说明为什么问题会发生，却并没有说明这个问题怎么解决，这的确是个问题哈。紧接着作者说出自己的做法，就是 在执行完外部命令后我们要控制好Process的所有输入和输出（视情况而定），在这个例子里边因为调用的是Javac，而他在没有参数的情况下会将提示 信息输出到标准出错，所以在下面的程序中我们要对此进行处理。</p>
+
+<pre>
+import java.util.*;
+import java.io.*;
+
+public class MediocreExecJavac {
+public static void main(String args[]) {
+try {
+Runtime rt = Runtime.getRuntime();
+Process proc = rt.exec("javac");
+InputStream stderr = proc.getErrorStream();
+InputStreamReader isr = new InputStreamReader(stderr);
+BufferedReader br = new BufferedReader(isr);
+String line = null;
+System.out.println("<error></error>");
+while ((line = br.readLine()) != null)
+System.out.println(line);
+System.out.println("");
+int exitVal = proc.waitFor();
+System.out.println("Process exitValue: " + exitVal);
+} catch (Throwable t) {
+t.printStackTrace();
+}
+}
+}</pre>
+
+<p> </p>
+
+<p> 程序的运行结果为</p>
+
+<pre>
+E:classescomjavaworldjpitfallsarticle2>java MediocreExecJavac <error></error> Usage: javac <options></options> <source files=""></source>
+
+where <options></options> includes: -g Generate all debugging info -g:none 
+Generate no debugging info -g:{lines,vars,source} Generate only some debugging info -O 
+Optimize; may hinder debugging or enlarge class files -nowarn Generate no warnings -verbose 
+Output messages about what the compiler is doing -deprecation Output source locations where deprecated APIs are used -classpath 
+Specify where to find user class files -sourcepath Specify where to find input source files -bootclasspath 
+Override location of bootstrap class files -extdirs <dirs></dirs>Override location of installed extensions -d <directory></directory>
+Specify where to place generated class files -encoding <encoding></encoding>
+Specify character encoding used by source files -target <release></release>
+Generate class files for specific VM version
+Process exitValue: 2
+</pre>
+
+<p> </p>
+
+<p>哎，不管怎么说还是出来了结果，作者作了一下总结，就是说，为了处理好外部命令大量输出的情况，你要确保你的程序处理好外部命令所需要的输入或者输出。</p>
+
+<p>下一个题目，当我们调用一个我们认为是可执行程序的时候容易发生的错误（今天晚上我刚刚犯这个错误，没事做这个练习时候发生的）</p>
+
+<pre>
+import java.util.*;
+import java.io.*;
+
+public class BadExecWinDir {
+public static void main(String args[]) {
+try {
+Runtime rt = Runtime.getRuntime();
+Process proc = rt.exec("dir");
+InputStream stdin = proc.getInputStream();
+InputStreamReader isr = new InputStreamReader(stdin);
+BufferedReader br = new BufferedReader(isr);
+String line = null;
+System.out.println("<output></output>");
+while ((line = br.readLine()) != null)
+System.out.println(line);
+System.out.println("");
+int exitVal = proc.waitFor();
+System.out.println("Process exitValue: " + exitVal);
+} catch (Throwable t) {
+t.printStackTrace();
+}
+}
+}
+</pre>
+
+<pre>
+A run of BadExecWinDir produces:
+
+E:classescomjavaworldjpitfallsarticle2>java BadExecWinDir java.io.IOException: 
+CreateProcess: dir error=2 at java.lang.Win32Process.create(Native Method) at java.lang.Win32Process.<init></init>
+(Unknown Source) at java.lang.Runtime.execInternal(Native Method) at java.lang.Runtime.exec(Unknown Source) 
+at java.lang.Runtime.exec(Unknown Source) at java.lang.Runtime.exec(Unknown Source) at java.lang.Runtime.exec(Unknown Source) 
+at BadExecWinDir.main(BadExecWinDir.java:12)
+</pre>
+
+<p> </p>
+
+<p>说实在的，这个错误还真是让我摸不着头脑，我觉得在windows中返回2应该是没有找到这个文件的缘故，可能windows 2000中只有cmd命令，dir命令不是当前环境变量能够解释的吧。我也不知道了，慢慢往下看吧。</p>
+
+<p>嘿， 果然和作者想的一样，就是因为dir命令是由windows中的解释器解释的，直接执行dir时无法找到dir.exe这个命令，所以会出现文件未找到这 个2的错误。如果我们要执行这样的命令，就要先根据操作系统的不同执行不同的解释程序command.com 或者cmd.exe。</p>
+
+<p>作者对上边的程序进行了修改</p>
+
+<pre>
+import java.util.*; 
+import java.io.*;
+
+class StreamGobbler extends Thread { 
+InputStream is; 
+String type;
+
+StreamGobbler(InputStream is, String type) { 
+this.is = is; 
+this.type = type; 
+}
+
+public void run() { 
+try { 
+InputStreamReader isr = new InputStreamReader(is); 
+BufferedReader br = new BufferedReader(isr); 
+String line=null; 
+while ( (line = br.readLine()) != null) 
+System.out.println(type + ">" + line); 
+} catch (IOException ioe) { 
+ioe.printStackTrace(); 
+}
+} 
+}
+
+public class GoodWindowsExec { 
+public static void main(String args[]) { 
+if (args.length < 1) { 
+System.out.println("USAGE: java GoodWindowsExec <cmd></cmd>"); 
+System.exit(1); 
+}
+
+try { 
+String osName = System.getProperty("os.name" ); 
+String[] cmd = new String[3];
+if( osName.equals( "Windows NT" ) ) { 
+cmd[0] = "cmd.exe" ; 
+cmd[1] = "/C" ; 
+cmd[2] = args[0]; 
+} else if( osName.equals( "Windows 95" ) ) { 
+cmd[0] = "command.com" ; 
+cmd[1] = "/C" ; 
+cmd[2] = args[0]; 
+}
+Runtime rt = Runtime.getRuntime(); 
+System.out.println("Execing " + cmd[0] + " " + cmd[1] + " " + cmd[2]); 
+Process proc = rt.exec(cmd); // any
+} 
+}
+}</pre>
+
+<p> </p>
+
+<pre>
+Running GoodWindowsExec with the dir command generates:
+
+E:classescomjavaworldjpitfallsarticle2>java GoodWindowsExec "dir *.java" 
+Execing cmd.exe /C dir *.java OUTPUT> Volume in drive E has no label. OUTPUT> 
+Volume Serial Number is 5C5F-0CC9 OUTPUT> OUTPUT> Directory of E:classescomjavaworldjpitfallsarticle2 OUTPUT> 
+OUTPUT>10/23/00 09:01p 805 BadExecBrowser.java OUTPUT>10/22/00 09:35a 770 BadExecBrowser1.java OUTPUT>10/24/00 08:45p 488 
+BadExecJavac.java OUTPUT>10/24/00 08:46p 519 BadExecJavac2.java OUTPUT>10/24/00 09:13p 930 
+BadExecWinDir.java OUTPUT>10/22/00 09:21a 2,282 
+BadURLPost.java OUTPUT>10/22/00 09:20a 2,273 BadURLPost1.java ... (some output omitted for brevity) OUTPUT>10/12/00 09:29p 151 S
+uperFrame.java OUTPUT>10/24/00 09:23p 1,814 TestExec.java OUTPUT>10/09/00 05:47p 23,543 
+TestStringReplace.java OUTPUT>10/12/00 08:55p 228 TopLevel.java OUTPUT> 22 File(s) 46,661 bytes 
+OUTPUT> 19,678,420,992 bytes free ExitValue: 0
+</pre>
+
+<p> </p>
+
+<p>这 里作者教了一个windows中很有用的方法，呵呵，至少我是不知道的，就是cmd.exe /C +一个windows中注册了后缀的文档名，windows会自动地调用相关的程序来打开这个文档，我试了一下，的确很好用，但是好像文件路径中有空格的 话就有点问题，我加上引号也无法解决。</p>
+
+<p>这里作者强调了一下，不要假设你执行的程序是可执行的程序，要清楚自己的程序是单独可执行的还是被解释的，本章的结束作者会介绍一个命令行工具来帮助我们分析。</p>
+
+<p>这里还有一点，就是得到process的输出的方式是getInputStream，这是因为我们要从Java 程序的角度来看，外部程序的输出对于Java来说就是输入，反之亦然。</p>
+
+<p>最 后的一个漏洞的地方就是错误的认为exec方法会接受所有你在命令行或者Shell中输入并接受的字符串。这些错误主要出现在命令作为参数的情况下，程序 员错误的将所有命令行中可以输入的参数命令加入到exec中（这段翻译的不好，凑合看吧）。下面的例子中就是一个程序员想重定向一个命令的输出。</p>
+
+<pre>
+import java.util.*;
+import java.io.*;
+
+//StreamGobbler omitted for brevity
+
+public class BadWinRedirect {
+public static void main(String args[]) {
+try { Runtime rt = Runtime.getRuntime(); 
+Process proc = rt.exec("java jecho 'Hello World' > test.txt"); // any
+}
+}
+}
+// error
+// message?
+// StreamGobbler
+// errorGobbler
+// =
+// new
+// StreamGobbler(proc.getErrorStream(),
+// "ERROR");
+
+// any output? StreamGobbler outputGobbler = new
+// StreamGobbler(proc.getInputStream(), "OUTPUT");
+</pre>
+
+<p> </p>
+
+<pre>
+Running BadWinRedirect produces:
+
+E:classescomjavaworldjpitfallsarticle2>java BadWinRedirect OUTPUT>'Hello World' > test.txt ExitValue: 0</pre>
+
+<p> </p>
+
+<p>程 序员的本意是将Hello World这个输入重订向到一个文本文件中，但是这个文件并没有生成，jecho仅仅是将命令行中的参数输出到标准输出中，用户觉得可以像dos中重定向 一样将输出重定向到一个文件中，但这并不能实现，用户错误的将exec认为是一个shell解释器，但它并不是，如果你想将一个程序的输出重定向到其他的 程序中，你必须用程序来实现他。可用java.io中的包。</p>
+
+<pre>
+import java.util.*;
+import java.io.*;
+
+class StreamGobbler extends Thread { 
+InputStream is;
+String type; 
+OutputStream os;
+
+StreamGobbler(InputStream is, String type) { 
+this(is, type, null); 
+}
+
+StreamGobbler(InputStream is, String type, OutputStream redirect) { 
+this.is = is; 
+this.type = type; 
+this.os = redirect; 
+}
+
+public void run() { 
+try { 
+PrintWriter pw = null; 
+if (os != null) 
+pw = new PrintWriter(os);
+
+InputStreamReader isr = new InputStreamReader(is); 
+BufferedReader br = new BufferedReader(isr); 
+String line=null; 
+while ( (line = br.readLine()) != null) { 
+if (pw != null) pw.println(line); 
+System.out.println(type + ">" + line); 
+} if (pw != null) pw.flush(); 
+} catch (IOException ioe) {
+ioe.printStackTrace(); 
+} 
+} 
+}
+
+public class GoodWinRedirect { 
+public static void main(String args[]) {
+try { 
+FileOutputStream fos = new FileOutputStream(args[0]); 
+Runtime rt = Runtime.getRuntime(); 
+Process proc = rt.exec("java jecho 'Hello World'"); // any
+}
+if (args.length < 1) {
+System.out.println("USAGE java GoodWinRedirect <outputfile></outputfile>"); 
+System.exit(1);
+}
+}
+}
+</pre>
+
+<pre>
+Running GoodWinRedirect produces:
+
+E:classescomjavaworldjpitfallsarticle2>java GoodWinRedirect test.txt OUTPUT>'Hello World' ExitValue: 0</pre>
+
+<p> </p>
+
+<p>这里就不多说了，看看就明白，紧接着作者给出了一个监测命令的小程序</p>
+
+<pre>
+import java.util.*; 
+import java.io.*;
+
+//class StreamGobbler omitted for brevity
+
+public class TestExec { 
+public static void main(String args[]) { 
+try { 
+String cmd = args[0]; 
+Runtime rt = Runtime.getRuntime(); 
+Process proc = rt.exec(cmd);
+if (args.length < 1) { 
+System.out.println("USAGE: java TestExec "+cmd); 
+System.exit(1); 
+}
+}
+}
+}
+
+
+
+// any error message? StreamGobbler errorGobbler = new
+// StreamGobbler(proc.getErrorStream(), "ERR");
+
+// any output? StreamGobbler outputGobbler = new
+// StreamGobbler(proc.getInputStream(), "OUT");
+
+// kick them off errorGobbler.start(); outputGobbler.start();
+
+// any error??? int exitVal = proc.waitFor(); System.out.println("ExitValue: " +
+// exitVal); } catch (Throwable t) { t.printStackTrace(); } } }
+</pre>
+
+<p> </p>
+
+<p>对这个程序进行运行:</p>
+
+<pre>
+E:classescomjavaworldjpitfallsarticle2>java TestExec "e:javadocsindex.html" java.io.IOException: 
+CreateProcess: e:javadocsindex.html error=193 at java.lang.Win32Process.create(Native Method) 
+at java.lang.Win32Process.<init></init>(Unknown Source) at java.lang.Runtime.execInternal(Native Method) 
+at java.lang.Runtime.exec(Unknown Source) at java.lang.Runtime.exec(Unknown Source) at java.lang.Runtime.exec(Unknown Source) 
+at java.lang.Runtime.exec(Unknown Source) at TestExec.main(TestExec.java:45)</pre>
+
+<p> </p>
+
+<p>193在windows中是说这不是一个win32程序，这说明路径中找不到这个网页的关联程序，下面作者决定用一个绝对路径来试一下。</p>
+
+<pre>
+E:classescomjavaworldjpitfallsarticle2>java TestExec "e:program filesnetscapeprogramnetscape.exe e:javadocsindex.html" ExitValue: 0</pre>
+
+<p> </p>
+
+<p>好用了，这个我也试了一下，用的是IE。</p>
+
+<p>最后，作者总结了几条规则，防止我们在进行<strong>Runtime.exec</strong>()调用时出现错误。</p>
+
+<p><!---->1、 <!---->在一个外部进程执行完之前你不能得到他的退出状态</p>
+
+<p><!---->2、 <!---->在你的外部程序开始执行的时候你必须马上控制输入、输出、出错这些流。</p>
+
+<p><!---->3、 <!---->你必须用<strong>Runtime.exec</strong>()去执行程序</p>
+
+<p><!---->4、 <!---->你不能象命令行一样使用<strong>Runtime.exec</strong>()。</p>

@@ -1,0 +1,1390 @@
+<h1>String、StringBuilder以及StringBuffer</h1>
+
+<p><strong>String 字符串常量<br />
+StringBuffer 字符串变量（线程安全）<br />
+StringBuilder 字符串变量（非线程安全）</strong></p>
+
+<p>探秘Java中String、StringBuilder以及StringBuffer</p>
+
+<p>　　相信String这个类是Java中使用得最频繁的类之一，并且又是各大公司面试喜欢问到的地方，今天就来和大家一起学习一下String、StringBuilder和StringBuffer这几个类，分析它们的异同点以及了解各个类适用的场景。下面是本文的目录大纲：</p>
+
+<p>　　一.你了解String类吗？</p>
+
+<p>　　二.深入理解String、StringBuffer、StringBuilder</p>
+
+<p>　　三.不同场景下三个类的性能测试</p>
+
+<p>　　四.常见的关于String、StringBuffer的面试题（辟谣网上流传的一些曲解String类的说法）</p>
+
+<p>　　若有不正之处，请多多谅解和指正，不胜感激。</p>
+
+<p>　　请尊重作者劳动成果，转载请标明转载地址：</p>
+
+<p> 　　<a href="http://www.cnblogs.com/dolphin0520/p/3778589.html">http://www.cnblogs.com/dolphin0520/p/3778589.html</a></p>
+
+<h2>一.你了解String类吗？</h2>
+
+<p>　　想要了解一个类，最好的办法就是看这个类的实现源代码，String类的实现在</p>
+
+<p>　　\jdk1.6.0_14\src\java\lang\String.java   文件中。</p>
+
+<p>　　打开这个类文件就会发现String类是被final修饰的：</p>
+
+<table border="0" cellpadding="0" cellspacing="0">
+<tbody>
+<tr>
+<td>
+<p>1</p>
+
+<p>2</p>
+
+<p>3</p>
+
+<p>4</p>
+
+<p>5</p>
+
+<p>6</p>
+
+<p>7</p>
+
+<p>8</p>
+
+<p>9</p>
+
+<p>10</p>
+
+<p>11</p>
+
+<p>12</p>
+
+<p>13</p>
+
+<p>14</p>
+
+<p>15</p>
+
+<p>16</p>
+
+<p>17</p>
+
+<p>18</p>
+
+<p>19</p>
+
+<p>20</p>
+
+<p>21</p>
+</td>
+<td>
+<p><code>public</code> <code>final</code> <code>class</code> <code>String</code></p>
+
+<p><code>    </code><code>implements</code> <code>java.io.Serializable, Comparable<String>, CharSequence</code></p>
+
+<p><code>{</code></p>
+
+<p><code>    </code><code>/** The value is used for character storage. */</code></p>
+
+<p><code>    </code><code>private</code> <code>final</code> <code>char</code> <code>value[];</code></p>
+
+<p> </p>
+
+<p><code>    </code><code>/** The offset is the first index of the storage that is used. */</code></p>
+
+<p><code>    </code><code>private</code> <code>final</code> <code>int</code> <code>offset;</code></p>
+
+<p> </p>
+
+<p><code>    </code><code>/** The count is the number of characters in the String. */</code></p>
+
+<p><code>    </code><code>private</code> <code>final</code> <code>int</code> <code>count;</code></p>
+
+<p> </p>
+
+<p><code>    </code><code>/** Cache the hash code for the string */</code></p>
+
+<p><code>    </code><code>private</code> <code>int</code> <code>hash; </code><code>// Default to 0</code></p>
+
+<p> </p>
+
+<p><code>    </code><code>/** use serialVersionUID from JDK 1.0.2 for interoperability */</code></p>
+
+<p><code>    </code><code>private</code> <code>static</code> <code>final</code> <code>long</code> <code>serialVersionUID = -6849794470754667710L;</code></p>
+
+<p> </p>
+
+<p><code>    </code><code>......</code></p>
+
+<p> </p>
+
+<p><code>}</code></p>
+</td>
+</tr>
+</tbody>
+</table>
+
+<p>　　从上面可以看出几点：</p>
+
+<p>　　1）String类是final类，也即意味着String类不能被继承，并且它的成员方法都默认为final方法。在Java中，被final修饰的类是不允许被继承的，并且该类中的成员方法都默认为final方法。在早期的JVM实现版本中，被final修饰的方法会被转为内嵌调用以提升执行效率。而从Java SE5/6开始，就渐渐摈弃这种方式了。因此在现在的Java SE版本中，不需要考虑用final去提升方法调用效率。只有在确定不想让该方法被覆盖时，才将方法设置为final。</p>
+
+<p>　　2）上面列举出了String类中所有的成员属性，从上面可以看出String类其实是通过char数组来保存字符串的。</p>
+
+<p>　　下面再继续看String类的一些方法实现：</p>
+
+<table border="0" cellpadding="0" cellspacing="0">
+<tbody>
+<tr>
+<td>
+<p>1</p>
+
+<p>2</p>
+
+<p>3</p>
+
+<p>4</p>
+
+<p>5</p>
+
+<p>6</p>
+
+<p>7</p>
+
+<p>8</p>
+
+<p>9</p>
+
+<p>10</p>
+
+<p>11</p>
+
+<p>12</p>
+
+<p>13</p>
+
+<p>14</p>
+
+<p>15</p>
+
+<p>16</p>
+
+<p>17</p>
+
+<p>18</p>
+
+<p>19</p>
+
+<p>20</p>
+
+<p>21</p>
+
+<p>22</p>
+
+<p>23</p>
+
+<p>24</p>
+
+<p>25</p>
+
+<p>26</p>
+
+<p>27</p>
+
+<p>28</p>
+
+<p>29</p>
+
+<p>30</p>
+
+<p>31</p>
+
+<p>32</p>
+
+<p>33</p>
+
+<p>34</p>
+
+<p>35</p>
+
+<p>36</p>
+
+<p>37</p>
+
+<p>38</p>
+
+<p>39</p>
+
+<p>40</p>
+
+<p>41</p>
+
+<p>42</p>
+
+<p>43</p>
+
+<p>44</p>
+
+<p>45</p>
+
+<p>46</p>
+
+<p>47</p>
+
+<p>48</p>
+
+<p>49</p>
+
+<p>50</p>
+
+<p>51</p>
+</td>
+<td>
+<p><code>public</code> <code>String substring(</code><code>int</code> <code>beginIndex, </code><code>int</code> <code>endIndex) {</code></p>
+
+<p><code>    </code><code>if</code> <code>(beginIndex < </code><code>0</code><code>) {</code></p>
+
+<p><code>        </code><code>throw</code> <code>new</code> <code>StringIndexOutOfBoundsException(beginIndex);</code></p>
+
+<p><code>    </code><code>}</code></p>
+
+<p><code>    </code><code>if</code> <code>(endIndex > count) {</code></p>
+
+<p><code>        </code><code>throw</code> <code>new</code> <code>StringIndexOutOfBoundsException(endIndex);</code></p>
+
+<p><code>    </code><code>}</code></p>
+
+<p><code>    </code><code>if</code> <code>(beginIndex > endIndex) {</code></p>
+
+<p><code>        </code><code>throw</code> <code>new</code> <code>StringIndexOutOfBoundsException(endIndex - beginIndex);</code></p>
+
+<p><code>    </code><code>}</code></p>
+
+<p><code>    </code><code>return</code> <code>((beginIndex == </code><code>0</code><code>) && (endIndex == count)) ? </code><code>this</code> <code>:</code></p>
+
+<p><code>        </code><code>new</code> <code>String(offset + beginIndex, endIndex - beginIndex, value);</code></p>
+
+<p><code>    </code><code>}</code></p>
+
+<p> </p>
+
+<p><code> </code><code>public</code> <code>String concat(String str) {</code></p>
+
+<p><code>    </code><code>int</code> <code>otherLen = str.length();</code></p>
+
+<p><code>    </code><code>if</code> <code>(otherLen == </code><code>0</code><code>) {</code></p>
+
+<p><code>        </code><code>return</code> <code>this</code><code>;</code></p>
+
+<p><code>    </code><code>}</code></p>
+
+<p><code>    </code><code>char</code> <code>buf[] = </code><code>new</code> <code>char</code><code>[count + otherLen];</code></p>
+
+<p><code>    </code><code>getChars(</code><code>0</code><code>, count, buf, </code><code>0</code><code>);</code></p>
+
+<p><code>    </code><code>str.getChars(</code><code>0</code><code>, otherLen, buf, count);</code></p>
+
+<p><code>    </code><code>return</code> <code>new</code> <code>String(</code><code>0</code><code>, count + otherLen, buf);</code></p>
+
+<p><code>    </code><code>}</code></p>
+
+<p> </p>
+
+<p><code> </code><code>public</code> <code>String replace(</code><code>char</code> <code>oldChar, </code><code>char</code> <code>newChar) {</code></p>
+
+<p><code>    </code><code>if</code> <code>(oldChar != newChar) {</code></p>
+
+<p><code>        </code><code>int</code> <code>len = count;</code></p>
+
+<p><code>        </code><code>int</code> <code>i = -</code><code>1</code><code>;</code></p>
+
+<p><code>        </code><code>char</code><code>[] val = value; </code><code>/* avoid getfield opcode */</code></p>
+
+<p><code>        </code><code>int</code> <code>off = offset;   </code><code>/* avoid getfield opcode */</code></p>
+
+<p> </p>
+
+<p><code>        </code><code>while</code> <code>(++i < len) {</code></p>
+
+<p><code>        </code><code>if</code> <code>(val[off + i] == oldChar) {</code></p>
+
+<p><code>            </code><code>break</code><code>;</code></p>
+
+<p><code>        </code><code>}</code></p>
+
+<p><code>        </code><code>}</code></p>
+
+<p><code>        </code><code>if</code> <code>(i < len) {</code></p>
+
+<p><code>        </code><code>char</code> <code>buf[] = </code><code>new</code> <code>char</code><code>[len];</code></p>
+
+<p><code>        </code><code>for</code> <code>(</code><code>int</code> <code>j = </code><code>0</code> <code>; j < i ; j++) {</code></p>
+
+<p><code>            </code><code>buf[j] = val[off+j];</code></p>
+
+<p><code>        </code><code>}</code></p>
+
+<p><code>        </code><code>while</code> <code>(i < len) {</code></p>
+
+<p><code>            </code><code>char</code> <code>c = val[off + i];</code></p>
+
+<p><code>            </code><code>buf[i] = (c == oldChar) ? newChar : c;</code></p>
+
+<p><code>            </code><code>i++;</code></p>
+
+<p><code>        </code><code>}</code></p>
+
+<p><code>        </code><code>return</code> <code>new</code> <code>String(</code><code>0</code><code>, len, buf);</code></p>
+
+<p><code>        </code><code>}</code></p>
+
+<p><code>    </code><code>}</code></p>
+
+<p><code>    </code><code>return</code> <code>this</code><code>;</code></p>
+</td>
+</tr>
+</tbody>
+</table>
+
+<p>　　从上面的三个方法可以看出，无论是sub操、concat还是replace操作都不是在原有的字符串上进行的，而是重新生成了一个新的字符串对象。也就是说进行这些操作后，最原始的字符串并没有被改变。</p>
+
+<p>　　在这里要永远记住一点：</p>
+
+<p>　　“对String对象的任何改变都不影响到原对象，相关的任何change操作都会生成新的对象”。</p>
+
+<p>　　在了解了于String类基础的知识后，下面来看一些在平常使用中容易忽略和混淆的地方。</p>
+
+<h2>二.深入理解String、StringBuffer、StringBuilder</h2>
+
+<p>1.String str="hello world"和String str=new String("hello world")的区别</p>
+
+<p>　　想必大家对上面2个语句都不陌生，在平时写代码的过程中也经常遇到，那么它们到底有什么区别和联系呢？下面先看几个例子：</p>
+
+<table border="0" cellpadding="0" cellspacing="0">
+<tbody>
+<tr>
+<td>
+<p>1</p>
+
+<p>2</p>
+
+<p>3</p>
+
+<p>4</p>
+
+<p>5</p>
+
+<p>6</p>
+
+<p>7</p>
+
+<p>8</p>
+
+<p>9</p>
+
+<p>10</p>
+
+<p>11</p>
+
+<p>12</p>
+
+<p>13</p>
+</td>
+<td>
+<p><code>public</code> <code>class</code> <code>Main {</code></p>
+
+<p><code>        </code> </p>
+
+<p><code>    </code><code>public</code> <code>static</code> <code>void</code> <code>main(String[] args) {</code></p>
+
+<p><code>        </code><code>String str1 = </code><code>"hello world"</code><code>;</code></p>
+
+<p><code>        </code><code>String str2 = </code><code>new</code> <code>String(</code><code>"hello world"</code><code>);</code></p>
+
+<p><code>        </code><code>String str3 = </code><code>"hello world"</code><code>;</code></p>
+
+<p><code>        </code><code>String str4 = </code><code>new</code> <code>String(</code><code>"hello world"</code><code>);</code></p>
+
+<p><code>        </code> </p>
+
+<p><code>        </code><code>System.out.println(str1==str2);</code></p>
+
+<p><code>        </code><code>System.out.println(str1==str3);</code></p>
+
+<p><code>        </code><code>System.out.println(str2==str4);</code></p>
+
+<p><code>    </code><code>}</code></p>
+
+<p><code>}</code></p>
+</td>
+</tr>
+</tbody>
+</table>
+
+<p>　　这段代码的输出结果为</p>
+
+<p>　　<img alt="" src="https://images0.cnblogs.com/i/288799/201406/091030134366487.jpg" /></p>
+
+<p>　　为什么会出现这样的结果？下面解释一下原因：</p>
+
+<p>　　在前面一篇讲解关于JVM内存机制的一篇博文中提到 ，在class文件中有一部分 来存储编译期间生成的 字面常量以及符号引用，这部分叫做class文件常量池，在运行期间对应着方法区的运行时常量池。</p>
+
+<p>　　因此在上述代码中，String str1 = "hello world";和String str3 = "hello world"; 都在编译期间生成了 字面常量和符号引用，运行期间字面常量"hello world"被存储在运行时常量池（当然只保存了一份）。通过这种方式来将String对象跟引用绑定的话，JVM执行引擎会先在运行时常量池查找是否存在相同的字面常量，如果存在，则直接将引用指向已经存在的字面常量；否则在运行时常量池开辟一个空间来存储该字面常量，并将引用指向该字面常量。</p>
+
+<p>　　总所周知，通过new关键字来生成对象是在堆区进行的，而在堆区进行对象生成的过程是不会去检测该对象是否已经存在的。因此通过new来创建对象，创建出的一定是不同的对象，即使字符串的内容是相同的。</p>
+
+<p>2.String、StringBuffer以及StringBuilder的区别</p>
+
+<p>　　既然在Java中已经存在了String类，那为什么还需要StringBuilder和StringBuffer类呢？</p>
+
+<p>　　那么看下面这段代码：</p>
+
+<table border="0" cellpadding="0" cellspacing="0">
+<tbody>
+<tr>
+<td>
+<p>1</p>
+
+<p>2</p>
+
+<p>3</p>
+
+<p>4</p>
+
+<p>5</p>
+
+<p>6</p>
+
+<p>7</p>
+
+<p>8</p>
+
+<p>9</p>
+</td>
+<td>
+<p><code>public</code> <code>class</code> <code>Main {</code></p>
+
+<p><code>        </code> </p>
+
+<p><code>    </code><code>public</code> <code>static</code> <code>void</code> <code>main(String[] args) {</code></p>
+
+<p><code>        </code><code>String string = </code><code>""</code><code>;</code></p>
+
+<p><code>        </code><code>for</code><code>(</code><code>int</code> <code>i=</code><code>0</code><code>;i<</code><code>10000</code><code>;i++){</code></p>
+
+<p><code>            </code><code>string += </code><code>"hello"</code><code>;</code></p>
+
+<p><code>        </code><code>}</code></p>
+
+<p><code>    </code><code>}</code></p>
+
+<p><code>}</code></p>
+</td>
+</tr>
+</tbody>
+</table>
+
+<p>　　这句 string += "hello";的过程相当于将原有的string变量指向的对象内容取出与"hello"作字符串相加操作再存进另一个新的String对象当中，再让string变量指向新生成的对象。如果大家还有疑问可以反编译其字节码文件便清楚了：</p>
+
+<p>　　<img alt="" src="https://images0.cnblogs.com/i/288799/201406/091056535456212.jpg" /></p>
+
+<p>　　从这段反编译出的字节码文件可以很清楚地看出：从第8行开始到第35行是整个循环的执行过程，并且每次循环会new出一个StringBuilder对象，然后进行append操作，最后通过toString方法返回String对象。也就是说这个循环执行完毕new出了10000个对象，试想一下，如果这些对象没有被回收，会造成多大的内存资源浪费。从上面还可以看出：string+="hello"的操作事实上会自动被JVM优化成：</p>
+
+<p>　　StringBuilder str = new StringBuilder(string);</p>
+
+<p>　　str.append("hello");</p>
+
+<p>　　str.toString();</p>
+
+<p>　　再看下面这段代码：</p>
+
+<table border="0" cellpadding="0" cellspacing="0">
+<tbody>
+<tr>
+<td>
+<p>1</p>
+
+<p>2</p>
+
+<p>3</p>
+
+<p>4</p>
+
+<p>5</p>
+
+<p>6</p>
+
+<p>7</p>
+
+<p>8</p>
+
+<p>9</p>
+</td>
+<td>
+<p><code>public</code> <code>class</code> <code>Main {</code></p>
+
+<p><code>        </code> </p>
+
+<p><code>    </code><code>public</code> <code>static</code> <code>void</code> <code>main(String[] args) {</code></p>
+
+<p><code>        </code><code>StringBuilder stringBuilder = </code><code>new</code> <code>StringBuilder();</code></p>
+
+<p><code>        </code><code>for</code><code>(</code><code>int</code> <code>i=</code><code>0</code><code>;i<</code><code>10000</code><code>;i++){</code></p>
+
+<p><code>            </code><code>stringBuilder.append(</code><code>"hello"</code><code>);</code></p>
+
+<p><code>        </code><code>}</code></p>
+
+<p><code>    </code><code>}</code></p>
+
+<p><code>}</code></p>
+</td>
+</tr>
+</tbody>
+</table>
+
+<p>　　反编译字节码文件得到：</p>
+
+<p>　　<img alt="" src="https://images0.cnblogs.com/i/288799/201406/091109234836868.jpg" /></p>
+
+<p>　　从这里可以明显看出，这段代码的for循环式从13行开始到27行结束，并且new操作只进行了一次，也就是说只生成了一个对象，append操作是在原有对象的基础上进行的。因此在循环了10000次之后，这段代码所占的资源要比上面小得多。</p>
+
+<p>　　那么有人会问既然有了StringBuilder类，为什么还需要StringBuffer类？查看源代码便一目了然，事实上，StringBuilder和StringBuffer类拥有的成员属性以及成员方法基本相同，区别是StringBuffer类的成员方法前面多了一个关键字：synchronized，不用多说，这个关键字是在多线程访问时起到安全保护作用的,也就是说StringBuffer是线程安全的。</p>
+
+<p>　　下面摘了2段代码分别来自StringBuffer和StringBuilder，insert方法的具体实现：</p>
+
+<p>　　StringBuilder的insert方法</p>
+
+<table border="0" cellpadding="0" cellspacing="0">
+<tbody>
+<tr>
+<td>
+<p>1</p>
+
+<p>2</p>
+
+<p>3</p>
+
+<p>4</p>
+
+<p>5</p>
+
+<p>6</p>
+</td>
+<td>
+<p><code>public</code> <code>StringBuilder insert(</code><code>int</code> <code>index, </code><code>char</code> <code>str[], </code><code>int</code> <code>offset,</code></p>
+
+<p><code>                              </code><code>int</code> <code>len)</code></p>
+
+<p><code>  </code><code>{</code></p>
+
+<p><code>      </code><code>super</code><code>.insert(index, str, offset, len);</code></p>
+
+<p><code>  </code><code>return</code> <code>this</code><code>;</code></p>
+
+<p><code>  </code><code>}</code></p>
+</td>
+</tr>
+</tbody>
+</table>
+
+<p>　　StringBuffer的insert方法：</p>
+
+<table border="0" cellpadding="0" cellspacing="0">
+<tbody>
+<tr>
+<td>
+<p>1</p>
+
+<p>2</p>
+
+<p>3</p>
+
+<p>4</p>
+
+<p>5</p>
+
+<p>6</p>
+</td>
+<td>
+<p><code>public</code> <code>synchronized</code> <code>StringBuffer insert(</code><code>int</code> <code>index, </code><code>char</code> <code>str[], </code><code>int</code> <code>offset,</code></p>
+
+<p><code>                                            </code><code>int</code> <code>len)</code></p>
+
+<p><code>    </code><code>{</code></p>
+
+<p><code>        </code><code>super</code><code>.insert(index, str, offset, len);</code></p>
+
+<p><code>        </code><code>return</code> <code>this</code><code>;</code></p>
+
+<p><code>    </code><code>}</code></p>
+</td>
+</tr>
+</tbody>
+</table>
+
+<h2>三.不同场景下三个类的性能测试</h2>
+
+<p>　　从第二节我们已经看出了三个类的区别，这一小节我们来做个小测试，来测试一下三个类的性能区别：</p>
+
+<table border="0" cellpadding="0" cellspacing="0">
+<tbody>
+<tr>
+<td>
+<p>1</p>
+
+<p>2</p>
+
+<p>3</p>
+
+<p>4</p>
+
+<p>5</p>
+
+<p>6</p>
+
+<p>7</p>
+
+<p>8</p>
+
+<p>9</p>
+
+<p>10</p>
+
+<p>11</p>
+
+<p>12</p>
+
+<p>13</p>
+
+<p>14</p>
+
+<p>15</p>
+
+<p>16</p>
+
+<p>17</p>
+
+<p>18</p>
+
+<p>19</p>
+
+<p>20</p>
+
+<p>21</p>
+
+<p>22</p>
+
+<p>23</p>
+
+<p>24</p>
+
+<p>25</p>
+
+<p>26</p>
+
+<p>27</p>
+
+<p>28</p>
+
+<p>29</p>
+
+<p>30</p>
+
+<p>31</p>
+
+<p>32</p>
+
+<p>33</p>
+
+<p>34</p>
+
+<p>35</p>
+
+<p>36</p>
+
+<p>37</p>
+
+<p>38</p>
+
+<p>39</p>
+
+<p>40</p>
+
+<p>41</p>
+
+<p>42</p>
+
+<p>43</p>
+
+<p>44</p>
+
+<p>45</p>
+
+<p>46</p>
+
+<p>47</p>
+
+<p>48</p>
+
+<p>49</p>
+
+<p>50</p>
+
+<p>51</p>
+
+<p>52</p>
+
+<p>53</p>
+
+<p>54</p>
+
+<p>55</p>
+
+<p>56</p>
+
+<p>57</p>
+
+<p>58</p>
+
+<p>59</p>
+
+<p>60</p>
+
+<p>61</p>
+
+<p>62</p>
+
+<p>63</p>
+</td>
+<td>
+<p><code>public</code> <code>class</code> <code>Main {</code></p>
+
+<p><code>    </code><code>private</code> <code>static</code> <code>int</code> <code>time = </code><code>50000</code><code>;</code></p>
+
+<p><code>    </code><code>public</code> <code>static</code> <code>void</code> <code>main(String[] args) {</code></p>
+
+<p><code>        </code><code>testString();</code></p>
+
+<p><code>        </code><code>testStringBuffer();</code></p>
+
+<p><code>        </code><code>testStringBuilder();</code></p>
+
+<p><code>        </code><code>test1String();</code></p>
+
+<p><code>        </code><code>test2String();</code></p>
+
+<p><code>    </code><code>}</code></p>
+
+<p><code>    </code> </p>
+
+<p><code>    </code> </p>
+
+<p><code>    </code><code>public</code> <code>static</code> <code>void</code> <code>testString () {</code></p>
+
+<p><code>        </code><code>String s=</code><code>""</code><code>;</code></p>
+
+<p><code>        </code><code>long</code> <code>begin = System.currentTimeMillis();</code></p>
+
+<p><code>        </code><code>for</code><code>(</code><code>int</code> <code>i=</code><code>0</code><code>; i<time; i++){</code></p>
+
+<p><code>            </code><code>s += </code><code>"java"</code><code>;</code></p>
+
+<p><code>        </code><code>}</code></p>
+
+<p><code>        </code><code>long</code> <code>over = System.currentTimeMillis();</code></p>
+
+<p><code>        </code><code>System.out.println(</code><code>"操作"</code><code>+s.getClass().getName()+</code><code>"类型使用的时间为："</code><code>+(over-begin)+</code><code>"毫秒"</code><code>);</code></p>
+
+<p><code>    </code><code>}</code></p>
+
+<p><code>    </code> </p>
+
+<p><code>    </code><code>public</code> <code>static</code> <code>void</code> <code>testStringBuffer () {</code></p>
+
+<p><code>        </code><code>StringBuffer sb = </code><code>new</code> <code>StringBuffer();</code></p>
+
+<p><code>        </code><code>long</code> <code>begin = System.currentTimeMillis();</code></p>
+
+<p><code>        </code><code>for</code><code>(</code><code>int</code> <code>i=</code><code>0</code><code>; i<time; i++){</code></p>
+
+<p><code>            </code><code>sb.append(</code><code>"java"</code><code>);</code></p>
+
+<p><code>        </code><code>}</code></p>
+
+<p><code>        </code><code>long</code> <code>over = System.currentTimeMillis();</code></p>
+
+<p><code>        </code><code>System.out.println(</code><code>"操作"</code><code>+sb.getClass().getName()+</code><code>"类型使用的时间为："</code><code>+(over-begin)+</code><code>"毫秒"</code><code>);</code></p>
+
+<p><code>    </code><code>}</code></p>
+
+<p><code>    </code> </p>
+
+<p><code>    </code><code>public</code> <code>static</code> <code>void</code> <code>testStringBuilder () {</code></p>
+
+<p><code>        </code><code>StringBuilder sb = </code><code>new</code> <code>StringBuilder();</code></p>
+
+<p><code>        </code><code>long</code> <code>begin = System.currentTimeMillis();</code></p>
+
+<p><code>        </code><code>for</code><code>(</code><code>int</code> <code>i=</code><code>0</code><code>; i<time; i++){</code></p>
+
+<p><code>            </code><code>sb.append(</code><code>"java"</code><code>);</code></p>
+
+<p><code>        </code><code>}</code></p>
+
+<p><code>        </code><code>long</code> <code>over = System.currentTimeMillis();</code></p>
+
+<p><code>        </code><code>System.out.println(</code><code>"操作"</code><code>+sb.getClass().getName()+</code><code>"类型使用的时间为："</code><code>+(over-begin)+</code><code>"毫秒"</code><code>);</code></p>
+
+<p><code>    </code><code>}</code></p>
+
+<p><code>    </code> </p>
+
+<p><code>    </code><code>public</code> <code>static</code> <code>void</code> <code>test1String () {</code></p>
+
+<p><code>        </code><code>long</code> <code>begin = System.currentTimeMillis();</code></p>
+
+<p><code>        </code><code>for</code><code>(</code><code>int</code> <code>i=</code><code>0</code><code>; i<time; i++){</code></p>
+
+<p><code>            </code><code>String s = </code><code>"I"</code><code>+</code><code>"love"</code><code>+</code><code>"java"</code><code>;</code></p>
+
+<p><code>        </code><code>}</code></p>
+
+<p><code>        </code><code>long</code> <code>over = System.currentTimeMillis();</code></p>
+
+<p><code>        </code><code>System.out.println(</code><code>"字符串直接相加操作："</code><code>+(over-begin)+</code><code>"毫秒"</code><code>);</code></p>
+
+<p><code>    </code><code>}</code></p>
+
+<p><code>    </code> </p>
+
+<p><code>    </code><code>public</code> <code>static</code> <code>void</code> <code>test2String () {</code></p>
+
+<p><code>        </code><code>String s1 =</code><code>"I"</code><code>;</code></p>
+
+<p><code>        </code><code>String s2 = </code><code>"love"</code><code>;</code></p>
+
+<p><code>        </code><code>String s3 = </code><code>"java"</code><code>;</code></p>
+
+<p><code>        </code><code>long</code> <code>begin = System.currentTimeMillis();</code></p>
+
+<p><code>        </code><code>for</code><code>(</code><code>int</code> <code>i=</code><code>0</code><code>; i<time; i++){</code></p>
+
+<p><code>            </code><code>String s = s1+s2+s3;</code></p>
+
+<p><code>        </code><code>}</code></p>
+
+<p><code>        </code><code>long</code> <code>over = System.currentTimeMillis();</code></p>
+
+<p><code>        </code><code>System.out.println(</code><code>"字符串间接相加操作："</code><code>+(over-begin)+</code><code>"毫秒"</code><code>);</code></p>
+
+<p><code>    </code><code>}</code></p>
+
+<p><code>    </code> </p>
+
+<p><code>}</code></p>
+</td>
+</tr>
+</tbody>
+</table>
+
+<p>　　测试结果（win7，Eclipse，JDK6)：</p>
+
+<p>　　<img alt="" src="https://images0.cnblogs.com/i/288799/201406/091146517809267.jpg" /></p>
+
+<p>　　上面提到string+="hello"的操作事实上会自动被JVM优化，看下面这段代码：</p>
+
+<table border="0" cellpadding="0" cellspacing="0">
+<tbody>
+<tr>
+<td>
+<p>1</p>
+
+<p>2</p>
+
+<p>3</p>
+
+<p>4</p>
+
+<p>5</p>
+
+<p>6</p>
+
+<p>7</p>
+
+<p>8</p>
+
+<p>9</p>
+
+<p>10</p>
+
+<p>11</p>
+
+<p>12</p>
+
+<p>13</p>
+
+<p>14</p>
+
+<p>15</p>
+
+<p>16</p>
+
+<p>17</p>
+
+<p>18</p>
+
+<p>19</p>
+
+<p>20</p>
+
+<p>21</p>
+
+<p>22</p>
+
+<p>23</p>
+
+<p>24</p>
+
+<p>25</p>
+
+<p>26</p>
+
+<p>27</p>
+
+<p>28</p>
+
+<p>29</p>
+
+<p>30</p>
+
+<p>31</p>
+
+<p>32</p>
+</td>
+<td>
+<p><code>public</code> <code>class</code> <code>Main {</code></p>
+
+<p><code>    </code><code>private</code> <code>static</code> <code>int</code> <code>time = </code><code>50000</code><code>;</code></p>
+
+<p><code>    </code><code>public</code> <code>static</code> <code>void</code> <code>main(String[] args) {</code></p>
+
+<p><code>        </code><code>testString();</code></p>
+
+<p><code>        </code><code>testOptimalString();</code></p>
+
+<p><code>    </code><code>}</code></p>
+
+<p><code>    </code> </p>
+
+<p><code>    </code> </p>
+
+<p><code>    </code><code>public</code> <code>static</code> <code>void</code> <code>testString () {</code></p>
+
+<p><code>        </code><code>String s=</code><code>""</code><code>;</code></p>
+
+<p><code>        </code><code>long</code> <code>begin = System.currentTimeMillis();</code></p>
+
+<p><code>        </code><code>for</code><code>(</code><code>int</code> <code>i=</code><code>0</code><code>; i<time; i++){</code></p>
+
+<p><code>            </code><code>s += </code><code>"java"</code><code>;</code></p>
+
+<p><code>        </code><code>}</code></p>
+
+<p><code>        </code><code>long</code> <code>over = System.currentTimeMillis();</code></p>
+
+<p><code>        </code><code>System.out.println(</code><code>"操作"</code><code>+s.getClass().getName()+</code><code>"类型使用的时间为："</code><code>+(over-begin)+</code><code>"毫秒"</code><code>);</code></p>
+
+<p><code>    </code><code>}</code></p>
+
+<p><code>    </code> </p>
+
+<p><code>    </code><code>public</code> <code>static</code> <code>void</code> <code>testOptimalString () {</code></p>
+
+<p><code>        </code><code>String s=</code><code>""</code><code>;</code></p>
+
+<p><code>        </code><code>long</code> <code>begin = System.currentTimeMillis();</code></p>
+
+<p><code>        </code><code>for</code><code>(</code><code>int</code> <code>i=</code><code>0</code><code>; i<time; i++){</code></p>
+
+<p><code>            </code><code>StringBuilder sb = </code><code>new</code> <code>StringBuilder(s);</code></p>
+
+<p><code>            </code><code>sb.append(</code><code>"java"</code><code>);</code></p>
+
+<p><code>            </code><code>s=sb.toString();</code></p>
+
+<p><code>        </code><code>}</code></p>
+
+<p><code>        </code><code>long</code> <code>over = System.currentTimeMillis();</code></p>
+
+<p><code>        </code><code>System.out.println(</code><code>"模拟JVM优化操作的时间为："</code><code>+(over-begin)+</code><code>"毫秒"</code><code>);</code></p>
+
+<p><code>    </code><code>}</code></p>
+
+<p><code>    </code> </p>
+
+<p><code>}</code></p>
+
+<p><code>   </code> </p>
+</td>
+</tr>
+</tbody>
+</table>
+
+<p>　　执行结果：</p>
+
+<p>　　<img alt="" src="https://images0.cnblogs.com/i/288799/201406/091151335303258.jpg" /></p>
+
+<p>　　得到验证。</p>
+
+<p>　　下面对上面的执行结果进行一般性的解释：</p>
+
+<p>　　1）对于直接相加字符串，效率很高，因为在编译器便确定了它的值，也就是说形如"I"+"love"+"java"; 的字符串相加，在编译期间便被优化成了"Ilovejava"。这个可以用javap -c命令反编译生成的class文件进行验证。</p>
+
+<p>　　对于间接相加（即包含字符串引用），形如s1+s2+s3; 效率要比直接相加低，因为在编译器不会对引用变量进行优化。</p>
+
+<p>　　2）String、StringBuilder、StringBuffer三者的执行效率：</p>
+
+<p>　　StringBuilder > StringBuffer > String</p>
+
+<p>　　当然这个是相对的，不一定在所有情况下都是这样。</p>
+
+<p>　　比如String str = "hello"+ "world"的效率就比 StringBuilder st  = new StringBuilder().append("hello").append("world")要高。</p>
+
+<p>　　因此，这三个类是各有利弊，应当根据不同的情况来进行选择使用：</p>
+
+<p>　　当字符串相加操作或者改动较少的情况下，建议使用 String str="hello"这种形式；</p>
+
+<p>　　当字符串相加操作较多的情况下，建议使用StringBuilder，如果采用了多线程，则使用StringBuffer。</p>
+
+<p> </p>
+
+<h2>四.常见的关于String、StringBuffer的面试题</h2>
+
+<p>　　下面是一些常见的关于String、StringBuffer的一些面试笔试题，若有不正之处，请谅解和批评指正。</p>
+
+<p>1. 下面这段代码的输出结果是什么？</p>
+
+<p>　　String a = "hello2"; 　　String b = "hello" + 2; 　　System.out.println((a == b));</p>
+
+<p>　　输出结果为：true。原因很简单，"hello"+2在编译期间就已经被优化成"hello2"，因此在运行期间，变量a和变量b指向的是同一个对象。</p>
+
+<p>2.下面这段代码的输出结果是什么？</p>
+
+<p>　　String a = "hello2"; 　  String b = "hello";       String c = b + 2;       System.out.println((a == c));</p>
+
+<p>　　输出结果为:false。由于有符号引用的存在，所以  String c = b + 2;不会在编译期间被优化，不会把b+2当做字面常量来处理的，因此这种方式生成的对象事实上是保存在堆上的。因此a和c指向的并不是同一个对象。javap -c得到的内容：</p>
+
+<p>　　<img alt="" src="https://images0.cnblogs.com/i/288799/201406/091527127176464.jpg" /></p>
+
+<p>3.下面这段代码的输出结果是什么？</p>
+
+<p>　　String a = "hello2";   　 final String b = "hello";       String c = b + 2;       System.out.println((a == c));</p>
+
+<p>　　输出结果为：true。对于被final修饰的变量，会在class文件常量池中保存一个副本，也就是说不会通过连接而进行访问，对final变量的访问在编译期间都会直接被替代为真实的值。那么String c = b + 2;在编译期间就会被优化成：String c = "hello" + 2; 下图是javap -c的内容：</p>
+
+<p>　　<img alt="" src="https://images0.cnblogs.com/i/288799/201406/091529124671347.jpg" /></p>
+
+<p>4.下面这段代码输出结果为：</p>
+
+<table border="0" cellpadding="0" cellspacing="0">
+<tbody>
+<tr>
+<td>
+<p>1</p>
+
+<p>2</p>
+
+<p>3</p>
+
+<p>4</p>
+
+<p>5</p>
+
+<p>6</p>
+
+<p>7</p>
+
+<p>8</p>
+
+<p>9</p>
+
+<p>10</p>
+
+<p>11</p>
+
+<p>12</p>
+</td>
+<td>
+<p><code>public</code> <code>class</code> <code>Main {</code></p>
+
+<p><code>    </code><code>public</code> <code>static</code> <code>void</code> <code>main(String[] args) {</code></p>
+
+<p><code>        </code><code>String a = </code><code>"hello2"</code><code>;</code></p>
+
+<p><code>        </code><code>final</code> <code>String b = getHello();</code></p>
+
+<p><code>        </code><code>String c = b + </code><code>2</code><code>;</code></p>
+
+<p><code>        </code><code>System.out.println((a == c));</code></p>
+
+<p><code>    </code><code>}</code></p>
+
+<p><code>    </code> </p>
+
+<p><code>    </code><code>public</code> <code>static</code> <code>String getHello() {</code></p>
+
+<p><code>        </code><code>return</code> <code>"hello"</code><code>;</code></p>
+
+<p><code>    </code><code>}</code></p>
+
+<p><code>}</code></p>
+</td>
+</tr>
+</tbody>
+</table>
+
+<p>　　输出结果为false。这里面虽然将b用final修饰了，但是由于其赋值是通过方法调用返回的，那么它的值只能在运行期间确定，因此a和c指向的不是同一个对象。</p>
+
+<p>5.下面这段代码的输出结果是什么？</p>
+
+<table border="0" cellpadding="0" cellspacing="0">
+<tbody>
+<tr>
+<td>
+<p>1</p>
+
+<p>2</p>
+
+<p>3</p>
+
+<p>4</p>
+
+<p>5</p>
+
+<p>6</p>
+
+<p>7</p>
+
+<p>8</p>
+
+<p>9</p>
+
+<p>10</p>
+
+<p>11</p>
+
+<p>12</p>
+
+<p>13</p>
+</td>
+<td>
+<p><code>public</code> <code>class</code> <code>Main {</code></p>
+
+<p><code>    </code><code>public</code> <code>static</code> <code>void</code> <code>main(String[] args) {</code></p>
+
+<p><code>        </code><code>String a = </code><code>"hello"</code><code>;</code></p>
+
+<p><code>        </code><code>String b =  </code><code>new</code> <code>String(</code><code>"hello"</code><code>);</code></p>
+
+<p><code>        </code><code>String c =  </code><code>new</code> <code>String(</code><code>"hello"</code><code>);</code></p>
+
+<p><code>        </code><code>String d = b.intern();</code></p>
+
+<p><code>        </code> </p>
+
+<p><code>        </code><code>System.out.println(a==b);</code></p>
+
+<p><code>        </code><code>System.out.println(b==c);</code></p>
+
+<p><code>        </code><code>System.out.println(b==d);</code></p>
+
+<p><code>        </code><code>System.out.println(a==d);</code></p>
+
+<p><code>    </code><code>}</code></p>
+
+<p><code>}</code></p>
+</td>
+</tr>
+</tbody>
+</table>
+
+<p>　　输出结果为（JDK版本 JDK6)：</p>
+
+<p>　　<img alt="" src="https://images0.cnblogs.com/i/288799/201406/091536144056475.jpg" /></p>
+
+<p>　　这里面涉及到的是String.intern方法的使用。在String类中，intern方法是一个本地方法，在JAVA SE6之前，intern方法会在运行时常量池中查找是否存在内容相同的字符串，如果存在则返回指向该字符串的引用，如果不存在，则会将该字符串入池，并返回一个指向该字符串的引用。因此，a和d指向的是同一个对象。</p>
+
+<p>6.String str = new String("abc")创建了多少个对象？</p>
+
+<p>　　这个问题在很多书籍上都有说到比如《Java程序员面试宝典》，包括很多国内大公司笔试面试题都会遇到，大部分网上流传的以及一些面试书籍上都说是2个对象，这种说法是片面的。</p>
+
+<p>　　如果有不懂得地方可以参考这篇帖子：</p>
+
+<p>　　<a href="http://rednaxelafx.iteye.com/blog/774673/">http://rednaxelafx.iteye.com/blog/774673/</a></p>
+
+<p>　　首先必须弄清楚创建对象的含义，创建是什么时候创建的？这段代码在运行期间会创建2个对象么？毫无疑问不可能，用javap -c反编译即可得到JVM执行的字节码内容：</p>
+
+<p>　　<img alt="" src="https://images0.cnblogs.com/i/288799/201406/091709344832053.jpg" /></p>
+
+<p>　　很显然，new只调用了一次，也就是说只创建了一个对象。</p>
+
+<p>　　而这道题目让人混淆的地方就是这里，这段代码在运行期间确实只创建了一个对象，即在堆上创建了"abc"对象。而为什么大家都在说是2个对象呢，这里面要澄清一个概念  该段代码执行过程和类的加载过程是有区别的。在类加载的过程中，确实在运行时常量池中创建了一个"abc"对象，而在代码执行过程中确实只创建了一个String对象。</p>
+
+<p>　　因此，这个问题如果换成 String str = new String("abc")涉及到几个String对象？合理的解释是2个。</p>
+
+<p>　　个人觉得在面试的时候如果遇到这个问题，可以向面试官询问清楚”是这段代码执行过程中创建了多少个对象还是涉及到多少个对象“再根据具体的来进行回答。</p>
+
+<p>7.下面这段代码1）和2）的区别是什么？</p>
+
+<table border="0" cellpadding="0" cellspacing="0">
+<tbody>
+<tr>
+<td>
+<p>1</p>
+
+<p>2</p>
+
+<p>3</p>
+
+<p>4</p>
+
+<p>5</p>
+
+<p>6</p>
+
+<p>7</p>
+
+<p>8</p>
+</td>
+<td>
+<p><code>public</code> <code>class</code> <code>Main {</code></p>
+
+<p><code>    </code><code>public</code> <code>static</code> <code>void</code> <code>main(String[] args) {</code></p>
+
+<p><code>        </code><code>String str1 = </code><code>"I"</code><code>;</code></p>
+
+<p><code>        </code><code>//str1 += "love"+"java";        1)</code></p>
+
+<p><code>        </code><code>str1 = str1+</code><code>"love"</code><code>+</code><code>"java"</code><code>;      </code><code>//2)</code></p>
+
+<p><code>        </code> </p>
+
+<p><code>    </code><code>}</code></p>
+
+<p><code>}</code></p>
+</td>
+</tr>
+</tbody>
+</table>
+
+<p>　　1）的效率比2）的效率要高，1）中的"love"+"java"在编译期间会被优化成"lovejava"，而2）中的不会被优化。下面是两种方式的字节码：</p>
+
+<p>　　1）的字节码：</p>
+
+<p>　　<img alt="" src="https://images0.cnblogs.com/i/288799/201406/092017165925249.jpg" /></p>
+
+<p>　　2）的字节码：</p>
+
+<p>　　<img alt="" src="https://images0.cnblogs.com/i/288799/201406/092017552494106.jpg" /></p>
+
+<p>　　可以看出，在1）中只进行了一次append操作，而在2）中进行了两次append操作。</p>
+
+<p> </p>
+
+<h1><a href="https://www.cnblogs.com/xingzc/p/6277581.html" id="cb_post_title_url">String,StringBuffer与StringBuilder的区别|线程安全与线程不安全</a></h1>
+
+<p><strong>String 字符串常量<br />
+StringBuffer 字符串变量（线程安全）<br />
+StringBuilder 字符串变量（非线程安全）</strong></p>
+
+<p> 简要的说， String 类型和 StringBuffer 类型的主要性能区别其实在于 String 是不可变的对象, 因此在每次对 String 类型进行改变的时候其实都等同于生成了一个新的 String 对象，然后将指针指向新的 String 对象，所以经常改变内容的字符串最好不要用 String ，因为每次生成对象都会对系统性能产生影响，特别当内存中无引用对象多了以后， JVM 的 GC 就会开始工作，那速度是一定会相当慢的。<br />
+ 而如果是使用 StringBuffer 类则结果就不一样了，每次结果都会对 StringBuffer 对象本身进行操作，而不是生成新的对象，再改变对象引用。所以在一般情况下我们推荐使用 StringBuffer ，特别是字符串对象经常改变的情况下。而在某些特别情况下， String 对象的字符串拼接其实是被 JVM 解释成了 StringBuffer 对象的拼接，所以这些时候 String 对象的速度并不会比 StringBuffer 对象慢，而特别是以下的字符串对象生成中， String 效率是远要比 StringBuffer 快的：<br />
+ String S1 = “This is only a” + “ simple” + “ test”;<br />
+ StringBuffer Sb = new StringBuilder(“This is only a”).append(“ simple”).append(“ test”);<br />
+ 你会很惊讶的发现，生成 String S1 对象的速度简直太快了，而这个时候 StringBuffer 居然速度上根本一点都不占优势。其实这是 JVM 的一个把戏，在 JVM 眼里，这个<br />
+ String S1 = “This is only a” + “ simple” + “test”; 其实就是：<br />
+ String S1 = “This is only a simple test”; 所以当然不需要太多的时间了。但大家这里要注意的是，如果你的字符串是来自另外的 String 对象的话，速度就没那么快了，譬如：<br />
+String S2 = “This is only a”;<br />
+String S3 = “ simple”;<br />
+String S4 = “ test”;<br />
+String S1 = S2 +S3 + S4;<br />
+这时候 JVM 会规规矩矩的按照原来的方式去做</p>
+
+<p><br />
+在大部分情况下 StringBuffer > String<br />
+<strong>StringBuffer</strong><br />
+Java.lang.StringBuffer线程安全的可变字符序列。一个类似于 String 的字符串缓冲区，但不能修改。虽然在任意时间点上它都包含某种特定的字符序列，但通过某些方法调用可以改变该序列的长度和内容。<br />
+可将字符串缓冲区安全地用于多个线程。可以在必要时对这些方法进行同步，因此任意特定实例上的所有操作就好像是以串行顺序发生的，该顺序与所涉及的每个线程进行的方法调用顺序一致。<br />
+StringBuffer 上的主要操作是 append 和 insert 方法，可重载这些方法，以接受任意类型的数据。每个方法都能有效地将给定的数据转换成字符串，然后将该字符串的字符追加或插入到字符串缓冲区中。append 方法始终将这些字符添加到缓冲区的末端；而 insert 方法则在指定的点添加字符。<br />
+例如，如果 z 引用一个当前内容是“start”的字符串缓冲区对象，则此方法调用 z.append("le") 会使字符串缓冲区包含“startle”，而 z.insert(4, "le") 将更改字符串缓冲区，使之包含“starlet”。<br />
+在大部分情况下 StringBuilder > StringBuffer</p>
+
+<p><strong>java.lang.StringBuilde</strong><br />
+java.lang.StringBuilder一个可变的字符序列是5.0新增的。此类提供一个与 StringBuffer 兼容的 API，但不保证同步。该类被设计用作 StringBuffer 的一个简易替换，用在字符串缓冲区被单个线程使用的时候（这种情况很普遍）。如果可能，建议优先采用该类，因为在大多数实现中，它比 StringBuffer 要快。两者的方法基本相同。</p>
+
+<p>关于线程和线程不安全：</p>
+
+<h2>概述</h2>
+
+<p>编辑</p>
+
+<p>如果你的代码所在的进程中有多个线程在同时运行，而这些线程可能会同时运行这段代码。如果每次运行结果和<a href="http://baike.baidu.com/view/2554947.htm" target="_blank">单线程</a>运行的结果是一样的，而且其他的变量的值也和预期的是一样的，就是线程安全的。</p>
+
+<p>或者说:一个类或者程序所提供的接口对于线程来说是<a href="http://baike.baidu.com/view/809659.htm" target="_blank">原子操作</a>或者多个线程之间的切换不会导致该接口的执行结果存在二义性,也就是说我们不用考虑同步的问题。</p>
+
+<p>线程安全问题都是由<a href="http://baike.baidu.com/view/261041.htm" target="_blank">全局变量</a>及<a href="http://baike.baidu.com/view/675642.htm" target="_blank">静态变量</a>引起的。</p>
+
+<p>若每个线程中对全局变量、静态变量只有读操作，而无写操作，一般来说，这个全局变量是线程安全的；若有多个线程同时执行写操作，一般都需要考虑<a href="http://baike.baidu.com/view/6501899.htm" target="_blank">线程同步</a>，否则的话就可能影响线程安全。<a name="安全性"></a></p>
+
+<h2>安全性</h2>
+
+<p>编辑</p>
+
+<p>类要成为线程安全的，首先必须在<a href="http://baike.baidu.com/view/2554947.htm" target="_blank">单线程</a>环境中有正确的行为。如果一个类实现正确(这是说它符合规格说明的另一种方式)，那么没有一种对这个类的对象的操作序列(读或者写公共字段以及调用公共方法)可以让对象处于无效状态，观察到对象处于无效状态、或者违反类的任何不可变量、前置条件或者后置条件的情况。</p>
+
+<p>此外，一个类要<a href="http://baike.baidu.com/view/1720027.htm" target="_blank">成为</a>线程安全的，在被多个线程访问时，不管运行时环境执行这些线程有什么样的时序安排或者交错，它必须仍然有如上所述的正确行为，并且在调用的代码中没有任何额外的同步。其效果就是，在所有线程看来，对于线程安全对象的操作是以固定的、全局一致的顺序发生的。</p>
+
+<p>正确性与<a href="http://baike.baidu.com/view/1302402.htm" target="_blank">线程安全性</a>之间的关系非常类似于在描述 ACID(原子性、一致性、独立性和持久性)<a href="http://baike.baidu.com/view/121511.htm" target="_blank">事务</a>时使用的一致性与独立性之间的关系：从特定线程的角度看，由不同线程所执行的对象操作是先后(虽然顺序不定)而不是<a href="http://baike.baidu.com/view/160033.htm" target="_blank">并行执行</a>的。</p>
+
+<h2>举例</h2>
+
+<p>比如一个 ArrayList 类，在添加一个元素的时候，它可能会有两步来完成：1. 在 Items[Size] 的位置存放此元素；2. 增大 Size 的值。</p>
+
+<p>在<a href="http://baike.baidu.com/view/2554947.htm" target="_blank">单线程</a>运行的情况下，如果 Size = 0，添加一个元素后，此元素在位置 0，而且 Size=1；</p>
+
+<p>而如果是在多线程情况下，比如有两个线程，线程 A 先将元素存放在位置 0。但是此时 CPU 调度线程A暂停，线程 B 得到运行的机会。线程B也向此 ArrayList 添加元素，因为此时 Size 仍然等于 0 （注意哦，我们假设的是添加一个元素是要两个步骤哦，而线程A仅仅完成了步骤1），所以线程B也将元素存放在位置0。然后线程A和线程B都继续运行，都增加 Size 的值。</p>
+
+<p>那好，我们来看看 ArrayList 的情况，元素实际上只有一个，存放在位置 0，而 Size 却等于 2。这就是“线程不安全”了。</p>
+
+<h2>安全程度</h2>
+
+<p><a href="http://baike.baidu.com/view/1302402.htm" target="_blank">线程安全性</a>不是一个非真即假的命题。 Vector 的方法都是同步的，并且 Vector 明确地设计为在多线程环境中工作。但是它的线程安全性是有限制的，即在某些方法之间有状态依赖(类似地，如果在迭代过程中 Vector 被其他线程修改，那么由 Vector.iterator() 返回的 iterator会抛出ConcurrentModificationException)。</p>
+
+<p>对于 Java 类中常见的线程安全性级别，没有一种<a href="http://baike.baidu.com/view/509073.htm" target="_blank">分类系统</a>可被广泛接受，不过重要的是在编写类时尽量记录下它们的线程安全行为。</p>
+
+<p>Bloch 给出了描述五类线程安全性的分类方法：不可变、线程安全、有条件线程安全、线程兼容和线程对立。只要明确地记录下线程安全特性，那么您是否使用这种系统都没关系。这种系统有其局限性 -- 各类之间的界线不是百分之百地明确，而且有些情况它没照顾到 -- 但是这套系统是一个很好的起点。这种分类系统的核心是调用者是否可以或者必须用外部同步包围操作(或者一系列操作)。下面几节分别描述了<a href="http://baike.baidu.com/view/1302402.htm" target="_blank">线程安全性</a>的这五种类别。</p>
+
+<p>不可变</p>
+
+<p>不可变的对象一定是线程安全的，并且永远也不需要额外的同步<sup>[1]</sup><a name="ref_[1]_1298606"></a> 。因为一个不可变的对象只要构建正确，其外部可见状态永远也不会改变，永远也不会看到它处于不一致的状态。Java 类库中大多数基本数值类如 Integer 、 String 和 BigInteger 都是不可变的。</p>
+
+<p>需要注意的是，对于Integer，该类不提供add方法，加法是使用+来直接操作。而+操作是不具线程安全的。这是提供原子操作类AtomicInteger的原因。</p>
+
+<p>线程安全</p>
+
+<p>线程安全的对象具有在上面“线程安全”一节中描述的属性 -- 由类的规格说明所规定的约束在对象被多个线程访问时仍然有效，不管运行时环境如何排列，线程都不需要任何额外的同步。这种<a href="http://baike.baidu.com/view/1302402.htm" target="_blank">线程安全性</a>保证是很严格的 -- 许多类，如 Hashtable 或者 Vector 都不能满足这种严格的定义。</p>
+
+<p>有条件的</p>
+
+<p>有条件的线程安全类对于单独的操作可以是线程安全的，但是某些操作序列可能需要外部同步。条件线程安全的最常见的例子是遍历由 Hashtable 或者 Vector 或者返回的<a href="http://baike.baidu.com/view/925158.htm" target="_blank">迭代器</a> -- 由这些类返回的 fail-fast 迭代器假定在迭代器进行遍历的时候底层集合不会有变化。为了保证其他线程不会在遍历的时候改变集合，进行迭代的线程应该确保它是独占性地访问集合以实现遍历的完整性。通常，独占性的访问是由对锁的同步保证的 -- 并且类的文档应该说明是哪个锁(通常是对象的内部监视器(intrinsic monitor))。</p>
+
+<p>如果对一个有条件线程安全类进行记录，那么您应该不仅要记录它是有条件线程安全的，而且还要记录必须防止哪些操作序列的并发访问。用户可以合理地假设其他操作序列不需要任何额外的同步。</p>
+
+<p>线程兼容</p>
+
+<p>线程兼容类不是线程安全的，但是可以通过正确使用同步而在并发环境中安全地使用。这可能意味着用一个 synchronized 块包围每一个方法调用，或者创建一个包装器对象，其中每一个方法都是同步的(就像 Collections.synchronizedList() 一样)。也可能意味着用 synchronized 块包围某些操作序列。为了最大程度地利用线程兼容类，如果所有调用都使用同一个块，那么就不应该要求调用者对该块同步。这样做会使线程兼容的对象作为变量实例包含在其他线程安全的对象中，从而可以利用其所有者对象的同步。</p>
+
+<p>许多常见的类是线程兼容的，如集合类 ArrayList 和 HashMap 、 java.text.SimpleDateFormat 、或者 JDBC 类 Connection 和 ResultSet 。</p>
+
+<p>线程对立</p>
+
+<p>线程对立类是那些不管是否调用了外部同步都不能在并发使用时安全地呈现的类。线程对立很少见，当类修改静态数据，而静态数据会影响在其他线程中执行的其他类的行为，这时通常会出现线程对立。线程对立类的一个例子是调用 System.setOut() 的类。</p>

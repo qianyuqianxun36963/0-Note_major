@@ -1,0 +1,243 @@
+<h1>spring boot 集成mybatis</h1>
+
+<h2>第一步：基础配置</h2>
+
+<h3>1、添加依赖</h3>
+
+<pre>
+<dependency>
+<groupId>org.mybatis.spring.boot</groupId>
+<artifactId>mybatis-spring-boot-starter</artifactId>
+<version>1.3.2</version>
+</dependency>
+</pre>
+
+<h3>2、全局配置application.yml配置</h3>
+
+<p>mapper文件在哪里，就是在这里配置</p>
+
+<p>application.yml</p>
+
+<pre>
+mybatis:
+mapper-locations: <strong>classpath:mybatis/mapper/**/*.xml</strong>
+config-location: classpath:mybatis-config.xml
+configuration:
+log-impl: <span style="font-size:18px"><strong>org.apache.ibatis.logging.stdout.StdOutImpl</strong></span></pre>
+
+<p><strong>注：加粗的部分，是配置debug时打印日志。</strong></p>
+
+<h3>3、编写mapper.xml</h3>
+
+<p>然后在resource路径下根据路径加入相应的mapper.xml 文件，<span style="font-size:14px"><strong>注意目录层级！注意目录层级！注意目录层级！</strong></span></p>
+
+<h3>4、定义配置mybatis-config.xml(可选)</h3>
+
+<p>还可以再resource下添加mybatis的配置文件，mybatis-config.xml </p>
+
+<p><?xml version="1.0" encoding="UTF-8" ?><br />
+<!DOCTYPE configuration PUBLIC "-//mybatis.org//DTD Config 3.0//EN" "http://mybatis.org/dtd/mybatis-3-config.dtd"><br />
+<configuration><br />
+    <typeAliases><br />
+        <typeAlias alias="Integer" type="java.lang.Integer" /><br />
+        <typeAlias alias="Long" type="java.lang.Long" /><br />
+        <typeAlias alias="HashMap" type="java.util.HashMap" /><br />
+        <typeAlias alias="LinkedHashMap" type="java.util.LinkedHashMap" /><br />
+        <typeAlias alias="ArrayList" type="java.util.ArrayList" /><br />
+        <typeAlias alias="LinkedList" type="java.util.LinkedList" /><br />
+    </typeAliases><br />
+</configuration></p>
+
+<h3>5、mybatis配置mapperLocations多个路径(可选配置)</h3>
+
+<pre>
+<property name="mapperLocations">
+<array>
+<value>classpath*:/mybatis-config.xml</value>
+<value>classpath*:/com/**/sqlmap-*.xml</value>
+</array>
+</property>
+</pre>
+
+<pre>
+<bean id="sqlSessionFactory" class="org.mybatis.spring.SqlSessionFactoryBean">
+<property name="mapperLocations">
+<array>
+<value>classpath:mybatis/mapper/*.xml</value>
+<value>classpath:mybatis/mapper/database/*.xml</value>
+</array>
+</property>
+<property name="dataSource" ref="dataSource"/>
+<property name="configLocation" value="classpath:mybatis/config/mybatis-config.xml"/>
+</bean>
+</pre>
+
+<pre>
+<property name="mapperLocations" >
+<list>
+<value>classpath*:/sqlmap/*.xml</value>
+<value>classpath*:/test/*.xml</value>
+</list>
+</property></pre>
+
+<h2>第二步：编写xml文件</h2>
+
+<pre>
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="<strong>com.huawei.na.manager.mapper.UserMapper</strong>" >
+<resultMap id="BaseResultMap" type="com.huawei.na.manager.entity.UserEntity" >
+<id column="id" property="id" jdbcType="BIGINT" />
+<result column="userName" property="userName" jdbcType="VARCHAR" />
+<result column="passWord" property="passWord" jdbcType="VARCHAR" />
+<result column="user_sex" property="userSex" javaType="com.huawei.na.manager.enums.UserSexEnum"/>
+<result column="nick_name" property="nickName" jdbcType="VARCHAR" />
+</resultMap>
+
+<sql id="Base_Column_List" >
+id, userName, passWord, user_sex, nick_name
+</sql>
+
+<select id="getAll" resultMap="BaseResultMap" >
+SELECT 
+<include refid="Base_Column_List" />
+FROM users
+</select>
+
+<select id="getOne" parameterType="java.lang.Long" resultMap="BaseResultMap" >
+SELECT 
+<include refid="Base_Column_List" />
+FROM users
+WHERE id = #{id}
+</select>
+
+<insert id="insert" parameterType="com.huawei.na.manager.entity.UserEntity" >
+INSERT INTO 
+users
+(userName,passWord,user_sex) 
+VALUES
+(#{userName}, #{passWord}, #{userSex})
+</insert>
+
+<update id="update" parameterType="com.huawei.na.manager.entity.UserEntity" >
+UPDATE 
+users 
+SET 
+<if test="userName != null">userName = #{userName},</if>
+<if test="passWord != null">passWord = #{passWord},</if>
+nick_name = #{nickName}
+WHERE 
+id = #{id}
+</update>
+
+<delete id="delete" parameterType="java.lang.Long" >
+DELETE FROM
+users 
+WHERE 
+id =#{id}
+</delete>
+</mapper></pre>
+
+<h2>第三步：编写xml所对应的mapper类</h2>
+
+<pre>
+package com.huawei.na.manager.mapper;
+
+<strong>import com.huawei.na.manager.entity.UserEntity;</strong>
+import org.apache.ibatis.annotations.Mapper;
+
+import java.util.List;
+
+@Mapper
+public interface UserMapper {
+
+List<UserEntity> getAll();
+
+UserEntity getOne(Long id);
+
+void insert(UserEntity user);
+
+void update(UserEntity user);
+
+void delete(Long id);
+
+}</pre>
+
+<h2>第四步：如果有实体类，定义之</h2>
+
+<pre>
+package com.huawei.na.manager.entity;
+
+import com.huawei.na.manager.enums.UserSexEnum;
+
+import java.io.Serializable;
+
+public class UserEntity implements Serializable {
+
+private static final long serialVersionUID = 1L;
+private Long id;
+private String userName;
+private String passWord;
+private UserSexEnum userSex;
+private String nickName;
+
+public UserEntity() {
+super();
+}
+
+public UserEntity(String userName, String passWord, UserSexEnum userSex) {
+super();
+this.passWord = passWord;
+this.userName = userName;
+this.userSex = userSex;
+}
+
+public Long getId() {
+return id;
+}
+
+public void setId(Long id) {
+this.id = id;
+}
+
+public String getUserName() {
+return userName;
+}
+
+public void setUserName(String userName) {
+this.userName = userName;
+}
+
+public String getPassWord() {
+return passWord;
+}
+
+public void setPassWord(String passWord) {
+this.passWord = passWord;
+}
+
+public UserSexEnum getUserSex() {
+return userSex;
+}
+
+public void setUserSex(UserSexEnum userSex) {
+this.userSex = userSex;
+}
+
+public String getNickName() {
+return nickName;
+}
+
+public void setNickName(String nickName) {
+this.nickName = nickName;
+}
+
+@Override
+public String toString() {
+// TODO Auto-generated method stub
+return "userName " + this.userName + ", pasword " + this.passWord + "sex " + userSex.name();
+}
+
+}</pre>
+
+<p> </p>

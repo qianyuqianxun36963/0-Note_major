@@ -1,0 +1,268 @@
+<h1>实际使用websocket</h1>
+
+<p><a href="https://github.com/dunwu/spring-notes/tree/master/codes/web/websocket">Spring 对 WebSocket 支持的示例</a></p>
+
+<h2><strong>第一步：添加依赖</strong></h2>
+
+<p>Spring 对于 WebSocket 的支持基于下面的 jar 包：</p>
+
+<pre>
+<code><dependency>
+<groupId>org.springframework</groupId>
+<artifactId>spring-websocket</artifactId>
+</dependency></code></pre>
+
+<p>在 Spring 实现 WebSocket 服务器大概分为以下几步：</p>
+
+<h2><strong>第二步：创建 WebSocket 处理器</strong></h2>
+
+<p>扩展 <code>TextWebSocketHandler</code> 或 <code>BinaryWebSocketHandler</code> ，你可以覆写指定的方法。Spring 在收到 WebSocket 事件时，会自动调用事件对应的方法。</p>
+
+<pre>
+MyHandler.java 文件</pre>
+
+<pre>
+package com.huawei.na.echo.handler;
+
+import org.springframework.stereotype.Component;
+import org.springframework.web.socket.CloseStatus;
+import org.springframework.web.socket.TextMessage;
+import org.springframework.web.socket.WebSocketSession;
+import org.springframework.web.socket.handler.TextWebSocketHandler;
+
+import java.io.IOException;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+
+<strong>@Component</strong>
+public class MyHandler extends <strong>TextWebSocketHandler </strong>{
+private static Map<String, WebSocketSession> keySocketSessionMap = new ConcurrentHashMap<>();
+private static Map<String,String> keySocketSessionIdMap = new ConcurrentHashMap<>();
+
+@Override
+public void handleTextMessage(WebSocketSession session, TextMessage message) {
+<strong> String keyId = message.getPayload();
+keySocketSessionMap.put(keyId,session);
+keySocketSessionIdMap.put(session.getId(),keyId);</strong>
+}
+
+public static void sendMessage(String keyId,TextMessage message) throws IOException {
+<strong> WebSocketSession session = keySocketSessionMap.get(keyId);
+session.sendMessage(message);</strong>
+}
+
+public boolean keySessionExist(String keyId){
+return null != keySocketSessionMap.get(keyId);
+}
+
+public void afterConnectionClosed(WebSocketSession session, CloseStatus closeStatus) throws Exception{
+<strong> keySocketSessionMap.remove(keySocketSessionIdMap.get(session.getId()));
+keySocketSessionIdMap.remove(session.getId());</strong>
+}
+}
+</pre>
+
+<h3><code>WebSocketHandler</code> 源码分析</h3>
+
+<p><code>WebSocketHandler</code> 源码如下，这意味着你的处理器大概可以处理哪些 WebSocket 事件：</p>
+
+<pre>
+<code>public interface WebSocketHandler {
+
+/**
+* 建立连接后触发的回调
+*/
+void afterConnectionEstablished(WebSocketSession session) throws Exception;
+
+/**
+* 收到消息时触发的回调
+*/
+void handleMessage(WebSocketSession session, WebSocketMessage<?> message) throws Exception;
+
+/**
+* 传输消息出错时触发的回调
+*/
+void handleTransportError(WebSocketSession session, Throwable exception) throws Exception;
+
+/**
+* 断开连接后触发的回调
+*/
+void afterConnectionClosed(WebSocketSession session, CloseStatus closeStatus) throws Exception;
+
+/**
+* 是否处理分片消息
+*/
+boolean supportsPartialMessages();
+
+}</code></pre>
+
+<h2><strong>第三步：配置 WebSocket</strong></h2>
+
+<p>注解方式配置：其作用就是将 WebSocket 处理器添加到注册中心。</p>
+
+<p>实现 <code>WebSocketConfigurer</code></p>
+
+<pre>
+<code>import org.springframework.web.socket.config.annotation.EnableWebSocket;
+import org.springframework.web.socket.config.annotation.WebSocketConfigurer;
+import org.springframework.web.socket.config.annotation.WebSocketHandlerRegistry;
+</code></pre>
+
+<pre>
+@Configuration
+@EnableWebSocket
+public class WebSocketConfig implements WebSocketConfigurer {
+@Override
+public void registerWebSocketHandlers(WebSocketHandlerRegistry registry) {
+<strong>registry.addHandler(myHandler(), "/myHandler").setAllowedOrigins("*");</strong>
+}
+
+@Bean
+public WebSocketHandler myHandler() {
+return new MyHandler();
+}
+}</pre>
+
+<h2><strong>第四步：在controller层应用</strong></h2>
+
+<pre>
+package com.huawei.na.echo.web;
+
+import com.huawei.na.echo.dto.MessageDto;
+import com.huawei.na.echo.entity.Message;
+import com.huawei.na.echo.handler.MyHandler;
+import com.huawei.na.echo.service.EchoService;
+import io.swagger.annotations.ApiOperation;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.socket.TextMessage;
+
+import javax.annotation.Resource;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.List;
+
+@RestController
+@RequestMapping("/message")
+public class MessageController {
+
+<strong> @Resource
+MyHandler handler;</strong>
+
+@Resource
+private EchoService echoService;
+
+@ApiOperation(value = "添加执行的过程信息", notes = "添加执行的过程信息")
+@RequestMapping(value = { "/push" }, method = RequestMethod.POST)
+public void push(@RequestBody MessageDto message) {
+Long id = Long.parseLong((new java.text.SimpleDateFormat("yyyyMMddhhmmss")).format(new Date()));
+echoService.push(message.getKey(), new Message(id, message.getContext()));
+echoService.set(message.getKey()+"save", new Message(id, message.getContext()));
+<strong> try {
+if(null!=handler&&handler.keySessionExist(message.getKey())){
+handler.sendMessage(message.getKey(), new TextMessage(message.getContext()));
+}
+}catch (IOException e){
+e.printStackTrace();
+}</strong>
+}
+
+@ApiOperation(value = "获取执行的实时信息", notes = "获取执行的实时信息")
+@RequestMapping(value = { "/pop/{key}" }, method = RequestMethod.GET)
+public String pop(@PathVariable("key") String key) {
+String message = echoService.pop(key).toString();
+return message==null?"":message;
+}
+
+@ApiOperation(value = "获取截止当前已返回的所有信息", notes = "获取截止当前已返回的所有信息")
+@RequestMapping(value = { "/get/{key}" }, method = RequestMethod.GET)
+public List<String> get(@PathVariable("key") String key) {
+List<String> message = echoService.get(key+"save");
+echoService.clean(key);
+return message==null?new ArrayList<>():message;
+}
+
+@ApiOperation(value = "清空执行的过程信息", notes = "清空执行的过程信息")
+@RequestMapping(value = { "/clean/{key}" }, method = RequestMethod.GET)
+public void clean(@PathVariable("key") String key) {
+echoService.clean(key);
+}
+
+}</pre>
+
+<h2><strong>第五步：前端页面调用</strong></h2>
+
+<pre>
+<html>
+<head>
+<title>Java后端WebSocket实现</title>
+</head>
+<body>
+Welcome<br/><input id="text" type="text"/>
+<button onclick="send()">发送消息(设置key值)</button>
+<hr/>
+<button onclick="closeWebSocket()">关闭WebSocket连接</button>
+<hr/>
+<div id="message"></div>
+</body>
+
+<script type="text/javascript">
+var websocket = null;
+//判断当前浏览器是否支持WebSocket
+if ('WebSocket' in window) {
+debugger;
+websocket = new WebSocket("<strong>ws://localhost:7577/myHandler</strong>");
+}
+else {
+alert('当前浏览器 Not support websocket')
+}
+
+//连接发生错误的回调方法
+websocket.onerror = function () {
+setMessageInnerHTML("WebSocket连接发生错误");
+};
+
+//连接成功建立的回调方法
+websocket.onopen = function () {
+setMessageInnerHTML("WebSocket连接成功");
+}
+
+//接收到消息的回调方法
+websocket.onmessage = function (event) {
+setMessageInnerHTML(event.data);
+}
+
+//连接关闭的回调方法
+websocket.onclose = function () {
+setMessageInnerHTML("WebSocket连接关闭");
+}
+
+//监听窗口关闭事件，当窗口关闭时，主动去关闭websocket连接，防止连接还没断开就关闭窗口，server端会抛异常。
+window.onbeforeunload = function () {
+closeWebSocket();
+}
+
+//将消息显示在网页上
+function setMessageInnerHTML(innerHTML) {
+document.getElementById('message').innerHTML += innerHTML + '<br/>';
+}
+
+//关闭WebSocket连接
+function closeWebSocket() {
+websocket.close();
+}
+
+//发送消息
+function send() {
+var message = document.getElementById('text').value;
+websocket.send(message);
+}
+</script>
+</html></pre>
+
+<pre>
+<!--在浏览器打开这个html页面。-->
+
+<!--将在输入框中输入key，如 111 ，然后发送消息，作为数据回显得依据。-->
+
+<!--然后在swagger页面，以key作为键，push数据，即可在页面回显了！--></pre>

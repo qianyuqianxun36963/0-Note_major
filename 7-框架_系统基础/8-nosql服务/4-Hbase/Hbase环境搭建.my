@@ -1,0 +1,690 @@
+<h1>1.  快速单击安装</h1>
+
+<p>在单机安装<a href="http://lib.csdn.net/base/hbase" target="_blank" title="Hbase知识库">Hbase</a>的方法。会引导你通过<strong>shell</strong>创建一个表，插入一行，然后删除它，最后停止Hbase。只要10分钟就可以完成以下的操作。</p>
+
+<h2>1.1下载解压最新版本</h2>
+
+<h3>选择一个 <a href="http://www.apache.org/dyn/closer.cgi/hbase/" target="_blank">Apache 下载镜像</a>：<a href="http://www.apache.org/dyn/closer.cgi/hbase/" target="_blank">http://www.apache.org/dyn/closer.cgi/hbase/</a>，下载 <em>HBase Releases</em>. 点击 stable目录，然后下载后缀为 .tar.gz 的文件; 例如 hbase-0.90.4.tar.gz.</h3>
+
+<p><strong>后面需要安装集群，整合到<a href="http://lib.csdn.net/base/hadoop" target="_blank" title="Hadoop知识库">Hadoop</a>，所以注意选择与hadoop对应的版本：</strong></p>
+
+<p> </p>
+
+<p>选择 Hadoop 版本对HBase部署很关键。下表显示不同HBase支持的Hadoop版本信息。基于HBase版本，应该选择合适的Hadoop版本。我们没有绑定 Hadoop 发行版选择。可以从Apache使用 Hadoop 发行版，或了解一下Hadoop发行商产品： <a href="http://wiki.apache.org/hadoop/Distributions%20and%20Commercial%20Support" target="_blank">http://wiki.apache.org/hadoop/Distributions%20and%20Commercial%20Support</a></p>
+
+<p><strong>Table 2.1. Hadoop version support matrix</strong></p>
+
+<table border="1" summary="Hadoop version support matrix">
+<thead>
+<tr>
+<th> </th>
+<th>HBase-0.92.x</th>
+<th>HBase-0.94.x</th>
+<th>HBase-0.96</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Hadoop-0.20.205</td>
+<td>S</td>
+<td>X</td>
+<td>X</td>
+</tr>
+<tr>
+<td>Hadoop-0.22.x</td>
+<td>S</td>
+<td>X</td>
+<td>X</td>
+</tr>
+<tr>
+<td>Hadoop-1.0.x</td>
+<td>S</td>
+<td>S</td>
+<td>S</td>
+</tr>
+<tr>
+<td>Hadoop-1.1.x</td>
+<td>NT</td>
+<td>S</td>
+<td>S</td>
+</tr>
+<tr>
+<td>Hadoop-0.23.x</td>
+<td>X</td>
+<td>S</td>
+<td>NT</td>
+</tr>
+<tr>
+<td>Hadoop-2.x</td>
+<td>X</td>
+<td>S</td>
+<td>S</td>
+</tr>
+</tbody>
+</table>
+
+<p> </p>
+
+<table border="0" summary="Simple list">
+<tbody>
+<tr>
+<td>S = supported and tested,支持</td>
+</tr>
+<tr>
+<td>X = not supported,不支持</td>
+</tr>
+<tr>
+<td>NT = not tested enough.可以运行但测试不充分</td>
+</tr>
+</tbody>
+</table>
+
+<p>由于 HBase 依赖 Hadoop，它配套发布了一个Hadoop jar 文件在它的 lib 下。该套装jar仅用于独立模式。在分布式模式下，Hadoop版本必须和HBase下的版本一致。用你运行的分布式Hadoop版本jar文件替换HBase lib目录下的Hadoop jar文件，以避免版本不匹配问题。确认替换了集群中所有HBase下的jar文件。Hadoop版本不匹配问题有不同表现，但看起来都像挂掉了。</p>
+
+<p> </p>
+
+<p><strong>安装：</strong></p>
+
+<p>$ tar xfz hbase-0.90.4.tar.gz<br />
+$ cd hbase-0.90.4</p>
+
+<p> </p>
+
+<p>现在你已经可以启动Hbase了。但是你可能需要先编辑 conf/hbase-site.xml 去配置hbase.rootdir，来选择Hbase将数据写到哪个目录 .</p>
+
+<p>单机配置，只需要如下配置hbase-site.xml：</p>
+
+<ol start="1">
+<li><?xml version="1.0"?>  </li>
+<li><?xml-stylesheet type="text/xsl" href="configuration.xsl"?>  </li>
+<li><configuration>  </li>
+<li>  <property>  </li>
+<li>    <name>hbase.rootdir</name>  </li>
+<li>    <value>file:///DIRECTORY/hbase</value>  </li>
+<li>  </property>  </li>
+<li></configuration>  </li>
+</ol>
+
+<p> </p>
+
+<p>将 DIRECTORY 替换成你期望写文件的目录. 默认 hbase.rootdir 是指向 /tmp/hbase-${user.name} ，也就说你会在重启后丢失数据(重启的时候<a href="http://lib.csdn.net/base/operatingsystem" target="_blank" title="操作系统知识库">操作系统</a>会清理/tmp目录)</p>
+
+<h2>1.2. 启动 HBase</h2>
+
+<p>现在启动Hbase:</p>
+
+<pre>
+$ ./bin/start-hbase.sh</pre>
+
+<pre>
+starting Master, logging to logs/hbase-user-master-example.org.out</pre>
+
+<p>现在你运行的是单机模式的Hbaes。所以的服务都运行在一个JVM上，包括Hbase和Zookeeper。Hbase的日志放在<code>logs</code>目录,当你启动出问题的时候，可以检查这个日志。</p>
+
+<h2>1.3. Hbase Shell 练习</h2>
+
+<p>用<strong>shell</strong>连接你的Hbase</p>
+
+<pre>
+$ ./bin/hbase shell</pre>
+
+<pre>
+HBase Shell; enter 'help<RETURN>' for list of supported commands.</pre>
+
+<pre>
+Type "exit<RETURN>" to leave the HBase Shell</pre>
+
+<pre>
+Version: 0.90.0, r1001068, Fri Sep 24 13:55:42 PDT 2010</pre>
+
+<pre>
+ </pre>
+
+<pre>
+hbase(main):001:0> </pre>
+
+<p>输入 <strong>help</strong> 然后 <strong><RETURN></strong> 可以看到一列shell命令。这里的帮助很详细，要注意的是表名，行和列需要加引号。</p>
+
+<p>创建一个名为 <code>test</code> 的表，这个表只有一个column family 为 <code>cf</code>。可以列出所有的表来检查创建情况，然后插入些值。</p>
+
+<pre>
+hbase(main):003:0> create 'test', 'cf'</pre>
+
+<pre>
+0 row(s) in 1.2200 seconds</pre>
+
+<pre>
+hbase(main):003:0> list 'table'</pre>
+
+<pre>
+test</pre>
+
+<pre>
+1 row(s) in 0.0550 seconds</pre>
+
+<pre>
+hbase(main):004:0> put 'test', 'row1', 'cf:a', 'value1'</pre>
+
+<pre>
+0 row(s) in 0.0560 seconds</pre>
+
+<pre>
+hbase(main):005:0> put 'test', 'row2', 'cf:b', 'value2'</pre>
+
+<pre>
+0 row(s) in 0.0370 seconds</pre>
+
+<pre>
+hbase(main):006:0> put 'test', 'row3', 'cf:c', 'value3'</pre>
+
+<pre>
+0 row(s) in 0.0450 seconds</pre>
+
+<p>以上我们分别插入了3行。第一个行key为<code>row1</code>, 列为 <code>cf:a</code>， 值是 <code>value1</code>。Hbase中的列是由 column family前缀和列的名字组成的，以冒号间隔。例如这一行的列名就是<code>a</code>.</p>
+
+<p>检查插入情况.</p>
+
+<p>Scan这个表，操作如下</p>
+
+<pre>
+hbase(main):007:0> scan 'test'</pre>
+
+<pre>
+ROW        COLUMN+CELL</pre>
+
+<pre>
+row1       column=cf:a, timestamp=1288380727188, value=value1</pre>
+
+<pre>
+row2       column=cf:b, timestamp=1288380738440, value=value2</pre>
+
+<pre>
+row3       column=cf:c, timestamp=1288380747365, value=value3</pre>
+
+<pre>
+3 row(s) in 0.0590 seconds</pre>
+
+<p>Get一行，操作如下</p>
+
+<pre>
+hbase(main):008:0> get 'test', 'row1'</pre>
+
+<pre>
+COLUMN      CELL</pre>
+
+<pre>
+cf:a        timestamp=1288380727188, value=value1</pre>
+
+<pre>
+1 row(s) in 0.0400 seconds</pre>
+
+<p>disable 再 drop 这张表，可以清除你刚刚的操作</p>
+
+<pre>
+hbase(main):012:0> disable 'test'</pre>
+
+<pre>
+0 row(s) in 1.0930 seconds</pre>
+
+<pre>
+hbase(main):013:0> drop 'test'</pre>
+
+<pre>
+0 row(s) in 0.0770 seconds </pre>
+
+<p>关闭shell</p>
+
+<pre>
+hbase(main):014:0> exit</pre>
+
+<h2>1.4. 停止 HBase</h2>
+
+<p>运行停止脚本来停止HBase.</p>
+
+<pre>
+$ ./bin/stop-hbase.sh</pre>
+
+<pre>
+stopping hbase...............
+</pre>
+
+<p> </p>
+
+<h1>2.  Hbase集群安装前注意</h1>
+
+<p><strong>1）  <a href="http://lib.csdn.net/base/javase" target="_blank" title="Java SE知识库">Java</a></strong>：（hadoop已经安装了）</p>
+
+<p><strong>2）  <a href="http://hadoop.apache.org/common/releases.html" target="_blank">Hadoop 0.20.x</a> / Hadoop-2.x 已经正确安装</strong>，并且可以启动 HDFS 系统, 可参考的Hadoop安装文档：<u>Hadoop集群配置（最全面总结）</u><a href="http://blog.csdn.net/hguisu/article/details/7237395" target="_blank">http://blog.csdn.net/hguisu/article/details/7237395</a></p>
+
+<p>3）  ssh 必须安装<strong>ssh</strong> ， <strong>sshd</strong> 也必须运行，这样Hadoop的脚本才可以远程操控其他的Hadoop和Hbase进程。ssh之间必须都打通，不用密码都可以登录，详细方法可以        Google一下 ("ssh passwordless login").</p>
+
+<p>4）  NTP：集群的时钟要保证基本的一致。稍有不一致是可以容忍的，但是很大的不一致会 造成奇怪的行为。 运行 <a href="http://en.wikipedia.org/wiki/Network_Time_Protocol" target="_blank">NTP</a> 或者其他什么东西来同步你的时间.</p>
+
+<p>如果你查询的时候或者是遇到奇怪的故障，可以检查一下系统时间是否正确!</p>
+
+<p> 设置集群各个节点时钟：date -s “2012-02-13 14:00:00”</p>
+
+<p><code>5）  </code><code>ulimit</code> 和 <code>nproc:</code></p>
+
+<p>Base是<a href="http://lib.csdn.net/base/mysql" target="_blank" title="MySQL知识库">数据库</a>，会在同一时间使用很多的文件句柄。大多数<a href="http://lib.csdn.net/base/linux" target="_blank" title="Linux知识库">Linux</a>系统使用的默认值1024是不能满足的，会导致FAQ: Why do I see "java.io.IOException...(Too manyopen files)" in my logs?异常。还可能会发生这样的异常</p>
+
+<p>     2010-04-06 03:04:37,542 INFO org.apache.hadoop.hdfs.DFSClient: ExceptionincreateBlockOutputStream java.io.EOFException</p>
+
+<p>     2010-04-06 03:04:37,542 INFO org.apache.hadoop.hdfs.DFSClient:Abandoning block blk_-6935524980745310745_1391901</p>
+
+<p>所以你需要修改你的最大文件句柄限制。可以设置到10k. 你还需要修改 hbase 用户的 nproc，如果过低会造成 OutOfMemoryError异常。 [2] [3].</p>
+
+<p>需要澄清的，这两个设置是针对操作系统的，不是Hbase本身的。有一个常见的错误是Hbase运行的用户，和设置最大值的用户不是一个用户。在Hbase启动的时候，第一行日志会现在ulimit信息，所以你最好检查一下。 </p>
+
+<p>可以先查看当前用户 ulimit：</p>
+
+<p>ulimit -n</p>
+
+<p> </p>
+
+<p><strong>设置</strong><code><strong>ulimit:</strong></code></p>
+
+<p><code>     </code>如果你使用的是Ubuntu,你可以这样设置:</p>
+
+<p>在文件 /etc/security/limits.conf 添加一行，如:</p>
+
+<p>hadoop  -       nofile 32768</p>
+
+<p>可以把 hadoop 替换成你运行Hbase和Hadoop的用户。如果你用两个用户，你就需要配两个。还有配nproc hard 和 softlimits. 如:</p>
+
+<p>hadoop soft/hard nproc 32000</p>
+
+<p>在 /etc/pam.d/common-session 加上这一行:</p>
+
+<p>session required pam_limits.so</p>
+
+<p>否则在 /etc/security/limits.conf上的配置不会生效.</p>
+
+<p>还有注销再登录，这些配置才能生效!</p>
+
+<p>7 ）修改Hadoop HDFS Datanode同时处理文件的上限：<code>dfs.datanode.max.xcievers</code></p>
+
+<p>一个 Hadoop HDFS Datanode 有一个同时处理文件的上限. 这个参数叫 xcievers (Hadoop的作者把这个单词拼错了). 在你加载之前，先确认下你有没有配置这个文件conf/hdfs-site.xml里面的xceivers参数，至少要有4096:</p>
+
+<p>      <property></p>
+
+<p>       <name>dfs.datanode.max.xcievers</name></p>
+
+<p>        <value>4096</value></p>
+
+<p>      </property></p>
+
+<p>对于HDFS修改配置要记得重启.</p>
+
+<p>如果没有这一项配置，你可能会遇到奇怪的失败。你会在Datanode的日志中看到xcievers exceeded，但是运行起来会报 missing blocks错误。例如: 02/12/1220:10:31 INFO hdfs.DFSClient: Could not obtain blockblk_XXXXXXXXXXXXXXXXXXXXXX_YYYYYYYY from any node: java.io.IOException: No livenodes contain current block. Will get new block locations from namenode andretry...</p>
+
+<p>8）继承hadoop安装的说明：</p>
+
+<p>每个机子/etc/hosts</p>
+
+<p>10.64.56.74  node2 （master）</p>
+
+<p>10.64.56.76  node1  （slave）</p>
+
+<p>10.64.56.77  node3 （slave）</p>
+
+<p>9) 继续使用hadoop用户安装</p>
+
+<p>Chown –R hadoop /usr/local/hbase</p>
+
+<h1>3.  分布式模式配置</h1>
+
+<h2>3.1配置<code>conf/hbase-env.sh</code></h2>
+
+<p># exportJAVA_HOME=/usr/java/jdk1.6.0/</p>
+
+<p>exportJAVA_HOME=/usr/lib/jvm/java-6-sun-1.6.0.26</p>
+
+<p># Tell HBase whether it should manage it'sown instance of Zookeeper or not.</p>
+
+<p>export HBASE_MANAGES_ZK=true</p>
+
+<p>不管是什么模式，你都需要编辑 <code>conf/hbase-env.sh</code>来告知Hbase <strong>java</strong>的安装路径.在这个文件里你还可以设置Hbase的运行环境，诸如 heapsize和其他 JVM有关的选项, 还有Log文件地址，等等. 设置 <code>JAVA_HOME</code>指向 <strong>java</strong>安装的路径.</p>
+
+<p>一个分布式运行的Hbase依赖一个zookeeper集群。所有的节点和客户端都必须能够访问zookeeper。默认的情况下Hbase会管理一个zookeep集群。这个集群会随着Hbase的启动而启动。当然，你也可以自己管理一个zookeeper集群，但需要配置Hbase。你需要修改<code>conf/hbase-env.sh</code>里面的<code>HBASE_MANAGES_ZK</code> 来切换。这个值默认是true的，作用是让Hbase启动的时候同时也启动zookeeper.</p>
+
+<p>让Hbase使用一个现有的不被Hbase托管的Zookeep集群，需要设置 <code>conf/hbase-env.sh</code>文件中的<code>HBASE_MANAGES_ZK</code> 属性为 false</p>
+
+<p># Tell HBase whether it should manage it's own instanceof Zookeeper or not.</p>
+
+<p>exportHBASE_MANAGES_ZK=false</p>
+
+<h2>3.2 配置conf/hbase-site.xml</h2>
+
+<ol start="1">
+<li><configuration>  </li>
+<li>  </li>
+<li>    <property>  </li>
+<li>  </li>
+<li>    <name>hbase.rootdir</name>  </li>
+<li>  </li>
+<li>    <value>hdfs://node1:49002/hbase</value>  </li>
+<li>  </li>
+<li>    <description>The directory shared byRegionServers.  </li>
+<li>  </li>
+<li>    </description>  </li>
+<li>  </li>
+<li>  </property>  </li>
+<li>  </li>
+<li>  <property>  </li>
+<li>  </li>
+<li>    <name>hbase.cluster.distributed</name>  </li>
+<li>  </li>
+<li>    <value>true</value>  </li>
+<li>  </li>
+<li>    <description>The mode the clusterwill be in. Possible values are  </li>
+<li>  </li>
+<li>      false: standalone and pseudo-distributedsetups with managed Zookeeper  </li>
+<li>  </li>
+<li>      true: fully-distributed with unmanagedZookeeper Quorum (see hbase-env.sh)  </li>
+<li>  </li>
+<li>    </description>  </li>
+<li>  </li>
+<li>  </property>  </li>
+<li>  </li>
+<li>   </li>
+<li>  </li>
+<li>    <property>  </li>
+<li>  </li>
+<li>      <name>hbase.zookeeper.property.clientPort</name>  </li>
+<li>  </li>
+<li>      <value>2222</value>  </li>
+<li>  </li>
+<li>      <description>Property fromZooKeeper's config zoo.cfg.  </li>
+<li>  </li>
+<li>      The port at which the clients willconnect.  </li>
+<li>  </li>
+<li>      </description>  </li>
+<li>  </li>
+<li>    </property>  </li>
+<li>  </li>
+<li>    <property>  </li>
+<li>  </li>
+<li>      <name>hbase.zookeeper.quorum</name>  </li>
+<li>  </li>
+<li>      <value>node1,node2,node3</value>  </li>
+<li>  </li>
+<li>      <description>Comma separated listof servers in the ZooKeeper Quorum.  </li>
+<li>  </li>
+<li>      For example,"host1.mydomain.com,host2.mydomain.com,host3.mydomain.com".  </li>
+<li>  </li>
+<li>      By default this is set to localhost forlocal and pseudo-distributed modes  </li>
+<li>  </li>
+<li>      of operation. For a fully-distributedsetup, this should be set to a full  </li>
+<li>  </li>
+<li>      list of ZooKeeper quorum servers. IfHBASE_MANAGES_ZK is set in hbase-env.sh  </li>
+<li>  </li>
+<li>      this is the list of servers which we willstart/stop ZooKeeper on.  </li>
+<li>  </li>
+<li>      </description>  </li>
+<li>  </li>
+<li>    </property>  </li>
+<li>  </li>
+<li>    <property>  </li>
+<li>  </li>
+<li>      <name>hbase.zookeeper.property.dataDir</name>  </li>
+<li>  </li>
+<li>      <value>/home/hadoop/zookeeper</value>  </li>
+<li>  </li>
+<li>      <description>Property fromZooKeeper's config zoo.cfg.  </li>
+<li>  </li>
+<li>      The directory where the snapshot isstored.  </li>
+<li>  </li>
+<li>      </description>  </li>
+<li>  </li>
+<li>    </property>  </li>
+<li>  </li>
+<li>  </configuration>  </li>
+</ol>
+
+<p><br />
+ </p>
+
+<p>要想运行完全分布式模式，加一个属性 <code>hbase.cluster.distributed</code> 设置为 <code>true</code> 然后把 <code>hbase.rootdir</code> 设置为HDFS的NameNode的位置。 例如，你的namenode运行在<strong>node1</strong>，端口是49002 你期望的目录是 <code>/hbase</code>,使用如下的配置：hdfs://node1:49002/hbase</p>
+
+<p><strong>hbase.rootdir</strong>：这个目录是region server的共享目录，用来持久化Hbase。URL需要是'完全正确'的，还要包含文件系统的scheme。例如，要表示hdfs中的'/hbase'目录，namenode 运行在node1的49002端口。则需要设置为hdfs://node1:49002/hbase。默认情况下Hbase是写到/tmp的。不改这个配置，数据会在重启的时候丢失。默认: file:///tmp/hbase-${user.name}/hbase</p>
+
+<p><strong>hbase.cluster.distributed</strong> ：Hbase的运行模式。false是单机模式，true是分布式模式。若为false,Hbase和Zookeeper会运行在同一个JVM里面。</p>
+
+<p>默认: false</p>
+
+<p><strong>在hbase-site.xml配置zookeeper：</strong></p>
+
+<p>当Hbase管理zookeeper的时候，你可以通过修改zoo.cfg来配置zookeeper，</p>
+
+<p>一个更加简单的方法是在 conf/hbase-site.xml里面修改zookeeper的配置。Zookeeer的配置是作为property写在 hbase-site.xml里面的。</p>
+
+<p><strong>对于zookeepr的配置</strong>，你至少要在 hbase-site.xml中列出zookeepr的<strong>ensemble servers</strong>，具体的字段是 <strong>hbase.zookeeper.quorum</strong>. 该这个字段的默认值是 localhost，这个值对于分布式应用显然是不可以的. (远程连接无法使用)。</p>
+
+<p> </p>
+
+<p><strong>hbase.zookeeper.property.clientPort</strong>：ZooKeeper的zoo.conf中的配置。 客户端连接的端口。</p>
+
+<p>hbase.zookeeper.quorum：Zookeeper集群的地址列表，用逗号分割。例如："host1.mydomain.com,host2.mydomain.com,host3.mydomain.com".默认是localhost,是给伪分布式用的。要修改才能在完全分布式的情况下使用。如果在hbase-env.sh设置了HBASE_MANAGES_ZK，这些ZooKeeper节点就会和Hbase一起启动。</p>
+
+<p>默认: localhost</p>
+
+<p>运行一个zookeeper也是可以的，但是在生产环境中，你最好部署3，5，7个节点。部署的越多，可靠性就越高，当然只能部署奇数个，偶数个是不可以的。你需要给每个zookeeper 1G左右的内存，如果可能的话，最好有独立的磁盘。 (独立磁盘可以确保zookeeper是高性能的。).如果你的集群负载很重，不要把Zookeeper和RegionServer运行在同一台机器上面。就像DataNodes 和 TaskTrackers一样</p>
+
+<p><strong>hbase.zookeeper.property.dataDir</strong>：ZooKeeper的zoo.conf中的配置。 快照的存储位置</p>
+
+<p>把ZooKeeper保存数据的目录地址改掉。默认值是 /tmp ，这里在重启的时候会被操作系统删掉，可以把它修改到 /home/hadoop/zookeeper<strong> (这个路径hadoop用户拥有操作权限)</strong></p>
+
+<p>对于独立的Zookeeper，要指明Zookeeper的host和端口。可以在 hbase-site.xml中设置, 也可以在Hbase的CLASSPATH下面加一个zoo.cfg配置文件。 HBase 会优先加载 zoo.cfg 里面的配置，把hbase-site.xml里面的覆盖掉.</p>
+
+<p>参见 <a href="http://www.yankay.com/wp-content/hbase/book.html#hbase_default_configurations" target="_blank">http://www.yankay.com/wp-content/hbase/book.html#hbase_default_configurations</a>可以查找hbase.zookeeper.property 前缀，找到关于zookeeper的配置。</p>
+
+<h2>3.3 配置conf/regionservers</h2>
+
+<p><strong>Node1</strong></p>
+
+<p><strong>Node2</strong></p>
+
+<p>完全分布式模式的还需要修改<code>conf/regionservers</code>. 在这里列出了你希望运行的全部 HRegionServer，一行写一个host (就像Hadoop里面的 <code>slaves</code> 一样). 列在这里的server会随着集群的启动而启动，集群的停止而停止.</p>
+
+<p><strong> </strong></p>
+
+<h2><strong>3.4 替换hadoop的jar包</strong></h2>
+
+<p> </p>
+
+<p>hbase基本的配置完了。</p>
+
+<p>查看hbase的lib目录下。</p>
+
+<p>ls lib |grep hadoop</p>
+
+<p><br />
+hadoop-annotations-2.1.0-beta.jar<br />
+hadoop-auth-2.1.0-beta.jar<br />
+hadoop-client-2.1.0-beta.jar<br />
+hadoop-common-2.1.0-beta.jar<br />
+hadoop-hdfs-2.1.0-beta.jar<br />
+hadoop-hdfs-2.1.0-beta-tests.jar<br />
+hadoop-mapreduce-client-app-2.1.0-beta.jar<br />
+hadoop-mapreduce-client-common-2.1.0-beta.jar<br />
+hadoop-mapreduce-client-core-2.1.0-beta.jar<br />
+hadoop-mapreduce-client-jobclient-2.1.0-beta.jar<br />
+hadoop-mapreduce-client-jobclient-2.1.0-beta-tests.jar<br />
+hadoop-mapreduce-client-shuffle-2.1.0-beta.jar<br />
+hadoop-yarn-api-2.1.0-beta.jar<br />
+hadoop-yarn-client-2.1.0-beta.jar<br />
+hadoop-yarn-common-2.1.0-beta.jar<br />
+hadoop-yarn-server-common-2.1.0-beta.jar<br />
+hadoop-yarn-server-nodemanager-2.1.0-beta.jar</p>
+
+<p> </p>
+
+<p>看到它是基于hadoop2.1.0的，所以我们需要用我们的hadoop2.2.0下的jar包来替换2.1的，保证版本的一致性，hadoop下的jar包都是在$HADOOP_HOME/share/hadoop下的.</p>
+
+<p> </p>
+
+<p>我们先cd 到 /home/hadoop/hbase-0.96.0-hadoop2/lib下运行命令： rm -rf hadoop*.jar删掉所有的hadoop相关的jar包，然后运行：</p>
+
+<p>find /home/hadoop/hadoop-2.2.0/share/hadoop -name "hadoop*jar" | xargs -i cp {} /home/hadoop/hbase-0.96.0-hadoop2/lib/ </p>
+
+<p> 拷贝所有hadoop2.2.0下的jar包hbase下进行hadoop版本的统一</p>
+
+<p> </p>
+
+<h1>4.  运行和确认安装</h1>
+
+<h2>4.1当Hbase托管ZooKeeper的时候</h2>
+
+<p>当Hbase托管ZooKeeper的时候Zookeeper集群的启动是Hbase启动脚本的一部分</p>
+
+<p>首先确认你的HDFS是运行着的。你可以运行<code>HADOOP_HOME</code>中的 <code>bin/start-hdfs.sh</code> 来启动HDFS.你可以通过<strong>put</strong>命令来<a href="http://lib.csdn.net/base/softwaretest" target="_blank" title="软件测试知识库">测试</a>放一个文件，然后有<strong>get</strong>命令来读这个文件。通常情况下Hbase是不会运行mapreduce的。所以比不需要检查这些。</p>
+
+<p>用如下命令启动Hbase:</p>
+
+<p>bin/start-hbase.sh</p>
+
+<p>这个脚本在<code>HBASE_HOME</code>目录里面。</p>
+
+<p>你现在已经启动Hbase了。Hbase把log记在 <code>logs</code> 子目录里面. 当Hbase启动出问题的时候，可以看看Log.</p>
+
+<p>Hbase也有一个界面，上面会列出重要的属性。默认是在Master的60010端口上H (HBase RegionServers 会默认绑定 60020端口，在端口60030上有一个展示信息的界面 ).如果Master运行在 <code>node1</code>，端口是默认的话，你可以用浏览器在 <code>http://node:60010</code>看到主界面. .</p>
+
+<p>一旦Hbase启动，可以看到如何建表，插入数据，scan你的表，还有disable这个表，最后把它删掉。</p>
+
+<p>可以在Hbase Shell停止Hbase</p>
+
+<p>$./bin/stop-hbase.sh</p>
+
+<p>stoppinghbase...............</p>
+
+<p>停止操作需要一些时间，你的集群越大，停的时间可能会越长。如果你正在运行一个分布式的操作，要确认在Hbase彻底停止之前，Hadoop不能停.</p>
+
+<p> </p>
+
+<h2><strong>4.2独立的zookeeper启动，</strong></h2>
+
+<p>除了启动habse，</p>
+
+<p><strong>执行：</strong>bin/start-hbase.sh启动habse</p>
+
+<p>你需要自己去运行zookeeper：</p>
+
+<p>${HBASE_HOME}/bin/hbase-daemons.sh {start,stop} zookeeper</p>
+
+<p>你可以用这条命令启动ZooKeeper而不启动Hbase. HBASE_MANAGES_ZK 的值是 false， 如果你想在Hbase重启的时候不重启ZooKeeper,你可以这样。</p>
+
+<p> </p>
+
+<h1>5.  测试</h1>
+
+<p> </p>
+
+<p>可以使用jps查看进程：在master上：</p>
+
+<p><img alt="" src="http://hi.csdn.net/attachment/201202/13/0_1329122220Xvgw.gif" /></p>
+
+<p>在node2，node3（slave节点）上</p>
+
+<p><img alt="" src="http://hi.csdn.net/attachment/201202/13/0_1329122252R5O1.gif" /></p>
+
+<p>通过浏览器查看60010端口：</p>
+
+<p><img alt="" src="http://hi.csdn.net/attachment/201202/13/0_1329122293KCsk.gif" style="height:394px; width:553px" /></p>
+
+<p> </p>
+
+<p>1.  安装中出现的问题</p>
+
+<h2>1 ）</h2>
+
+<p>用./start-hbase.sh启动HBase后，执行hbase shell<br />
+# bin/hbase shell<br />
+HBase Shell; enter 'help<RETURN>' for list of supported commands.<br />
+Version: 0.20.6, rUnknown, Thu Oct 28 19:02:04 CST 2010<br />
+接着创建表时候出现如下情况：hbase(main):001:0> create 'test',''c<br />
+NativeException: org.apache.hadoop.hbase.MasterNotRunningException: null</p>
+
+<p>jps下，发现主节点上HMaster没有启动，查理HBase log（logs/hbase-hadoop-master-ubuntu.log）里有下面异常：<br />
+FATAL org.apache.hadoop.hbase.master.HMaster: Unhandled exception. Starting shutdown.<br />
+java.io.IOException: Call to node1/10.64.56.76:49002 failed on local exception: java.io.EOFException</p>
+
+<p> </p>
+
+<p>解决：</p>
+
+<p>从hadoop_home/下面cp一个hadoop/hadoop-core-0.20.203.0.jar到hbase_home/lib下。</p>
+
+<p>因为Hbase建立在Hadoop之上，所以他用到了hadoop.jar,这个Jar在 lib 里面。这个jar是hbase自己打了branch-0.20-append 补丁的hadoop.jar. Hadoop使用的hadoop.jar和Hbase使用的 必须 一致。所以你需要将 Hbaselib 目录下的hadoop.jar替换成Hadoop里面的那个，防止版本冲突。比方说CDH的版本没有HDFS-724而branch-0.20-append里面有，这个HDFS-724补丁修改了RPC协议。如果不替换，就会有版本冲突，继而造成严重的出错，Hadoop会看起来挂了。</p>
+
+<p>再用./start-hbase.sh启动HBase后，jps下，发现主节点上HMaster还是没有启动，在HBase log里有下面异常：<br />
+FATAL org.apache.hadoop.hbase.master.HMaster: Unhandled exception. Starting shutdown.<br />
+java.lang.NoClassDefFoundError: org/apache/commons/configuration/Configuration<br />
+解决：<br />
+在NoClassDefFoundError,缺少 org/apache/commons/configuration/Configuration <br />
+果断给他加一个commons-configuration包，<br />
+从hadoop_home/lib下面cp一个hadoop/lib/commons-configuration-1.6.jar到hbase_home/lib下。</p>
+
+<p>（集群上所有机子的hbase配置都需要一样）</p>
+
+<p> </p>
+
+<p>创建表报错：</p>
+
+<p>ERROR: java.io.IOException: Table Namespace Manager not ready yet, try again later<br />
+at org.apache.hadoop.hbase.master.HMaster.getNamespaceDescriptor(HMaster.java:3101)<br />
+at org.apache.hadoop.hbase.master.HMaster.createTable(HMaster.java:1738)<br />
+at org.apache.hadoop.hbase.master.HMaster.createTable(HMaster.java:1777)<br />
+at org.apache.hadoop.hbase.protobuf.generated.MasterProtos$MasterService$2.callBlockingMethod(MasterProtos.java:38221)<br />
+at org.apache.hadoop.hbase.ipc.RpcServer.call(RpcServer.java:2146)<br />
+at org.apache.hadoop.hbase.ipc.RpcServer$Handler.run(RpcServer.java:1851)</p>
+
+<p> </p>
+
+<p>解决：</p>
+
+<p>1） 查看集群的所有机器上，</p>
+
+<p>HRegionServer和HQuorumPeer进程是否都启动？</p>
+
+<p>2）查看集群的所有机器的logs是不是有错误消息；</p>
+
+<p>tail -f hbase-hadoop-regionserver-XXX..log </p>
+
+<p> </p>
+
+<h2>2  注意事项：</h2>
+
+<p> 1）、先启动hadoop后，再开启hbase<br />
+ 2）、去掉hadoop的安全模式：hadoop dfsadmin -safemode leave<br />
+ 3）、把/etc/hosts里的ubuntu的IP改为服务器当前的IP<br />
+ 4)  、确认hbase的hbase-site.xml中<br />
+                  <name>hbase.rootdir</name><br />
+                 <value>hdfs://node：49002/hbase</value><br />
+         与hadoop的core-site.xml中<br />
+                   <name>fs.default.name</name><br />
+                  <value>hdfs://node：49002/hbase</value><br />
+       红字部分保持一致</p>
+
+<p>      <value>hdfs://localhost:8020/hbase</value></p>
+
+<p>     否则报错：java.lang.RuntimeException: HMaster Aborted</p>
+
+<p><br />
+ 6)、重新执行./start-hbase.sh之前，先kill掉当前的hbase和zookeeper进程</p>
+
+<p>7）hosts注意顺序：</p>
+
+<p>192.168.1.214 master<br />
+192.168.1.205 node1<br />
+192.168.1.207 node2<br />
+192.168.1.209 node3<br />
+192.168.1.205 T205.joy.cc</p>
+
+<p><strong>PS：遇到问题时，先查看logs，很有帮助。</strong></p>
+
+<p> </p>
+
+<p>HBase 官方文档，全面介绍hbase安装配置：</p>
+
+<p><a href="http://www.yankay.com/wp-content/hbase/book.html#hbase_default_configurations" target="_blank">http://www.yankay.com/wp-content/hbase/book.html#hbase_default_configurations</a></p>

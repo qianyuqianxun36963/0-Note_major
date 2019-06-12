@@ -1,0 +1,75 @@
+<h1>Openshift 之 Docker Registry</h1>
+
+<h2>查看私库对应service信息</h2>
+
+<p>执行 <strong>oc get svc -n default</strong> 命令查看 <strong>Registry</strong> 容器对应的 <strong>Service</strong> 信息。</p>
+
+<pre>
+<code>$ oc get svc -n default
+NAME CLUSTER-IP EXTERNAL-IP PORT(S) AGE
+docker-registry 172.30.89.21 <none> 5000/TCP 18h
+kubernetes 172.30.0.1 <none> 443/TCP,53/UDP,53/TCP 18h
+router 172.30.10.51 <none> 80/TCP,443/TCP,1936/TCP 18h
+</code></pre>
+
+<p>每当 <strong>S2I</strong> 完成镜像构建，就会向内部的镜像仓库推送构建完成的镜像。</p>
+
+<p>上面可以查询到具体的docker registry name以及ip.</p>
+
+<h2>查看私库容器状态</h2>
+
+<p>执行 <strong>oc get pod -n default</strong> 命令查看 <strong>Registry</strong> 容器状态。</p>
+
+<pre>
+<code>$ oc get pod -n default
+NAME READY STATUS RESTARTS AGE
+docker-registry-1-2kxx2 1/1 Running 4 18h
+router-1-zvm87 1/1 Running 4 18h</code></pre>
+
+<h2>登录私库</h2>
+
+<p>用docker login连接到该pod：</p>
+
+<pre>
+<code># docker login docker-registry.default.svc:5000
+Username: user.id 
+Password: [登陆openshift的串码]
+Login Succeeded
+</code></pre>
+
+<p>接下来就可以push image到具体的project里了:</p>
+
+<pre>
+<code> To push an image to this image stream:
+$ sudo docker tag myimage registry/myproject/myimage:tag
+$ sudo docker push registry/myproject/myimage:tag
+</code></pre>
+
+<p>下面是个真实范例：</p>
+
+<pre>
+<code># docker tag cas-svc:1.0.0 docker-registry.default.svc:5000/demo-project/cas-svc:1.0.0
+
+# docker push docker-registry.default.svc:5000/demo-project/cas-svc:1.0.0 
+The push refers to a repository [docker-registry.default.svc:5000/demo-project/cas-svc]
+638735aba39b: Pushed 
+4ffb2c49a619: Pushed 
+e33af80de3fe: Pushed 
+79fe6d0e931d: Pushed 
+685fdd7e6770: Pushed 
+c9b26f41504c: Pushed 
+cd7100a72410: Pushed 
+1.0.0: digest: sha256:67c018604ad33d420e79c20a3f40e77b0fabe610f2cf2ead86217c0ff7655a27 size: 1782</code>
+</pre>
+
+<h2>遇到的问题</h2>
+
+<h3>错误一：</h3>
+
+<h4>错误代码：getsockopt: connection refused</h4>
+
+<p>具体错误：Get https://192.168.107.165:5000/v1/_ping: dial tcp 192.168.107.165:5000: getsockopt: connection refused</p>
+
+<h4>原因：repository 镜像没有起来</h4>
+
+<p>解决办法:docker start repository镜像ID</p>

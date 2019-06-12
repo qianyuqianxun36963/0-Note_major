@@ -1,0 +1,79 @@
+<h1>resultMap 使用小结</h1>
+
+<h2>mapper.xml 文件</h2>
+
+<pre>
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.huawei.na.manager.mapper.sys.SysUserMapper">
+<resultMap id="BaseResultMap" type="com.huawei.na.manager.model.sys.SysUser">
+<constructor>
+<idArg column="id" javaType="java.lang.String" jdbcType="VARCHAR" />
+<arg column="w3User_id" javaType="java.lang.String" jdbcType="VARCHAR" />
+<arg column="user_name" javaType="java.lang.String" jdbcType="VARCHAR" />
+<arg column="create_time" javaType="java.util.Date" jdbcType="TIMESTAMP" />
+<arg column="create_by" javaType="java.lang.String" jdbcType="VARCHAR" />
+<arg column="update_time" javaType="java.util.Date" jdbcType="TIMESTAMP" />
+<arg column="update_by" javaType="java.lang.String" jdbcType="VARCHAR" />
+<arg column="has_del" javaType="java.lang.Byte" jdbcType="TINYINT" />
+<arg column="has_used" javaType="java.lang.Byte" jdbcType="TINYINT" />
+</constructor>
+</resultMap>
+<resultMap id="BaseResultMapFull" type="com.huawei.na.manager.model.scene.<span style="font-size:18px"><strong>SceneBaseinfoFull</strong></span>">
+<<strong>constructor</strong>>
+<<strong>idArg <span style="font-size:18px">column="bid" </span></strong>javaType="java.lang.String" jdbcType="VARCHAR" />
+<<strong>arg </strong>column="scene_name" javaType="java.lang.String" jdbcType="VARCHAR" />
+<arg column="create_time" javaType="java.util.Date" jdbcType="TIMESTAMP" />
+<arg column="create_by" javaType="java.lang.String" jdbcType="VARCHAR" />
+<arg column="update_time" javaType="java.util.Date" jdbcType="TIMESTAMP" />
+<arg column="update_by" javaType="java.lang.String" jdbcType="VARCHAR" />
+</constructor>
+<collection property="sceneFileList" ofType="com.huawei.na.manager.model.scene.SceneBaseinfoFile">
+<<strong>id </strong><span style="font-size:18px"><strong>column="fid"</strong></span> jdbcType="VARCHAR" javaType="java.lang.String" <strong><span style="font-size:18px">property="id"</span></strong>/>
+<<strong>result </strong>column="scene_id" jdbcType="VARCHAR" javaType="java.lang.String" property="sceneId"/>
+<result column="file_type" jdbcType="VARCHAR" javaType="java.lang.String" property="fileType"/>
+<result column="file_name" jdbcType="VARCHAR" javaType="java.lang.String" property="fileName"/>
+<result column="file_path_access" jdbcType="VARCHAR" javaType="java.lang.String" property="filePathAccess"/>
+<result column="file_path_download" jdbcType="VARCHAR" javaType="java.lang.String" property="filePathDownload"/>
+<result column="create_time" javaType="java.util.Date" jdbcType="TIMESTAMP" property="createTime"/>
+<result column="create_by" javaType="java.lang.String" jdbcType="VARCHAR" property="createBy"/>
+</collection>
+</resultMap>
+
+<sql id="Main_Base_Column_List">
+b.id <span style="font-size:18px"><strong>bid</strong></span>, b.scene_name, b.create_time, b.create_by, b.update_time, b.update_by
+</sql>
+
+<sql id="File_Column_List">
+f.id <span style="font-size:18px"><strong>fid</strong></span>, f.scene_id, file_type, f.file_name, f.file_path_access, f.file_path_download, f.create_time, f.create_by
+</sql>
+
+<select id="selectByPrimaryKeyFull" parameterType="java.lang.String" resultMap="BaseResultMapFull">
+select
+<include refid="Main_Base_Column_List" />,<include refid="File_Column_List" />
+from scene_baseinfo b
+left join scene_baseinfo_file f on b.id = f.scene_id
+where b.id = #{id,jdbcType=VARCHAR}
+</select>
+
+</mapper></pre>
+
+<h2>总结：</h2>
+
+<p>1、一个mapper配置文件中，可以有两个resultMap节点</p>
+
+<p>2、<include refid="Main_Base_Column_List" /> 实际上就是替换。</p>
+
+<p>select b.id <span style="font-size:18px"><strong>bid</strong></span>, b.scene_name, b.create_time, b.create_by, b.update_time, b.update_by,f.id <span style="font-size:18px"><strong>fid</strong></span>, f.scene_id, file_type, f.file_name, f.file_path_access, f.file_path_download, f.create_time, f.create_by from ...</p>
+
+<p>3、resultMap实际的原理就是将查询结果中的字段名映射到类的属性名。这里如果fid写成bid，完全可能映射成 bid 对应的值！！！</p>
+
+<p><<strong>id </strong><span style="font-size:18px"><strong>column="fid"</strong></span> jdbcType="VARCHAR" javaType="java.lang.String" <strong><span style="font-size:18px">property="id"</span></strong>/> </p>
+
+<p>fid是查询结果中的column名，id是SceneBaseinfoFile中的属性名。</p>
+
+<p>4、id 和 <strong>idArg </strong>标签是用来结果集去重的，如果不指定，多条结果可能会只返回一条！类型与group by 效果</p>
+
+<p>5、idarg arg 对应(<strong>constructor)</strong>类的构造方法，属性必须与构造方法一致。</p>
+
+<p>     id result 则对应于get set 属性方式。</p>

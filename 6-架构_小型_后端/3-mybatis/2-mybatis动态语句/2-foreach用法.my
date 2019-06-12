@@ -1,332 +1,286 @@
 <h1>mybatis动态sql之foreach用法</h1>
-
-<h2>一、介绍：&nbsp;</h2>
-
-<p>&nbsp;foreach主要是用于一个循环，大部分用到的是循环的生成sql，下面说一下动态foreach的属性：<br />
-&nbsp; foreach元素的属性主要有item，index，collection，open，separator，close。<br />
-&nbsp; 1、collection表示如何来得到这个集合，如果传入的直接为一个List，那么collection值就为list，如果直接传入的为一个array不可变数组，那么collection值就为array，如果传入的为一个dto，比如dto里面的array变量名为idLists，那么collection的值就为idLists。<br />
-&nbsp; 2、item表示集合中每一个元素进行迭代时的别名，比如item为value，那么，每次获取的都使用#{value}即可<br />
-&nbsp; 3、index指定一个名字，用于表示在迭代过程中，每次迭代到的位置，一般很少使用这个<br />
-&nbsp; 4、open表示该语句以什么开始<br />
-&nbsp; 5、separator表示在每次进行迭代之间以什么符号作为分隔符<br />
-&nbsp; 6、close表示以什么结束</p>
-
+<h2>一、介绍： </h2>
+<p> foreach主要是用于一个循环，大部分用到的是循环的生成sql，下面说一下动态foreach的属性：<br />
+  foreach元素的属性主要有item，index，collection，open，separator，close。<br />
+  1、collection表示如何来得到这个集合，如果传入的直接为一个List，那么collection值就为list，如果直接传入的为一个array不可变数组，那么collection值就为array，如果传入的为一个dto，比如dto里面的array变量名为idLists，那么collection的值就为idLists。<br />
+  2、item表示集合中每一个元素进行迭代时的别名，比如item为value，那么，每次获取的都使用#{value}即可<br />
+  3、index指定一个名字，用于表示在迭代过程中，每次迭代到的位置，一般很少使用这个<br />
+  4、open表示该语句以什么开始<br />
+  5、separator表示在每次进行迭代之间以什么符号作为分隔符<br />
+  6、close表示以什么结束</p>
 <h2>二、原理：</h2>
-
 <p>动态SQL，最后都会根据条件拼成SQL，foreach也不例外，原理为：<br />
 首先根据collection来得到集合，然后写入open字符，然后开始遍历：<br />
 每次遍历，都会执行里面的条件得到生成的sql，然后加入separator，遍历完成之后，加入close字符。</p>
-
 <h2>三、实战：</h2>
-
 <p><a href="http://www.cnblogs.com/fangyu19900812/p/6046209.html" id="cb_post_title_url">mybatis 中 foreach collection的三种用法</a><br />
 <br />
 在使用foreach的时候最关键的也是最容易出错的就是collection属性，该属性是必须指定的，但是在不同情况 下，该属性的值是不一样的，主要有一下3种情况：</p>
-
-<p>&nbsp; &nbsp; 1. 如果传入的是单参数且参数类型是一个List的时候，collection属性值为list<br />
-&nbsp;&nbsp;&nbsp;&nbsp;2. 如果传入的是单参数且参数类型是一个array数组的时候，collection的属性值为array<br />
-&nbsp;&nbsp;&nbsp;&nbsp;3. 如果传入的参数是多个的时候，我们就需要把它们封装成一个Map了，当然单参数也可</p>
-
+<p>    1. 如果传入的是单参数且参数类型是一个List的时候，collection属性值为list<br />
+    2. 如果传入的是单参数且参数类型是一个array数组的时候，collection的属性值为array<br />
+    3. 如果传入的参数是多个的时候，我们就需要把它们封装成一个Map了，当然单参数也可</p>
 <p>以封装成map，实际上如果你在传入参数的时候，在breast里面也是会把它封装成一个Map的，map的key就是参数名，所以这个时候collection属性值就是传入的List或array对象在自己封装的map里面的key 下面分别来看看上述三种情况的示例代码：<br />
 1.单参数List的类型：<br />
-&nbsp;&nbsp;</p>
-
+  </p>
 <pre>
-1 &lt;select id=&quot;dynamicForeachTest&quot; resultType=&quot;Blog&quot;&gt;
-2           select * from t_blog where id in
-3        &lt;foreach collection=&quot;list&quot; index=&quot;index&quot; item=&quot;item&quot; open=&quot;(&quot; separator=&quot;,&quot; close=&quot;)&quot;&gt;
-4                #{item}       
-5        &lt;/foreach&gt;    
-6    &lt;/select&gt;</pre>
-
-<p>&nbsp;</p>
-
+1 <select id="dynamicForeachTest" resultType="Blog">
+2 select * from t_blog where id in
+3 <foreach collection="list" index="index" item="item" open="(" separator="," close=")">
+4 #{item} 
+5 </foreach> 
+6 </select></pre>
+<p> </p>
 <p><br />
 上述collection的值为list，对应的Mapper是这样的<br />
 public List dynamicForeachTest(List ids);<br />
 测试代码：</p>
-
 <pre>
- 1 @Test
- 2     public void dynamicForeachTest() {
- 3         SqlSession session = Util.getSqlSessionFactory().openSession();      
- 4         BlogMapper blogMapper = session.getMapper(BlogMapper.class);
- 5          List ids = new ArrayList();
- 6          ids.add(1);
- 7          ids.add(3);
- 8          ids.add(6);
- 9         List blogs = blogMapper.dynamicForeachTest(ids);
-10          for (Blog blog : blogs)
-11              System.out.println(blog);
-12          session.close();
-13      }
-
+1 @Test
+2 public void dynamicForeachTest() {
+3 SqlSession session = Util.getSqlSessionFactory().openSession(); 
+4 BlogMapper blogMapper = session.getMapper(BlogMapper.class);
+5 List ids = new ArrayList();
+6 ids.add(1);
+7 ids.add(3);
+8 ids.add(6);
+9 List blogs = blogMapper.dynamicForeachTest(ids);
+10 for (Blog blog : blogs)
+11 System.out.println(blog);
+12 session.close();
+13 }
 2.单参数array数组的类型：</pre>
-
 <pre>
-1 &lt;select id=&quot;dynamicForeach2Test&quot; resultType=&quot;Blog&quot;&gt;
-2     select * from t_blog where id in
-3     &lt;foreach collection=&quot;array&quot; index=&quot;index&quot; item=&quot;item&quot; open=&quot;(&quot; separator=&quot;,&quot; close=&quot;)&quot;&gt;
-4          #{item}
-5     &lt;/foreach&gt;
-6 &lt;/select&gt;    </pre>
-
-<p>&nbsp;</p>
-
+1 <select id="dynamicForeach2Test" resultType="Blog">
+2 select * from t_blog where id in
+3 <foreach collection="array" index="index" item="item" open="(" separator="," close=")">
+4 #{item}
+5 </foreach>
+6 </select> </pre>
+<p> </p>
 <p><br />
 上述collection为array，对应的Mapper代码：<br />
 public List dynamicForeach2Test(int[] ids);<br />
 对应的测试代码：</p>
-
 <pre>
- 1 @Test
- 2 public void dynamicForeach2Test() {
- 3         SqlSession session = Util.getSqlSessionFactory().openSession();
- 4         BlogMapper blogMapper = session.getMapper(BlogMapper.class);
- 5         int[] ids = new int[] {1,3,6,9};
- 6         List blogs = blogMapper.dynamicForeach2Test(ids);
- 7         for (Blog blog : blogs)
- 8         System.out.println(blog);    
- 9         session.close();
+1 @Test
+2 public void dynamicForeach2Test() {
+3 SqlSession session = Util.getSqlSessionFactory().openSession();
+4 BlogMapper blogMapper = session.getMapper(BlogMapper.class);
+5 int[] ids = new int[] {1,3,6,9};
+6 List blogs = blogMapper.dynamicForeach2Test(ids);
+7 for (Blog blog : blogs)
+8 System.out.println(blog); 
+9 session.close();
 10 }</pre>
-
 <p><br />
 3.自己把参数封装成Map的类型</p>
-
 <pre>
-1 &lt;select id=&quot;dynamicForeach3Test&quot; resultType=&quot;Blog&quot;&gt;
-2         select * from t_blog where title like &quot;%&quot;#{title}&quot;%&quot; and id in
-3          &lt;foreach collection=&quot;ids&quot; index=&quot;index&quot; item=&quot;item&quot; open=&quot;(&quot; separator=&quot;,&quot; close=&quot;)&quot;&gt;
-4               #{item}
-5          &lt;/foreach&gt;
-6 &lt;/select&gt;
-
+1 <select id="dynamicForeach3Test" resultType="Blog">
+2 select * from t_blog where title like "%"#{title}"%" and id in
+3 <foreach collection="ids" index="index" item="item" open="(" separator="," close=")">
+4 #{item}
+5 </foreach>
+6 </select>
 上述collection的值为ids，是传入的参数Map的key，对应的Mapper代码：
 public List dynamicForeach3Test(Map params);
 对应测试代码：
 </pre>
-
 <pre>
 @Test
-    public void dynamicForeach3Test() {
-        SqlSession session = Util.getSqlSessionFactory().openSession();
-         BlogMapper blogMapper = session.getMapper(BlogMapper.class);
-          final List ids = new ArrayList();
-          ids.add(1);
-          ids.add(2);
-          ids.add(3);
-          ids.add(6);
-          ids.add(7);
-          ids.add(9);
-          Map params = new HashMap();
-          params.put(&quot;ids&quot;, ids);
-          params.put(&quot;title&quot;, &quot;中国&quot;);
-          List blogs = blogMapper.dynamicForeach3Test(params);
-          for (Blog blog : blogs)
-             System.out.println(blog);
-          session.close();
-     }</pre>
-
+public void dynamicForeach3Test() {
+SqlSession session = Util.getSqlSessionFactory().openSession();
+BlogMapper blogMapper = session.getMapper(BlogMapper.class);
+final List ids = new ArrayList();
+ids.add(1);
+ids.add(2);
+ids.add(3);
+ids.add(6);
+ids.add(7);
+ids.add(9);
+Map params = new HashMap();
+params.put("ids", ids);
+params.put("title", "中国");
+List blogs = blogMapper.dynamicForeach3Test(params);
+for (Blog blog : blogs)
+System.out.println(blog);
+session.close();
+}</pre>
 <h2><strong>实际中使用的例子</strong></h2>
-
 <p>service层里面封装参数：</p>
-
-<p>&nbsp; &nbsp; &nbsp; &nbsp; Map&lt;String, Object&gt; paramMap = new HashMap&lt;String, Object&gt;();<br />
-&nbsp; &nbsp; &nbsp; &nbsp; paramMap.put(&quot;userId&quot;, &quot;0-1&quot;);// 操作人ID<br />
-&nbsp; &nbsp; &nbsp; &nbsp; paramMap.put(&quot;userName&quot;, &quot;wang&quot;);// 操作人ID<br />
-&nbsp; &nbsp; &nbsp; &nbsp; paramMap.put(&quot;reVerifyDatas&quot;,reVerifyDatas);//用于批量操作的&nbsp;&nbsp;List&lt;Map&lt;String, Object&gt;<br />
-&nbsp; &nbsp; &nbsp; &nbsp; paramMap.put(&quot;formParams&quot;,formParams);&nbsp; &nbsp; &nbsp;//表单传来的参数&nbsp;Map&lt;String,Object&gt;</p>
-
+<p>        Map<String, Object> paramMap = new HashMap<String, Object>();<br />
+        paramMap.put("userId", "0-1");// 操作人ID<br />
+        paramMap.put("userName", "wang");// 操作人ID<br />
+        paramMap.put("reVerifyDatas",reVerifyDatas);//用于批量操作的  List<Map<String, Object><br />
+        paramMap.put("formParams",formParams);     //表单传来的参数 Map<String,Object></p>
 <p>Mapper.xml 里面：</p>
-
-<p>&nbsp; &nbsp; &lt;!--添加审核状态--&gt;<br />
-&nbsp; &nbsp; &lt;insert id=&quot;insertReRegVerify_batch&quot; parameterType=&quot;java.util.Map&quot;&gt;<br />
-&nbsp; &nbsp; &nbsp; &nbsp; INSERT reg_verify (&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; id,&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;student_reg_id,&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; user_id,&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; user_name,&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; verify_status_id,&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; remark,&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; verify_time<br />
-&nbsp; &nbsp; &nbsp; &nbsp; ) VALUES<br />
-&nbsp; &nbsp; &nbsp; &nbsp; &lt;foreach collection=&quot;reVerifyDatas&quot; index=&quot;index&quot; item=&quot;reVerifyData&quot; separator=&quot;,&quot;&gt;<br />
-&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; (replace(uuid(), &#39;-&#39;, &#39;&#39;),#{reVerifyData.reRegVerifyId},#{userId},#{userName},#{formParams.status},#{formParams.remark},NOW()) &nbsp;<br />
-&nbsp; &nbsp; &nbsp; &nbsp; &lt;/foreach&gt;<br />
-&nbsp; &nbsp; &lt;/insert&gt;</p>
-
-<p>&nbsp;</p>
-
+<p>    <!--添加审核状态--><br />
+    <insert id="insertReRegVerify_batch" parameterType="java.util.Map"><br />
+        INSERT reg_verify (            id,           student_reg_id,            user_id,            user_name,            verify_status_id,            remark,            verify_time<br />
+        ) VALUES<br />
+        <foreach collection="reVerifyDatas" index="index" item="reVerifyData" separator=","><br />
+            (replace(uuid(), '-', ''),#{reVerifyData.reRegVerifyId},#{userId},#{userName},#{formParams.status},#{formParams.remark},NOW())  <br />
+        </foreach><br />
+    </insert></p>
+<p> </p>
 <h1>Mybatis foreach 批量操作</h1>
-
 <h2>foreach属性</h2>
-
 <table border="0">
-	<thead>
-		<tr>
-			<th>属性</th>
-			<th>描述</th>
-		</tr>
-	</thead>
-	<tbody>
-		<tr>
-			<td><tt>item</tt></td>
-			<td>循环体中的具体对象。支持属性的点路径访问，如item.age,item.info.details。<br />
-			具体说明：在list和数组中是其中的对象，在map中是value。<br />
-			该参数为必选。</td>
-		</tr>
-		<tr>
-			<td><tt>collection</tt></td>
-			<td>要做foreach的对象，作为入参时，List&lt;?&gt;对象默认用list代替作为键，数组对象有array代替作为键，Map对象用map代替作为键。<br />
-			当然在作为入参时可以使用@Param(&quot;keyName&quot;)来设置键，设置keyName后，list,array,map将会失效。 除了入参这种情况外，还有一种作为参数对象的某个字段的时候。举个例子：<br />
-			如果User有属性List ids。入参是User对象，那么这个collection = &quot;ids&quot;<br />
-			如果User有属性Ids ids;其中Ids是个对象，Ids有个属性List id;入参是User对象，那么collection = &quot;ids.id&quot;<br />
-			上面只是举例，具体collection等于什么，就看你想对那个元素做循环。<br />
-			该参数为必选。</td>
-		</tr>
-		<tr>
-			<td><tt>separator</tt></td>
-			<td>元素之间的分隔符，例如在in()的时候，separator=&quot;,&quot;会自动在元素中间用&ldquo;,&ldquo;隔开，避免手动输入逗号导致sql错误，如in(1,2,)这样。该参数可选。</td>
-		</tr>
-		<tr>
-			<td><tt>open</tt></td>
-			<td>foreach代码的开始符号，一般是(和close=&quot;)&quot;合用。常用在in(),values()时。该参数可选。</td>
-		</tr>
-		<tr>
-			<td><tt>close</tt></td>
-			<td>foreach代码的关闭符号，一般是)和open=&quot;(&quot;合用。常用在in(),values()时。该参数可选。</td>
-		</tr>
-		<tr>
-			<td><tt>index</tt></td>
-			<td>在list和数组中,index是元素的序号，在map中，index是元素的key，该参数可选。</td>
-		</tr>
-	</tbody>
+<thead>
+<tr>
+<th>属性</th>
+<th>描述</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><tt>item</tt></td>
+<td>循环体中的具体对象。支持属性的点路径访问，如item.age,item.info.details。<br />
+具体说明：在list和数组中是其中的对象，在map中是value。<br />
+该参数为必选。</td>
+</tr>
+<tr>
+<td><tt>collection</tt></td>
+<td>要做foreach的对象，作为入参时，List<?>对象默认用list代替作为键，数组对象有array代替作为键，Map对象用map代替作为键。<br />
+当然在作为入参时可以使用@Param("keyName")来设置键，设置keyName后，list,array,map将会失效。 除了入参这种情况外，还有一种作为参数对象的某个字段的时候。举个例子：<br />
+如果User有属性List ids。入参是User对象，那么这个collection = "ids"<br />
+如果User有属性Ids ids;其中Ids是个对象，Ids有个属性List id;入参是User对象，那么collection = "ids.id"<br />
+上面只是举例，具体collection等于什么，就看你想对那个元素做循环。<br />
+该参数为必选。</td>
+</tr>
+<tr>
+<td><tt>separator</tt></td>
+<td>元素之间的分隔符，例如在in()的时候，separator=","会自动在元素中间用“,“隔开，避免手动输入逗号导致sql错误，如in(1,2,)这样。该参数可选。</td>
+</tr>
+<tr>
+<td><tt>open</tt></td>
+<td>foreach代码的开始符号，一般是(和close=")"合用。常用在in(),values()时。该参数可选。</td>
+</tr>
+<tr>
+<td><tt>close</tt></td>
+<td>foreach代码的关闭符号，一般是)和open="("合用。常用在in(),values()时。该参数可选。</td>
+</tr>
+<tr>
+<td><tt>index</tt></td>
+<td>在list和数组中,index是元素的序号，在map中，index是元素的key，该参数可选。</td>
+</tr>
+</tbody>
 </table>
-
-<p>&nbsp;</p>
-
+<p> </p>
 <h2>1.select count(*) from users id in (x1,x2,x3,...)</h2>
-
 <pre>
-&lt;select id=&quot;countByUserList&quot; resultType=&quot;int&quot; parameterType=&quot;list&quot;&gt;    
-select count(*) from users    
-  &lt;where&gt;    
-    id in    
-    &lt;foreach item=&quot;item&quot; collection=&quot;list&quot; separator=&quot;,&quot; open=&quot;(&quot; close=&quot;)&quot; index=&quot;&quot;&gt;    
-      #{item.id, jdbcType=NUMERIC}    
-    &lt;/foreach&gt;    
-  &lt;/where&gt;    
-&lt;/select&gt; 
+<select id="countByUserList" resultType="int" parameterType="list"> 
+select count(*) from users 
+<where> 
+id in 
+<foreach item="item" collection="list" separator="," open="(" close=")" index=""> 
+#{item.id, jdbcType=NUMERIC} 
+</foreach> 
+</where> 
+</select> 
 </pre>
-
 <h2>2.循环插入表数据，用到dual伪表给数据做掩护。</h2>
-
 <p>insert into deliver (col1,col2,col3,col4,...) select col1,col2,col3,col4... from dual union all select col11,col22,col33,col44,... from dual。（字段col1,col2,col3,col4,...）添加 或者 insert into deliver select col1,col2,col3,col4,... from dual union all select col11,col22,col33,col44,... from dual。（全部字段添加）</p>
-
 <pre>
-&lt;insert id=&quot;addList&quot;&gt;  
-          
-        INSERT INTO DELIVER  
-            (  
-                &lt;include refid=&quot;selectAllColumnsSql&quot;/&gt;  
-             )  
-           
-          &lt;foreach collection=&quot;deliverList&quot; item=&quot;item&quot; separator=&quot;UNION ALL&quot;&gt;  
-                SELECT   
-                     #{item.id, jdbcType=NUMERIC},  
-                     #{item.name, jdbcType=VARCHAR}  
-                FROM DUAL  
-          &lt;/foreach&gt;  
-    &lt;/insert&gt;  
+<insert id="addList"> 
+
+INSERT INTO DELIVER 
+( 
+<include refid="selectAllColumnsSql"/> 
+) 
+
+<foreach collection="deliverList" item="item" separator="UNION ALL"> 
+SELECT 
+#{item.id, jdbcType=NUMERIC}, 
+#{item.name, jdbcType=VARCHAR} 
+FROM DUAL 
+</foreach> 
+</insert> 
 </pre>
-
-<h2>3.循环插入map值 &nbsp;insert into users(key,values) values(key1,values1),(key2,values3),(key3,values4)</h2>
-
+<h2>3.循环插入map值  insert into users(key,values) values(key1,values1),(key2,values3),(key3,values4)</h2>
 <pre>
-&lt;insert id=&quot;ins_string_string&quot;&gt;    
-        insert into string_string (key, value) values    
-        &lt;foreach item=&quot;item&quot; index=&quot;key&quot; collection=&quot;map&quot;    
-            open=&quot;&quot; separator=&quot;,&quot; close=&quot;&quot;&gt;(#{key}, #{item})&lt;/foreach&gt;    
-    &lt;/insert&gt; 
+<insert id="ins_string_string"> 
+insert into string_string (key, value) values 
+<foreach item="item" index="key" collection="map" 
+open="" separator="," close="">(#{key}, #{item})</foreach> 
+</insert> 
 </pre>
-
-<h2>4.select&nbsp;count(*)&nbsp;from&nbsp;key_cols&nbsp;where&nbsp;col_a&nbsp;=&nbsp;?&nbsp;AND&nbsp;col_b&nbsp;=&nbsp;?</h2>
-
-<p>(<strong>一定要注意到$和#的区别</strong>，$的参数直接输出，#的参数会被替换为?，然后传入参数值，加上&#39; &#39;后执行。可以防止sql注入)</p>
-
 <pre>
-&lt;select id=&quot;sel_key_cols&quot; resultType=&quot;int&quot;&gt;    
-        select count(*) from key_cols where    
-        &lt;foreach item=&quot;item&quot; index=&quot;key&quot; collection=&quot;map&quot;    
-            open=&quot;&quot; separator=&quot;AND&quot; close=&quot;&quot;&gt;${key} = #{item}&lt;/foreach&gt;    
-    &lt;/select&gt;  
-</pre>
-
-<h2>5.select * from t_news n where n.tags like ? or n.tags like ?&nbsp;</h2>
-
+<insert id="insertList" parameterType="java.util.Map" >
+insert into scene_appointment_detail (id, date, appointment_id,
+scene_id, user_id, status,
+create_time, create_by)
+values
+<foreach <strong>collection="dates"</strong> <strong>item="date"</strong> index="index" open="" <strong>separator=","</strong> close="">
+(replace(uuid(),'-',''), #{date,jdbcType=DATE}, #{record.appointmentId,jdbcType=VARCHAR},
+#{record.sceneId,jdbcType=VARCHAR}, #{record.userId,jdbcType=VARCHAR}, #{record.status,jdbcType=TINYINT},
+#{record.createTime,jdbcType=TIMESTAMP}, #{record.createBy,jdbcType=VARCHAR})
+</foreach>
+</insert></pre>
+<h2>4.select count(*) from key_cols where col_a = ? AND col_b = ?</h2>
+<p>(<strong>一定要注意到$和#的区别</strong>，$的参数直接输出，#的参数会被替换为?，然后传入参数值，加上' '后执行。可以防止sql注入)</p>
 <pre>
- &lt;select id=&quot;selectTestForEach&quot; parameterType=&quot;News&quot; resultMap=&quot;NewsResultMapper&quot;&gt;
-  select * from t_news n where 
-  &lt;foreach collection=&quot;listTag&quot; index=&quot;index&quot; item=&quot;tag&quot; open=&quot;&quot; separator=&quot;or&quot; close=&quot;&quot;&gt;
-             n.tags like  &#39;%&#39;||#{tag}||&#39;%&#39;
-  &lt;/foreach&gt;
- &lt;select&gt;
+<select id="sel_key_cols" resultType="int"> 
+select count(*) from key_cols where 
+<foreach item="item" index="key" collection="map" 
+open="" separator="AND" close="">${key} = #{item}</foreach> 
+</select> 
 </pre>
-
+<h2>5.select * from t_news n where n.tags like ? or n.tags like ? </h2>
+<pre>
+<select id="selectTestForEach" parameterType="News" resultMap="NewsResultMapper">
+select * from t_news n where 
+<foreach collection="listTag" index="index" item="tag" open="" separator="or" close="">
+n.tags like '%'||#{tag}||'%'
+</foreach>
+<select>
+</pre>
 <h1>mybatis批量更新update-设置多个字段值</h1>
-
 <p>mybatis由于简单易用性得到大家的认可和使用</p>
-
 <p>但是在批量更新操作中，网上介绍的貌似不全，正好今天做个记录，大家一起进步</p>
-
 <p>在实际项目开发过程中，常有这样的需求：根据ids更新表的某一个字段值，这时的sql语句是：</p>
-
 <ol start="1">
-	<li>public&nbsp;interface&nbsp;IStaffDao&nbsp;{&nbsp;&nbsp;</li>
-	<li>&nbsp;&nbsp;&nbsp;&nbsp;void&nbsp;batchUpdate(@Param(&quot;list&quot;)&nbsp;List&lt;Long&gt;&nbsp;list);&nbsp;&nbsp;</li>
-	<li>}&nbsp;&nbsp;</li>
+<li>public interface IStaffDao {  </li>
+<li>    void batchUpdate(@Param("list") List<Long> list);  </li>
+<li>}  </li>
 </ol>
-
-<p>&nbsp;</p>
-
+<p> </p>
 <ol start="1">
-	<li>&lt;select&nbsp;id=&quot;getStaffsByIds&quot;&nbsp;resultMap=&quot;staff_Mapper&quot;&gt;&nbsp;&nbsp;</li>
-	<li>&nbsp;&nbsp;&nbsp;&nbsp;update&nbsp;staff&nbsp;set&nbsp;status&nbsp;=&nbsp;0&nbsp;where&nbsp;id&nbsp;in&nbsp;&nbsp;</li>
-	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;foreach&nbsp;collection=&quot;list&quot;&nbsp;item=&quot;item&quot;&nbsp;index=&quot;index&quot;&nbsp;open=&quot;(&quot;&nbsp;separator=&quot;,&quot;&nbsp;close=&quot;)&quot;&nbsp;&gt;&nbsp;&nbsp;</li>
-	<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;#{item}&nbsp;&nbsp;</li>
-	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;/foreach&gt;&nbsp;&nbsp;</li>
-	<li>&nbsp;&nbsp;&nbsp;&nbsp;ORDER&nbsp;BY&nbsp;id&nbsp;&nbsp;</li>
-	<li>&lt;/select&gt;&nbsp;&nbsp;</li>
+<li><select id="getStaffsByIds" resultMap="staff_Mapper">  </li>
+<li>    update staff set status = 0 where id in  </li>
+<li>    <foreach collection="list" item="item" index="index" open="(" separator="," close=")" >  </li>
+<li>        #{item}  </li>
+<li>    </foreach>  </li>
+<li>    ORDER BY id  </li>
+<li></select>  </li>
 </ol>
-
 <p><br />
 还有一种情况：根据ids更新表的多个值，并且每个id对应的值也不一样，这时上述语句已经满足不了需求，需要另一种批量更新sql语句</p>
-
 <ol start="1">
-	<li>public&nbsp;interface&nbsp;IStaffDao&nbsp;{&nbsp;&nbsp;</li>
-	<li>&nbsp;&nbsp;&nbsp;&nbsp;void&nbsp;batchUpdate(@Param(&quot;list&quot;)&nbsp;List&lt;Staff&gt;&nbsp;list);&nbsp;&nbsp;</li>
-	<li>}&nbsp;&nbsp;</li>
+<li>public interface IStaffDao {  </li>
+<li>    void batchUpdate(@Param("list") List<Staff> list);  </li>
+<li>}  </li>
 </ol>
-
-<p>&nbsp;</p>
-
+<p> </p>
 <ol start="1">
-	<li>&lt;update&nbsp;id=&quot;batchUpdate&quot;&nbsp;parameterType=&quot;java.util.List&quot;&nbsp;&gt;&nbsp;&nbsp;</li>
-	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;foreach&nbsp;collection=&quot;list&quot;&nbsp;item=&quot;item&quot;&nbsp;index=&quot;index&quot;&nbsp;separator=&quot;;&quot;&gt;&nbsp;&nbsp;</li>
-	<li>&nbsp;&nbsp;&nbsp;&nbsp;UPDATE&nbsp;staff&nbsp;set&nbsp;count&nbsp;=&nbsp;#{item.count}&nbsp;,&nbsp;code&nbsp;=&nbsp;#{item.code}&nbsp;,&nbsp;invalid_time&nbsp;=&nbsp;#{item.time}&nbsp;WHERE&nbsp;id&nbsp;=&nbsp;#{item.id}&nbsp;&nbsp;</li>
-	<li>&nbsp;&nbsp;&nbsp;&nbsp;&lt;/foreach&gt;&nbsp;&nbsp;</li>
-	<li>&lt;/update&gt;&nbsp;&nbsp;&nbsp;</li>
+<li><update id="batchUpdate" parameterType="java.util.List" >  </li>
+<li>    <foreach collection="list" item="item" index="index" separator=";">  </li>
+<li>    UPDATE staff set count = #{item.count} , code = #{item.code} , invalid_time = #{item.time} WHERE id = #{item.id}  </li>
+<li>    </foreach>  </li>
+<li></update>   </li>
 </ol>
-
 <p>由于这种批量更新是一次执行多个update语句，所以mybatis需要额外的配置：</p>
-
 <p>在spring.datasource.url后加上allowMultiQueries=true<br />
 如：jdbc:mysql://10.10.20.36:3306/test?allowMultiQueries=true</p>
-
 <p>否则，在执行sql语句时，会报下面的错误</p>
-
 <ol start="1">
-	<li>[org.apache.ibatis.session.defaults.DefaultSqlSession@76a2f910]&nbsp;&nbsp;</li>
-	<li>org.springframework.jdbc.BadSqlGrammarException:&nbsp;&nbsp;&nbsp;</li>
-	<li>###&nbsp;Error&nbsp;updating&nbsp;database.&nbsp;&nbsp;Cause:&nbsp;com.mysql.jdbc.exceptions.jdbc4.MySQLSyntaxErrorException:&nbsp;You&nbsp;have&nbsp;an&nbsp;error&nbsp;in&nbsp;your&nbsp;SQL&nbsp;syntax;&nbsp;check&nbsp;the&nbsp;manual&nbsp;that&nbsp;corresponds&nbsp;to&nbsp;your&nbsp;MySQL&nbsp;server&nbsp;version&nbsp;for&nbsp;the&nbsp;right&nbsp;syntax&nbsp;to&nbsp;use&nbsp;near&nbsp;&#39;update&nbsp;b_email_msg_remind&nbsp;&nbsp;&nbsp;</li>
-	<li>SET&nbsp;send_status&nbsp;=&nbsp;1,&nbsp;send_email_code=&#39;abc@abc.abc&#39;&#39;&nbsp;at&nbsp;line&nbsp;6&nbsp;&nbsp;</li>
-	<li>###&nbsp;The&nbsp;error&nbsp;may&nbsp;involve&nbsp;com.hhsoft.sectionservice.model.persistence.EmailMapper.updateEmailTasks-Inline&nbsp;&nbsp;</li>
-	<li>###&nbsp;The&nbsp;error&nbsp;occurred&nbsp;while&nbsp;setting&nbsp;parameters&nbsp;&nbsp;</li>
-	<li>###&nbsp;Cause:&nbsp;com.mysql.jdbc.exceptions.jdbc4.MySQLSyntaxErrorException:&nbsp;You&nbsp;have&nbsp;an&nbsp;error&nbsp;in&nbsp;your&nbsp;SQL&nbsp;syntax;&nbsp;check&nbsp;the&nbsp;manual&nbsp;that&nbsp;corresponds&nbsp;to&nbsp;your&nbsp;MySQL&nbsp;server&nbsp;version&nbsp;for&nbsp;the&nbsp;right&nbsp;syntax&nbsp;to&nbsp;use&nbsp;near&nbsp;&#39;update&nbsp;staff&nbsp;&nbsp;&nbsp;</li>
-	<li>SET&nbsp;status&nbsp;=&nbsp;1,&nbsp;send_email_code=&#39;abc@abc.abc&#39;;&lt;span&nbsp;style=&quot;font-family:&nbsp;Helvetica,&nbsp;Tahoma,&nbsp;Arial,&nbsp;sans-serif;&quot;&gt;update&nbsp;sta&lt;span&nbsp;style=&quot;font-size:10px;&quot;&gt;ff&nbsp;SET&nbsp;status&nbsp;=&nbsp;2,&lt;/span&gt;&nbsp;send_email_code=&#39;test@qq.com&#39;&nbsp;&lt;/span&gt;&#39;&nbsp;at&nbsp;line&nbsp;6&nbsp;&nbsp;</li>
-	<li>;&nbsp;bad&nbsp;SQL&nbsp;grammar&nbsp;[];&nbsp;nested&nbsp;exception&nbsp;is&nbsp;com.mysql.jdbc.exceptions.jdbc4.MySQLSyntaxErrorException:&nbsp;You&nbsp;have&nbsp;an&nbsp;error&nbsp;in&nbsp;your&nbsp;SQL&nbsp;syntax;&nbsp;check&nbsp;the&nbsp;manual&nbsp;that&nbsp;corresponds&nbsp;to&nbsp;your&nbsp;MySQL&nbsp;server&nbsp;version&nbsp;for&nbsp;the&nbsp;right&nbsp;syntax&nbsp;to&nbsp;use&nbsp;near&nbsp;&#39;update&nbsp;b_email_msg_remind&nbsp;&nbsp;&nbsp;</li>
-	<li>SET&nbsp;send_status&nbsp;=&nbsp;1,&nbsp;send_email_code=&#39;abc@abc.abc&#39;&#39;&nbsp;at&nbsp;line&nbsp;6&nbsp;&nbsp;</li>
+<li>[org.apache.ibatis.session.defaults.DefaultSqlSession@76a2f910]  </li>
+<li>org.springframework.jdbc.BadSqlGrammarException:   </li>
+<li>### Error updating database.  Cause: com.mysql.jdbc.exceptions.jdbc4.MySQLSyntaxErrorException: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'update b_email_msg_remind   </li>
+<li>SET send_status = 1, send_email_code='abc@abc.abc'' at line 6  </li>
+<li>### The error may involve com.hhsoft.sectionservice.model.persistence.EmailMapper.updateEmailTasks-Inline  </li>
+<li>### The error occurred while setting parameters  </li>
+<li>### Cause: com.mysql.jdbc.exceptions.jdbc4.MySQLSyntaxErrorException: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'update staff   </li>
+<li>SET status = 1, send_email_code='abc@abc.abc';<span style="font-family: Helvetica, Tahoma, Arial, sans-serif;">update sta<span style="font-size:10px;">ff SET status = 2,</span> send_email_code='test@qq.com' </span>' at line 6  </li>
+<li>; bad SQL grammar []; nested exception is com.mysql.jdbc.exceptions.jdbc4.MySQLSyntaxErrorException: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'update b_email_msg_remind   </li>
+<li>SET send_status = 1, send_email_code='abc@abc.abc'' at line 6  </li>
 </ol>

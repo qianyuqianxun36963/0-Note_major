@@ -1,0 +1,306 @@
+<h1>SonarQube 7.x 的安装使用 + 集成Maven 使用</h1>
+
+<p>SonarQube 能干啥？？？？看下面这张图就应该知道他能干啥了!</p>
+
+<p><img alt="" src="https://img-blog.csdn.net/20180721104129692?watermark/2/text/aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L2Nkc3pkZDg=/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70" style="height:404px; width:800px" /></p>
+
+<p>对就是各种分析你写的代码，帮助我们检查隐藏的问。好处不多说了，装上试试吧！</p>
+
+<p>1、SonarQube的安装（这里只说linux系统）</p>
+
+<p>     首先我们先来下载SonarQube </p>
+
+<p>     下载地址：<a href="https://www.sonarqube.org/downloads/" rel="nofollow" target="_blank">https://www.sonarqube.org/downloads/</a> 目前比较新的是7.2.1</p>
+
+<p>      <img alt="" src="https://img-blog.csdn.net/20180721104650917?watermark/2/text/aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L2Nkc3pkZDg=/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70" style="height:168px; width:800px" /></p>
+
+<p>SonarQube 的目录是这样的我们需要配置一下SonarQube的环境变量</p>
+
+<p>我的是在Linux 上，目录在/etc/profile下</p>
+
+<pre>
+<code>vi /etc/profile</code>
+</pre>
+
+<ol>
+<li>
+<p><code>export SONAR_SCANNER_HOME=/home/sonarUser/sonarscanner/sonar-scanner-2.8</code></p>
+</li>
+<li>
+<p><code>export PATH=$PATH:$SONAR_HOME/linux-x86-64</code></p>
+</li>
+</ol>
+
+<p>这段代码放到 profile 最后就可以了（当然这个地址需要自己换哈）</p>
+
+<p> 保存好后执行</p>
+
+<pre>
+<code>source /etc/profile</code></pre>
+
+<p>让其配置生效 执行</p>
+
+<ol>
+<li>
+<p><code>$ sonar.sh </code></p>
+</li>
+<li>
+<p><code>Usage: /home/sonar/sonarqube-7.2.1/bin/linux-x86-64/sonar.sh { console | start | stop | restart | status | dump }</code></p>
+</li>
+</ol>
+
+<p>配置sonar</p>
+
+<p>在sonarqube-7.2.1/conf的目录下有sonar.properties</p>
+
+<p>vi sonar.properties</p>
+
+<p>修改我们用的是mysql   </p>
+
+<ol>
+<li>
+<p><code># User credentials.</code></p>
+</li>
+<li>
+<p><code># Permissions to create tables, indices and triggers must be granted to JDBC user.</code></p>
+</li>
+<li>
+<p><code># The schema must be created first.</code></p>
+</li>
+<li>
+<p><code>sonar.jdbc.username=xxx</code></p>
+</li>
+<li>
+<p><code>sonar.jdbc.password=xxx</code></p>
+</li>
+<li> </li>
+<li>
+<p><code>#----- Embedded Database (default)</code></p>
+</li>
+<li>
+<p><code># H2 embedded database server listening port, defaults to 9092</code></p>
+</li>
+<li>
+<p><code>#sonar.embeddedDatabase.port=9092</code></p>
+</li>
+<li> </li>
+<li>
+<p><code>#----- DEPRECATED</code></p>
+</li>
+<li>
+<p><code>#----- MySQL >=5.6 && <8.0</code></p>
+</li>
+<li>
+<p><code># Support of MySQL is dropped in Data Center Editions and deprecated in all other editions</code></p>
+</li>
+<li>
+<p><code># Only InnoDB storage engine is supported (not myISAM).</code></p>
+</li>
+<li>
+<p><code># Only the bundled driver is supported. It can not be changed.</code></p>
+</li>
+<li>
+<p><code>sonar.jdbc.url=jdbc:mysql://xxx.xxx.xx.xx:3306/sonar?useUnicode=true&characterEncoding=utf8&rewriteBatchedStatements=true&useConfigs=maxPerformance&useSSL=false</code></p>
+</li>
+</ol>
+
+<p>保存即可。</p>
+
+<p>启动 SonarQube</p>
+
+<p>在启动中你有可能会启动失败失败原因如下（原因是sonarqube 从6.x后使用了es 但是es 是不能用root 用户启动的）</p>
+
+<p>在 sonarqube-7.2.1的根目录下有logs  es.log 和 sonar.log</p>
+
+<p>es.log</p>
+
+<ol>
+<li>
+<p><code>java.lang.RuntimeException: can not run elasticsearch as root</code></p>
+</li>
+<li>
+<p><code>3 at org.elasticsearch.bootstrap.Bootstrap.initializeNatives(Bootstrap.java:106) ~[elasticsearch-5.6.3.jar:5.6.3]</code></p>
+</li>
+<li>
+<p><code>4 at org.elasticsearch.bootstrap.Bootstrap.setup(Bootstrap.java:195) ~[elasticsearch-5.6.3.jar:5.6.3]</code></p>
+</li>
+<li>
+<p><code>5 at org.elasticsearch.bootstrap.Bootstrap.init(Bootstrap.java:342) [elasticsearch-5.6.3.jar:5.6.3]</code></p>
+</li>
+<li>
+<p><code>6 at org.elasticsearch.bootstrap.Elasticsearch.init(Elasticsearch.java:132) [elasticsearch-5.6.3.jar:5.6.3]</code></p>
+</li>
+<li>
+<p><code>7 at org.elasticsearch.bootstrap.Elasticsearch.execute(Elasticsearch.java:123) [elasticsearch-5.6.3.jar:5.6.3]</code></p>
+</li>
+<li>
+<p><code>8 at org.elasticsearch.cli.EnvironmentAwareCommand.execute(EnvironmentAwareCommand.java:70) [elasticsearch-5.6.3.jar:5.6.3]</code></p>
+</li>
+<li>
+<p><code>9 at org.elasticsearch.cli.Command.mainWithoutErrorHandling(Command.java:134) [elasticsearch-5.6.3.jar:5.6.3]</code></p>
+</li>
+<li>
+<p><code>10 at org.elasticsearch.cli.Command.main(Command.java:90) [elasticsearch-5.6.3.jar:5.6.3]</code></p>
+</li>
+<li>
+<p><code>11 at org.elasticsearch.bootstrap.Elasticsearch.main(Elasticsearch.java:91) [elasticsearch-5.6.3.jar:5.6.3]</code></p>
+</li>
+<li>
+<p><code>12 at org.elasticsearch.bootstrap.Elasticsearch.main(Elasticsearch.java:84) [elasticsearch-5.6.3.jar:5.6.3]</code></p>
+</li>
+</ol>
+
+<p>解决以上问题</p>
+
+<ol>
+<li>
+<p><code>$ adduser sonarUser</code></p>
+</li>
+<li>
+<p><code>$ passwd sonarUser</code></p>
+</li>
+<li>
+<p><code>$ chown -R sonarUser:sonarUser sonarqube-7.2.1</code></p>
+</li>
+</ol>
+
+<p>依次执行以上命令 使用sonarUser 账户启动SonarQube</p>
+
+<p>如果不出意外的话就成了！请访问：<a href="http://106.14.17.77:9000/" rel="nofollow" target="_blank">http://xxx.xxx.xxx.xx:9000/</a> 我这个端口没有修改</p>
+
+<p><img alt="" src="https://img-blog.csdn.net/20180721111037712?watermark/2/text/aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L2Nkc3pkZDg=/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70" style="height:406px; width:800px" /></p>
+
+<p>哦哦对了，我这个是弄完后的截图当然还有其他插件需要下载，比如汉化</p>
+
+<p>我们等了SonarQube用户名和密码都是 Admin</p>
+
+<p><img alt="" src="https://img-blog.csdn.net/20180721111331819?watermark/2/text/aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L2Nkc3pkZDg=/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70" style="height:406px; width:800px" /></p>
+
+<p>安装后重启服务即可！</p>
+
+<p>2、maven 的集成</p>
+
+<p>需要修改你本地的maven  setting.xml</p>
+
+<p>找到 <profiles>在其内部添加如下代码</p>
+
+<pre>
+
+ </pre>
+
+<ol>
+<li>
+<p><code><profile></code></p>
+</li>
+<li>
+<p><code><id>sonar</id></code></p>
+</li>
+<li>
+<p><code><activation></code></p>
+</li>
+<li>
+<p><code><activeByDefault>true</activeByDefault></code></p>
+</li>
+<li>
+<p><code></activation></code></p>
+</li>
+<li>
+<p><code><properties></code></p>
+</li>
+<li>
+<p><code><sonar.jdbc.url>jdbc:mysql://XX.XX.XX.XX:3306/sonar</sonar.jdbc.url></code></p>
+</li>
+<li>
+<p><code><sonar.jdbc.driver>com.mysql.jdbc.Driver</sonar.jdbc.driver></code></p>
+</li>
+<li>
+<p><code><sonar.jdbc.username>XXX</sonar.jdbc.username></code></p>
+</li>
+<li>
+<p><code><sonar.jdbc.password>XXX</sonar.jdbc.password></code></p>
+</li>
+<li>
+<p><code><sonar.host.url>http://XXXX.XX.XX.XX:9000</sonar.host.url></code></p>
+</li>
+<li>
+<p><code></properties></code></p>
+</li>
+<li>
+<p><code></profile></code></p>
+</li>
+</ol>
+
+<p>这样就可以了来试试</p>
+
+<p>找到你项目的根目录就是有pom.xml的哪个目录</p>
+
+<p>执行</p>
+
+<pre>
+<code>mvn clean install sonar:sonar</code></pre>
+
+<p>等待出现以下内容</p>
+
+<pre>
+
+ </pre>
+
+<ol>
+<li>
+<p><code>[INFO] 8 files had no CPD blocks</code></p>
+</li>
+<li>
+<p><code>[INFO] Calculating CPD for 70 files</code></p>
+</li>
+<li>
+<p><code>[INFO] CPD calculation finished</code></p>
+</li>
+<li>
+<p><code>[INFO] Analysis report generated in 301ms, dir size=526 KB</code></p>
+</li>
+<li>
+<p><code>[INFO] Analysis reports compressed in 286ms, zip size=288 KB</code></p>
+</li>
+<li>
+<p><code>[INFO] Analysis report uploaded in 584ms</code></p>
+</li>
+<li>
+<p><code>[INFO] ANALYSIS SUCCESSFUL, you can browse http://xxx.xxx.xxx:9000/dashboard?id=angproject%3Aangproject</code></p>
+</li>
+<li>
+<p><code>[INFO] Note that you will be able to access the updated dashboard once the server has processed the submitted analysis report</code></p>
+</li>
+<li>
+<p><code>[INFO] More about the report processing at http://xxx.xxx.xxx:9000/api/ce/task?id=AWS6pbIZAOMtYibgnlk7</code></p>
+</li>
+<li>
+<p><code>[INFO] Task total time: 54.795 s</code></p>
+</li>
+<li>
+<p><code>[INFO] ------------------------------------------------------------------------</code></p>
+</li>
+<li>
+<p><code>[INFO] BUILD SUCCESS</code></p>
+</li>
+<li>
+<p><code>[INFO] ------------------------------------------------------------------------</code></p>
+</li>
+<li>
+<p><code>[INFO] Total time: 01:13 min</code></p>
+</li>
+<li>
+<p><code>[INFO] Finished at: 2018-07-21T10:22:58+08:00</code></p>
+</li>
+<li>
+<p><code>[INFO] Final Memory: 63M/857M</code></p>
+</li>
+<li>
+<p><code>[INFO] ------------------------------------------------------------------------</code></p>
+</li>
+</ol>
+
+<p>来刷新一下SonarQube</p>
+
+<p><img alt="" src="https://img-blog.csdn.net/2018072111260863?watermark/2/text/aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L2Nkc3pkZDg=/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70" style="height:201px; width:800px" /></p>
+
+<p>第一截图出现了。到此安装就完毕了。谢谢大家的观看</p>

@@ -1,0 +1,122 @@
+<h1>Openshift 之 Docker Registry</h1>
+
+<p>自行开发的app, 如果没有从source code build 到openshift, 那么我们可以用Dockerfile自行打包images， 并存放到openshift 具体的project中去部署使用。<br />
+例如：</p>
+
+<p><img src="//upload-images.jianshu.io/upload_images/8478288-fb7468a593933d1d.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1000/format/webp" style="height:159px; width:500px" /></p>
+
+<p>下面记录下具体步骤：</p>
+
+<pre>
+<code># oc get svc -n default
+
+NAME TYPE CLUSTER-IP EXTERNAL-IP PORT(S) AGE
+
+docker-registry ClusterIP 172.30.235.48 5000/TCP 35d
+</code></pre>
+
+<p>上面可以查询到具体的docker registry name以及ip.</p>
+
+<p>用docker login连接到该pod：</p>
+
+<pre>
+<code># docker login docker-registry.default.svc:5000
+
+Username: user.id 
+
+Password: [登陆openshift的串码]
+
+Login Succeeded
+</code></pre>
+
+<p>接下来就可以push image到具体的project里了:</p>
+
+<pre>
+<code> To push an image to this image stream:
+$ sudo docker tag myimage registry/myproject/myimage:tag
+$ sudo docker push registry/myproject/myimage:tag
+</code></pre>
+
+<p>下面是个真实范例：</p>
+
+<pre>
+<code># docker tag cas-svc:1.0.0 docker-registry.default.svc:5000/demo-project/cas-svc:1.0.0
+
+# docker push docker-registry.default.svc:5000/demo-project/cas-svc:1.0.0 
+The push refers to a repository [docker-registry.default.svc:5000/demo-project/cas-svc]
+638735aba39b: Pushed 
+4ffb2c49a619: Pushed 
+e33af80de3fe: Pushed 
+79fe6d0e931d: Pushed 
+685fdd7e6770: Pushed 
+c9b26f41504c: Pushed 
+cd7100a72410: Pushed 
+1.0.0: digest: sha256:67c018604ad33d420e79c20a3f40e77b0fabe610f2cf2ead86217c0ff7655a27 size: 1782
+</code>
+</pre>
+
+<h1>镜像仓库</h1>
+
+<p><strong>OpenShift</strong> 提供了一个内部的 <strong>Docker</strong> 镜像仓库（<strong>Registry</strong>），该镜像仓库用于存放用户通过内置的 <strong>Source to Image</strong> 镜像构建流程所产生的镜像。<strong>Registry</strong> 组件默认以容器的方式提供。</p>
+
+<p>执行 <strong>oc get pod -n default</strong> 命令查看 <strong>Registry</strong> 容器状态。</p>
+
+<pre>
+<code>$ oc get pod -n default
+NAME READY STATUS RESTARTS AGE
+docker-registry-1-2kxx2 1/1 Running 4 18h
+router-1-zvm87 1/1 Running 4 18h
+</code></pre>
+
+<p>执行 <strong>oc get svc -n default</strong> 命令查看 <strong>Registry</strong> 容器对应的 <strong>Service</strong> 信息。</p>
+
+<pre>
+<code>$ oc get svc -n default
+NAME CLUSTER-IP EXTERNAL-IP PORT(S) AGE
+docker-registry 172.30.89.21 <none> 5000/TCP 18h
+kubernetes 172.30.0.1 <none> 443/TCP,53/UDP,53/TCP 18h
+router 172.30.10.51 <none> 80/TCP,443/TCP,1936/TCP 18h
+</code></pre>
+
+<p>每当 <strong>S2I</strong> 完成镜像构建，就会向内部的镜像仓库推送构建完成的镜像。</p>
+
+<blockquote>
+<p>注：内部镜像仓库存放的只是S2I产生的镜像。其他镜像可以存放在集群外部的镜像仓库，如企业的镜像仓库或者社区的镜像仓库。只要保证 <strong>OpenShift</strong>的节点可以访问到这些镜像所在的镜像仓库即可。</p>
+</blockquote>
+
+<p> </p>
+
+<h1>docker registry 部署常见错误</h1>
+
+<h2>错误一：</h2>
+
+<h3>错误代码：getsockopt: connection refused</h3>
+
+<p>具体错误：Get https://192.168.107.165:5000/v1/_ping: dial tcp 192.168.107.165:5000: getsockopt: connection refused</p>
+
+<h3>原因：repository 镜像没有起来</h3>
+
+<p>解决办法:docker start repository镜像ID</p>
+
+<h2>错误二：</h2>
+
+<h3>错误代码：server gave HTTP response to HTTPS client</h3>
+
+<p>具体错误：Get https://192.168.107.165:5000/v1/_ping: http: server gave HTTP response to HTTPS client</p>
+
+<h3>原因：1.3以后的docker版本不支持http连接，只支持https连接</h3>
+
+<p>解决办法:</p>
+
+<ol>
+<li>
+<p><code>vim /etc/docker/daemon.json</code></p>
+</li>
+<li>
+<p><code>{ "insecure-registries":["192.168.107.165:5000"] } ip为部署私有仓库的IP</code></p>
+</li>
+</ol>
+
+<p> </p>
+
+<p><!-- 如果是付费文章，未购买，则显示购买按钮 --><!-- 连载目录项 --><!-- 如果是付费文章 --><!-- 如果是付费连载，已购买，且作者允许赞赏，则显示付费信息和赞赏 --></p>

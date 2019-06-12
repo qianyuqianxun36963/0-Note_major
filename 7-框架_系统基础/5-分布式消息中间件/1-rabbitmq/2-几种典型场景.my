@@ -1,0 +1,684 @@
+<h1>RabbitMQ的几种典型使用场景</h1>
+
+<p>RabbitMQ主页：https://www.rabbitmq.com/</p>
+
+<h2><strong>AMQP</strong></h2>
+
+<p>AMQP协议是一个高级抽象层消息通信协议，RabbitMQ是AMQP协议的实现。它主要包括以下组件：</p>
+
+<p><img alt="" src="https://images2015.cnblogs.com/blog/434101/201601/434101-20160124204752953-1513084258.png" /></p>
+
+<p>1.Server(broker): 接受客户端连接，实现AMQP消息队列和路由功能的进程。</p>
+
+<p>2.Virtual Host:其实是一个虚拟概念，类似于权限控制组，一个Virtual Host里面可以有若干个Exchange和Queue，但是权限控制的最小粒度是Virtual Host</p>
+
+<p>3.Exchange:接受生产者发送的消息，并根据Binding规则将消息路由给服务器中的队列。<strong>ExchangeType决定了Exchange路由消息的行为，例如，在RabbitMQ中，ExchangeType有direct、Fanout和Topic三种，不同类型的Exchange路由的行为是不一样的。</strong></p>
+
+<p>4.Message Queue：消息队列，用于存储还未被消费者消费的消息。</p>
+
+<p>5.Message: 由Header和Body组成，<strong>Header是由生产者添加的各种属性的集合，包括Message是否被持久化、由哪个Message Queue接受、优先级是多少等</strong>。<strong>而Body是真正需要传输的APP数据。</strong></p>
+
+<p>6.Binding:Binding联系了Exchange与Message Queue。Exchange在与多个Message Queue发生Binding后会生成一张路由表，路由表中存储着Message Queue所需消息的限制条件即Binding Key。当Exchange收到Message时会解析其Header得到Routing Key，Exchange根据Routing Key与Exchange Type将Message路由到Message Queue。Binding Key由Consumer在Binding Exchange与Message Queue时指定，而Routing Key由Producer发送Message时指定，两者的匹配方式由Exchange Type决定。 </p>
+
+<p>7.Connection:连接，对于RabbitMQ而言，其实就是一个位于客户端和Broker之间的TCP连接。</p>
+
+<p>8.Channel:信道，仅仅创建了客户端到Broker之间的连接后，客户端还是不能发送消息的。需要为每一个Connection创建Channel，AMQP协议规定只有通过Channel才能执行AMQP的命令。一个Connection可以包含多个Channel。之所以需要Channel，是因为TCP连接的建立和释放都是十分昂贵的，如果一个客户端每一个线程都需要与Broker交互，如果每一个线程都建立一个TCP连接，暂且不考虑TCP连接是否浪费，就<strong>算操作系统也无法承受每秒建立如此多的TCP连接</strong>。<strong>RabbitMQ建议客户端线程之间不要共用Channel，至少要保证共用Channel的线程发送消息必须是串行的，但是建议尽量共用Connection</strong>。</p>
+
+<p>9.Command:AMQP的命令，客户端通过Command完成与AMQP服务器的交互来实现自身的逻辑。例如在RabbitMQ中，客户端可以通过publish命令发送消息，txSelect开启一个事务，txCommit提交一个事务。</p>
+
+<p>在了解了AMQP模型以后，需要简单介绍一下AMQP的协议栈，AMQP协议本身包括三层：</p>
+
+<p><img alt="" src="https://images2015.cnblogs.com/blog/434101/201601/434101-20160124205249375-897662551.png" /></p>
+
+<p>1.Module Layer，位于协议最高层，主要定义了一些供客户端调用的命令，客户端可以利用这些命令实现自己的业务逻辑，例如，客户端可以通过queue.declare声明一个队列，利用consume命令获取一个队列中的消息。</p>
+
+<p>2.Session Layer，主要负责将客户端的命令发送给服务器，在将服务器端的应答返回给客户端，主要为客户端与服务器之间通信提供可靠性、同步机制和错误处理。</p>
+
+<p>3.Transport Layer，主要传输二进制数据流，提供帧的处理、信道复用、错误检测和数据表示。</p>
+
+<h2><strong>RabbitMQ使用场景</strong></h2>
+
+<p>学习RabbitMQ的使用场景，来自官方教程：https://www.rabbitmq.com/getstarted.html</p>
+
+<h2><strong>场景1：单发送单接收</strong></h2>
+
+<p>使用场景：简单的发送与接收，没有特别的处理。</p>
+
+<p><img alt="" src="https://images0.cnblogs.com/i/434101/201408/171507104838529.png" /></p>
+
+<h3>Producer：</h3>
+
+<pre>
+import com.rabbitmq.client.ConnectionFactory;
+import com.rabbitmq.client.Connection;
+import com.rabbitmq.client.Channel;
+
+public class Send {
+
+private final static String QUEUE_NAME = "hello";
+
+public static void main(String[] argv) throws Exception {
+
+ConnectionFactory factory = new ConnectionFactory();
+factory.setHost("localhost");
+Connection connection = factory.newConnection();
+Channel channel = connection.createChannel();
+
+channel.queueDeclare(QUEUE_NAME, false, false, false, null);
+String message = "Hello World!";
+channel.basicPublish("", QUEUE_NAME, null, message.getBytes());
+System.out.println(" [x] Sent '" + message + "'");
+
+channel.close();
+connection.close();
+}
+}
+</pre>
+
+<h3>Consumer：</h3>
+
+<pre>
+import com.rabbitmq.client.ConnectionFactory;
+import com.rabbitmq.client.Connection;
+import com.rabbitmq.client.Channel;
+import com.rabbitmq.client.QueueingConsumer;
+
+public class Recv {
+
+private final static String QUEUE_NAME = "hello";
+
+public static void main(String[] argv) throws Exception {
+
+ConnectionFactory factory = new ConnectionFactory();
+factory.setHost("localhost");
+Connection connection = factory.newConnection();
+Channel channel = connection.createChannel();
+
+channel.queueDeclare(QUEUE_NAME, false, false, false, null);
+System.out.println(" [*] Waiting for messages. To exit press CTRL+C");
+
+QueueingConsumer consumer = new QueueingConsumer(channel);
+channel.basicConsume(QUEUE_NAME, true, consumer);
+
+while (true) {
+QueueingConsumer.Delivery delivery = consumer.nextDelivery();
+String message = new String(delivery.getBody());
+System.out.println(" [x] Received '" + message + "'");
+}
+}
+}
+</pre>
+
+<h2><strong>场景2：单发送多接收</strong></h2>
+
+<p>使用场景：一个发送端，多个接收端，如分布式的任务派发。为了保证消息发送的可靠性，不丢失消息，使消息持久化了。同时为了防止接收端在处理消息时down掉，只有在消息处理完成后才发送ack消息。</p>
+
+<p><img alt="" src="https://images0.cnblogs.com/i/434101/201408/171513043112193.png" /></p>
+
+<h3>Producer：</h3>
+
+<pre>
+import com.rabbitmq.client.ConnectionFactory;
+import com.rabbitmq.client.Connection;
+import com.rabbitmq.client.Channel;
+import com.rabbitmq.client.MessageProperties;
+
+public class NewTask {
+
+private static final String TASK_QUEUE_NAME = "task_queue";
+
+public static void main(String[] argv) throws Exception {
+
+ConnectionFactory factory = new ConnectionFactory();
+factory.setHost("localhost");
+Connection connection = factory.newConnection();
+Channel channel = connection.createChannel();
+
+channel.queueDeclare(TASK_QUEUE_NAME, true, false, false, null);
+
+String message = getMessage(argv);
+
+channel.basicPublish( "", TASK_QUEUE_NAME, 
+MessageProperties.PERSISTENT_TEXT_PLAIN,
+message.getBytes());
+System.out.println(" [x] Sent '" + message + "'");
+
+channel.close();
+connection.close();
+}
+
+private static String getMessage(String[] strings){
+if (strings.length < 1)
+return "Hello World!";
+return joinStrings(strings, " ");
+} 
+
+private static String joinStrings(String[] strings, String delimiter) {
+int length = strings.length;
+if (length == 0) return "";
+StringBuilder words = new StringBuilder(strings[0]);
+for (int i = 1; i < length; i++) {
+words.append(delimiter).append(strings[i]);
+}
+return words.toString();
+}
+}
+</pre>
+
+<h3>发送端和场景1不同点：</h3>
+
+<p>1、使用“task_queue”声明了另一个Queue，因为RabbitMQ不容许声明2个相同名称、配置不同的Queue</p>
+
+<p>2、使"task_queue"的Queue的durable的属性为true，即使消息队列durable</p>
+
+<p>3、使用MessageProperties.PERSISTENT_TEXT_PLAIN使消息durable</p>
+
+<p>When RabbitMQ quits or crashes it will forget the queues and messages unless you tell it not to. Two things are required to make sure that messages aren't lost: we need to mark both the queue and messages as durable.</p>
+
+<h3>Consumer：</h3>
+
+<pre>
+import com.rabbitmq.client.ConnectionFactory;
+import com.rabbitmq.client.Connection;
+import com.rabbitmq.client.Channel;
+import com.rabbitmq.client.QueueingConsumer;
+
+public class Worker {
+
+private static final String TASK_QUEUE_NAME = "task_queue";
+
+public static void main(String[] argv) throws Exception {
+
+ConnectionFactory factory = new ConnectionFactory();
+factory.setHost("localhost");
+Connection connection = factory.newConnection();
+Channel channel = connection.createChannel();
+
+channel.queueDeclare(TASK_QUEUE_NAME, true, false, false, null);
+System.out.println(" [*] Waiting for messages. To exit press CTRL+C");
+
+channel.basicQos(1);
+
+QueueingConsumer consumer = new QueueingConsumer(channel);
+channel.basicConsume(TASK_QUEUE_NAME, false, consumer);
+
+while (true) {
+QueueingConsumer.Delivery delivery = consumer.nextDelivery();
+String message = new String(delivery.getBody());
+
+System.out.println(" [x] Received '" + message + "'");
+doWork(message);
+System.out.println(" [x] Done");
+
+channel.basicAck(delivery.getEnvelope().getDeliveryTag(), false);
+} 
+}
+
+private static void doWork(String task) throws InterruptedException {
+for (char ch: task.toCharArray()) {
+if (ch == '.') Thread.sleep(1000);
+}
+}
+}
+</pre>
+
+<h3>接收端和场景1不同点：</h3>
+
+<p>1、使用“task_queue”声明消息队列，并使消息队列durable</p>
+
+<p>2、在使用channel.basicConsume接收消息时使autoAck为false，即不自动会发ack，由channel.basicAck()在消息处理完成后发送消息。</p>
+
+<p>3、使用了channel.basicQos(1)保证在接收端一个消息没有处理完时不会接收另一个消息，即接收端发送了ack后才会接收下一个消息。在这种情况下发送端会尝试把消息发送给下一个not busy的接收端。</p>
+
+<p>注意点：</p>
+
+<p>1）It's a common mistake to miss the basicAck. It's an easy error, but the consequences are serious. Messages will be redelivered when your client quits (which may look like random redelivery), but RabbitMQ will eat more and more memory as it won't be able to release any unacked messages.</p>
+
+<p>2）Note on message persistence</p>
+
+<p>Marking messages as persistent doesn't fully guarantee that a message won't be lost. Although it tells RabbitMQ to save the message to disk, there is still a short time window when RabbitMQ has accepted a message and hasn't saved it yet. Also, RabbitMQ doesn't do fsync(2) for every message -- it may be just saved to cache and not really written to the disk. The persistence guarantees aren't strong, but it's more than enough for our simple task queue. If you need a stronger guarantee you can wrap the publishing code in a<em>transaction</em>.</p>
+
+<p>3）Note about queue size</p>
+
+<p>If all the workers are busy, your queue can fill up. You will want to keep an eye on that, and maybe add more workers, or have some other strategy.</p>
+
+<p>4）RabbitMQ allows you to set Time To Live for both messages and queues. https://www.rabbitmq.com/ttl.html</p>
+
+<h2><strong>场景3：Publish/Subscribe</strong></h2>
+
+<p>使用场景：发布、订阅模式，发送端发送广播消息，多个接收端接收。</p>
+
+<p><img alt="" src="https://images0.cnblogs.com/i/434101/201408/171657207955618.png" /></p>
+
+<h3>Producer：</h3>
+
+<pre>
+import com.rabbitmq.client.ConnectionFactory;
+import com.rabbitmq.client.Connection;
+import com.rabbitmq.client.Channel;
+
+public class EmitLog {
+
+private static final String EXCHANGE_NAME = "logs";
+
+public static void main(String[] argv) throws Exception {
+
+ConnectionFactory factory = new ConnectionFactory();
+factory.setHost("localhost");
+Connection connection = factory.newConnection();
+Channel channel = connection.createChannel();
+
+channel.exchangeDeclare(EXCHANGE_NAME, "fanout");
+
+String message = getMessage(argv);
+
+channel.basicPublish(EXCHANGE_NAME, "", null, message.getBytes());
+System.out.println(" [x] Sent '" + message + "'");
+
+channel.close();
+connection.close();
+}
+
+private static String getMessage(String[] strings){
+if (strings.length < 1)
+return "info: Hello World!";
+return joinStrings(strings, " ");
+}
+
+private static String joinStrings(String[] strings, String delimiter) {
+int length = strings.length;
+if (length == 0) return "";
+StringBuilder words = new StringBuilder(strings[0]);
+for (int i = 1; i < length; i++) {
+words.append(delimiter).append(strings[i]);
+}
+return words.toString();
+}
+}
+</pre>
+
+<h3>发送端：</h3>
+
+<p>发送消息到一个名为“logs”的exchange上，使用“fanout”方式发送，即广播消息，不需要使用queue，发送端不需要关心谁接收。</p>
+
+<h3>Consumer：</h3>
+
+<pre>
+import com.rabbitmq.client.ConnectionFactory;
+import com.rabbitmq.client.Connection;
+import com.rabbitmq.client.Channel;
+import com.rabbitmq.client.QueueingConsumer;
+
+public class ReceiveLogs {
+
+private static final String EXCHANGE_NAME = "logs";
+
+public static void main(String[] argv) throws Exception {
+
+ConnectionFactory factory = new ConnectionFactory();
+factory.setHost("localhost");
+Connection connection = factory.newConnection();
+Channel channel = connection.createChannel();
+
+channel.exchangeDeclare(EXCHANGE_NAME, "fanout");
+String queueName = channel.queueDeclare().getQueue();
+channel.queueBind(queueName, EXCHANGE_NAME, "");
+
+System.out.println(" [*] Waiting for messages. To exit press CTRL+C");
+
+QueueingConsumer consumer = new QueueingConsumer(channel);
+channel.basicConsume(queueName, true, consumer);
+
+while (true) {
+QueueingConsumer.Delivery delivery = consumer.nextDelivery();
+String message = new String(delivery.getBody());
+
+System.out.println(" [x] Received '" + message + "'"); 
+}
+}
+}
+</pre>
+
+<h3>接收端：</h3>
+
+<p>1、声明名为“logs”的exchange的，方式为"fanout"，和发送端一样。</p>
+
+<p>2、channel.queueDeclare().getQueue();该语句得到一个随机名称的Queue，该queue的类型为non-durable、exclusive、auto-delete的，将该queue绑定到上面的exchange上接收消息。</p>
+
+<p>3、注意binding queue的时候，channel.queueBind()的第三个参数Routing key为空，即所有的消息都接收。如果这个值不为空，在exchange type为“fanout”方式下该值被忽略！</p>
+
+<h2><strong>场景4：Routing (按路线发送接收)</strong></h2>
+
+<p>使用场景：发送端按routing key发送消息，不同的接收端按不同的routing key接收消息。</p>
+
+<p><img alt="" src="https://images0.cnblogs.com/i/434101/201408/171709256231158.png" /></p>
+
+<h3>Producer：</h3>
+
+<pre>
+import com.rabbitmq.client.ConnectionFactory;
+import com.rabbitmq.client.Connection;
+import com.rabbitmq.client.Channel;
+
+public class EmitLogDirect {
+
+private static final String EXCHANGE_NAME = "direct_logs";
+
+public static void main(String[] argv) throws Exception {
+
+ConnectionFactory factory = new ConnectionFactory();
+factory.setHost("localhost");
+Connection connection = factory.newConnection();
+Channel channel = connection.createChannel();
+
+channel.exchangeDeclare(EXCHANGE_NAME, "direct");
+
+String severity = getSeverity(argv);
+String message = getMessage(argv);
+
+channel.basicPublish(EXCHANGE_NAME, severity, null, message.getBytes());
+System.out.println(" [x] Sent '" + severity + "':'" + message + "'");
+
+channel.close();
+connection.close();
+}
+
+private static String getSeverity(String[] strings){
+if (strings.length < 1)
+return "info";
+return strings[0];
+}
+
+private static String getMessage(String[] strings){ 
+if (strings.length < 2)
+return "Hello World!";
+return joinStrings(strings, " ", 1);
+}
+
+private static String joinStrings(String[] strings, String delimiter, int startIndex) {
+int length = strings.length;
+if (length == 0 ) return "";
+if (length < startIndex ) return "";
+StringBuilder words = new StringBuilder(strings[startIndex]);
+for (int i = startIndex + 1; i < length; i++) {
+words.append(delimiter).append(strings[i]);
+}
+return words.toString();
+}
+}
+</pre>
+
+<h3>发送端和场景3的区别：</h3>
+
+<p>1、exchange的type为direct</p>
+
+<p>2、发送消息的时候加入了routing key</p>
+
+<h3>Consumer：</h3>
+
+<pre>
+import com.rabbitmq.client.ConnectionFactory;
+import com.rabbitmq.client.Connection;
+import com.rabbitmq.client.Channel;
+import com.rabbitmq.client.QueueingConsumer;
+
+public class ReceiveLogsDirect {
+
+private static final String EXCHANGE_NAME = "direct_logs";
+
+public static void main(String[] argv) throws Exception {
+
+ConnectionFactory factory = new ConnectionFactory();
+factory.setHost("localhost");
+Connection connection = factory.newConnection();
+Channel channel = connection.createChannel();
+
+channel.exchangeDeclare(EXCHANGE_NAME, "direct");
+String queueName = channel.queueDeclare().getQueue();
+
+if (argv.length < 1){
+System.err.println("Usage: ReceiveLogsDirect [info] [warning] [error]");
+System.exit(1);
+}
+
+for(String severity : argv){ 
+channel.queueBind(queueName, EXCHANGE_NAME, severity);
+}
+
+System.out.println(" [*] Waiting for messages. To exit press CTRL+C");
+
+QueueingConsumer consumer = new QueueingConsumer(channel);
+channel.basicConsume(queueName, true, consumer);
+
+while (true) {
+QueueingConsumer.Delivery delivery = consumer.nextDelivery();
+String message = new String(delivery.getBody());
+String routingKey = delivery.getEnvelope().getRoutingKey();
+
+System.out.println(" [x] Received '" + routingKey + "':'" + message + "'"); 
+}
+}
+}
+</pre>
+
+<h3>接收端和场景3的区别：</h3>
+
+<p>在绑定queue和exchange的时候使用了routing key，即从该exchange上只接收routing key指定的消息。</p>
+
+<h2><strong>场景5：Topics (按topic发送接收)</strong></h2>
+
+<p>使用场景：发送端不只按固定的routing key发送消息，而是按字符串“匹配”发送，接收端同样如此。</p>
+
+<p><img alt="" src="https://images0.cnblogs.com/i/434101/201408/171739210926049.png" /></p>
+
+<h3>Producer：</h3>
+
+<pre>
+import com.rabbitmq.client.ConnectionFactory;
+import com.rabbitmq.client.Connection;
+import com.rabbitmq.client.Channel;
+
+public class EmitLogTopic {
+
+private static final String EXCHANGE_NAME = "topic_logs";
+
+public static void main(String[] argv) {
+Connection connection = null;
+Channel channel = null;
+try {
+ConnectionFactory factory = new ConnectionFactory();
+factory.setHost("localhost");
+
+connection = factory.newConnection();
+channel = connection.createChannel();
+
+channel.exchangeDeclare(EXCHANGE_NAME, "topic");
+
+String routingKey = getRouting(argv);
+String message = getMessage(argv);
+
+channel.basicPublish(EXCHANGE_NAME, routingKey, null, message.getBytes());
+System.out.println(" [x] Sent '" + routingKey + "':'" + message + "'");
+
+}
+catch (Exception e) {
+e.printStackTrace();
+}
+finally {
+if (connection != null) {
+try {
+connection.close();
+}
+catch (Exception ignore) {}
+}
+}
+}
+
+private static String getRouting(String[] strings){
+if (strings.length < 1)
+return "anonymous.info";
+return strings[0];
+}
+
+private static String getMessage(String[] strings){ 
+if (strings.length < 2)
+return "Hello World!";
+return joinStrings(strings, " ", 1);
+}
+
+private static String joinStrings(String[] strings, String delimiter, int startIndex) {
+int length = strings.length;
+if (length == 0 ) return "";
+if (length < startIndex ) return "";
+StringBuilder words = new StringBuilder(strings[startIndex]);
+for (int i = startIndex + 1; i < length; i++) {
+words.append(delimiter).append(strings[i]);
+}
+return words.toString();
+}
+}
+</pre>
+
+<h3>发送端和场景4的区别：</h3>
+
+<p>1、exchange的type为topic</p>
+
+<p>2、发送消息的routing key不是固定的单词，而是匹配字符串，如"*.lu.#"，*匹配一个单词，#匹配0个或多个单词。</p>
+
+<h3>Consumer：</h3>
+
+<pre>
+import com.rabbitmq.client.ConnectionFactory;
+import com.rabbitmq.client.Connection;
+import com.rabbitmq.client.Channel;
+import com.rabbitmq.client.QueueingConsumer;
+
+public class ReceiveLogsTopic {
+
+private static final String EXCHANGE_NAME = "topic_logs";
+
+public static void main(String[] argv) {
+Connection connection = null;
+Channel channel = null;
+try {
+ConnectionFactory factory = new ConnectionFactory();
+factory.setHost("localhost");
+
+connection = factory.newConnection();
+channel = connection.createChannel();
+
+channel.exchangeDeclare(EXCHANGE_NAME, "topic");
+String queueName = channel.queueDeclare().getQueue();
+
+if (argv.length < 1){
+System.err.println("Usage: ReceiveLogsTopic [binding_key]...");
+System.exit(1);
+}
+
+for(String bindingKey : argv){ 
+channel.queueBind(queueName, EXCHANGE_NAME, bindingKey);
+}
+
+System.out.println(" [*] Waiting for messages. To exit press CTRL+C");
+
+QueueingConsumer consumer = new QueueingConsumer(channel);
+channel.basicConsume(queueName, true, consumer);
+
+while (true) {
+QueueingConsumer.Delivery delivery = consumer.nextDelivery();
+String message = new String(delivery.getBody());
+String routingKey = delivery.getEnvelope().getRoutingKey();
+
+System.out.println(" [x] Received '" + routingKey + "':'" + message + "'"); 
+}
+}
+catch (Exception e) {
+e.printStackTrace();
+}
+finally {
+if (connection != null) {
+try {
+connection.close();
+}
+catch (Exception ignore) {}
+}
+}
+}
+}
+</pre>
+
+<h3>接收端和场景4的区别：</h3>
+
+<p>1、exchange的type为topic</p>
+
+<p>2、接收消息的routing key不是固定的单词，而是匹配字符串。</p>
+
+<h3>注意点：</h3>
+
+<p>Topic exchange</p>
+
+<p>Topic exchange is powerful and can behave like other exchanges. When a queue is bound with "#" (hash) binding key - it will receive all the messages, regardless of the routing key - like in fanout exchange. When special characters "*" (star) and "#" (hash) aren't used in bindings, the topic exchange will behave just like a direct one.</p>
+
+<h4><strong>About queue：</strong></h4>
+
+<p>1 queue-name</p>
+
+<p>The queue name MAY be empty, in which case the server MUST create a new queue with a unique generated name and return this to the client in the Declare-Ok method.</p>
+
+<p>2 passive</p>
+
+<p>If set, the server will reply with Declare-Ok if the queue already exists with the same name, and raise an error if not.</p>
+
+<p>3 durable</p>
+
+<p>If set when creating a new queue, the queue will be marked as durable. Durable queues remain active when a server restarts. Non-durable queues (transient queues) are purged if/when a server restarts. Note that durable queues do not necessarily hold persistent messages, although it does not make sense to send persistent messages to a transient queue.</p>
+
+<p>The server MUST recreate the durable queue after a restart.</p>
+
+<p>The server MUST support both durable and transient queues.</p>
+
+<p>4 exclusive</p>
+
+<p>Exclusive queues may only be accessed by the current connection, and are deleted when that connection closes. Passive declaration of an exclusive queue by other connections are not allowed.</p>
+
+<p>The server MUST support both exclusive (private) and non-exclusive (shared) queues.</p>
+
+<p>The client MAY NOT attempt to use a queue that was declared as exclusive by another still-open connection. Error code: <a href="http://www.rabbitmq.com/amqp-0-9-1-reference.html#constant.resource-locked">resource-locked</a></p>
+
+<p>5 auto-delete</p>
+
+<p>If set, the queue is deleted when all consumers have finished using it. The last consumer can be cancelled either explicitly or because its channel is closed. If there was no consumer ever on the queue, it won't be deleted. Applications can explicitly delete auto-delete queues using the Delete method as normal.</p>
+
+<p>The server MUST ignore the auto-delete field if the queue already exists.</p>
+
+<h4><strong>About exchange：</strong></h4>
+
+<p>1 passive</p>
+
+<p>If set, the server will reply with Declare-Ok if the exchange already exists with the same name, and raise an error if not. </p>
+
+<p>2 durable</p>
+
+<p>If set when creating a new exchange, the exchange will be marked as durable. Durable exchanges remain active when a server restarts. Non-durable exchanges (transient exchanges) are purged if/when a server restarts.</p>
+
+<p>3 auto-delete</p>
+
+<p>If set, the exchange is deleted when all queues have finished using it. </p>
+
+<p>The server SHOULD allow for a reasonable delay between the point when it determines that an exchange is not being used (or no longer used), and the point when it deletes the exchange. At the least it must allow a client to create an exchange and then bind a queue to it, with a small but non-zero delay between these two actions.</p>
+
+<p>The server MUST ignore the auto-delete field if the exchange already exists.</p>
+
+<p>4 internal</p>
+
+<p>If set, the exchange may not be used directly by publishers, but only when bound to other exchanges. Internal exchanges are used to construct wiring that is not visible to applications.</p>
+
+<h2>参考：</h2>
+
+<p>https://www.rabbitmq.com/getstarted.html</p>
+
+<p>http://www.rabbitmq.com/amqp-0-9-1-reference.html#queue.declare.exclusive</p>
+
+<p>https://www.rabbitmq.com/ttl.html</p>
+
+<p>http://backend.blog.163.com/blog/static/202294126201322215551999/</p>

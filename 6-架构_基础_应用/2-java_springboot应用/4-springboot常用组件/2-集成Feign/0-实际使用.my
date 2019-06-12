@@ -1,0 +1,214 @@
+<h1>springcloud-Feigh 使用</h1>
+
+<p>springcloud组件：<a href="https://springcloud.cc/">https://springcloud.cc/</a></p>
+
+<p>官网：<a href="https://github.com/OpenFeign/feign">https://github.com/OpenFeign/feign</a></p>
+
+<p>官网示例：<a href="https://github.com/spring-cloud-samples/feign-eureka">https://github.com/spring-cloud-samples/feign-eureka</a></p>
+
+<h2>服务端</h2>
+
+<p>服务端和消费端都配置eureka，application name 会用到。</p>
+
+<h3>一.开启服务发现</h3>
+
+<pre>
+@SpringBootApplication
+<strong>@EnableDiscoveryClient</strong>
+public class NaportalFileserviceApplication {
+public static void main(String[] args) {
+SpringApplication.run(NaportalFileserviceApplication.class, args);
+}
+}</pre>
+
+<p>其他的，就正常的配置controller就好了。</p>
+
+<h3>二.提供服务的接口</h3>
+
+<p>FileProcessController.java 提供服务接口的类</p>
+
+<pre>
+@RestController
+@RequestMapping("/file")
+public class FileProcessController {
+/**
+* 业务层注入
+*/
+@Resource
+private FileProcessService fileProcessService;
+
+@Resource
+private Environment env;
+
+@Resource
+private FileUtils fileUtils;
+
+@RequestMapping(value = "/getFileInfo", method = {RequestMethod.GET})
+public String getFileInfo() {
+return "Hello feign";
+}
+
+@ApiOperation(value = "普通上传", notes = "普通上传，存到类似如下路径/basepath/场景名/file.txt，当前使用这个")
+@RequestMapping(value = "/normalUploadServer/{filePathKey}", method = RequestMethod.POST)
+public void normalUploadServer(@PathVariable("filePathKey") String filePathKey, @RequestParam("uploadfile") MultipartFile uploadfile, HttpServletRequest request, HttpServletResponse response) {
+String[] subDirs = {filePathKey};
+uploadFile(subDirs, uploadfile, request, response);
+}
+}</pre>
+
+<h2>消费端</h2>
+
+<h3>一.引入依赖 </h3>
+
+<p>在pom文件中引入如下依赖。如果springboot和springcloud版本较老，可能引入的版本要不一样 (spring-cloud-starter-feign)</p>
+
+<pre>
+<dependency>
+<groupId>org.springframework.cloud</groupId>
+<artifactId>spring-cloud-starter-openfeign</artifactId>
+</dependency>
+<dependency>
+<groupId>io.github.openfeign.form</groupId>
+<artifactId>feign-form</artifactId>
+<version>3.4.1</version>
+</dependency>
+<dependency>
+<groupId>io.github.openfeign.form</groupId>
+<artifactId>feign-form-spring</artifactId>
+<version>3.4.1</version>
+</dependency></pre>
+
+<p>使用的时候，引用不到EnableFeignClients，后来改了spring-cloud版本，就可以了。修改后如下：</p>
+
+<pre>
+<parent>
+<groupId>org.springframework.boot</groupId>
+<artifactId>spring-boot-starter-parent</artifactId>
+<version>2.0.6.RELEASE</version>
+<relativePath/> <!-- lookup parent from repository -->
+</parent>
+
+<properties>
+<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+<project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+<java.version>1.8</java.version>
+<spring-cloud.version>Finchley.SR2</spring-cloud.version>
+</properties>
+</pre>
+
+<h3>二.启动类开启配置</h3>
+
+<p>client 消费者使用：</p>
+
+<p>在启动类上加 上注解：@EnableFeignClients，以开启扫描哪些申明为FeignClients的客户端。</p>
+
+<p>NaportalManagerApplication.java 主启动类，添加feign使用端开启。</p>
+
+<pre>
+@SpringBootApplication
+<strong>@EnableDiscoveryClient
+@EnableFeignClients</strong>
+public class NaportalManagerApplication {
+
+public static void main(String[] args) {
+ApplicationContext app = SpringApplication.run(NaportalManagerApplication.class, args);
+SpringUtil.setApplicationContext(app);
+}
+}</pre>
+
+<h3>三.FeignClients接口编写</h3>
+
+<pre>
+FileServiceClient.java 引入外部接口的接口类：</pre>
+
+<p><span style="font-size:14px"><strong>提醒一句，你调用的接口，如果是外部接口，服务名都不在本eureka里面。请转到 jersey 调用外部接口相关指导。==> 5-框架_基础  ->  5-服务调用 -> 1-restful接口调用</strong></span></p>
+
+<pre>
+<strong>@FeignClient(name = "naportal-fileservice",url = "http://10.134.192.241:7579")  //name 对应于enruka 中注册的服务名。url 对应于服务提供者对应的地址。</strong>
+public interface FileServiceClient {
+    @RequestMapping(value = "/file/getFileInfo", method = GET)  //对应于，外部系统调用的restful接口。
+    String getFileInfo();                                       //对应于，本系统的本地方法。
+
+    @RequestMapping(value = "/file/importSceneBaseInfos/{sceneUser}/{sceneName}", method = POST,consumes = MediaType.MULTIPART_FORM_DATA_VALUE) <span style="font-size:12px"><strong>这里标粗的地方，试了下，在controller里，RequestParam的value可以不写，但这里必须写！</strong></span>
+    String importSceneBaseInfos(@PathVariable("sceneUser") String sceneUser,@PathVariable("sceneName") String sceneName,@RequestParam(<strong>value = "userName"</strong>),@RequestPart("uploadfile") MultipartFile uploadfile);
+}
+</pre>
+
+<h3>四.业务代码调用</h3>
+
+<p>业务代码里使用就和平常代码调用基本一致，先将FeignClients接口注入进来，然后在业务逻辑里直接调用相关的方法即可。具体如下：</p>
+
+<pre>
+TestController.java 业务层调用服务的类：</pre>
+
+<pre>
+@RestController
+@RequestMapping(value = "/test/file")
+public class TestController{
+
+<strong> @Autowired
+FileServiceClient fileServiceClient;</strong>
+
+@RequestMapping("/getFileInfo")
+public String hello() {
+<strong>return fileServiceClient.getFileInfo();</strong>
+}
+}
+如果这里Autowired出现找不到bean，回头看看 <strong>@EnableFeignClients 注解有没有写！</strong></pre>
+
+<h2>使用feign上传文件</h2>
+
+<h3>三.FeignClients接口编写</h3>
+
+<pre>
+@FeignClient(name = "naportal-fileservice",url = "http://10.134.192.241:7579",<strong>configuration = FileServiceClient.MultipartSupportConfig.class</strong>)
+public interface FileServiceClient {
+@RequestMapping(value = "/file/getFileInfo", method = GET)
+String getFileInfo();
+
+@RequestMapping(value = "/file/normalUploadServer/{filePathKey}", method = POST,<strong>consumes = MediaType.MULTIPART_FORM_DATA_VALUE</strong>)
+String normalUploadServer(@PathVariable("filePathKey") String filePathKey,@<strong>RequestPart</strong>("uploadfile") MultipartFile uploadfile);
+
+public class MultipartSupportConfig {
+
+@Autowired
+private ObjectFactory<HttpMessageConverters> messageConverters;
+
+@Bean
+@Primary
+@Scope("prototype")
+public Encoder multipartFormEncoder() {
+return new SpringFormEncoder();
+}
+
+@Bean
+public Encoder feignFormEncoder() {
+return new SpringFormEncoder(new SpringEncoder(messageConverters));
+}
+}
+}
+</pre>
+
+<h3>四.业务代码调用</h3>
+
+<p>FileController.java 业务层调用服务的类：</p>
+
+<pre>
+@RestController
+@RequestMapping(value = "/common/file")
+public class FileController extends BaseController {
+
+@Resource
+private Environment env;
+
+@Autowired
+FileServiceClient fileServiceClient;
+
+@RequestMapping(value = "/normalUploadServer/{filePathKey}/{sceneId}",method = RequestMethod.POST)
+public ResultData<String> normalUploadServer(@PathVariable("filePathKey") String filePathKey,@PathVariable("sceneId") String sceneId, @RequestParam("uploadfile") MultipartFile uploadfile, HttpServletRequest request, HttpServletResponse response) throws Exception {
+String uploadresult = fileServiceClient.normalUploadServer(filePathKey, uploadfile);
+JSONObject jsonobject = JSONObject.parseObject(uploadresult);
+String result = jsonobject.get("status").toString();
+}</pre>
+
+<p> </p>

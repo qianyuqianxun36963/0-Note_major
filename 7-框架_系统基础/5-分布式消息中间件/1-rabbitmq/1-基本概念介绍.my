@@ -1,0 +1,148 @@
+<h1>RabbitMQ基础概念</h1>
+
+<h2>RabbitMQ简介</h2>
+
+<p>在介绍RabbitMQ之前实现要介绍一下MQ，MQ是什么？</p>
+
+<p>MQ全称是Message Queue，可以理解为消息队列的意思，简单来说就是消息以管道的方式进行传递。</p>
+
+<p>RabbitMQ是一个实现了AMQP（Advanced Message Queuing Protocol）高级消息队列协议的消息队列服务，用Erlang语言的。</p>
+
+<h2>使用场景</h2>
+
+<p>在我们秒杀抢购商品的时候，系统会提醒我们稍等排队中，而不是像几年前一样页面卡死或报错给用户。</p>
+
+<p>像这种排队结算就用到了消息队列机制，放入通道里面一个一个结算处理，而不是某个时间断突然涌入大批量的查询新增把数据库给搞宕机，所以RabbitMQ本质上起到的作用就是削峰填谷，为业务保驾护航。</p>
+
+<h2>为什么选择RabbitMQ</h2>
+
+<p>现在的市面上有很多MQ可以选择，比如ActiveMQ、ZeroMQ、Appche Qpid，那问题来了为什么要选择RabbitMQ？</p>
+
+<ol>
+<li>除了Qpid，RabbitMQ是唯一一个实现了AMQP标准的消息服务器；</li>
+<li>可靠性，RabbitMQ的持久化支持，保证了消息的稳定性；</li>
+<li>高并发，RabbitMQ使用了Erlang开发语言，Erlang是为电话交换机开发的语言，天生自带高并发光环，和高可用特性；</li>
+<li>集群部署简单，正是应为Erlang使得RabbitMQ集群部署变的超级简单；</li>
+<li>社区活跃度高，根据网上资料来看，RabbitMQ也是首选；</li>
+</ol>
+
+<h2>工作机制</h2>
+
+<p><strong>生产者、消费者和代理</strong></p>
+
+<p>在了解消息通讯之前首先要了解3个概念：生产者、消费者和代理。</p>
+
+<p>生产者：消息的创建者，负责创建和推送数据到消息服务器；</p>
+
+<p>消费者：消息的接收方，用于处理数据和确认消息；</p>
+
+<p>代理：就是RabbitMQ本身，用于扮演“快递”的角色，本身不生产消息，只是扮演“快递”的角色。</p>
+
+<p><strong>消息发送原理</strong></p>
+
+<p>首先你必须连接到Rabbit才能发布和消费消息，那怎么连接和发送消息的呢？</p>
+
+<p>你的应用程序和Rabbit Server之间会创建一个TCP连接，一旦TCP打开，并通过了认证，认证就是你试图连接Rabbit之前发送的Rabbit服务器连接信息和用户名和密码，有点像程序连接数据库，使用Java有两种连接认证的方式，后面代码会详细介绍，一旦认证通过你的应用程序和Rabbit就创建了一条AMQP信道（Channel）。</p>
+
+<p>信道是创建在“真实”TCP上的虚拟连接，AMQP命令都是通过信道发送出去的，每个信道都会有一个唯一的ID，不论是发布消息，订阅队列或者介绍消息都是通过信道完成的。</p>
+
+<h5>为什么不通过TCP直接发送命令？</h5>
+
+<p>对于操作系统来说创建和销毁TCP会话是非常昂贵的开销，假设高峰期每秒有成千上万条连接，每个连接都要创建一条TCP会话，这就造成了TCP连接的巨大浪费，而且操作系统每秒能创建的TCP也是有限的，因此很快就会遇到系统瓶颈。</p>
+
+<p>如果我们每个请求都使用一条TCP连接，既满足了性能的需要，又能确保每个连接的私密性，这就是引入信道概念的原因。</p>
+
+<p><img src="http://icdn.apigo.cn/blog/rabbit_channel.png" /></p>
+
+<h2>你必须知道的Rabbit</h2>
+
+<p>想要真正的了解Rabbit有些名词是你必须知道的。</p>
+
+<p>包括：ConnectionFactory（连接管理器）、Channel（信道）、Exchange（交换器）、Queue（队列）、RoutingKey（路由键）、BindingKey（绑定键）。</p>
+
+<p><strong>ConnectionFactory（连接管理器）：</strong>应用程序与Rabbit之间建立连接的管理器，程序代码中使用；</p>
+
+<p><strong>Channel（信道）：</strong>消息推送使用的通道；</p>
+
+<p><strong>Exchange（交换器）：</strong>用于接受、分配消息；它指定消息按什么规则，路由到哪个队列</p>
+
+<p><strong>Queue（队列）</strong>：用于存储生产者的消息；</p>
+
+<p><strong>Binding（绑定）</strong>：它的作用就是把 exchange 和 queue 按照路由规则绑定起来；</p>
+
+<p><strong>RoutingKey（路由键）</strong>：用于把生成者的数据分配到交换器上；路由关键字，exchange 根据这个关键字进行消息投递；</p>
+
+<p><strong>BindingKey（绑定键）</strong>：用于把交换器的消息绑定到队列上；</p>
+
+<p><strong>vhost（虚拟主机）</strong>：一个 broker 里可以开设多个 vhost，用作不同用户的权限分离；</p>
+
+<p><strong>P（生产者）</strong>： 为 Producer，数据的发送方；</p>
+
+<p><strong>C（消费者）</strong>：为 Consumer，数据的接收方；</p>
+
+<p>看到上面的解释，最难理解的路由键和绑定键了，那么他们具体怎么发挥作用的，请看下图：</p>
+
+<p><img src="http://icdn.apigo.cn/blog/rabbit-producer.gif" /></p>
+
+<p>关于更多交换器的信息，我们在后面再讲。</p>
+
+<h2>消息持久化</h2>
+
+<p>Rabbit队列和交换器有一个不可告人的秘密，就是默认情况下重启服务器会导致消息丢失，那么怎么保证Rabbit在重启的时候不丢失呢？答案就是消息持久化。</p>
+
+<p>当你把消息发送到Rabbit服务器的时候，你需要选择你是否要进行持久化，但这并不能保证Rabbit能从崩溃中恢复，想要Rabbit消息能恢复必须满足3个条件：</p>
+
+<ol>
+<li>投递消息的时候durable设置为true，消息持久化，代码：channel.queueDeclare(x, true, false, false, null)，参数2设置为true持久化；</li>
+<li>设置投递模式deliveryMode设置为2（持久），代码：channel.basicPublish(x, x, MessageProperties.PERSISTENT_TEXT_PLAIN,x)，参数3设置为存储纯文本到磁盘；</li>
+<li>消息已经到达持久化交换器上；</li>
+<li>消息已经到达持久化的队列；</li>
+</ol>
+
+<p><strong>持久化工作原理</strong></p>
+
+<p>Rabbit会将你的持久化消息写入磁盘上的持久化日志文件，等消息被消费之后，Rabbit会把这条消息标识为等待垃圾回收。</p>
+
+<p><strong>持久化的缺点</strong></p>
+
+<p>消息持久化的优点显而易见，但缺点也很明显，那就是性能，因为要写入硬盘要比写入内存性能较低很多，从而降低了服务器的吞吐量，尽管使用SSD硬盘可以使事情得到缓解，但他仍然吸干了Rabbit的性能，当消息成千上万条要写入磁盘的时候，性能是很低的。</p>
+
+<p>所以使用者要根据自己的情况，选择适合自己的方式。</p>
+
+<h2>虚拟主机</h2>
+
+<p>每个Rabbit都能创建很多vhost，我们称之为虚拟主机，每个虚拟主机其实都是mini版的RabbitMQ，拥有自己的队列，交换器和绑定，拥有自己的权限机制。</p>
+
+<p><strong>vhost特性</strong></p>
+
+<ol>
+<li>
+<p>RabbitMQ默认的vhost是“/”开箱即用；</p>
+</li>
+<li>
+<p>多个vhost是隔离的，多个vhost无法通讯，并且不用担心命名冲突（队列和交换器和绑定），实现了多层分离；</p>
+</li>
+<li>
+<p>创建用户的时候必须指定vhost；</p>
+</li>
+</ol>
+
+<p><strong>vhost操作</strong></p>
+
+<p>可以通过rabbitmqctl工具命令创建：</p>
+
+<blockquote>
+<p>rabbitmqctl add_vhost[vhost_name]</p>
+</blockquote>
+
+<p>删除vhost：</p>
+
+<blockquote>
+<p>rabbitmqctl delete_vhost[vhost_name]</p>
+</blockquote>
+
+<p>查看所有的vhost：</p>
+
+<blockquote>
+<p>rabbitmqctl list_vhosts</p>
+</blockquote>

@@ -1,0 +1,51 @@
+<h1>简单调用wsdl代码</h1>
+
+<h2>pom依赖</h2>
+
+<p>如果之调用几个简单的接口，可以不用反向生成wsdl客户端代码。</p>
+
+<p><dependency><br />
+<groupId>org.apache.cxf</groupId><br />
+<artifactId>cxf-rt-frontend-jaxws</artifactId><br />
+<version>3.2.6</version><br />
+</dependency><br />
+<br />
+<dependency><br />
+<groupId>org.apache.cxf</groupId><br />
+<artifactId>cxf-core</artifactId><br />
+<version>3.2.6</version><br />
+</dependency><br />
+<br />
+<dependency><br />
+<groupId>org.apache.cxf</groupId><br />
+<artifactId>cxf-rt-transports-http</artifactId><br />
+<version>3.2.6</version><br />
+</dependency></p>
+
+<h2>Java代码</h2>
+
+<p>*/<br />
+public static List<TaskInfoBo> getTaskInfoList(String startTime, String endTime, String server){<br />
+JaxWsDynamicClientFactory dcf = JaxWsDynamicClientFactory.newInstance();<br />
+Client client = dcf.createClient(server);<br />
+<br />
+List<TaskInfoBo> taskList = new ArrayList<>();<br />
+TaskInfoResponse taskInfoResponse = null;<br />
+<br />
+JsonNode param = new ObjectNode(new JsonNodeFactory(false)).put(START_TIME_STR, startTime).put(END_TIME_STR, endTime);<br />
+<br />
+logger.info(param.toString());<br />
+<br />
+try {<br />
+Object[] objects = client.invoke("getTaskInfoByTimeLimit", param.toString());<br />
+if (objects != null && objects.length > 0) {<br />
+taskInfoResponse = new ObjectMapper().readValue(objects[0].toString(), TaskInfoResponse.class);<br />
+}<br />
+} catch (Exception e) {<br />
+e.printStackTrace();<br />
+logger.error("Web Service接口调用失败，无法获取TaskInfo数据");<br />
+return taskList;<br />
+}<br />
+taskList = taskInfoResponse.getTasks();<br />
+return taskList;<br />
+}</p>

@@ -1,0 +1,48 @@
+<h1>Kubernetes 介绍</h1>
+
+<p>Kubernetes是Google开源的容器集群管理系统，其提供应用部署、维护、 扩展机制等功能。</p>
+
+<h2>一、Kubernetes 架构图</h2>
+
+<p> </p>
+
+<p><img src="http://wiki.inhuawei.com/download/attachments/14814307/image2019-1-26_10-50-10.png?version=1&modificationDate=1548471025000&api=v2" style="width:800px" /></p>
+
+<p> </p>
+
+<h2>二、Flannel网络架构图</h2>
+
+<p> </p>
+
+<p><img src="http://wiki.inhuawei.com/download/attachments/14814307/image2019-1-26_10-51-5.png?version=1&modificationDate=1548471078000&api=v2" style="width:700px" /></p>
+
+<p> </p>
+
+<p>数据从源容器中发出后，经由所在主机的docker0虚拟网卡转发到flannel0虚拟网卡，这是个P2P的虚拟网卡，flanneld服务监听在网卡的另外一端。<br />
+Flannel通过Etcd服务维护了一张节点间的路由表，在稍后的配置部分我们会介绍其中的内容。<br />
+源主机的flanneld服务将原本的数据内容UDP封装后根据自己的路由表投递给目的节点的flanneld服务，数据到达以后被解包，然后直接进入目的节点的flannel0虚拟网卡，<br />
+然后被转发到目的主机的docker0虚拟网卡，最后就像本机容器通信一下的有docker0路由到达目标容器。</p>
+
+<h2>三、Kubernetes工作流程</h2>
+
+<p><img src="http://wiki.inhuawei.com/download/attachments/14814307/image2019-1-26_10-51-52.png?version=1&modificationDate=1548471126000&api=v2" style="width:700px" /></p>
+
+<p>集群功能各模块功能描述：</p>
+
+<p>Master节点：<br />
+Master节点上面主要由四个模块组成，APIServer，schedule,controller-manager,etcd</p>
+
+<p>APIServer: APIServer负责对外提供RESTful的kubernetes API的服务，它是系统管理指令的统一接口，任何对资源的增删该查都要交给APIServer处理后再交给etcd，如图，kubectl(kubernetes提供的客户端工具，该工具内部是对kubernetes API的调用）是直接和APIServer交互的。</p>
+
+<p>schedule: schedule负责调度Pod到合适的Node上，如果把scheduler看成一个黑匣子，那么它的输入是pod和由多个Node组成的列表，输出是Pod和一个Node的绑定。 kubernetes目前提供了调度算法，同样也保留了接口。用户根据自己的需求定义自己的调度算法。</p>
+
+<p>controller manager: 如果APIServer做的是前台的工作的话，那么controller manager就是负责后台的。每一个资源都对应一个控制器。而control manager就是负责管理这些控制器的，比如我们通过APIServer创建了一个Pod，当这个Pod创建成功后，APIServer的任务就算完成了。</p>
+
+<p>etcd：etcd是一个高可用的键值存储系统，kubernetes使用它来存储各个资源的状态，从而实现了Restful的API。</p>
+
+<p>Node节点：<br />
+每个Node节点主要由三个模板组成：kublet, kube-proxy</p>
+
+<p>kube-proxy: 该模块实现了kubernetes中的服务发现和反向代理功能。kube-proxy支持TCP和UDP连接转发，默认基Round Robin算法将客户端流量转发到与service对应的一组后端pod。服务发现方面，kube-proxy使用etcd的watch机制监控集群中service和endpoint对象数据的动态变化，并且维护一个service到endpoint的映射关系，从而保证了后端pod的IP变化不会对访问者造成影响，另外，kube-proxy还支持session affinity。</p>
+
+<p>kublet：kublet是Master在每个Node节点上面的agent，是Node节点上面最重要的模块，它负责维护和管理该Node上的所有容器，但是如果容器不是通过kubernetes创建的，它并不会管理。本质上，它负责使Pod的运行状态与期望的状态一致。</p>

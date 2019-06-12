@@ -1,0 +1,98 @@
+<h1>java数据库查询</h1>
+
+<p>package sql.wangyajun;</p>
+
+<p>import java.sql.Connection;<br />
+import java.sql.DriverManager;<br />
+import java.sql.ResultSet;<br />
+import java.sql.Statement;<br />
+import java.util.ArrayList;<br />
+import java.util.HashMap;<br />
+import java.util.List;</p>
+
+<p>import commonj.sdo.DataObject;</p>
+
+<p>public class GetResults {<br />
+    <br />
+    static String conStr = "jdbc:oracle:thin:@115.159.93.180:1521:ORCL";<br />
+    static String username = "EOS";<br />
+    static String password = "123456";<br />
+    <br />
+    public static List getParticipant(int[] jyids) throws Exception {<br />
+        Connection con = null;<br />
+        Statement stmt = null;<br />
+        con = DriverManager.getConnection(conStr, username, password);</p>
+
+<p>        stmt = con.createStatement();<br />
+        String sqlStr="";<br />
+        for(int i=1;i<jyids.length;i++){<br />
+            str=str+","+String.valueOf(i);<br />
+        }<br />
+        ResultSet resultSet = stmt.executeQuery("select * from ORG_EMPLOYEE where ORGID in "+str);<br />
+        <br />
+        List list = new ArrayList(); <br />
+        <br />
+        while(resultSet.next()){<br />
+            String empid=String.valueOf(resultSet.getInt("EMPID"));<br />
+            String empname=resultSet.getString("EMPNAME");<br />
+            WFParticipant p = new WFParticipant(empid ,empname);<br />
+            list.add(p);<br />
+        }<br />
+<br />
+        return list;<br />
+<br />
+    }<br />
+<br />
+    @SuppressWarnings({ "rawtypes", "unchecked" })<br />
+    @Bizlet("")<br />
+    public static HashMap testParticipants(int[] jyids) throws Exception {<br />
+        Connection con = null;<br />
+        Statement stmt = null;<br />
+        con = DriverManager.getConnection(conStr, username, password);</p>
+
+<p>        stmt=con.createStatement(ResultSet.TYPE_SCROLL_INSENSITIVE,ResultSet.CONCUR_READ_ONLY);<br />
+        //stmt = con.createStatement();<br />
+        <br />
+        ArrayList list=new ArrayList();<br />
+        for(int i=0;i<jyids.length;i++){<br />
+            ResultSet rs = stmt.executeQuery("SELECT * FROM ORG_ORGANIZATION WHERE PARENTORGID =\'"+jyids[i]+"\' AND　ORGTYPE='4'");<br />
+            while(rs.next()){<br />
+                int childId=rs.getInt("ORGID");  <br />
+                list.add(childId);<br />
+            }<br />
+        }<br />
+<br />
+        String str=String.valueOf(list.get(0));<br />
+        for(int j=1;j<list.size();j++){<br />
+            str=str+","+String.valueOf(list.get(j));<br />
+        }<br />
+<br />
+        str="select * from ORG_EMPLOYEE where ORGID in ("+str+")";<br />
+        ResultSet resultSet = stmt.executeQuery(str);<br />
+        <br />
+        resultSet.last(); // 游标移到最后, 获得rs长度<br />
+        int length = resultSet.getRow();<br />
+        resultSet.first(); <br />
+        <br />
+        if(length>0){<br />
+            WFParticipant[] participants=new WFParticipant[length];<br />
+            HashMap<String, String>data = new HashMap<String, String>();<br />
+            <br />
+            int k=0;<br />
+            do{<br />
+                String empid=String.valueOf(resultSet.getInt("EMPID"));<br />
+                String empname=resultSet.getString("EMPNAME");<br />
+                data.put(empid, empname);<br />
+                 participants[k]=new WFParticipant();<br />
+                 participants[k].setId(empid);<br />
+                 participants[k].setName(empname);<br />
+                k++;<br />
+            }while(resultSet.next());<br />
+            return data;<br />
+        }<br />
+        else{<br />
+            System.out.println("没有查询到人员"); return null;<br />
+        }<br />
+            <br />
+    }<br />
+    </p>

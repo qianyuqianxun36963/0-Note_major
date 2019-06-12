@@ -1,0 +1,150 @@
+<h1>mysql主从配置和读写分离配置</h1>
+
+<h2>设备情况</h2>
+
+<p>10.179.175.9     master</p>
+
+<p>10.179.95.210   slaveA<br />
+10.179.97.236   slaveB</p>
+
+<h2>主服务器配置</h2>
+
+<h3>修改配置</h3>
+
+<p>找到主数据库的配置文件my.cnf(或者my.ini)，我的在/etc/mysql/my.cnf,在[mysqld]部分插入如下两行：</p>
+
+<pre>
+[mysqld]
+log-bin=mysql-bin #开启二进制日志 [不是必须]启用二进制日志 
+server-id=1 #设置server-id [必须]服务器唯一ID，默认是1，一般取IP最后一段
+binlog-do-db=mstest     #要同步的mstest数据库,要同步多个数据库，就多加几个replicate-db-db=数据库名
+binlog-ignore-db=mysql   #要忽略的数据库
+</pre>
+
+<h3>验证配置</h3>
+
+<p>登录主服务器，运行查看命令：</p>
+
+<p>show variables like 'server_id';</p>
+
+<p>show variables like 'log_bin';</p>
+
+<h3>配置同步用户</h3>
+
+<p>创建用户并授权：用户：repl 密码：repl</p>
+
+<pre>
+CREATE user repl identified by 'repl';
+GRANT ALL ON *.* TO 'repl'@'%'; 新版mysql 授权，使用这句 ...
+flush privileges; 
+</pre>
+
+<pre>
+mysql> CREATE USER 'repl'@'123.57.44.85' IDENTIFIED BY 'repl';#创建用户
+mysql> GRANT REPLICATION SLAVE ON *.* TO 'repl'@'123.57.44.85';#分配权限
+mysql>flush privileges; #刷新权限</pre>
+
+<p>查看权限：</p>
+
+<p>select * from mysql.user where user='repl'\G </p>
+
+<p>select host,user,authentication_string,plugin from user;</p>
+
+<h3>锁表、备份数据</h3>
+
+<h4>主表上锁表</h4>
+
+<p>flush table with read lock;</p>
+
+<h4>查看master状态并记录</h4>
+
+<pre>
+SHOW MASTER STATUS;</pre>
+
+<pre>
+mysql > SHOW MASTER STATUS;
++------------------+----------+--------------+------------------+
+| File | Position | Binlog_Do_DB | Binlog_Ignore_DB |
++------------------+----------+--------------+------------------+
+| mysql-bin.000001 | 73 | test | manual,mysql |
++------------------+----------+--------------+------------------+</pre>
+
+<h4>备份数据</h4>
+
+<p>mysqldump -uroot -P3307 -p na_data_dev > d:/NAPortal/dev.sql</p>
+
+<p>mysqldump -uroot -P3307 -p na_data_uat > d:/NAPortal/uat.sql</p>
+
+<h4>主表上解锁</h4>
+
+<p>unlock table;</p>
+
+<h2>从服务器配置</h2>
+
+<p><strong>以repl用户身份进行登陆！！</strong></p>
+
+<h3>修改mysql配置</h3>
+
+<p>同样找到my.cnf配置文件，添加server-id</p>
+
+<pre>
+[mysqld]
+server-id=2 #设置server-id，必须唯一</pre>
+
+<h3>设置从服务器位置</h3>
+
+<p><strong>重启mysql，打开mysql会话，执行同步SQL语句</strong>(需要主服务器主机名，登陆凭据，二进制文件的名称和位置)：</p>
+
+<pre>
+mysql> CHANGE MASTER TO
+-> MASTER_HOST='10.179.175.9',
+-> MASTER_PORT=3306, //可以省略。
+-> MASTER_USER='rep1',
+-> MASTER_PASSWORD='repl',
+-> MASTER_LOG_FILE='mysql-bin.000002',
+-> MASTER_LOG_POS=8597094;</pre>
+
+<h3>启动同步进程</h3>
+
+<pre>
+mysql>start slave;
+</pre>
+
+<h3>查看slave状态</h3>
+
+<pre>
+show slave status\G</pre>
+
+<pre>
+** 1. row ******
+Slave_IO_State: Waiting for master to send event
+Master_Host: 182.92.172.80
+Master_User: rep1
+Master_Port: 3306
+Connect_Retry: 60
+Master_Log_File: mysql-bin.000013
+Read_Master_Log_Pos: 11662
+Relay_Log_File: mysqld-relay-bin.000022
+Relay_Log_Pos: 11765
+Relay_Master_Log_File: mysql-bin.000013
+Slave_IO_Running: Yes
+Slave_SQL_Running: Yes
+Replicate_Do_DB: 
+Replicate_Ignore_DB: </pre>
+
+<p>当Slave_IO_Running和Slave_SQL_Running都为YES的时候就表示主从同步设置成功了。接下来就可以进行一些验证了，比如在主master数据库的test数据库的一张表中插入一条数据，在slave的test库的相同数据表中查看是否有新增的数据即可验证主从复制功能是否有效，还可以关闭slave（mysql>stop slave;）,然后再修改master，看slave是否也相应修改（停止slave后，master的修改不会同步到slave），就可以完成主从复制功能的验证了。</p>
+
+<p>还可以用到的其他相关参数：</p>
+
+<p>master开启二进制日志后默认记录所有库所有表的操作，可以通过配置来指定只记录指定的数据库甚至指定的表的操作，具体在mysql配置文件的[mysqld]可添加修改如下选项：</p>
+
+<pre>
+# 不同步哪些数据库 
+binlog-ignore-db = mysql 
+binlog-ignore-db = test 
+binlog-ignore-db = information_schema 
+
+# 只同步哪些数据库，除此之外，其他不同步 
+binlog-do-db = game </pre>
+
+<p>如之前查看master状态时就可以看到只记录了test库，忽略了manual和mysql库。</p>

@@ -1,0 +1,883 @@
+<h1>《java与设计模式》之装饰模式详解&Java IO中的装饰器模式</h1>
+
+<h1>1 概述</h1>
+
+<p>在一个项目中，你会有非常多的因素考虑不到，特别是业务的变更，不时的冒出一个需求是很正常的情况。有三个继承关系的类：Father、Son、GrandSon，我们要在Son类上增强一些功能怎么办？给Son类增加方法吗？那对GrandSon的影响呢？特别是对GrandSon有多个的情况，你会怎么办？认真看完本文，你会找到你的答案。</p>
+
+<p>JavaIO中，像下面的嵌套语句是不是很常见，为什么要怎样定义呢？理解装饰模式后，你会找到答案。</p>
+
+<table border="1" cellpadding="0" cellspacing="0">
+<tbody>
+<tr>
+<td>
+<p>DataInputStream in = new DataInputStream(new BufferedInputStream(new FileInputStream("FileTest.java")));</p>
+</td>
+</tr>
+</tbody>
+</table>
+
+<p> </p>
+
+<h1>2 《设计模式之禅》中的例子</h1>
+
+<p>成绩单需要父母签名这事很多人都经历过，这举这样一个例子：</p>
+
+<p><img alt="" src="https://img-blog.csdn.net/20160506191637731?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQv/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70/gravity/Center" /></p>
+
+<p> </p>
+
+<p>代码清单1 抽象成绩单</p>
+
+<p><strong>[java]</strong> <a href="https://blog.csdn.net/caihuangshi/article/details/51334097#" onclick="dp.sh.Toolbar.Command('ViewSource',this);return false;" title="view plain">view plain</a> <a href="https://blog.csdn.net/caihuangshi/article/details/51334097#" onclick="dp.sh.Toolbar.Command('CopyToClipboard',this);return false;" title="copy">copy</a></p>
+
+<ol start="1">
+<li><span style="font-size:14px;">package decorator;  </li>
+<li>//抽象成绩单  </li>
+<li>public abstract class SchoolReport {  </li>
+<li>    //展示成绩情况  </li>
+<li>    public abstract void report();  </li>
+<li>    //家长签字  </li>
+<li>    public abstract void sign(String name);  </li>
+<li>}</span>  </li>
+</ol>
+
+<p> </p>
+
+<p>代码清单2 四年级成绩单</p>
+
+<ol start="1">
+<li><span style="font-size:14px;">package decorator;  </li>
+<li>//四年级成绩单  </li>
+<li>public class FouthGradeSchoolReport extends SchoolReport{  </li>
+<li>    //我的成绩单  </li>
+<li>    public void report(){  </li>
+<li>        //成绩单的格式是这个样子的  </li>
+<li>        System.out.println("尊敬的XXX家长：");  </li>
+<li>        System.out.println("······");  </li>
+<li>        System.out.println("语文62 数学65 体育98 自然63");  </li>
+<li>        System.out.println("······");  </li>
+<li>        System.out.println("      家长签字");  </li>
+<li>    }  </li>
+<li>    //家长签名  </li>
+<li>    public void sign(String name){  </li>
+<li>        System.out.println("家长签字为：" + name);  </li>
+<li>    }  </li>
+<li>}</span>  </li>
+</ol>
+
+<p> </p>
+
+<p>代码清单3 老爸查看成绩单</p>
+
+<ol start="1">
+<li>package decorator;  </li>
+<li>//老爸查看成绩单  </li>
+<li>public class Father {  </li>
+<li>    public static void main(String[] args) {  </li>
+<li>        //把成绩单拿过来  </li>
+<li>        SchoolReport sr = new FouthGradeSchoolReport();  </li>
+<li>        //看成绩单  </li>
+<li>        sr.report();  </li>
+<li>        //签名？ 休想！  </li>
+<li>    }  </li>
+<li>}  </li>
+<li>/*Output: </li>
+<li>尊敬的XXX家长： </li>
+<li>······ </li>
+<li>语文62 数学65 体育98 自然63 </li>
+<li>······ </li>
+<li>      家长签字 </li>
+<li> */  </li>
+</ol>
+
+<p> </p>
+
+<p>就这成绩还要我签字？！老爸就开始找扫帚，我开始做准备：深呼吸，绷紧肌肉，提臀，收腹。 哈哈，幸运的是，这个不是当时的真实情况，我没有直接把成绩单交给老爸，而是在交给他之前做了点技术工作，我要把成绩单封装一下，封装分类两步来实现， 如下所示。</p>
+
+<p>● 汇报最高成绩</p>
+
+<p>跟老爸说各个科目的最高分，语文最高是75，数学是78，自然是80，然后老爸觉得我的成绩与最高分数相差不多，考的还是不错的嘛！这个是实情，但是不知道是什么原因，反正期末考试都考得不怎么样，但是基本上都集中在70分以上，我这60多分基本上还是垫底的角色。</p>
+
+<p>● 汇报排名情况</p>
+
+<p>在老爸看完成绩单后，告诉他我在全班排第38名，这个也是实情，为啥呢？有将近十个同学退学了！ 这个情况我是不会说的。 不知道是不是当时第一次发成绩单时学校没有考虑清楚，没有写上总共有多少同学，排第几名，反正是被我钻了个空子。</p>
+
+<p>那修饰是说完了，我们看看类图如何修改，如下图所示：</p>
+
+<p><img alt="" src="https://img-blog.csdn.net/20160506192009073?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQv/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70/gravity/Center" /></p>
+
+<p> </p>
+
+<p> </p>
+
+<p>代码清单4 修饰成绩单</p>
+
+<p><strong>[java]</strong> <a href="https://blog.csdn.net/caihuangshi/article/details/51334097#" onclick="dp.sh.Toolbar.Command('ViewSource',this);return false;" title="view plain">view plain</a> <a href="https://blog.csdn.net/caihuangshi/article/details/51334097#" onclick="dp.sh.Toolbar.Command('CopyToClipboard',this);return false;" title="copy">copy</a></p>
+
+<ol start="1">
+<li>package decorator;  </li>
+<li>//修饰成绩单  </li>
+<li>public class SugarFouthGradeSchoolReport extends FouthGradeSchoolReport {  </li>
+<li>    // 首先要定义你要美化的方法， 先给老爸说学校最高成绩  </li>
+<li>    private void reportHighScore() {  </li>
+<li>        System.out.println("这次考试语文最高是75， 数学是78， 自然是80");  </li>
+<li>    }// 在老爸看完毕成绩单后，我再汇报学校的排名情况  </li>
+<li>  </li>
+<li>    private void reportSort() {  </li>
+<li>        System.out.println("我是排名第38名...");  </li>
+<li>    }// 由于汇报的内容已经发生变更，那所以要重写父类  </li>
+<li>  </li>
+<li>    @Override  </li>
+<li>    public void report() {  </li>
+<li>        this.reportHighScore(); // 先说最高成绩  </li>
+<li>        super.report(); // 然后老爸看成绩单  </li>
+<li>        this.reportSort(); // 然后告诉老爸学习学校排名  </li>
+<li>    }  </li>
+<li>}  </li>
+</ol>
+
+<p> </p>
+
+<p>代码清单5 老爸查看修饰后的成绩单</p>
+
+<p><strong>[java]</strong> <a href="https://blog.csdn.net/caihuangshi/article/details/51334097#" onclick="dp.sh.Toolbar.Command('ViewSource',this);return false;" title="view plain">view plain</a> <a href="https://blog.csdn.net/caihuangshi/article/details/51334097#" onclick="dp.sh.Toolbar.Command('CopyToClipboard',this);return false;" title="copy">copy</a></p>
+
+<ol start="1">
+<li>package decorator;  </li>
+<li>  </li>
+<li>public class Father2 {  </li>
+<li>    public static void main(String[] args) {  </li>
+<li>        // 把美化过的成绩单拿过来  </li>
+<li>        SchoolReport sr = new SugarFouthGradeSchoolReport();  </li>
+<li>        // 看成绩单  </li>
+<li>        sr.report();  </li>
+<li>        // 然后老爸， 一看， 很开心， 就签名了  </li>
+<li>        sr.sign("老三"); // 我叫小三， 老爸当然叫老三  </li>
+<li>    }  </li>
+<li>}  </li>
+<li>/* </li>
+<li>这次考试语文最高是75， 数学是78， 自然是80 </li>
+<li>尊敬的XXX家长： </li>
+<li>······ </li>
+<li>语文62 数学65 体育98 自然63 </li>
+<li>······ </li>
+<li>      家长签字 </li>
+<li>我是排名第38名... </li>
+<li>家长签字为：老三 </li>
+<li> * */  </li>
+</ol>
+
+<p> </p>
+
+<p>通过继承确实能够解决这个问题，老爸看成绩单很开心，然后就给签字了，但现实的情况是很复杂的，可能老爸听我汇报最高成绩后，就直接乐开花了，直接签名了，后面的排名就没必要看了，或者老爸要先看排名情况，那怎么办？ 继续扩展？你能扩展多少个类？这还是一个比较简单的场景，一旦需要装饰的条件非常多，比如20个，你还通过继承来解决，你想象的子类有多少个？ 你是不是马上就要崩溃了！</p>
+
+<p>好，你也看到通过继承情况确实出现了问题，类爆炸，类的数量激增，光写这些类不累死你才怪，而且还要想想以后维护怎么办，谁愿意接收这么一大摊本质相似的代码维护工作？并且在面向对象的设计中，如果超过两层继承，你就应该想想是不是出设计问题了，是不是应该重新找一条康庄大道了，这是经验值，不是什么绝对的，继承层次越多以后的维护成本越多，问题这么多，那怎么办？好办，我们定义一批专门负责装饰的类，然后根据实际情况来决定是否需要进行装饰，类图稍做修正，如图17-4所示。</p>
+
+<p><img alt="" src="https://img-blog.csdn.net/20160506192147544?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQv/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70/gravity/Center" /></p>
+
+<p> </p>
+
+<p> </p>
+
+<p>增加一个抽象类和两个实现类，其中Decorator的作用是封装SchoolReport类，如果大家还记得代理模式，那么很容易看懂这个类图，装饰类的作用也就是一个特殊的代理类，真实的执行者还是被代理的角色FouthGradeSchoolReport，如代码清单6所示。</p>
+
+<p> </p>
+
+<p>代码清单6 修饰的抽象类</p>
+
+<p> </p>
+
+<p><strong>[java]</strong> <a href="https://blog.csdn.net/caihuangshi/article/details/51334097#" onclick="dp.sh.Toolbar.Command('ViewSource',this);return false;" title="view plain">view plain</a> <a href="https://blog.csdn.net/caihuangshi/article/details/51334097#" onclick="dp.sh.Toolbar.Command('CopyToClipboard',this);return false;" title="copy">copy</a></p>
+
+<ol start="1">
+<li>package decorator;  </li>
+<li>  </li>
+<li>public abstract class Decorator extends SchoolReport {  </li>
+<li>    // 首先我要知道是哪个成绩单  </li>
+<li>    private SchoolReport sr;  </li>
+<li>  </li>
+<li>    // 构造函数， 传递成绩单过来  </li>
+<li>    public Decorator(SchoolReport sr){  </li>
+<li>    this.sr = sr;  </li>
+<li>    }//成绩单还是要被看到的  </li>
+<li>  </li>
+<li>    public void report(){  </li>
+<li>    this.sr.report();  </li>
+<li>    }//看完还是要签名的  </li>
+<li>  </li>
+<li>    public void sign(String name) {  </li>
+<li>        this.sr.sign(name);  </li>
+<li>    }  </li>
+<li>}  </li>
+</ol>
+
+<p> </p>
+
+<p>看到没，装饰类还是把动作的执行委托给需要装饰的对象， Decorator抽象类的目的很简单，就是要让子类来封装SchoolReport的子类，怎么封装？ 重写report方法！ 先看HighScoreDecorator实现类，如代码清单7所示。</p>
+
+<p> </p>
+
+<p>代码清单7 最高成绩修饰</p>
+
+<p><strong>[java]</strong> <a href="https://blog.csdn.net/caihuangshi/article/details/51334097#" onclick="dp.sh.Toolbar.Command('ViewSource',this);return false;" title="view plain">view plain</a> <a href="https://blog.csdn.net/caihuangshi/article/details/51334097#" onclick="dp.sh.Toolbar.Command('CopyToClipboard',this);return false;" title="copy">copy</a></p>
+
+<ol start="1">
+<li>package decorator;  </li>
+<li>  </li>
+<li>public class HighScoreDecorator extends Decorator {  </li>
+<li>    //构造函数  </li>
+<li>    public HighScoreDecorator(SchoolReport sr){  </li>
+<li>        super(sr);  </li>
+<li>    }  </li>
+<li>    //我要汇报最高成绩  </li>
+<li>    private void reportHighScore(){  </li>
+<li>        System.out.println("这次考试语文最高是75， 数学是78， 自然是80");  </li>
+<li>    }  </li>
+<li>    //我要在老爸看成绩单前告诉他最高成绩， 否则等他一看， 就抡起扫帚揍我， 我哪里还有机会说啊  </li>
+<li>    @Override  </li>
+<li>    public void report(){  </li>
+<li>        this.reportHighScore();  </li>
+<li>        super.report();  </li>
+<li>    }  </li>
+<li>}  </li>
+</ol>
+
+<p> </p>
+
+<p>重写了report方法，先调用具体装饰类的装饰方法reportHighScore， 然后再调用具体构件的方法，我们再来看怎么汇报学校排序情况SortDecorator代码，如代码清单8所示。</p>
+
+<p> </p>
+
+<p>代码清单8 排名情况修饰</p>
+
+<p><strong>[java]</strong> <a href="https://blog.csdn.net/caihuangshi/article/details/51334097#" onclick="dp.sh.Toolbar.Command('ViewSource',this);return false;" title="view plain">view plain</a> <a href="https://blog.csdn.net/caihuangshi/article/details/51334097#" onclick="dp.sh.Toolbar.Command('CopyToClipboard',this);return false;" title="copy">copy</a></p>
+
+<ol start="1">
+<li>package decorator;  </li>
+<li>  </li>
+<li>public class SortDecorator extends Decorator{  </li>
+<li>    //构造函数  </li>
+<li>    public SortDecorator(SchoolReport sr){  </li>
+<li>        super(sr);  </li>
+<li>    }  </li>
+<li>    //告诉老爸成绩的排名情况  </li>
+<li>    private void reportSort(){  </li>
+<li>        System.out.println("我排名是第38名...");  </li>
+<li>    }  </li>
+<li>    //老爸看完成绩单后再告诉他，加强作用  </li>
+<li>    public void report(){  </li>
+<li>        super.report();  </li>
+<li>        this.reportSort();  </li>
+<li>    }  </li>
+<li>}  </li>
+</ol>
+
+<p> </p>
+
+<p>我准备好了这两个强力的修饰工具，然后就“毫不畏惧”地把成绩单交给老爸，看看老爸怎么看成绩单的，如代码清单9所示。</p>
+
+<p> </p>
+
+<p>代码清单9 老爸查看修饰后的成绩单</p>
+
+<p> </p>
+
+<p><strong>[java]</strong> <a href="https://blog.csdn.net/caihuangshi/article/details/51334097#" onclick="dp.sh.Toolbar.Command('ViewSource',this);return false;" title="view plain">view plain</a> <a href="https://blog.csdn.net/caihuangshi/article/details/51334097#" onclick="dp.sh.Toolbar.Command('CopyToClipboard',this);return false;" title="copy">copy</a></p>
+
+<ol start="1">
+<li>package decorator;  </li>
+<li>  </li>
+<li>public class Father3 {  </li>
+<li>    public static void main(String[] args) {  </li>
+<li>        //把成绩单拿过来  </li>
+<li>        SchoolReport sr;  </li>
+<li>        //原装的成绩单  </li>
+<li>        sr = new FouthGradeSchoolReport();  </li>
+<li>        //加了最高分说明的成绩单  </li>
+<li>        sr = new HighScoreDecorator(sr);  </li>
+<li>        //又加了成绩排名的说明  </li>
+<li>        sr = new SortDecorator(sr);  </li>
+<li>        //看成绩单  </li>
+<li>        sr.report();  </li>
+<li>        //然后老爸一看， 很开心， 就签名了  </li>
+<li>        sr.sign("老三");//我叫小三， 老爸当然叫老三  </li>
+<li>    }  </li>
+<li>}  </li>
+</ol>
+
+<p> </p>
+
+<p>老爸一看成绩单，听我这么一说，非常开心，儿子有进步呀，从40多名进步到30多名，进步很大，躲过了一顿海扁。想想看，如果我还要增加其他的修饰条件，是不是就非常容易了，只要实现Decorator类就可以了！ 这就是装饰模式。</p>
+
+<h1>3 装饰模式的定义</h1>
+
+<p>装饰模式（Decorator Pattern）是一种比较常见的模式，其定义如下：Attach additionalresponsibilities to an object dynamically keeping the same interface.Decoratorsprovide a flexible alternative to subclassing for extending functionality.（ 动态地给一个对象添加一些额外的职责。就增加功能来说，装饰模式相比生成子类更为灵活。）</p>
+
+<p>装饰模式的通用类图如图5所示。</p>
+
+<p><img alt="" src="https://img-blog.csdn.net/20160506192531484?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQv/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70/gravity/Center" /></p>
+
+<p> </p>
+
+<p> </p>
+
+<p> </p>
+
+<p>图5 装饰模式的通用类图</p>
+
+<p>在类图中，有四个角色需要说明：</p>
+
+<p>●Component抽象构件</p>
+
+<p>Component是一个接口或者是抽象类，就是定义我们最核心的对象，也就是最原始的对象，如上面的成绩单。</p>
+
+<p>注意 在装饰模式中，必然有一个最基本、最核心、最原始的接口或抽象类充当Component抽象构件。</p>
+
+<p>●ConcreteComponent 具体构件</p>
+
+<p>ConcreteComponent是最核心、最原始、最基本的接口或抽象类的实现，你要装饰的就是它。</p>
+
+<p>●Decorator装饰角色</p>
+
+<p>一般是一个抽象类，做什么用呢？实现接口或者抽象方法，它里面可不一定有抽象的方法呀，在它的属性里必然有一个private变量指向Component抽象构件。</p>
+
+<p>● 具体装饰角色</p>
+
+<p>ConcreteDecoratorA和ConcreteDecoratorB是两个具体的装饰类，你要把你最核心的、最原始的、最基本的东西装饰成其他东西，上面的例子就是把一个比较平庸的成绩单装饰成家长认可的成绩单。</p>
+
+<p>装饰模式的所有角色都已经解释完毕，我们来看看如何实现， 先看抽象构件，如代码清单10所示。</p>
+
+<p> </p>
+
+<p>代码清单10 抽象构件</p>
+
+<p><strong>[java]</strong> <a href="https://blog.csdn.net/caihuangshi/article/details/51334097#" onclick="dp.sh.Toolbar.Command('ViewSource',this);return false;" title="view plain">view plain</a> <a href="https://blog.csdn.net/caihuangshi/article/details/51334097#" onclick="dp.sh.Toolbar.Command('CopyToClipboard',this);return false;" title="copy">copy</a></p>
+
+<ol start="1">
+<li>public abstract class Component {  </li>
+<li>//抽象的方法  </li>
+<li>public abstract void operate();  </li>
+<li>}  </li>
+</ol>
+
+<p> </p>
+
+<p>代码清单11 具体构件</p>
+
+<p> </p>
+
+<p><strong>[java]</strong> <a href="https://blog.csdn.net/caihuangshi/article/details/51334097#" onclick="dp.sh.Toolbar.Command('ViewSource',this);return false;" title="view plain">view plain</a> <a href="https://blog.csdn.net/caihuangshi/article/details/51334097#" onclick="dp.sh.Toolbar.Command('CopyToClipboard',this);return false;" title="copy">copy</a></p>
+
+<ol start="1">
+<li>public class ConcreteComponent extends Component {  </li>
+<li>    // 具体实现  </li>
+<li>    @Override  </li>
+<li>    public void operate() {  </li>
+<li>        System.out.println("do Something");  </li>
+<li>    }  </li>
+<li>}  </li>
+</ol>
+
+<p> </p>
+
+<p>代码清单12 抽象装饰者</p>
+
+<p><strong>[java]</strong> <a href="https://blog.csdn.net/caihuangshi/article/details/51334097#" onclick="dp.sh.Toolbar.Command('ViewSource',this);return false;" title="view plain">view plain</a> <a href="https://blog.csdn.net/caihuangshi/article/details/51334097#" onclick="dp.sh.Toolbar.Command('CopyToClipboard',this);return false;" title="copy">copy</a></p>
+
+<ol start="1">
+<li>package decorator;  </li>
+<li>  </li>
+<li>public abstract class Decorator2 extends Component {  </li>
+<li>    private Component component = null;  </li>
+<li>  </li>
+<li>    // 通过构造函数传递被修饰者  </li>
+<li>    public Decorator2(Component component) {  </li>
+<li>        this.component = component;  </li>
+<li>    }  </li>
+<li>  </li>
+<li>    // 委托给被修饰者执行  </li>
+<li>    @Override  </li>
+<li>    public void operate() {  </li>
+<li>        this.component.operate();  </li>
+<li>    }  </li>
+<li>}  </li>
+</ol>
+
+<p> </p>
+
+<p>当然了，若只有一个装饰类，则可以没有抽象装饰角色，直接实现具体的装饰角色即可。具体的装饰类如代码清单13所示。</p>
+
+<p> </p>
+
+<p>代码清单13 具体的装饰类</p>
+
+<ol start="1">
+<li>package decorator;  </li>
+<li>  </li>
+<li>public class ConcreteDecorator1 extends Decorator2 {  </li>
+<li>    // 定义被修饰者  </li>
+<li>    public ConcreteDecorator1(Component component) {  </li>
+<li>        super(component);  </li>
+<li>    }  </li>
+<li>  </li>
+<li>    // 定义自己的修饰方法  </li>
+<li>    private void method1() {  </li>
+<li>        System.out.println("method1 修饰");  </li>
+<li>    }  </li>
+<li>  </li>
+<li>    // 重写父类的Operation方法  </li>
+<li>    public void operate() {  </li>
+<li>        this.method1();  </li>
+<li>        super.operate();  </li>
+<li>    }  </li>
+<li>}  </li>
+</ol>
+
+<ol start="1">
+<li>package decorator;  </li>
+<li>  </li>
+<li>public class ConcreteDecorator2 extends Decorator2 {  </li>
+<li>    // 定义被修饰者  </li>
+<li>    public ConcreteDecorator2(Component component) {  </li>
+<li>        super(component);  </li>
+<li>    }  </li>
+<li>  </li>
+<li>    // 定义自己的修饰方法  </li>
+<li>    private void method2() {  </li>
+<li>        System.out.println("menthod2 修饰方法");  </li>
+<li>    }  </li>
+<li>  </li>
+<li>    // 重写父类的Operation方法  </li>
+<li>    public void operate() {  </li>
+<li>        super.operate();  </li>
+<li>        this.method2();  </li>
+<li>    }  </li>
+<li>}  </li>
+</ol>
+
+<p> </p>
+
+<p>注意 原始方法和装饰方法的执行顺序在具体的装饰类是固定的，可以通过方法重载实现多种执行顺序。</p>
+
+<p>我们通过Client类来模拟高层模块的耦合关系， 看看装饰模式是如何运行的， 如代码清单14所示。</p>
+
+<p> </p>
+
+<p>代码清单14 场景类</p>
+
+<ol start="1">
+<li>package decorator;  </li>
+<li>  </li>
+<li>public class Client {  </li>
+<li>    public static void main(String[] args) {  </li>
+<li>        Component component = new ConcreteComponent();  </li>
+<li>        // 第一次修饰  </li>
+<li>        component = new ConcreteDecorator1(component);  </li>
+<li>        // 第二次修饰  </li>
+<li>        component = new ConcreteDecorator2(component);  </li>
+<li>        // 修饰后运行  </li>
+<li>        component.operate();  </li>
+<li>    }  </li>
+<li>}  </li>
+</ol>
+
+<p> </p>
+
+<h1>4、半透明的装饰模式</h1>
+
+<h2>4.1 装饰模式的简化</h2>
+
+<p>如果只有一个ConcreteComponent类，那么可以考虑去掉抽象的Component类（接口），把Decorator作为一个ConcreteComponent子类。如下图所示：</p>
+
+<p><img alt="" src="https://img-blog.csdn.net/20160506192920111?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQv/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70/gravity/Center" /></p>
+
+<p> </p>
+
+<p>如果只有一个ConcreteDecorator类，那么就没有必要建立一个单独的Decorator类，而可以把Decorator和ConcreteDecorator的责任合并成一个类。甚至在只有两个ConcreteDecorator类的情况下，都可以这样做。如下图所示：</p>
+
+<p><img alt="" src="https://img-blog.csdn.net/20160506192958314?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQv/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70/gravity/Center" /></p>
+
+<p> </p>
+
+<p> </p>
+
+<h2>4.2透明性的要求</h2>
+
+<p>装饰模式对客户端的透明性要求程序不要声明一个ConcreteComponent类型的变量，而应当声明一个Component类型的变量。</p>
+
+<p>用上面成绩单的例子来说有：</p>
+
+<table border="1" cellpadding="0" cellspacing="0">
+<tbody>
+<tr>
+<td>
+<p>SchoolReport sr;</p>
+
+<p>sr = new FouthGradeSchoolReport();</p>
+
+<p>sr = new HighScoreDecorator(sr);</p>
+
+<p>sr = new SortDecorator(sr);</p>
+</td>
+</tr>
+</tbody>
+</table>
+
+<p>      而下面的做法是不对的：</p>
+
+<table border="1" cellpadding="0" cellspacing="0">
+<tbody>
+<tr>
+<td>
+<p>HighScoreDecorator hd = <strong>new</strong> HighScoreDecorator(sr);</p>
+
+<p>SortDecorator sd = <strong>new</strong> SortDecorator(sr);</p>
+</td>
+</tr>
+</tbody>
+</table>
+
+<h2>4.3半透明的装饰模式</h2>
+
+<p>然而，纯粹的装饰模式很难找到。装饰模式的用意是在不改变接口的前提下，增强所考虑的类的性能。在增强性能的时候，往往需要建立新的公开的方法。上面成绩单的例子中，显示前十名学生信息。这就意味着SortDecorator类中应当有一个新的displayTopTen()方法。再比如，显示显示各科最高分学生信息，这就意味着在HighScoreDecorator类里应当有一个新的showTop()方法。</p>
+
+<p>这就导致了大多数的装饰模式的实现都是“半透明”的，而不是完全透明的。换言之，允许装饰模式改变接口，增加新的方法。这意味着客户端可以声明ConcreteDecorator类型的变量，从而可以调用ConcreteDecorator类中才有的方法：</p>
+
+<table border="1" cellpadding="0" cellspacing="0">
+<tbody>
+<tr>
+<td>
+<p>SchoolReport sr = new SortDecorator();</p>
+
+<p>SortDecorator sd = new SortDecorator();</p>
+
+<p>sd.displayTopTen();</p>
+</td>
+</tr>
+</tbody>
+</table>
+
+<p>半透明的装饰模式是介于装饰模式和适配器模式之间的。适配器模式的用意是改变所考虑的类的接口，也可以通过改写一个或几个方法，或增加新的方法来增强或改变所考虑的类的功能。大多数的装饰模式实际上是半透明的装饰模式，这样的装饰模式也称做半装饰、半适配器模式。</p>
+
+<p>装饰模式和适配器模式都是“包装模式(Wrapper Pattern)”，它们都是通过封装其他对象达到设计的目的的，但是它们的形态有很大区别。</p>
+
+<p>理想的装饰模式在对被装饰对象进行功能增强的同时，要求具体构件角色、装饰角色的接口与抽象构件角色的接口完全一致。而适配器模式则不然，一般而言，适配器模式并不要求对源对象的功能进行增强，但是会改变源对象的接口，以便和目标接口相符合。</p>
+
+<p>装饰模式有透明和半透明两种，这两种的区别就在于装饰角色的接口与抽象构件角色的接口是否完全一致。透明的装饰模式也就是理想的装饰模式，要求具体构件角色、装饰角色的接口与抽象构件角色的接口完全一致。相反，如果装饰角色的接口与抽象构件角色接口不一致，也就是说装饰角色的接口比抽象构件角色的接口宽的话，装饰角色实际上已经成了一个适配器角色，这种装饰模式也是可以接受的，称为“半透明”的装饰模式，如下图所示。</p>
+
+<p><img alt="" src="https://img-blog.csdn.net/20160506193107049?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQv/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70/gravity/Center" /></p>
+
+<p> </p>
+
+<p> </p>
+
+<p>在适配器模式里面，适配器类的接口通常会与目标类的接口重叠，但往往并不完全相同。换言之，适配器类的接口会比被装饰的目标类接口宽。</p>
+
+<p>显然，半透明的装饰模式实际上就是处于适配器模式与装饰模式之间的灰色地带。如果将装饰模式与适配器模式合并成为一个“包装模式”的话，那么半透明的装饰模式倒可以成为这种合并后的“包装模式”的代表。</p>
+
+<p> </p>
+
+<h1>5 装饰模式应用</h1>
+
+<h2><a name="OLE_LINK1">5.1</a>装饰模式的优点</h2>
+
+<p>A、装饰类和被装饰类可以独立发展，而不会相互耦合。换句话说，Component类无须知道Decorator类，Decorator类是从外部来扩展Component类的功能，而Decorator也不用知道具体的构件。</p>
+
+<p>B、装饰模式是继承关系的一个替代方案。我们看装饰类Decorator，不管装饰多少层，返回的对象还是Component，实现的还是is-a的关系。</p>
+
+<p>C、装饰模式与继承关系的目的都是要扩展对象的功能，但是装饰模式可以提供比继承更多的灵活性。装饰模式允许系统动态决定“贴上”一个需要的“装饰”，或者除掉一个不需要的“装饰”。继承关系则不同，继承关系是静态的，它在系统运行前就决定了。</p>
+
+<p>D、过使用不同的具体装饰类以及这些装饰类的排列组合，设计师可以创造出很多不同行为的组合。</p>
+
+<h2>5.2 装饰模式的缺点</h2>
+
+<p>A、由于使用装饰模式，可以比使用继承关系需要较少数目的类。使用较少的类，当然使设计比较易于进行。但是，在另一方面，使用装饰模式会产生比使用继承关系更多的对象。更多的对象会使得查错变得困难，特别是这些对象看上去都很相像。</p>
+
+<p>B、多层的装饰是比较复杂的。</p>
+
+<h2>5.3 装饰模式的使用场景</h2>
+
+<p>A、需要扩展一个类的功能，或给一个类增加附加功能。</p>
+
+<p>B、需要动态地给一个对象增加功能，这些功能可以再动态地撤销。</p>
+
+<p>C、需要为一批的兄弟类进行改装或加装功能，当然是首选装饰模式。</p>
+
+<h1>6 深入剖析InputStream中的装饰模式</h1>
+
+<p>装饰模式在Java语言中的最著名的应用莫过于Java I/O标准库的设计了。</p>
+
+<p>由于Java I/O库需要很多性能的各种组合，如果这些性能都是用继承的方法实现的，那么每一种组合都需要一个类，这样就会造成大量性能重复的类出现。而如果采用装饰模式，那么类的数目就会大大减少，性能的重复也可以减至最少。因此装饰模式是Java I/O库的基本模式。</p>
+
+<p>JavaI/O库的对象结构图如下，由于Java I/O的对象众多，因此只画出InputStream的部分。</p>
+
+<p><img alt="" src="https://img-blog.csdn.net/20160506193142964?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQv/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70/gravity/Center" /></p>
+
+<p> </p>
+
+<p> </p>
+
+<p>根据上图可以看出：</p>
+
+<p>●<strong>抽象构件(Component)角色：</strong>由InputStream扮演。这是一个抽象类，为各种子类型提供统一的接口。</p>
+
+<p>●<strong>具体构件(ConcreteComponent)角色：</strong>由ByteArrayInputStream、FileInputStream、PipedInputStream、StringBufferInputStream等类扮演。它们实现了抽象构件角色所规定的接口。</p>
+
+<p>●<strong>抽象装饰(Decorator)角色：</strong>由FilterInputStream扮演。它实现了InputStream所规定的接口。</p>
+
+<p>●<strong>具体装饰(ConcreteDecorator)角色：</strong>由几个类扮演，分别是BufferedInputStream、DataInputStream以及两个不常用到的类LineNumberInputStream、PushbackInputStream。</p>
+
+<p>InputStream类型中的装饰模式</p>
+
+<p>InputStream类型中的装饰模式是半透明的。为了说明这一点，不妨看一看作装饰模式的抽象构件角色的InputStream的源代码。这个抽象类声明了九个方法，并给出了其中八个的实现，另外一个是抽象方法，需要由子类实现。</p>
+
+<ol start="1">
+<li>public abstract class InputStream implements Closeable {  </li>
+<li>private static final int MAX_SKIP_BUFFER_SIZE = 2048;  </li>
+<li>    public abstract int read() throws IOException;  </li>
+<li>    public int read(byte b[]) throws IOException {}  </li>
+<li>    public int read(byte b[], int off, int len) throws IOException {}  </li>
+<li>    public long skip(long n) throws IOException {}  </li>
+<li>    public int available() throws IOException {}  </li>
+<li>    public void close() throws IOException {}  </li>
+<li>    public synchronized void mark(int readlimit) {}  </li>
+<li>    public synchronized void reset() throws IOException {}  </li>
+<li>    public boolean markSupported() {}  </li>
+<li>}  </li>
+</ol>
+
+<p> </p>
+
+<p>下面是作为装饰模式的抽象装饰角色FilterInputStream类的源代码。可以看出，FilterInputStream的接口与InputStream的接口是完全一致的。也就是说，直到这一步，还是与装饰模式相符合的。</p>
+
+<ol start="1">
+<li>public class FilterInputStream extends InputStream {  </li>
+<li>    protected volatile InputStream in;  </li>
+<li>    protected FilterInputStream(InputStream in) {  </li>
+<li>        this.in = in;  </li>
+<li>    }  </li>
+<li>    public int read() throws IOException {  </li>
+<li>        return in.read();  </li>
+<li>    }  </li>
+<li>    public int read(byte b[]) throws IOException {  </li>
+<li>        return read(b, 0, b.length);  </li>
+<li>    }  </li>
+<li>    public int read(byte b[], int off, int len) throws IOException {  </li>
+<li>        return in.read(b, off, len);  </li>
+<li>    }  </li>
+<li>    public long skip(long n) throws IOException {  </li>
+<li>        return in.skip(n);  </li>
+<li>    }  </li>
+<li>    public int available() throws IOException {  </li>
+<li>        return in.available();  </li>
+<li>    }  </li>
+<li>    public void close() throws IOException {  </li>
+<li>        in.close();  </li>
+<li>    }  </li>
+<li>    public synchronized void mark(int readlimit) {  </li>
+<li>        in.mark(readlimit);  </li>
+<li>    }  </li>
+<li>    public synchronized void reset() throws IOException {  </li>
+<li>        in.reset();  </li>
+<li>    }  </li>
+<li>    public boolean markSupported() {  </li>
+<li>        return in.markSupported();  </li>
+<li>    }  </li>
+<li>}  </li>
+</ol>
+
+<p> </p>
+
+<p>下面是具体装饰角色PushbackInputStream的源代码。</p>
+
+<p> </p>
+
+<ol start="1">
+<li>public class PushbackInputStream extends FilterInputStream {  </li>
+<li>    private void ensureOpen() throws IOException {}  </li>
+<li>    public PushbackInputStream(InputStream in, int size) {}  </li>
+<li>    public PushbackInputStream(InputStream in) {}  </li>
+<li>    public int read() throws IOException {}  </li>
+<li>    public int read(byte[] b, int off, int len) throws IOException {}  </li>
+<li>    public void unread(int b) throws IOException {}  </li>
+<li>    public void unread(byte[] b, int off, int len) throws IOException {}  </li>
+<li>    public void unread(byte[] b) throws IOException {}  </li>
+<li>    public int available() throws IOException {}  </li>
+<li>    public long skip(long n) throws IOException {}  </li>
+<li>    public boolean markSupported() {}  </li>
+<li>    public synchronized void mark(int readlimit) {}  </li>
+<li>    public synchronized void reset() throws IOException {}  </li>
+<li>    public synchronized void close() throws IOException {}  </li>
+<li>}  </li>
+</ol>
+
+<p> </p>
+
+<p>查看源码，你会发现，这个装饰类提供了额外的方法unread()，这就意味着PushbackInputStream是一个半透明的装饰类。换言 之，它破坏了理想的装饰模式的要求。如果客户端持有一个类型为InputStream对象的引用in的话，那么如果in的真实类型是 PushbackInputStream的话，只要客户端不需要使用unread()方法，那么客户端一般没有问题。但是如果客户端必须使用这个方法，就 必须进行向下类型转换。将in的类型转换成为PushbackInputStream之后才可能调用这个方法。但是，这个类型转换意味着客户端必须知道它 拿到的引用是指向一个类型为PushbackInputStream的对象。这就破坏了使用装饰模式的原始用意。</p>
+
+<p>现实世界与理论总归是有一段差距的。纯粹的装饰模式在真实的系统中很难找到。一般所遇到的，都是这种半透明的装饰模式。</p>
+
+<p>下面是使用I/O流读取文件内容的简单操作示例。</p>
+
+<p> </p>
+
+<ol start="1">
+<li>public class IOTest {  </li>
+<li>  </li>
+<li>    public static void main(String[] args) throws IOException {  </li>
+<li>        // 流式读取文件  </li>
+<li>        DataInputStream dis = null;  </li>
+<li>        try {  </li>
+<li>            dis = new DataInputStream(new BufferedInputStream(new FileInputStream("test.txt")));  </li>
+<li>            // 读取文件内容  </li>
+<li>            byte[] bs = new byte[dis.available()];  </li>
+<li>            dis.read(bs);  </li>
+<li>            String content = new String(bs);  </li>
+<li>            System.out.println(content);  </li>
+<li>        } finally {  </li>
+<li>            dis.close();  </li>
+<li>        }  </li>
+<li>    }  </li>
+<li>}  </li>
+</ol>
+
+<p> </p>
+
+<p>观察上面的代码，会发现最里层是一个FileInputStream对象，然后把它传递给一个BufferedInputStream对象，经过BufferedInputStream处理，再把处理后的对象传递给了DataInputStream对象进行处理，这个过程其实就是装饰器的组装过程，FileInputStream对象相当于原始的被装饰的对象，而BufferedInputStream对象和DataInputStream对象则相当于装饰器。</p>
+
+<h1>7 深入剖析OutputStream中的装饰模式</h1>
+
+<p>OutputStream对象结构图</p>
+
+<p><img alt="" src="https://img-blog.csdn.net/20160506193417108?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQv/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70/gravity/Center" /></p>
+
+<p> </p>
+
+<p> </p>
+
+<p>根据上图可以看出：</p>
+
+<p>●<strong>抽象构件(Component)角色：</strong>由OutputStream扮演。这是一个抽象类，为各种子类型提供统一的接口。</p>
+
+<p>●<strong>具体构件(ConcreteComponent)角色：</strong>由ByteArrayOutputStream、FileOutputStream、ObjectOutputStream、PipedOutputStream等类扮演。它们实现了抽象构件角色所规定的接口。</p>
+
+<p>●<strong>抽象装饰(Decorator)角色：</strong>由FilterOutputStream扮演。它实现了OutputStream所规定的接口。</p>
+
+<p>●<strong>具体装饰(ConcreteDecorator)角色：</strong>由几个类扮演，分别是BufferedOutputStream、CheckedOutputStream、CipheOutputSteam、DataOutputStream等类扮演。</p>
+
+<p> </p>
+
+<p>java.io.OutputStream的源码如下：</p>
+
+<ol start="1">
+<li>package java.io;  </li>
+<li>public abstract class OutputStream implements Closeable, Flushable {  </li>
+<li>    public abstract void write(int b) throws IOException;  </li>
+<li>    public void write(byte b[]) throws IOException {}  </li>
+<li>    public void write(byte b[], int off, int len) throws IOException {}  </li>
+<li>    public void flush() throws IOException { }  </li>
+<li>    public void close() throws IOException { }  </li>
+<li>}  </li>
+</ol>
+
+<p> </p>
+
+<p>下面是作为装饰模式的抽象装饰角色FilterOutputStream类的源代码。可以看出，FilterOutputStream的接口与OutputStream的接口是完全一致的。也就是说，直到这一步，还是与装饰模式相符合的。</p>
+
+<ol start="1">
+<li>package java.io;  </li>
+<li>  </li>
+<li>public class FilterOutputStream extends OutputStream {  </li>
+<li>    protected OutputStream out;  </li>
+<li>  </li>
+<li>    public FilterOutputStream(OutputStream out) {  </li>
+<li>        this.out = out;  </li>
+<li>    }  </li>
+<li>  </li>
+<li>    public void write(int b) throws IOException {  </li>
+<li>        out.write(b);  </li>
+<li>    }  </li>
+<li>  </li>
+<li>    public void write(byte b[]) throws IOException {  </li>
+<li>        write(b, 0, b.length);  </li>
+<li>    }  </li>
+<li>  </li>
+<li>    public void write(byte b[], int off, int len) throws IOException {  </li>
+<li>        if ((off | len | (b.length - (len + off)) | (off + len)) < 0)  </li>
+<li>            throw new IndexOutOfBoundsException();  </li>
+<li>  </li>
+<li>        for (int i = 0; i < len; i++) {  </li>
+<li>            write(b[off + i]);  </li>
+<li>        }  </li>
+<li>    }  </li>
+<li>  </li>
+<li>    public void flush() throws IOException {  </li>
+<li>        out.flush();  </li>
+<li>    }  </li>
+<li>  </li>
+<li>    @SuppressWarnings("try")  </li>
+<li>    public void close() throws IOException {  </li>
+<li>        try (OutputStream ostream = out) {  </li>
+<li>            flush();  </li>
+<li>        }  </li>
+<li>    }  </li>
+<li>}  </li>
+</ol>
+
+<p> </p>
+
+<p>下面是具体装饰角色BufferedOutputStream的源代码</p>
+
+<ol start="1">
+<li>package java.io;  </li>
+<li>public class BufferedOutputStream extends FilterOutputStream {  </li>
+<li>    protected byte buf[];  </li>
+<li>    protected int count;  </li>
+<li>    public BufferedOutputStream(OutputStream out) {}  </li>
+<li>    public BufferedOutputStream(OutputStream out, int size) {}  </li>
+<li>    private void flushBuffer() throws IOException {}  </li>
+<li>    public synchronized void write(int b) throws IOException {}  </li>
+<li>    public synchronized void write(byte b[], int off, int len) throws IOException {}  </li>
+<li>    public synchronized void flush() throws IOException {}  </li>
+<li>}  </li>
+</ol>
+
+<p> </p>
+
+<h1>8 字符流简介</h1>
+
+<h2>8.1 输入流</h2>
+
+<p><img alt="" src="https://img-blog.csdn.net/20160506193608345?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQv/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70/gravity/Center" /></p>
+
+<p> </p>
+
+<p> </p>
+
+<p>●<strong>抽象构件(Component)角色：</strong>由Reader扮演。这是一个抽象类，为各种子类型提供统一的接口。</p>
+
+<p>●<strong>具体构件(ConcreteComponent)角色：</strong>由CharArayReader、FilterReader、InputStreamReader、PipedReader、StringReader扮演。它们实现了抽象构件角色所规定的接口。</p>
+
+<p>●<strong>抽象装饰(Decorator)角色：</strong>由BufferedReader 、FilterReader、InputStreamReader扮演。它实现了Reader所规定的接口。</p>
+
+<p>●<strong>具体装饰(ConcreteDecorator)角色：</strong>由几个类扮演，分别是LineNumberReader、PushbackReader、FileReader扮演。</p>
+
+<p> </p>
+
+<h2>8.2 输出流</h2>
+
+<p><img alt="" src="https://img-blog.csdn.net/20160506193647301?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQv/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70/gravity/Center" /></p>
+
+<p> </p>
+
+<p> </p>
+
+<p> </p>
+
+<p>●<strong>抽象构件(Component)角色：</strong>由Writer扮演。这是一个抽象类，为各种子类型提供统一的接口。</p>
+
+<p>●<strong>具体构件(ConcreteComponent)角色：</strong>由BufferedWriter、CharArrayWriter、FilterWriter、OutputStreamWriter、PipedWriter、PrintWriter、StringWriter扮演。它们实现了抽象构件角色所规定的接口。</p>
+
+<p>●<strong>抽象装饰(Decorator)角色：</strong>由OutputStreamWriter扮演。它实现了Writer所规定的接口。</p>
+
+<p>●<strong>具体装饰(ConcreteDecorator)角色：</strong>由FileWriter扮演。</p>

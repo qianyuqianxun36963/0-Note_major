@@ -1,0 +1,544 @@
+<h1>spring cloud feign学习: Feign的深入使用</h1>
+
+<h2>覆盖Feign的默认配置</h2>
+
+<blockquote>
+<p>A central concept in Spring Cloud’s Feign support is that of the named client. Each feign client is part of an ensemble of components that work together to contact a remote server on demand, and the ensemble has a name that you give it as an application developer using the @FeignClient annotation. Spring Cloud creates a new ensemble as an ApplicationContext on demand for each named client using FeignClientsConfiguration. This contains (amongst other things) an feign.Decoder, a feign.Encoder, and a feign.Contract.</p>
+</blockquote>
+
+<p><code>Spring Cloud的Feign</code>支持的一个中心概念就是命名客户端。 每个<code>Feign</code>客户端都是组合的组件的一部分，它们一起工作以按需调用远程服务器，并且该集合具有您将其作为使用<code>@FeignClient</code>注释的参数名称。 <code>Spring Cloud</code>使用<code>FeignClientsConfiguration</code>创建一个新的集合作为每个命名客户端的<code>ApplicationContext</code>（应用上下文）。 这包含（除其他外）<code>feign.Decoder</code>，<code>feign.Encoder</code>和<code>feign.Contract</code>。</p>
+
+<p>你可以自定义<code>FeignClientsConfiguration</code>以完全控制这一系列的配置。比如我们下面的demo：</p>
+
+<p>定义一个order服务，并加入依赖：</p>
+
+<pre>
+<code> <dependencies>
+<dependency>
+<groupId>org.springframework.boot</groupId>
+<artifactId>spring-boot-starter-web</artifactId>
+</dependency>
+<dependency>
+<groupId>org.springframework.boot</groupId>
+<artifactId>spring-boot-starter-test</artifactId>
+<scope>test</scope>
+</dependency>
+<dependency>
+<groupId>org.springframework.cloud</groupId>
+<artifactId>spring-cloud-starter-eureka</artifactId>
+</dependency>
+<dependency>
+<groupId>org.springframework.boot</groupId>
+<artifactId>spring-boot-starter-actuator</artifactId>
+</dependency>
+<dependency>
+<groupId>org.springframework.cloud</groupId>
+<artifactId>spring-cloud-starter-feign</artifactId>
+</dependency>
+</dependencies>
+</code></pre>
+
+<p>定义主体启动类：</p>
+
+<pre>
+<code>@SpringBootApplication
+@EnableDiscoveryClient
+@EnableFeignClients
+public class OrderApplication {
+public static void main(String[] args) {
+SpringApplication.run(OrderApplication.class,args);
+}
+}
+</code></pre>
+
+<p>定义Controller：</p>
+
+<pre>
+<code>@RestController
+@RequestMapping("/order")
+public class OrderController {
+
+private Logger logger = LoggerFactory.getLogger(getClass());
+
+
+@Autowired
+UserService userService;
+
+@RequestMapping("/index")
+public String index(){
+logger.info("index方法");
+return userService.index();
+}
+}
+</code></pre>
+
+<p>定义Feign客户端接口：</p>
+
+<pre>
+<code>@FeignClient(value = "user-service",configuration = FooConfiguration.class)
+public interface UserService {
+
+@RequestLine("GET /user/index")
+String index();
+
+}
+</code></pre>
+
+<p>使用了配置<code>@Configuration</code>参数，自己定义了<code>FooConfiguration</code>类来自定义<code>FeignClientsConfiguration</code>，并且<code>FeignClientsConfiguration</code>类的类路径不在启动类OrderApplication的扫描路径下，是因为如果在扫描目录下会覆盖该项目所有的Feign接口的默认配置。</p>
+
+<p>FooConfiguration定义：</p>
+
+<pre>
+<code>package com.zhihao.miao.config;
+
+import feign.Contract;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+
+@Configuration
+public class FooConfiguration {
+
+//使用Feign自己的注解，使用springmvc的注解就会报错
+@Bean
+public Contract feignContract() {
+return new feign.Contract.Default();
+}
+}
+</code></pre>
+
+<p>因为配置<code>FooConfiguration</code>定义的是<code>new feign.Contract.Default()</code>，所有在<code>UserService</code>接口中只能使用<code>Feign</code>自己的注解url方式。</p>
+
+<p>配置文件：</p>
+
+<pre>
+<code>spring:
+application:
+name: order-service
+eureka:
+client:
+service-url:
+defaultZone: http://zhihao.miao:123456@localhost:8761/eureka
+instance:
+instance-id: ${spring.application.name}:${spring.cloud.client.ipAddress}:${spring.application.instance_id:${server.port}}
+server:
+port: 9090
+</code></pre>
+
+<p>访问<code>http://192.168.5.3:9090/order/index</code>，正常访问到结果。</p>
+
+<p>再定义一个FeignClient接口，使用SpringMvc注解的方式来访问</p>
+
+<pre>
+<code>@FeignClient(value = "eureka-service",url = "http://localhost:8761/",configuration = EurekaConfiguration.class)
+public interface EurekaService {
+
+@RequestMapping(value = "/eureka/apps/{serviceName}")
+String findServiceInfoFromEurekaByServiceName(@PathVariable("serviceName") String serviceName);
+}
+</code></pre>
+
+<p>因为<code>Eureka</code>配置了用户名和密码，所有这个<code>FeignClient</code>也自己定义了<code>FeignClientsConfiguration</code>，也可以用来访问<code>Eureka</code>服务接口。</p>
+
+<pre>
+<code>package com.zhihao.miao.config;
+
+import feign.auth.BasicAuthRequestInterceptor;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+
+@Configuration
+public class EurekaConfiguration {
+
+@Bean
+public BasicAuthRequestInterceptor basicAuthRequestInterceptor() {
+return new BasicAuthRequestInterceptor("zhihao.miao", "123456");
+}
+}
+</code></pre>
+
+<p>通过访问<code>http://192.168.5.3:9090/order/findServiceInfoFromEurekaByServiceName/user-service</code>也能访问成功，通过这个列子我们知道可以为每个Feign客户端都配置了自己的默认配置。</p>
+
+<p><strong>注意</strong></p>
+
+<ul>
+<li><code>@FeignClient</code>注解的<code>serviceId</code>参数不建议被使用。</li>
+<li>以前使用<code>@FeignClient</code>注解的时候使用<code>url</code>参数的使用就不需要使用<code>name</code>属性了，现在不然，需要在<code>url</code>属性的基础上也要使用<code>name</code>属性，此时的name属性只是一个标识。</li>
+</ul>
+
+<p><strong>参考资料</strong></p>
+
+<p><a href="https://link.jianshu.com/?t=http://cloud.spring.io/spring-cloud-static/Camden.SR5/#spring-cloud-feign" rel="nofollow" target="_blank">springcloud 官网</a><br />
+<a href="https://link.jianshu.com/?t=https://github.com/OpenFeign/feign" rel="nofollow" target="_blank">feign的github地址</a></p>
+
+<h2>参数绑定</h2>
+
+<p>在快速入门中，我们使用了<code>spring cloud feign</code>实现的是一个不带参数的REST服务绑定。现实中的各种业务接口要比它复杂的多，我们会在http的各个位置传入各种不同类型的参数，并且在返回请求响应的时候也可能是一个复杂的对象结构。</p>
+
+<p>扩展一下<code>user-servcice</code>服务，增加一些接口定义，其中包含Request参数的请求，带有Header信息的请求，带有<code>RequestBody</code>的请求以及请求响应体中是一个对象的请求,扩展了三个接口分别是hello，hello2，hello3</p>
+
+<pre>
+<code>@RestController
+@RequestMapping("/user")
+public class UserController {
+
+private final Logger logger = LoggerFactory.getLogger(getClass());
+
+@Autowired
+private DiscoveryClient client;
+
+@RequestMapping(value="/index",method = RequestMethod.GET)
+public String index(){
+ServiceInstance instance = client.getLocalServiceInstance();
+logger.info("/user,host:"+instance.getHost()+",service id:"+instance.getServiceId()+",port:"+instance.getPort());
+return "user index, local time="+ LocalDateTime.now();
+}
+
+@GetMapping("/hello")
+public String userHello() throws Exception{
+ServiceInstance serviceInstance = client.getLocalServiceInstance();
+//线程阻塞
+int sleeptime = new Random().nextInt(3000);
+logger.info("sleeptime:"+sleeptime);
+Thread.sleep(sleeptime);
+logger.info("/user,host:"+serviceInstance.getHost()+",service id:"+serviceInstance.getServiceId()+",port:"+serviceInstance.getPort());
+return "user hello";
+}
+
+@RequestMapping(value = "/hello1",method = RequestMethod.GET)
+public String hello(@RequestParam String username){
+return "hello "+username;
+}
+
+@RequestMapping(value = "hello2",method = RequestMethod.GET)
+public User hello2(@RequestHeader String username,@RequestHeader Integer age){
+return new User(username,age);
+}
+
+@RequestMapping(value = "hello3",method = RequestMethod.POST)
+public String hello3(@RequestBody User user){
+return "hello "+user.getUsername() +", "+user.getAge()+", "+user.getId();
+}
+}
+</code></pre>
+
+<p>访问：</p>
+
+<pre>
+<code>localhost:8080/user/hello1?username=zhihao.miao
+</code></pre>
+
+<p><img src="https://upload-images.jianshu.io/upload_images/5225109-0eccb20012702c79.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/902/format/webp" /></p>
+
+<p><img src="https://upload-images.jianshu.io/upload_images/5225109-13cd440e4f68562d.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/948/format/webp" /></p>
+
+<p>User对象的定义如下，需要注意的是要有User的默认的构造函数，不然，spring cloud feign根据json字符串转换User对象的时候会抛出异常。</p>
+
+<pre>
+<code>public class User {
+private String username;
+
+private int age;
+
+private int id;
+
+public String getUsername() {
+return username;
+}
+
+public void setUsername(String username) {
+this.username = username;
+}
+
+public int getAge() {
+return age;
+}
+
+public void setAge(int age) {
+this.age = age;
+}
+
+public int getId() {
+return id;
+}
+
+public void setId(int id) {
+this.id = id;
+}
+
+public User(String username, int age) {
+this.username = username;
+this.age = age;
+}
+
+public User() {
+
+}
+
+@Override
+public String toString() {
+return "User{" +
+"username='" + username + '\'' +
+", age=" + age +
+", id=" + id +
+'}';
+}
+}
+</code></pre>
+
+<p>完成对<code>user-service</code>的改造之后，我们对<code>pay-service</code>进行改造：</p>
+
+<ul>
+<li>在<code>user-service</code>中创建与上面一样的User类</li>
+<li>在<code>pay-service</code>中的UserService接口中加入之前的接口定义：</li>
+</ul>
+
+<pre>
+<code>@FeignClient("user-service")
+public interface UserService {
+
+@RequestMapping("/user/index")
+String index();
+
+@RequestMapping("/user/hello")
+String hello();
+
+@RequestMapping(value = "/user/hello1",method = RequestMethod.GET)
+String hello1(@RequestParam("username") String username);
+
+@RequestMapping(value = "/user/hello2",method = RequestMethod.GET)
+User hello2(@RequestHeader("username") String username, @RequestHeader("age") Integer age);
+
+@RequestMapping(value = "/user/hello3",method = RequestMethod.POST)
+String hello3(@RequestBody User user);
+}
+</code></pre>
+
+<p><strong>注意</strong><br />
+在定义各参数绑定的时候，<code>@RequestParam</code>和<code>@RequestHeader</code>等可以指定参数名称的注解，它们的<code>value</code>值千万不能少。在<code>spring mvc</code>程序中，这些注解会根据指定参数名来作为默认值，但是在fegin中绑定参数必须通过value属性来指明具体的参数名，不然会抛出<code>IllegalStateException</code>异常，value属性不能为空。</p>
+
+<ul>
+<li>在payservice中增加对UserService中新增接口的调用，来验证feign客户端的调用是否可行：</li>
+</ul>
+
+<pre>
+<code>@RestController
+@RequestMapping("/pay")
+public class PayController {
+
+private Logger logger = LoggerFactory.getLogger(getClass());
+
+@Autowired
+UserService userService;
+
+@RequestMapping("/index")
+public String index(){
+return userService.index();
+}
+
+@RequestMapping("/hello")
+public String hello(){
+return userService.hello();
+}
+
+@RequestMapping(value = "/hello1",method = RequestMethod.GET)
+public String hello1(@RequestParam String username){
+return userService.hello1(username);
+}
+
+@RequestMapping(value = "/hello2",method = RequestMethod.GET)
+public User hello2(@RequestHeader String username,@RequestHeader Integer age){
+logger.info(age.getClass().getName());
+return userService.hello2(username,age);
+}
+
+@RequestMapping(value = "/hello3",method = RequestMethod.POST)
+public String hello3(@RequestBody User user){
+return userService.hello3(user);
+}
+}
+</code></pre>
+
+<p>测试，</p>
+
+<pre>
+<code>localhost:7070/pay/hello1?username=zhihao.miao
+localhost:7070/pay/hello2
+</code></pre>
+
+<p><img src="https://upload-images.jianshu.io/upload_images/5225109-6597bd8ec4cfcc9d.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/915/format/webp" /></p>
+
+<pre>
+<code>localhost:7070/pay/hello3
+</code></pre>
+
+<p><img src="https://upload-images.jianshu.io/upload_images/5225109-99773beb59b4e19b.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/959/format/webp" /></p>
+
+<p>图片.png</p>
+
+<h2>继承特性</h2>
+
+<p>通过上面的快速入门和参数绑定二个demo，当使用springmvc的注解来绑定服务接口时候，我们几乎可以完全从服务提供方（user-service）的Controller中依靠复制操作，构建出相应的服务客户端绑定接口。既然存在这么多复制操作，我们自然需要考虑这部分内容是否可以得到进一步的抽象。spring cloud feign中，针对该问题提供了继承特性来帮助我们解决这些复制操作，以进一步减少编码量。</p>
+
+<ul>
+<li>定义一个maven工程，<code>user-service-api</code></li>
+<li>由于在<code>user-service-api</code>中需要定义可同时复用于服务端与客户端的接口，需要用到spring mvc的注解，所以在pom.xml中引入<code>spring-boot-starter-web</code>依赖，具体的内容如下：</li>
+</ul>
+
+<pre>
+<code> <dependencies>
+<dependency>
+<groupId>org.springframework.boot</groupId>
+<artifactId>spring-boot-starter-web</artifactId>
+</dependency>
+<dependency>
+<groupId>org.springframework.boot</groupId>
+<artifactId>spring-boot-starter-test</artifactId>
+<scope>test</scope>
+</dependency>
+</dependencies>
+</code></pre>
+
+<ul>
+<li>将之前的User对象复制到自己的项目中，创建<code>UserService</code>接口，内容如下：</li>
+</ul>
+
+<pre>
+<code> @RequestMapping("/refactor")
+public interface UserService {
+
+@RequestMapping(value = "/hello4",method = RequestMethod.GET)
+String hello1(@RequestParam("username") String username);
+
+@RequestMapping(value = "/hello5",method = RequestMethod.GET)
+User hello2(@RequestHeader("username") String username, @RequestHeader("age") Integer age);
+
+@RequestMapping(value = "/hello6",method = RequestMethod.POST)
+String hello3(@RequestBody User user);
+}
+</code></pre>
+
+<ul>
+<li>对user-service进行重构，在pom依赖中加入user-service-api的依赖：</li>
+</ul>
+
+<pre>
+<code> <dependency>
+<groupId>com.zhihao.miao</groupId>
+<artifactId>user-service-api</artifactId>
+<version>1.0-SNAPSHOT</version>
+</dependency>
+</code></pre>
+
+<ul>
+<li>创建<code>com.zhihao.miao.user.controller.RefactorUserController</code>继承<code>user-service</code>中的<code>UserService</code>接口，实现如下：</li>
+</ul>
+
+<pre>
+<code>@RestController
+public class RefactorUserController implements UserService{
+
+@Override
+public String hello1(@RequestParam String username) {
+return "user "+username;
+}
+
+@Override
+public User hello2(@RequestHeader("username") String username, @RequestHeader("age") Integer age) {
+return new User(username,age);
+}
+
+@Override
+public String hello3(@RequestBody User user) {
+return "user "+user.getUsername()+", "+user.getAge();
+}
+}
+</code></pre>
+
+<p>我们看到可以通过集成的方式，在<code>Controller</code>中不再包含以往会定义的映射注解<code>@RequestMapping</code>，而参数的注解定义在重写的时候自动带过来了，这个类中，除了要实现接口逻辑之外，只需要增加了<code>@RestController</code>注解使该类成为一个REST接口类。</p>
+
+<p>此时这些restful接口的接口url就是<code>user-service-api</code>中定义的，具体的uri地址是<code>/refactor/hello4</code>，<code>/refactor/hello5</code>，<code>/refactor/hello6</code></p>
+
+<ul>
+<li>完成了对服务提供者的重构，在消费端的pay-service中也要进行改造，在pay-service中加入如下依赖：</li>
+</ul>
+
+<pre>
+<code><dependency>
+<groupId>com.zhihao.miao</groupId>
+<artifactId>user-service-api</artifactId>
+<version>1.0-SNAPSHOT</version>
+</dependency>
+</code></pre>
+
+<ul>
+<li>创建<code>RefactorUserService</code>,继承<code>user-service-api</code>的<code>UserService</code>接口，然后添加<code>@FeignClient</code>来绑定服务。</li>
+</ul>
+
+<pre>
+<code>@FeignClient(value = "user-service")
+public interface RefactorUserService extends com.zhihao.miao.service.UserService{
+
+}
+</code></pre>
+
+<ul>
+<li>在<code>PayController2</code>中注入<code>RefactorUserService</code>实例，新增restful接口进行访问：</li>
+</ul>
+
+<pre>
+<code>@RestController
+@RequestMapping("/pay2")
+public class PayController2 {
+
+@Autowired
+RefactorUserService refactorUserService;
+
+private Logger logger = LoggerFactory.getLogger(getClass());
+
+@RequestMapping(value = "/hello1",method = RequestMethod.GET)
+public String hello4(@RequestParam String username){
+return refactorUserService.hello1(username);
+}
+
+@RequestMapping(value = "/hello2",method = RequestMethod.GET)
+public User hello5(@RequestHeader String username, @RequestHeader Integer age){
+logger.info(age.getClass().getName());
+return refactorUserService.hello2(username,age);
+}
+
+@RequestMapping(value = "/hello3",method = RequestMethod.POST)
+public String hello6(@RequestBody User user){
+return refactorUserService.hello3(user);
+}
+}
+</code></pre>
+
+<ul>
+<li>测试：</li>
+</ul>
+
+<p>访问<code>user-service</code>服务：<code>localhost:8080/refactor/hello4?username=zhihao.miao</code></p>
+
+<p><img src="https://upload-images.jianshu.io/upload_images/5225109-82e406deb9710545.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1000/format/webp" /></p>
+
+<p><img src="https://upload-images.jianshu.io/upload_images/5225109-5529993f7a268a3b.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/923/format/webp" /></p>
+
+<p>测试pay-service：</p>
+
+<pre>
+<code>localhost:7070/pay/hello1?username=zhihao.miao
+</code></pre>
+
+<p><img src="https://upload-images.jianshu.io/upload_images/5225109-1cd6264874473c45.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/900/format/webp" /></p>
+
+<p>图片.png</p>
+
+<p><img src="https://upload-images.jianshu.io/upload_images/5225109-dd32055e74fc8d56.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/990/format/webp" /></p>
+
+<p>图片.png</p>
+
+<p><strong>优点与缺点</strong><br />
+使用<code>spring cloud feign</code>的继承特性的优点很明显，可以将接口的定义从<code>Controller</code>中剥离，同时配合maven仓库就可以轻易实现接口定义的共享，实现在构建期的接口绑定，从而有效的减少服务客户端的绑定配置。这么做虽然可以很方便的实现接口定义和依赖的共享，不用在复制粘贴接口进行绑定，但是这样的做法使用不当的话会带来副作用。由于接口在构建期间就建立起了依赖，那么接口变化就会对项目构建造成了影响，可能服务提供方修改一个接口定义，那么会直接导致客户端工程的构建失败。所以，如果开发团队通过此方法来实现接口共享的话，建议在开发评审期间严格遵守面向对象的开闭原则，尽可能低做好前后版本兼容，防止因为版本原因造成接口定义的不一致。</p>
+
+<p><strong>代码地址</strong><br />
+<a href="https://link.jianshu.com/?t=https://github.com/springcloud-study/springcloud_feign.git" rel="nofollow" target="_blank">代码地址</a></p>

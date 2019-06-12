@@ -1,0 +1,410 @@
+<h1>基于 Token 的身份验证</h1>
+
+<p>最近了解下基于 Token 的身份验证，跟大伙分享下。很多大型网站也都在用，比如 Facebook，Twitter，Google+，Github 等等，比起传统的身份验证方法，Token 扩展性更强，也更安全点，非常适合用在 Web 应用或者移动应用上。Token 的中文有人翻译成 “令牌”，我觉得挺好，意思就是，你拿着这个令牌，才能过一些关卡。</p>
+
+<h2>传统身份验证的方法</h2>
+
+<p>HTTP 是一种没有状态的协议，也就是它并不知道是谁是访问应用。这里我们把用户看成是客户端，客户端使用用户名还有密码通过了身份验证，不过下回这个客户端再发送请求时候，还得再验证一下。</p>
+
+<p>解决的方法就是，当用户请求登录的时候，如果没有问题，我们在服务端生成一条记录，这个记录里可以说明一下登录的用户是谁，然后把这条记录的 ID 号发送给客户端，客户端收到以后把这个 ID 号存储在 Cookie 里，下次这个用户再向服务端发送请求的时候，可以带着这个 Cookie ，这样服务端会验证一个这个 Cookie 里的信息，看看能不能在服务端这里找到对应的记录，如果可以，说明用户已经通过了身份验证，就把用户请求的数据返回给客户端。</p>
+
+<p>上面说的就是 Session，我们需要在服务端存储为登录的用户生成的 Session ，这些 Session 可能会存储在内存，磁盘，或者数据库里。我们可能需要在服务端定期的去清理过期的 Session 。</p>
+
+<h2>基于 Token 的身份验证方法</h2>
+
+<p>使用基于 Token 的身份验证方法，在服务端不需要存储用户的登录记录。大概的流程是这样的：</p>
+
+<ol>
+<li>客户端使用用户名跟密码请求登录</li>
+<li>服务端收到请求，去验证用户名与密码</li>
+<li>验证成功后，服务端会签发一个 Token，再把这个 Token 发送给客户端</li>
+<li>客户端收到 Token 以后可以把它存储起来，比如放在 Cookie 里或者 Local Storage 里</li>
+<li>客户端每次向服务端请求资源的时候需要带着服务端签发的 Token</li>
+<li>服务端收到请求，然后去验证客户端请求里面带着的 Token，如果验证成功，就向客户端返回请求的数据</li>
+</ol>
+
+<h2>JWT</h2>
+
+<p>实施 Token 验证的方法挺多的，还有一些标准方法，比如 JWT，读作：jot ，表示：JSON Web Tokens 。JWT 标准的 Token 有三个部分：</p>
+
+<ul>
+<li>header</li>
+<li>payload</li>
+<li>signature</li>
+</ul>
+
+<p>中间用点分隔开，并且都会使用 Base64 编码，所以真正的 Token 看起来像这样：</p>
+
+<pre>
+eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJuaW5naGFvLm5ldCIsImV4cCI6IjE0Mzg5NTU0NDUiLCJuYW1lIjoid2FuZ2hhbyIsImFkbWluIjp0cnVlfQ.SwyHTEx_RQppr97g4J5lKXtabJecpejuef8AqKYMAJc</pre>
+
+<h4>Header</h4>
+
+<p>header 部分主要是两部分内容，一个是 Token 的类型，另一个是使用的算法，比如下面类型就是 JWT，使用的算法是 HS256。</p>
+
+<pre>
+{
+"typ": "JWT",
+"alg": "HS256"
+}</pre>
+
+<p>上面的内容要用 Base64 的形式编码一下，所以就变成这样：</p>
+
+<pre>
+eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9</pre>
+
+<h4>Payload</h4>
+
+<p>Payload 里面是 Token 的具体内容，这些内容里面有一些是标准字段，你也可以添加其它需要的内容。下面是标准字段：</p>
+
+<ul>
+<li>iss：Issuer，发行者</li>
+<li>sub：Subject，主题</li>
+<li>aud：Audience，观众</li>
+<li>exp：Expiration time，过期时间</li>
+<li>nbf：Not before</li>
+<li>iat：Issued at，发行时间</li>
+<li>jti：JWT ID</li>
+</ul>
+
+<p>比如下面这个 Payload ，用到了 iss 发行人，还有 exp 过期时间。另外还有两个自定义的字段，一个是 name ，还有一个是 admin 。</p>
+
+<pre>
+{
+"iss": "ninghao.net",
+"exp": "1438955445",
+"name": "wanghao",
+"admin": true
+}</pre>
+
+<p>使用 Base64 编码以后就变成了这个样子：</p>
+
+<pre>
+eyJpc3MiOiJuaW5naGFvLm5ldCIsImV4cCI6IjE0Mzg5NTU0NDUiLCJuYW1lIjoid2FuZ2hhbyIsImFkbWluIjp0cnVlfQ</pre>
+
+<h4>Signature</h4>
+
+<p>JWT 的最后一部分是 Signature ，这部分内容有三个部分，先是用 Base64 编码的 header.payload ，再用加密算法加密一下，加密的时候要放进去一个 Secret ，这个相当于是一个密码，这个密码秘密地存储在服务端。</p>
+
+<ul>
+<li>header</li>
+<li>payload</li>
+<li>secret</li>
+</ul>
+
+<pre>
+var encodedString = base64UrlEncode(header) + "." + base64UrlEncode(payload); 
+HMACSHA256(encodedString, 'secret');</pre>
+
+<p>处理完成以后看起来像这样：</p>
+
+<pre>
+SwyHTEx_RQppr97g4J5lKXtabJecpejuef8AqKYMAJc</pre>
+
+<p>最后这个在服务端生成并且要发送给客户端的 Token 看起来像这样：</p>
+
+<pre>
+eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJuaW5naGFvLm5ldCIsImV4cCI6IjE0Mzg5NTU0NDUiLCJuYW1lIjoid2FuZ2hhbyIsImFkbWluIjp0cnVlfQ.SwyHTEx_RQppr97g4J5lKXtabJecpejuef8AqKYMAJc</pre>
+
+<p>客户端收到这个 Token 以后把它存储下来，下回向服务端发送请求的时候就带着这个 Token 。服务端收到这个 Token ，然后进行验证，通过以后就会返回给客户端想要的资源。</p>
+
+<h2>项目中代码</h2>
+
+<h3>common.js中相关代码</h3>
+
+<p>jQuery.ajaxSetup({<br />
+        beforeSend:function(xhr,settings){<br />
+            var _this = this;<br />
+            var _url = _this.url;<br />
+/*            if(_url.indexOf("ACCESSTOKEN") != -1) {<br />
+                return ;<br />
+            }<br />
+            if(_url.indexOf("?") != -1){<br />
+                _this.url = _url + "&ACCESSTOKEN=" + accessTokenId;<br />
+            }else{<br />
+                _this.url = _url + "?ACCESSTOKEN=" + accessTokenId;<br />
+            }*/<br />
+            var accessTokenId = $.cookie('ACCESSTOKEN');<br />
+            if (!settings.crossDomain && settings.type != null && settings.type.toLowerCase() == "post") { <br />
+                xhr.setRequestHeader("ACCESSTOKEN", accessTokenId);<br />
+            } else {<br />
+                _this.url = changeURLParam(_url,"ACCESSTOKEN",accessTokenId);<br />
+            }<br />
+        },<br />
+        complete :function(xhr,textStatus,settings){<br />
+            try{<br />
+                var loginStatus = xhr.getResponseHeader("loginStatus");<br />
+                var tokenStatus = xhr.getResponseHeader("tokenStatus");<br />
+                if(loginStatus == 'accessDenied'){<br />
+                     showSuccessOrErrorModal("登录超时，请重新登录","warning");<br />
+                     setTimeout(function(){<br />
+                         //top.location.href=base+"/login";<br />
+                         location.reload(true);<br />
+                     },2000);<br />
+                } else if (tokenStatus == 'accessDenied') {<br />
+                    var accessTokenId = $.cookie('ACCESSTOKEN');<br />
+                    if (accessTokenId != null) {<br />
+                        $.extend(settings, {<br />
+                            global: false,<br />
+                            headers: {ACCESSTOKEN: accessTokenId}<br />
+                        });<br />
+                        $.ajax(settings);<br />
+                    }<br />
+                }<br />
+            }catch(e){<br />
+                 showSuccessOrErrorModal(e,"error");<br />
+                 <br />
+            }<br />
+        }<br />
+    });<br />
+    <br />
+    //针对form表单提交的进行自动添加token $this.attr("method") != null && $this.attr("method").toLowerCase() == "post"<br />
+    $("form").submit(function() {<br />
+        var $this = $(this);<br />
+        if ($this.find("input[name='ACCESSTOKEN']").size() == 0) {<br />
+            var accessTokenId = $.cookie('ACCESSTOKEN');<br />
+            if (accessTokenId != null) {<br />
+                $this.append('<input type="hidden" name="ACCESSTOKEN" value="' + accessTokenId + '" \/>');<br />
+            }<br />
+        }<br />
+    });<br />
+    <br />
+    </p>
+
+<h3>ManageUserSessionFilter</h3>
+
+<p>package com.wh.eas.manage.base.shiro;</p>
+
+<p>import javax.servlet.ServletRequest;<br />
+import javax.servlet.ServletResponse;<br />
+import javax.servlet.http.HttpServletRequest;<br />
+import javax.servlet.http.HttpServletResponse;</p>
+
+<p>import org.apache.shiro.SecurityUtils;<br />
+import org.springframework.stereotype.Component;</p>
+
+<p>import com.alibaba.druid.util.StringUtils;<br />
+import com.wh.eas.manage.base.utils.GlobalConstant;</p>
+
+<p>@Component("manageuser")<br />
+public class ManageUserSessionFilter extends BaseUserSessionFilter{</p>
+
+<p>    public ManageUserSessionFilter(){<br />
+        //跳转到教务登录页面<br />
+        super.setLoginUrl("/login");<br />
+    }</p>
+
+<p>    @Override<br />
+    protected boolean isAccessAllowed(ServletRequest request,<br />
+            ServletResponse response, Object mappedValue) {<br />
+        boolean accessState = super.isAccessAllowed(request, response, mappedValue);<br />
+        <br />
+        HttpServletRequest req = (HttpServletRequest) request;<br />
+        HttpServletResponse resp = (HttpServletResponse)response;<br />
+        //没有登录，跳转至onAccessDenied处理<br />
+        if(!accessState) {<br />
+            return accessState;<br />
+        }<br />
+        Object obj = req.getSession().getAttribute(GlobalConstant.ACCESSTOKEN);<br />
+        Object objectshirosession = SecurityUtils.getSubject().getSession().getAttribute(GlobalConstant.ACCESSTOKEN);<br />
+        //没有sessionid，跳转到session错误页面<br />
+        if(obj == null || (!obj.toString().startsWith("sys_"))) {<br />
+            request.setAttribute(GlobalConstant.ERRORACCESSTOKEN,"accessDenied");<br />
+            return false;<br />
+        }<br />
+        <br />
+        String serverAccessTokenId = obj.toString();<br />
+        if(checkAccessToken(request,response,serverAccessTokenId)){<br />
+            return true;<br />
+        }<br />
+        request.setAttribute(GlobalConstant.ERRORACCESSTOKEN,"accessDenied");<br />
+        return false;<br />
+    }<br />
+    <br />
+    private boolean checkAccessToken(ServletRequest request,ServletResponse response,String serverTokenId) {<br />
+        HttpServletRequest req = (HttpServletRequest)request;<br />
+        HttpServletResponse res = (HttpServletResponse)response;<br />
+        String reqAccessTokenId = null;<br />
+        if(req.getMethod().equalsIgnoreCase("POST")) {<br />
+            String requestType = req.getHeader("X-Requested-With");<br />
+            if(requestType != null && requestType.equalsIgnoreCase("XMLHttpRequest")) {<br />
+                reqAccessTokenId = req.getHeader(GlobalConstant.ACCESSTOKEN);<br />
+            } else {<br />
+                reqAccessTokenId = req.getParameter(GlobalConstant.ACCESSTOKEN);<br />
+            }<br />
+        } else {<br />
+            reqAccessTokenId = req.getParameter(GlobalConstant.ACCESSTOKEN);<br />
+        }<br />
+        <br />
+        if(!StringUtils.isEmpty(serverTokenId) && serverTokenId.equals(reqAccessTokenId)) {<br />
+            return true;<br />
+        } else {<br />
+            return false;<br />
+        }<br />
+        <br />
+    }<br />
+}<br />
+ </p>
+
+<h3>LoginController</h3>
+
+<p>package com.wh.eas.manage.controller.sys;</p>
+
+<p>import java.util.HashMap;<br />
+import java.util.Map;</p>
+
+<p>import javax.annotation.Resource;<br />
+import javax.servlet.http.HttpServletRequest;<br />
+import javax.servlet.http.HttpServletResponse;<br />
+import javax.servlet.http.HttpSession;</p>
+
+<p>import org.apache.shiro.SecurityUtils;<br />
+import org.apache.shiro.authc.IncorrectCredentialsException;<br />
+import org.apache.shiro.authc.LockedAccountException;<br />
+import org.apache.shiro.authc.UnknownAccountException;<br />
+import org.apache.shiro.authc.UsernamePasswordToken;<br />
+import org.apache.shiro.subject.Subject;<br />
+import org.springframework.stereotype.Controller;<br />
+import org.springframework.ui.Model;<br />
+import org.springframework.web.bind.annotation.RequestMapping;<br />
+import org.springframework.web.bind.annotation.RequestMethod;<br />
+import org.springframework.web.bind.annotation.RequestParam;<br />
+import org.springframework.web.bind.annotation.ResponseBody;</p>
+
+<p>import com.wh.eas.manage.base.controller.BaseController;<br />
+import com.wh.eas.manage.base.utils.GlobalConstant;<br />
+import com.wh.eas.manage.base.utils.StringUtils;<br />
+import com.wh.eas.manage.base.utils.WebUtils;<br />
+import com.wh.eas.manage.service.sys.IPersonalDataService;</p>
+
+<p>@Controller<br />
+public class LoginController extends BaseController{</p>
+
+<p>    @Resource<br />
+    private IPersonalDataService personalDataService;<br />
+    <br />
+    public static final String LOGIN_VIEW = "common/login.ftl";<br />
+    @RequestMapping("/")<br />
+    public String index(){<br />
+        return "redirect:/index";<br />
+    }<br />
+    <br />
+    @RequestMapping("/index")<br />
+    public String index(Model model){<br />
+        return "common/index.ftl";<br />
+    }<br />
+    <br />
+    @RequestMapping(value="/login",method = RequestMethod.GET)<br />
+    public String toLogin(Model model,HttpServletRequest request,HttpServletResponse response,HttpSession session){<br />
+        //判断用户是否登录<br />
+        if(SecurityUtils.getSubject().isAuthenticated()){<br />
+            String reqAccessTokenId = request.getParameter(GlobalConstant.ACCESSTOKEN);<br />
+            Object objectshirosession = SecurityUtils.getSubject().getSession().getAttribute(GlobalConstant.ACCESSTOKEN);<br />
+            if(objectshirosession != null && (!objectshirosession.toString().equals(reqAccessTokenId))){<br />
+                reqAccessTokenId = objectshirosession.toString();<br />
+            }<br />
+            model.addAttribute(GlobalConstant.ACCESSTOKEN, reqAccessTokenId);<br />
+            WebUtils.setCookie(response, GlobalConstant.ACCESSTOKEN, reqAccessTokenId, -1);<br />
+            return REDIRECT+"/index";<br />
+        }<br />
+        String gotoUrl = request.getParameter(GlobalConstant.GOTOURL);<br />
+        if(StringUtils.isNotBlank(gotoUrl)){<br />
+            model.addAttribute(GlobalConstant.GOTOURL, gotoUrl);<br />
+        }<br />
+        return LOGIN_VIEW;<br />
+    }<br />
+    <br />
+    /**<br />
+     * 处理登录提交的方法<br />
+     * @param request<br />
+     * @param response<br />
+     * @param userName<br />
+     * @param password<br />
+     * @param rememberMe<br />
+     * @param model<br />
+     * @return<br />
+     */<br />
+    @RequestMapping(value="/login",method=RequestMethod.POST)<br />
+    @ResponseBody<br />
+    public Object sysLogin(HttpServletRequest request,HttpServletResponse response,HttpSession session,<br />
+            @RequestParam(value="userName") String userName,<br />
+            @RequestParam(value="password") String password,<br />
+            @RequestParam(value="rememberMe",defaultValue="0") Integer rememberMe,Model model){<br />
+        if(StringUtils.isBlank(userName)) {<br />
+            throw new RuntimeException("用户名不能为空");<br />
+        }<br />
+        <br />
+        if(StringUtils.isBlank(password)) {<br />
+            throw new RuntimeException("密码不能为空");<br />
+        }<br />
+        //用户输入的验证码<br />
+        String submitCode = org.apache.shiro.web.util.WebUtils.getCleanParam(request, GlobalConstant.DEFAULT_CAPTCHA_PARAM);<br />
+        //回话中存储的验证码<br />
+        String secCode = (String) session.getAttribute(GlobalConstant.DEFAULT_CAPTCHA_PARAM);<br />
+        session.removeAttribute(GlobalConstant.DEFAULT_CAPTCHA_PARAM);<br />
+        if(StringUtils.isNotBlank(secCode)) {<br />
+            secCode = secCode.toUpperCase();<br />
+        }<br />
+        </p>
+
+<p>        if(StringUtils.isNotBlank(submitCode)) {<br />
+            submitCode = submitCode.toUpperCase();<br />
+        } <br />
+        <br />
+        if(StringUtils.isBlank(submitCode) || StringUtils.isBlank(secCode) || !secCode.equals(submitCode)) {<br />
+            throw new RuntimeException("验证码错误");<br />
+        }<br />
+        String gotoUrl=request.getParameter(GlobalConstant.GOTOURL);<br />
+        Subject user = SecurityUtils.getSubject();<br />
+        <br />
+        UsernamePasswordToken token = new UsernamePasswordToken(userName, password);<br />
+        // 设置记住密码<br />
+        token.setRememberMe(1 == rememberMe);<br />
+        try{<br />
+            //会调用 shiroDbRealm 的认证方法<br />
+            //org.springrain.frame.shiro.ShiroDbRealm.doGetAuthenticationInfo(AuthenticationToken)<br />
+            user.login(token);<br />
+            <br />
+            if(StringUtils.isBlank(gotoUrl)){<br />
+                gotoUrl = null;<br />
+            }<br />
+            <br />
+            //设置tokenkey<br />
+            String accessTokenId = "sys_"+StringUtils.getUUId();<br />
+            session.setAttribute(GlobalConstant.ACCESSTOKEN, accessTokenId);<br />
+            WebUtils.setCookie(response, GlobalConstant.ACCESSTOKEN, accessTokenId, -1);<br />
+            <br />
+            model.addAttribute(GlobalConstant.ACCESSTOKEN, accessTokenId);<br />
+            Map<String,Object> data = new HashMap<String,Object>();<br />
+            data.put("status", "success");<br />
+            data.put("gotoUrl", gotoUrl);<br />
+            data.put(GlobalConstant.ACCESSTOKEN, accessTokenId);<br />
+            data.put("msg", "登录成功");<br />
+            return data;<br />
+        }catch(UnknownAccountException e){<br />
+            throw new RuntimeException("账户不存在");<br />
+        }catch(IncorrectCredentialsException e){<br />
+            throw new RuntimeException("密码错误",e);<br />
+        }catch(LockedAccountException e){<br />
+            throw new RuntimeException("账户被锁定",e);<br />
+        }catch(Exception e){<br />
+            throw new RuntimeException("未知错误，请联系管理员",e);<br />
+        }<br />
+        <br />
+    }    <br />
+    <br />
+    <br />
+    @RequestMapping(value="/logout")<br />
+    public String logout(HttpServletRequest request,HttpServletResponse response) {<br />
+        WebUtils.removeCookie(response, GlobalConstant.ACCESSTOKEN);<br />
+        Subject subject = SecurityUtils.getSubject();<br />
+        if(subject != null) {<br />
+            subject.logout();<br />
+        }<br />
+        <br />
+        return REDIRECT + "/login";<br />
+    }<br />
+}<br />
+ </p>
+
+<p> </p>

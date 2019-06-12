@@ -1,0 +1,97 @@
+<h1>OpenShift推送本地镜像到镜像仓库</h1>
+
+<p><strong>一、创建push权限，添加registry</strong></p>
+
+<ol>
+<li>
+<p><code>oc create serviceaccount registry -n default</code></p>
+</li>
+<li>
+<p><code>oc adm policy add-scc-to-user privileged system:serviceaccount:default:registry</code></p>
+</li>
+</ol>
+
+<p><strong>二、添加admin登陆授权</strong></p>
+
+<p>   admin为集群管理员账号；</p>
+
+<ol>
+<li>
+<p><code>oc adm policy add-role-to-user system:registry admin</code></p>
+</li>
+<li>
+<p><code>oc adm policy add-role-to-user admin admin -n openshift</code></p>
+</li>
+<li>
+<p><code>oc adm policy add-role-to-user system:image-builder admin</code></p>
+</li>
+<li>
+<p><code>oc adm policy add-role-to-user system:image-puller system:anonymous -n openshift</code></p>
+</li>
+</ol>
+
+<p><strong>三、登陆openshift 项目</strong></p>
+
+<p><strong>先登录openshift控制台，查看openshift仓库地址：</strong><strong>docker-registry.default.svc:5000</strong></p>
+
+<p><img alt="" src="https://img-blog.csdnimg.cn/20181107093357522.png?x-oss-process=image/watermark,type_ZmFuZ3poZW5naGVpdGk,shadow_10,text_aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L3UwMTIzNzEwOTc=,size_16,color_FFFFFF,t_70" style="height:368px; width:867px" /></p>
+
+<p>openshift项目比较特殊，openshift项目下添加的镜像其他所有项目均可见，因此镜像添加在openshift项目下：</p>
+
+<ul>
+<li>admin用户登陆openshift：用户名dev 密码：dev</li>
+</ul>
+
+<pre>
+<code>oc login -n openshift</code>
+</pre>
+
+<ul>
+<li>查看admin用户的token</li>
+</ul>
+
+<pre>
+<code>oc whoami -t</code>
+</pre>
+
+<p><strong>四、登陆Docker login 私有库</strong></p>
+
+<p><strong>说明：如果是集群：所node都要登陆一次</strong></p>
+
+<p><img alt="" src="https://img-blog.csdnimg.cn/20181107093701397.png" style="height:40px; width:396px" /></p>
+
+<pre>
+<code>docker login -u admin -p 7Lafs_ovD53jIuN3ks1QapudhGMH3GKJ24-qsiQznE8 docker-registry.default.svc:5000</code></pre>
+
+<p><img alt="" src="https://img-blog.csdnimg.cn/20181106153549129.png" style="height:91px; width:812px" /></p>
+
+<ul>
+<li>给镜像打tag</li>
+</ul>
+
+<pre>
+<code>docker tag spring docker-registry.default.svc:5000/openshift/springv1</code></pre>
+
+<ul>
+<li>配置Http</li>
+</ul>
+
+<pre>
+<code>  vi /etc/docker/daemon.json</code></pre>
+
+<p> <img alt="" src="https://img-blog.csdnimg.cn/20181107094614654.png?x-oss-process=image/watermark,type_ZmFuZ3poZW5naGVpdGk,shadow_10,text_aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L3UwMTIzNzEwOTc=,size_16,color_FFFFFF,t_70" style="height:212px; width:646px" /></p>
+
+<ul>
+<li>push 镜像到仓库</li>
+</ul>
+
+<pre>
+<code> docker push docker-registry.default.svc:5000/openshift/springv1</code></pre>
+
+<p><img alt="" src="https://img-blog.csdnimg.cn/20181107095314650.png" style="height:140px; width:751px" /></p>
+
+<ul>
+<li>通过openshift web控制台查看刚刚push的镜像</li>
+</ul>
+
+<p><img alt="" src="https://img-blog.csdnimg.cn/20181107095429560.png?x-oss-process=image/watermark,type_ZmFuZ3poZW5naGVpdGk,shadow_10,text_aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L3UwMTIzNzEwOTc=,size_16,color_FFFFFF,t_70" style="height:348px; width:1114px" /></p>

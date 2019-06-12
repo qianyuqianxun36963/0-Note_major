@@ -1,0 +1,89 @@
+<h1><a href="http://www.cnblogs.com/bluedeblog/p/6033626.html" id="cb_post_title_url">MySQL的四种外键</a></h1>
+
+<p>具体使用时需要参考：<a href="http://blog.csdn.net/codeforme/article/details/5539454">http://blog.csdn.net/codeforme/article/details/5539454</a> <br />
+<br />
+ MySQL有两种常用的引擎类型：MyISAM和InnoDB。目前<strong>只有InnoDB引擎类型支持外键约束</strong>。InnoDB中外键约束定义的语法如下：<br />
+<br />
+[CONSTRAINT [symbol]] FOREIGN KEY [index_name] (index_col_name, ...) REFERENCES tbl_name (index_col_name,...) [ON DELETE reference_option] [ON UPDATE reference_option] reference_option: RESTRICT | CASCADE | SET NULL | NO ACTION</p>
+
+<h2>外键使用条件</h2>
+
+<p>外键的使用需要满足下列的条件：<br />
+<br />
+  1. 两张表必须都是InnoDB表，并且它们没有临时表。<br />
+<br />
+  2. 建立外键关系的对应列必须具有相似的InnoDB内部数据类型。<br />
+<br />
+  3. 建立外键关系的对应列必须建立了索引。<br />
+<br />
+  4. 假如显式的给出了CONSTRAINT symbol，那symbol在数据库中必须是唯一的。假如没有显式的给出，InnoDB会自动的创建。</p>
+
+<h2>外键操作类型</h2>
+
+<p>如果子表试图创建一个在父表中不存在的外键值，InnoDB会拒绝任何INSERT或UPDATE操作。如果父表试图UPDATE或者DELETE任何子 表中存在或匹配的外键值，最终动作取决于外键约束定义中的ON UPDATE和ON DELETE选项。InnoDB支持5种不同的动作，如果没有指定ON DELETE或者ON UPDATE，默认的动作为RESTRICT:<br />
+<br />
+  1. <strong>CASCADE</strong>: 从父表中删除或更新对应的行，同时自动的删除或更新自表中匹配的行。ON DELETE CANSCADE和ON UPDATE CANSCADE都被InnoDB所支持。<br />
+<br />
+  2. SET NULL: 从父表中删除或更新对应的行，同时将子表中的外键列设为空。注意，这些在外键列没有被设为NOT NULL时才有效。ON DELETE SET NULL和ON UPDATE SET SET NULL都被InnoDB所支持。<br />
+<br />
+  3. NO ACTION: InnoDB拒绝删除或者更新父表。<br />
+<br />
+  4. <strong>RESTRICT</strong>: 拒绝删除或者更新父表。指定RESTRICT（或者NO ACTION）和忽略ON DELETE或者ON UPDATE选项的效果是一样的。<br />
+<br />
+<s>  5. SET DEFAULT: InnoDB目前不支持。<strong>这里的第五种？</strong></s></p>
+
+<h2>常用情形</h2>
+
+<p>外键约束使用最多的两种情况无外乎：</p>
+
+<p>  1）父表更新时子表也更新，父表删除时如果子表有匹配的项，删除失败；</p>
+
+<p>  2）父表更新时子表也更新，父表删除时子表匹配的项也删除。<br />
+<br />
+前一种情况，在外键定义中，我们使用 ON UPDATE CASCADE ON DELETE RESTRICT；</p>
+
+<p>后一种情况，可以使用 ON UPDATE CASCADE ON DELETE CASCADE。</p>
+
+<p>InnoDB允许你使用ALTER TABLE在一个已经存在的表上增加一个新的外键:<br />
+<br />
+ALTER TABLE tbl_name ADD [CONSTRAINT [symbol]] FOREIGN KEY [index_name] (index_col_name, ...) REFERENCES tbl_name (index_col_name,...) [ON DELETE reference_option] [ON UPDATE reference_option] <br />
+<br />
+InnoDB也支持使用ALTER TABLE来删除外键：<br />
+<br />
+ALTER TABLE tbl_name DROP FOREIGN KEY fk_symbol; </p>
+
+<h2>实际使用</h2>
+
+<h3>使用简介</h3>
+
+<p>建立两个表 c表，cd 表。</p>
+
+<p>c表作为主表，cd表作为从表。cd表中有字段c_id，是外键。</p>
+
+<p><strong>ALTER TABLE cd ADD CONSTRAINT FK_cd_c_id FOREIGN KEY (c_id) REFERENCES c (id) ON DELETE RESTRICT;</strong></p>
+
+<h3>建立表c：</h3>
+
+<p>CREATE TABLE   c<br />
+    (<br />
+        id VARCHAR(10) NOT NULL COMMENT '主键id',<br />
+        name VARCHAR(10) NOT NULL COMMENT '姓名',<br />
+        age VARCHAR(10) NOT NULL COMMENT '年龄',<br />
+        PRIMARY KEY (id)<br />
+    )<br />
+    ENGINE=InnoDB DEFAULT CHARSET=utf8 COMMENT='数据表C';</p>
+
+<h3>建立表cd：</h3>
+
+<p>CREATE TABLE<br />
+    cd<br />
+    (<br />
+        id VARCHAR(10) NOT NULL COMMENT '主键id',<br />
+        c_id VARCHAR(10) NOT NULL COMMENT '主表c的id',<br />
+        name VARCHAR(10) NOT NULL COMMENT '姓名',<br />
+        age VARCHAR(10) NOT NULL COMMENT '年龄',<br />
+        PRIMARY KEY (id)   <strong><s>,</s></strong><br />
+        <s>CONSTRAINT FK_cd_c_id FOREIGN KEY (c_id) REFERENCES c (id),</s><br />
+        <s>INDEX FK_cd_c_id (c_id)</s><br />
+    )<br />
+    ENGINE=InnoDB DEFAULT CHARSET=utf8 COMMENT='数据表d';</p>

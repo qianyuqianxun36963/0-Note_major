@@ -1,0 +1,34 @@
+<h1>Tornado容器介绍</h1>
+
+<p>Tornado作为web server，提供了web framework的api，可以来直接构建自己的web程序。同时，Tornado支持WSGI （ http://www.python.org/dev/peps/pep-0333/ ），也就是说它可以有能力其它的一些python的框架一起使用，比如django, bottle, flask等。不妨看下bottle在不同server下的性能评测，其中就有tornado http://bottlepy.org/page/2009-12-19_Comparing_HelloWorld_Performance ）。额外说的是，WSGI的框架是不支持异步的，所以如果有异步调用的逻辑的web程序，Tornado也是选择之一。<br />
+<br />
+使用Nginx是因为一些单进程服务无法利用多核CPU，同时也会有单机的限制，所以通常会在多个服务器启动多个进程实例，使用Nginx在前端作为反向代理服务器来分发web请求，同时负载均衡。Nginx是C写的，有更好的并发性，可配置性，对静态文件也有更好的支持。当然这是Nginx的常用情景，其实也可以直接使用Nginx来构建web应用，可以参考OpenResty项目<br />
+<br />
+<br />
+Nginx的确是多进程的，但其实我想表达的是说Tornado这样的单进程服务无法利用多核CPU（全面点说，像Tornado自己也有multiple processes模式的，但它的进程管理的功能很弱，通常还是自己启动N个进程，而且不能拓展到多机<br />
+<br />
+<br />
+如果咬文嚼字的话，host静态文件的被称为web server，比如nginx和apache。动态的应该称为application server才对，比如tornado和tomcat<br />
+<br />
+<br />
+nginx常用做静态内容服务和代理服务器（不是你翻墙那个代理），直面外来请求转发给后面的应用服务tomcat，django什么的），tomcat更多用来做做一个应用容器，让java web app跑在里面的东西，对应同级别的有jboss,jetty等东西。但是事无绝对，nginx也可以通过模块开发来提供应用功能，tomcat也可以直接提供http服务，通常用在内网和不需要流控等小型服务的场景。<br />
+apache用的越来越少了，大体上和nginx功能重合的更多<br />
+<br />
+<br />
+apache和nginx可以归为一类，属于静态页面服务器。tomcat属于Java Servlet容器，用来生成动态页面的。<br />
+<br />
+apache属于比较老的静态页面服务器，比较多现有插件，包括代理、SSL支持、动态编程语言处理等。<br />
+nginx和apache差不多，都有插件支持动态编程语言处理等、但nginx的IO模型比apache更适合跑代理。所以一般都作为前端缓冲代理。<br />
+tomcat就是Java Servlet容器，主要用来跑Java的Web功能，当然也提供一个简单静态页面转换。<br />
+<br />
+<br />
+严格的来说，Apache/Nginx 应该叫做「HTTP Server」；而 Tomcat 则是一个「Application Server」，或者更准确的来说，是一个「Servlet/JSP」应用的容器（Ruby/Python 等其他语言开发的应用也无法直接运行在 Tomcat 上）。<br />
+一个 HTTP Server 关心的是 HTTP 协议层面的传输和访问控制，所以在 Apache/Nginx 上你可以看到代理、负载均衡等功能。客户端通过 HTTP Server 访问服务器上存储的资源（HTML 文件、图片文件等等）。通过 CGI 技术，也可以将处理过的内容通过 HTTP Server 分发，但是一个 HTTP Server 始终只是把服务器上的文件如实的通过 HTTP 协议传输给客户端。<br />
+<br />
+而应用服务器，则是一个应用执行的容器。它首先需要支持开发语言的 Runtime（对于 Tomcat 来说，就是 Java），保证应用能够在应用服务器上正常运行。其次，需要支持应用相关的规范，例如类库、安全方面的特性。对于 Tomcat 来说，就是需要提供 JSP/Sevlet 运行需要的标准类库、Interface 等。为了方便，应用服务器往往也会集成 HTTP Server 的功能，但是不如专业的 HTTP Server 那么强大，所以应用服务器往往是运行在 HTTP Server 的背后，执行应用，将动态的内容转化为静态的内容之后，通过 HTTP Server 分发到客户端。</p>
+
+<p>一般的运用场景下，apache和nginx在负载均衡里是前端服务器，用来处理请求的转发（反向代理等）；绝大部分时候他们本身并不会运行项目。tomcat和jetty，WebLogic是后端服务器，是直接用来运行项目的容器。</p>
+
+<p> </p>
+
+<p>简单来说就是你发出一个请求，先经过apache或nginx，他们会合理地把请求分配到后台比较不忙的tomcat或jetty。tomcat或jetty会把请求处理好返回给apache或nginx，然后a或n会把最终的请求结果告诉你。当然，如果是一些静态的数据，a和n就可以直接返回给你了。</p>

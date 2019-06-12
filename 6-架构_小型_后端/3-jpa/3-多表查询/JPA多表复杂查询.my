@@ -1,0 +1,231 @@
+<h1>JPA的多表复杂查询</h1>
+<blockquote>
+<p>最近工作中由于要求只能用hibernate+jpa 与数据库进行交互，在简单查询中，jpa继承CrudRepository<T, ID>接口 ，然后利用jpa的方法命名规范进行jpql查询，然而在进行复杂查询时，需要继承JpaSpecificationExecutor接口 利用Specification 进行复杂查询，由于我自己就遇到了这一问题，查了好多资料，虽然有方法，但是都没有一个详细的讲解，以至于知道方法而不能很好的利用jpa复杂查询的方便之处。我将举几个栗子，来详细的说一下我自己在使用jpa多表复杂查询的场景和想法。</p>
+</blockquote>
+<p>栗子1：</p>
+<p>以一个实体类User中的几个属性进行筛选。</p>
+<table>
+<tbody>
+<tr>
+<td>
+<pre>
+1. 名字
+2. ID
+3. 手机号
+</pre>
+</td>
+</tr>
+</tbody>
+</table>
+<p>这是一个单表的多条件复杂查询，由于是在几个属性中进行筛选，其中的属性的个数不知道有多少个，所以只需要利用Specification 查询就可以很方便的实现这个需求。 下面请看代码：<br />
+场景：页面上通过条件筛选，查询用户列表</p>
+<p>这里有3个条件 在页面上我设置的id分别为searchName，searchId，searchMobile。 由于这个是user表 所以userRepository 继承JpaSpecificationExecutor接口，随后我创建了一个封装条件的类</p>
+<table>
+<tbody>
+<tr>
+<td>
+<pre>
+public class PageParam<T> {
+private Integer pageSize = 10;
+private Integer pageNumber = 1;
+private String searchName;
+private String searchMobile;
+private String searchId;
+}
+</pre>
+</td>
+</tr>
+</tbody>
+</table>
+<p>由于我这个方法是直接分页的 所以pageNumber 和pageSize 也可以直接写入到这个类中，用于方便接收参数，主要是对下面3个参数的封装</p>
+<table>
+<tbody>
+<tr>
+<td>
+<pre>
+Specification<T> specification = new Specification<T>() {
+@Override
+public Predicate toPredicate(Root<T> root, CriteriaQuery<?> query, CriteriaBuilder cb) {
+List<Predicate> list = new ArrayList<Predicate>();
+if (StringUtils.isNotBlank(searchName)) {
+list.add(cb.like(root.get("name").as(String.class), "%" + searchName + "%"));
+}
+if (StringUtils.isNotBlank(searchId)) {
+list.add(cb.equal(root.get("id").as(Long.class), searchId));
+}
+if (StringUtils.isNotBlank(searchMobile)) {
+list.add(cb.like(root.get("mobile").as(String.class), "%" + searchMobile + "%"));
+}
+Predicate[] p = new Predicate[list.size()];
+return cb.and(list.toArray(p));
+};
+};
+</pre>
+</td>
+</tr>
+</tbody>
+</table>
+<p>这里因为都是一个表，所以只要root.get(‘N ‘)这个N对应所要查的 属性的名字就好，属性名 属性名 重要的事情说三遍。<br />
+再接下来看一组多表的查询</p>
+<p>栗子2：</p>
+<p>这里有4张表</p>
+<table>
+<tbody>
+<tr>
+<td>
+<pre>
+public class Living {
+Long id;
+
+@ManyToOne
+@JsonIgnore
+@JoinColumn(name = "actorId", foreignKey = @ForeignKey(name = "none", value =ConstraintMode.NO_CONSTRAINT))
+public Actor actor;
+
+@ManyToOne
+@JsonIgnore
+@JoinColumn(name = "regionId", foreignKey = @ForeignKey(name = "none", value =ConstraintMode.NO_CONSTRAINT))
+public Region region;
+}
+</pre>
+</td>
+</tr>
+</tbody>
+</table>
+<table>
+<tbody>
+<tr>
+<td>
+<pre>
+public class Actor {
+Long id;
+
+@OneToMany(cascade = { CascadeType.PERSIST, CascadeType.MERGE, CascadeType.REFRESH }, fetch = FetchType.LAZY)
+@JoinColumn(name = "actorId")
+@org.hibernate.annotations.ForeignKey(name = "none")
+List<Living> livings = new ArrayList<>();
+
+@OneToOne(cascade = { CascadeType.PERSIST, CascadeType.MERGE, CascadeType.REFRESH }, fetch = FetchType.LAZY)
+@org.hibernate.annotations.ForeignKey(name = "none")
+@JoinColumn(name = "userDetailId", foreignKey = @ForeignKey(name = "none", value = ConstraintMode.NO_CONSTRAINT))
+UserDetail userDetail;
+
+@Column(nullable = false)
+@Enumerated(value = EnumType.ORDINAL)
+ActorType actorType = ActorType.A;
+
+public enum ActorType{
+A,B,C
+}
+}
+</pre>
+</td>
+</tr>
+</tbody>
+</table>
+<table>
+<tbody>
+<tr>
+<td>
+<pre>
+public class UserDetail {
+Long id; 
+
+@OneToOne(cascade = { CascadeType.PERSIST, CascadeType.MERGE, CascadeType.REFRESH }, fetch = FetchType.LAZY)
+@org.hibernate.annotations.ForeignKey(name = "none")
+@JoinColumn(name = "actorId", foreignKey = @ForeignKey(name = "none", value = ConstraintMode.NO_CONSTRAINT))
+Actor actor;
+
+String truename;
+}
+</pre>
+</td>
+</tr>
+</tbody>
+</table>
+<table>
+<tbody>
+<tr>
+<td>
+<pre>
+public class Region {
+Long id;
+
+String name;
+
+@OneToMany(cascade = { CascadeType.PERSIST, CascadeType.MERGE, CascadeType.REFRESH }, fetch = FetchType.LAZY)
+@JoinColumn(name = "regionId")
+@org.hibernate.annotations.ForeignKey(name = "none")
+List<Living> Livings;
+}
+</pre>
+</td>
+</tr>
+</tbody>
+</table>
+<p>现在要根据userdetai 种的 sex actor中的actortype 还有 region的id 为条件查询出满足条件的living。</p>
+<table>
+<tbody>
+<tr>
+<td>
+<pre>
+public class PageParam<Living> {
+private Integer pageSize = 10;
+private Integer pageNumber = 1;
+private Sex sex;
+private ActorType actortype;
+private Long cityid;
+</pre>
+</td>
+</tr>
+</tbody>
+</table>
+<p>首先我还是封装了这样一个类，但是这里的泛型 我是直接给到了想要的查询结果的泛型，接下来 因为这里涉及到了一个 多表的查询 所以上面的单表查询的例子 已经不适合这个查询了，但是Criteria 的join方法 给我们提供了一个模式</p>
+<table>
+<tbody>
+<tr>
+<td>
+<pre>
+Specification<Living> specification = new Specification<Living>() {
+@Override
+public Predicate toPredicate(Root<Living> root, CriteriaQuery<?> query, CriteriaBuilder cb) {
+List<Predicate> list = new ArrayList<Predicate>();
+if (null!=sex) {
+Join<UserDetail, Living> join = root.join("actor", JoinType.LEFT);
+list.add(cb.equal(join.get("userDetail").get("sex"), sex ));
+}
+if (null!=actortype) {
+Join<Actor, Living> join = root.join("actor", JoinType.LEFT);
+list.add(cb.equal(join.get("actorType"), actortype));
+}
+if (null!=cityid) {
+Join<Region, Living> join = root.join("region", JoinType.LEFT);
+list.add(cb.equal(join.get("id"), cityid));
+}
+//Join<A, B> join = root.join("bs", JoinType.LEFT);
+//list.add(cb.equal(join.get("c").get("id"), id));
+Predicate[] p = new Predicate[list.size()];
+return cb.and(list.toArray(p));
+};
+};
+</pre>
+</td>
+</tr>
+</tbody>
+</table>
+<p>这里是我对条件进行的封装。jpa 的多条件查询 主要是根据Criteria 为我们提供的方法封装条件，然后根据 给条件定义的位置，再生成sql语句，之后完成查询。<br />
+不得不说的地方，在这个多表的查询中以下面这句为例</p>
+<table>
+<tbody>
+<tr>
+<td>
+<pre>
+Join<UserDetail, Living> join = root.join("actor", JoinType.LEFT);
+list.add(cb.equal(join.get("userDetail").get("sex"), sex ));
+</pre>
+</td>
+</tr>
+</tbody>
+</table>
+<p>jointype.LEFT主要是说最终的这个属性 是在哪个表中， 而前面的 “actor” 则表示 从living表中 查询的 第一步的查询，比如我给出的例子 是要查询出 living 中的 actor 然后是actor 中的userdetail 之后才是 userdetail中的 sex属性 所以下面的join.get(“userDetail”).get(“sex”) ，这里就是get出相应的属性，一直到你得到想要的属性为止。 接下来的两个属性 也同理，<br />
+许多人多jpa 有很大的误解，认为jpa 的多表，多条件复杂查询，不如mybatis的查询，在之前我也是这么觉得，但自从通过jpa 实现了这个多表多条件的复杂查询之后，我觉得hibernate的复杂查询 不逊于mybatis ，尤其是对sql 语句不是很精通的 码农，虽然hibernate的门槛较高可jpa 恰恰降低了hibernate 所需要的门槛，希望大家可以通过我的经验，更方便的与数据库进行交互。</p>

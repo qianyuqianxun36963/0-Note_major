@@ -1,0 +1,81 @@
+<h1>部署Glusterfs集群</h1>
+
+<h2>1、配置yum源</h2>
+
+<p>创建文件/etc/yum.repos.d/glusterfs.repo</p>
+
+<p>[gluster]<br />
+name=gluster<br />
+baseurl=http://cmc-cd-mirror.rnd.huawei.com/centos/7/storage/x86_64/gluster-4.1/<br />
+gpgcheck=0<br />
+enabled=1</p>
+
+<p><s>使用外部源时需要在/etc/yum.conf中配置代理（记得把用户名和密码改成自己的）：</s></p>
+
+<p>proxy=http://proxycn2.huawei.com:8080 proxy_username=w00438280 proxy_password=123456</p>
+
+<h2>2、关闭防火墙，禁用SELinux</h2>
+
+<p>systemctl stop firewalld<br />
+systemctl disable firewalld</p>
+
+<p>setenforce 0<br />
+sed -i "s/SELINUX=enforcing/SELINUX=disabled/" /etc/sysconfig/selinux</p>
+
+<p>如果要开启防火墙，那么把端口24007和49152打开：</p>
+
+<p>-A INPUT -p tcp -m state --state NEW -m tcp --dport 24007 -j ACCEPT<br />
+-A INPUT -p tcp -m state --state NEW -m tcp --dport 49152 -j ACCEPT</p>
+
+<p>CentOS的防火墙默认是firewalld：</p>
+
+<p>firewall-cmd --zone=public --add-port=24007-24050/tcp --permanent<br />
+firewall-cmd --zone=public --add-port=49152-49251/tcp --permanent<br />
+firewall-cmd --reload</p>
+
+<p>如果要开启SELinux，执行以下命令：</p>
+
+<p>audit2allow -M glusterd_centos64 -l -i /var/log/audit/audit.log<br />
+semodule -i glusterd_centos64.pp</p>
+
+<h2>3、安装glusterfs-server</h2>
+
+<p>yum install -y glusterfs-server<br />
+systemctl start glusterd<br />
+systemctl enable glusterd</p>
+
+<h2>4、组建集群</h2>
+
+<p>将节点加入到集群中，可以使用待加入集群的节点的IP地址，也可以是主机名（集群内能ping通主机名）：</p>
+
+<p><code>gluster peer probe <ip_or_hostname></code></p>
+
+<p>查看集群状态：</p>
+
+<p><code>gluster peer status</code></p>
+
+<h2>5、管理卷</h2>
+
+<p>创建卷：</p>
+
+<p>查看卷：</p>
+
+<p># 查看卷列表（只有卷的名称）<br />
+gluster volume list<br />
+# 查看卷的详细信息<br />
+gluster volume info</p>
+
+<h2>99、OpenShift中使用Glusterfs的注意事项</h2>
+
+<p>OpenShift对外部Glusterfs集群的要求是必须使用未分区的裸盘，使用Heketi进行集群管理。</p>
+
+<p>a.清理磁盘，以/dev/xvde为例：</p>
+
+<p><code>wipefs -af /dev/xvde</code></p>
+
+<p>b.OpenShift已使用过的磁盘已经创建device-mapper了，使用dmsetup工具进行删除：</p>
+
+<p># 查看device-mapper<br />
+dmsetup ls<br />
+# 删除device-mapper，注意先删除tpool后删除tmeta和tdata<br />
+dmsetup remove <device-mapper-name></p>

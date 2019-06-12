@@ -1,0 +1,479 @@
+<h1>Statement</h1>
+<p>本节介绍Statement接口及其子类PreparedStatement和CallableStatement。 它还描述了相关主题，包括转义语法，性能提示和自动生成的键</p>
+<h2>Statement 接口</h2>
+<p>Statement接口定义了执行不包含参数标记的SQL语句的方法。 PreparedStatement接口添加了设置输入参数的方法，CallableStatement接口添加了用于检索从存储过程返回的输出参数值的方法</p>
+<h3>创建 Statement 接口</h3>
+<p>语句对象由Connection对象创建，如代码示例13-1所示：</p>
+<blockquote>
+<p>Connection conn = dataSource.getConnection(user, passwd);<br />
+Statement stmt = conn.createStatement()</p>
+</blockquote>
+<p>每个Connection对象都可以创建可以由程序同时使用的多个Statement对象。 这在代码示例13-2中演示</p>
+<blockquote>
+<p>Connection conn = ds.getConnection(user, passwd);<br />
+// create two instances of Statement<br />
+Statement stmt1 = conn.createStatement();<br />
+Statement stmt2 = conn.createStatement();</p>
+</blockquote>
+<h5>设置结果集特性</h5>
+<p>可以使用其他构造函数来设置语句生成的任何结果集的类型，并发性或类型，并发性和可保持性。 有关ResultSet界面的更多信息，请参见第15章“结果集”</p>
+<p>代码示例13-3创建一个Statement对象，该对象返回可滚动的结果集，对ResultSet对象打开时所做的更改不敏感，可以更新，并且在调用commit时不关闭ResultSet对象</p>
+<blockquote>
+<p>Connection conn = ds.getConnection(user, passwd);<br />
+Statement stmt = conn.createStatement(<br />
+ResultSet.TYPE_SCROLL_INSENSITIVE,<br />
+ResultSet.CONCUR_UPDATABLE,<br />
+ResultSet.HOLD_CURSORS_OVER_COMMIT);</p>
+</blockquote>
+<h3>执行 Statement 对象</h3>
+<p>用于执行Statement对象的方法取决于正在执行的SQL语句的类型。 如果Statement对象表示返回ResultSet对象的SQL查询，则应该使用executeQuery方法。 如果SQL已知为DDL语句或返回更新计数的DML语句，则应使用executeUpdate方法。 如果SQL语句的类型不知道，则应该使用execute方法</p>
+<h4>返回 ResultSet 对象</h4>
+<p>代码示例13-4显示了返回ResultSet对象的SQL字符串的执行</p>
+<blockquote>
+<p>Statement stmt = conn.createStatement();<br />
+ResultSet rs = stmt.executeQuery(“select TITLE, AUTHOR, ISBN " +<br />
+"from BOOKLIST”);<br />
+while (rs.next()){<br />
+...<br />
+}</p>
+</blockquote>
+<p>如果正在执行的SQL字符串不返回ResultSet对象，那么executeQuery方法会抛出一个SQLException</p>
+<h4>返回更新的行数</h4>
+<p>在代码示例13-5中，正在执行的SQL语句返回受SQL数据操作语言（DML）语句更新影响的行数，或者对于不返回任何内容的SQL语句返回0。</p>
+<blockquote>
+<p>Statement stmt = conn.createStatement();<br />
+int rows = stmt.executeUpdate(“update STOCK set ORDER = ‘Y’ " +<br />
+"where SUPPLY = 0”);<br />
+if (rows > 0) {<br />
+...<br />
+}</p>
+</blockquote>
+<p>执行返回更新计数的Statement对象<br />
+如果正在执行的SQL字符串返回一个ResultSet，那么executeUpdate方法会抛出SQLException</p>
+<p>备注：如果您的数据库支持返回可能超过Integer.MAX_VALUE的更新计数，请使用executeLargeUpdate方法</p>
+<h4>返回未知或多个结果</h4>
+<p>如果有多个结果，或者如果在运行时之前不知道Statement对象返回的结果的类型或数量，则Statement对象应该使用方法execute执行。 方法getMoreResults，getUpdateCount和getResultSet可用于检索所有结果</p>
+<p>备注：如果您的数据库支持返回可能超过Integer.MAX_VALUE的更新计数，请使用getLargeUpdateCount 方法</p>
+<p>如果第一个结果是ResultSet对象，那么方法execute将返回true，如果它是更新计数，则返回false</p>
+<p>当方法执行返回true时，方法getResultSet被调用来检索ResultSet对象。 当执行返回false时，方法getUpdateCount返回一个int。 如果该数字大于或等于零，则表示该语句返回的更新计数。 如果为-1，则表示没有更多结果</p>
+<p>如果返回多个结果，可以调用getMoreResults方法来获取下一个结果。 与方法执行一样，如果下一个结果是ResultSet对象，getMoreResults将返回true，如果下一个结果是更新计数或没有更多结果可用，则返回false</p>
+<blockquote>
+<p>Statement stmt = conn.createStatement();<br />
+boolean retval = cstmt.execute(sql_queries);<br />
+ResultSet rs;<br />
+int count;<br />
+do {<br />
+if (retval == false) {count = stmt.getUpdateCount();<br />
+if (count == -1) {<br />
+// no more results<br />
+break;<br />
+} else {<br />
+// process update count<br />
+}<br />
+} else { // ResultSet<br />
+rs = stmt.getResultSet();<br />
+// process ResultSet<br />
+}<br />
+retval = stmt.getMoreResults();<br />
+while (true);</p>
+</blockquote>
+<p>默认情况下，对方法getMoreResults的每次调用都会关闭getResultSet方法返回的任何先前的ResultSet对象。 但是，getMoreResults方法可能会使用一个参数来指定getResultSet返回的ResultSet对象是否应该被关闭。 Statement接口定义了可以提供给方法getMoreResults的三个常量</p>
+<ul>
+<li>CLOSE_CURRENT_RESULTS ：表示当返回下一个ResultSet对象时，当前的ResultSet对象应该被关闭</li>
+<li>KEEP_CURRENT_RESULTS ：表示当返回下一个ResultSet对象时，不应关闭当前的ResultSet对象</li>
+<li>CLOSE_ALL_RESULTS ： 表示当返回下一个结果时，任何已保持打开的ResultSet对象应该被关闭</li>
+</ul>
+<p>如果当前结果是更新计数而不是ResultSet对象，则将忽略传递给getMoreResults的任何参数</p>
+<p>要确定驱动程序是否实现此功能，应用程序可以调用DatabaseMetaData方法支持多打开结果</p>
+<blockquote>
+<p>ResultSet rs1 = stmt.getResultSet();<br />
+rs1.next();<br />
+...<br />
+retval = stmt.getMoreResults(Statement.KEEP_CURRENT_RESULT);<br />
+if (retval == true) {<br />
+ResultSet rs2 = stmt.getResultSet();<br />
+rs2.next();<br />
+...<br />
+rs1.next();<br />
+}<br />
+retval = stmt.getMoreResults(Statement.CLOSE_ALL_RESULTS);<br />
+...</p>
+</blockquote>
+<h3>限制Statement对象的执行时间</h3>
+<p>setQueryTimeout方法可用于指定JDBC驱动程序尝试取消正在运行的语句之前的最短时间。 JDBC驱动程序必须将此限制应用于execute，executeBatch，executeQuery和executeUpdate方法。 一旦数据源有机会处理终止运行命令的请求，SQLException将被抛出给客户端，并且不会对先前运行的命令发生额外的处理，而无需重新执行Statement</p>
+<p>一些JDBC驱动程序实现也可以将此限制应用于ResultSet方法。 有关详细信息，请咨询驱动程序供应商文档</p>
+<p>在声明批处理的情况下，定义了超时是否应用于通过addBatch方法添加的单个SQL命令或由executeBatch方法调用的整个SQL命令的实现的实现</p>
+<h3>关闭 Statement 对象</h3>
+<p>一个应用程序调用Statement.close方法来指示它已经完成处理语句。 当创建它们的连接关闭时，所有Statement对象将被关闭。 但是，一旦应用程序完成处理，就关闭语句是很好的编码习惯。 这允许立即释放语句所使用的任何外部资源</p>
+<p>关闭Statement对象将关闭并声明该Statement对象生成的ResultSet的任何实例。 在垃圾回收再次运行之前，ResultSet对象持有的资源可能不会被释放，所以在不再需要时显式关闭ResultSet对象是一个很好的做法</p>
+<p>一旦声明已关闭，除了isClosed或close方法之外，任何访问其方法的尝试将导致抛出SQLException</p>
+<p>关于Statement对象的这些注释也适用于PreparedStatement和CallableStatement对象</p>
+<h2>PreparedStatement 接口</h2>
+<p>PreparedStatement接口扩展了Statement，增加了为语句中包含的参数标记设置值的功能</p>
+<p>PreparedStatement对象表示可以准备或预编译的SQL语句，用于执行一次，然后执行多次。 在SQL字符串中由“？”表示的参数标记用于指定在运行时可能会有变化的语句的输入值</p>
+<h3>创建 PreparedStatement</h3>
+<p>Prepared语句的实例以与Statement对象相同的方式创建，除了在创建语句时提供SQL命令</p>
+<blockquote>
+<p>Connection conn = ds.getConnection(user, passwd);<br />
+PreparedStatement ps = conn.prepareStatement(“INSERT INTO BOOKLIST" +<br />
+"(AUTHOR, TITLE, ISBN) VALUES (?, ?, ?)”);</p>
+</blockquote>
+<h4>设置 ResultSet 特性</h4>
+<p>与createStatement一样，prepareStatement方法定义了一个构造函数，可以用于指定该准备语句生成的结果集的特征</p>
+<blockquote>
+<p>Connection conn = ds.getConnection(user, passwd);<br />
+PreparedStatement ps = conn.prepareStatement(<br />
+“SELECT AUTHOR, TITLE FROM BOOKLIST WHERE ISBN = ?”,<br />
+ResultSet.TYPE_FORWARD_ONLY,<br />
+ResultSet.CONCUR_UPDATABLE);</p>
+</blockquote>
+<h3>设置参数</h3>
+<p>PreparedStatement接口定义了setter方法，用于替换预编译SQL字符串中每个参数标记的值。 方法的名称遵循模式“set <Type>”</p>
+<p>例如，setString方法用于指定一个需要字符串的参数标记的值。 这些设置器方法中的每一个至少需要两个参数。 第一个始终是等于要设置的参数的顺序位置的int，从1开始。第二个和任何其余参数指定要分配给参数的值</p>
+<blockquote>
+<p>PreparedStatement ps = conn.prepareStatement(“INSERT INTO BOOKLIST" +<br />
+"(AUTHOR, TITLE, ISBN) VALUES (?, ?, ?)”);<br />
+ps.setString(1, “Zamiatin, Evgenii”);<br />
+ps.setString(2, “We”);<br />
+ps.setLong(3, 140185852L);</p>
+</blockquote>
+<p>必须为PreparedStatement对象中的每个参数标记提供一个值才能执行。 用于执行PreparedStatement对象（executeQuery，executeUpdate和execute）的方法将抛出SQLException，如果不为参数标记提供值</p>
+<p>为PreparedStatement对象的参数标记设置的值在执行时不会重置。 可以调用clearParameters方法以显式清除已设置的值。 用不同的值设置参数将替换以前的值</p>
+<p>备注：如果在执行PreparedStatement对象时，JDBC驱动程序通过方法setAsciiStream，setBinaryStream，setCharacterStream，setNCharacterStream或setUnicodeStream读取为参数标记设置的值，则在下一次执行PreparedStatement对象之前必须重置这些参数，否则SQLException 将被抛出。 如果在同一个PreparedStatement对象执行中的多个参数标记使用相同的流，也会抛出SQLException</p>
+<p>对于任何给定的语句，应用程序不应修改传递给setXXX方法的值参数，在setXXX方法被调用之后，并且在执行后续执行executeQuery，executeUpdate，executeBatch或clearParameters方法被调用之前。 如果有一个后续setXXX方法调用覆盖上一个值或者如果Statement不被重用，应用程序可以在执行execute，executeQuery，executeUpdate，executeBatch或clearParameters方法之后修改value参数。 不符合此限制可能导致不可预知的行为</p>
+<h4>类型转换</h4>
+<p>在PreparedStatement setter方法中指定的数据类型是Java编程语言中的数据类型。 JDBC驱动程序负责将其映射到相应的JDBC类型（java.sql.Types中定义的SQL类型之一），以便它是发送到数据源的适当类型。 默认映射在附录B表B-2中指定。</p>
+<h4>国际字符集转换</h4>
+<p>SQL：2003提供对国际字符集类型的支持，这些类型在SQL：2003规范中被描述为一个实现定义的字符集。以下JDBC类型可用于访问国际字符集类型：NCHAR，NVARCHAR，LONGNVARCHAR和NCLOB。这些类型类似于CHAR，VARCHAR，LONGVARCHAR和CLOB，除了使用替代字符集（国际字符集）对值进行编码。由于Java类型使用UTF-16编码字符数据，所以没有理由使用备用Java类型来保存这些值。然而，区分CLOB和NCLOB可能是有利的。 JDBC规范使用字符串表示NCHAR，NVARCHAR和LONGNVARCHAR数据，在Java字符集和国际字符集之间自动转换。 JDBC使用NClob来表示NCLOB值。 Clob和NClob值之间没有自动转换。有关Java语言如何使用Unicode的其他信息，请参阅java.lang.Character的Java API文档</p>
+<p>为了最大的可移植性，当特定值对应于国际字符类型时，应用程序必须向JDBC驱动程序指示。 当指定作为国家字符类型的参数标记的值时，应用程序将调用setNString，setNCharStream，setNClob或setObject方法。 如果使用setObject方法，则必须将目标数据类型指定为Types.NCHAR，Types.NCLOB，Types.NVARCHAR或Types.LONGNVARCHAR。 如果应用程序未指示参数标记值对应于国家字符类型，则JDBC驱动程序可能会错误地解释该值，从而导致数据转换错误的可能性。 在JDBC驱动程序可以检测到可能发生数据转换错误的情况下，对setXXX方法的调用将导致抛出SQLException。 驱动程序可能不总是发现可能会发生数据转换错误。</p>
+<p>如果驱动程序不支持国家字符类型，则尝试调用setNString，setNCharacterStream，setNClob或setObject的方法，将目标数据类型指定为国际字符集，可能会导致抛出SQLException</p>
+<p>要检索一个国际字符值，应用程序将调用getNString，getNClob，getNCharacterStream或getObject的方法</p>
+<h4>使用方法setObject进行类型转换</h4>
+<p>方法setObject可用于将Java编程语言中的对象转换为JDBC类型</p>
+<p>当setObject传递Java对象和JDBC数据类型时，转换是显式的。 驱动程序将尝试将对象转换为指定的JDBC类型，然后再将其传递给数据源。 如果对象无法转换为目标类型，则抛出SQLException对象。 在代码示例13-11中，类型为整型的Java对象正在转换为JDBC类型SHORT</p>
+<blockquote>
+<p>Integer value = new Integer(15);<br />
+ps.setObject(1, value, java.sql.Types.SHORT);</p>
+</blockquote>
+<p>如果没有使用type参数调用setObject，则使用该对象类型的默认映射隐式地映射Java对象</p>
+<blockquote>
+<p>Integer value = new Integer(15);<br />
+// value is mapped to java.sql.Types.INTEGER<br />
+ps.setObject(1, value);</p>
+</blockquote>
+<p>方法setObject将对具有自定义映射的SQL UDT执行自定义映射。 有关详细信息，请参见第17章“自定义类型映射”。</p>
+<h4>设置 NULL 参数</h4>
+<p>方法setNull可用于将任何参数设置为JDBC NULL。 它需要两个参数，参数标记的顺序位置和参数的JDBC类型</p>
+<blockquote>
+<p>ps.setNull(2, java.sql.Types.VARCHAR);</p>
+</blockquote>
+<p>如果将Java null传递给使用Java对象的任何setter方法，则该参数将被设置为JDBC NULL</p>
+<p>并非所有数据库都允许将非类型的Null发送到底层数据源。 为了最大的可移植性，应该使用setNull或setObject（int parameterIndex，Object x，int sqlType）方法，而不是使用setObject（int parameterIndex，Object x）。</p>
+<h4>清除参数</h4>
+<p>通过调用clearParameters方法可以明确地清除为PreparedStatement对象的IN参数标记设置的值。 PreparedStatement对象用于表示设置值的任何资源也被释放</p>
+<h3>描述PreparedStatement对象的输出和输入</h3>
+<p>PreparedStatement.getMetaData方法检索一个ResultSetMetaData对象，该对象包含执行时准备语句返回的列的描述。 ResultSetMetaData对象包含每个返回列的记录。 ResultSetMetaData接口中的方法提供有关返回的列数和每列的特性的信息</p>
+<blockquote>
+<p>PreparedStatement pstmt = conn.prepareStatement(<br />
+"SELECT * FROM CATALOG");<br />
+ResultSetMetaData rsmd = pstmt.getMetaData();<br />
+int colCount = rsmd.getColumnCount();<br />
+int colType;<br />
+String colLabel;<br />
+for (int i = 1; i <= colCount; i++) {<br />
+colType = rsmd.getColumnType(i);<br />
+colLabel = rsmd.getColumnLabel(i);<br />
+...<br />
+}</p>
+</blockquote>
+<p>PreparedStatement.getParameterMetaData方法返回一个ParameterMetaData对象，描述出现在PreparedStatement对象中的参数标记。 ParameterMetaData接口中的方法提供了有关参数数量及其特征的信息</p>
+<blockquote>
+<p>PreparedStatement pstmt = conn.prepareStatement(<br />
+"SELECT * FROM BOOKLIST WHERE ISBN = ?");<br />
+ParameterMetaData pmd = pstmt.getParameterMetaData();<br />
+int colType = pmd.getParameterType(1);<br />
+...</p>
+</blockquote>
+<h3>执行 PreparedStatement 对象</h3>
+<p>与Statement对象一样，用于执行PreparedStatement对象的方法取决于正在执行的SQL语句的类型。 如果PreparedStatement对象是返回ResultSet对象的查询，则应使用executeQuery方法执行。 如果是返回更新计数的DML语句，则应使用executeUpdate方法执行。 只有当语句的返回类型未知时，才应使用方法execute</p>
+<p>如果使用SQL字符串作为参数调用了任何PreparedStatement execute方法，则抛出SQLException</p>
+<h3>返回 ResultSet 对象</h3>
+<p>代码示例13-16显示正在准备并然后多次执行的查询</p>
+<blockquote>
+<p>PreparedStatement pstmt = conn.prepareStatement(“SELECT AUTHOR, " +<br />
+"TITLE FROM BOOKLIST WHERE SECTION = ?”);<br />
+for (int i = 1; i <= maxSectionNumber; i++) {<br />
+pstmt.setInt(1, i);<br />
+ResultSet rs = pstmt.executeQuery();<br />
+while (rs.next()) {<br />
+// process the record<br />
+}<br />
+rs.close();<br />
+}<br />
+pstmt.close();</p>
+</blockquote>
+<p>如果正在执行的语句不返回ResultSet对象，则executeQuery抛出SQLException</p>
+<h3>返回更新行数</h3>
+<p>如果有多个结果，或者如果PreparedStatement对象返回的结果的类型或数量在运行时尚未知，则PreparedStatement对象应使用方法execute执行。 方法getMoreResults，getUpdateCount和getResultSet可用于检索所有结果</p>
+<p>如果您的数据库支持返回可能超过Integer.MAX_VALUE的更新计数，请使用getLargeUpdateCount方法</p>
+<blockquote>
+<p>PreparedStatement pstmt = conn.prepareStatement(sqlStatement);<br />
+boolean retval = pstmt.execute();<br />
+ResultSet rs;<br />
+int count;<br />
+do {<br />
+if (retval == false) {<br />
+count = pstmt.getUpdateCount();<br />
+if (count == -1) {<br />
+// no more results<br />
+break;<br />
+} else {<br />
+// process update count<br />
+}<br />
+} else { // ResultSet<br />
+rs = pstmt.getResultSet();<br />
+// process ResultSet<br />
+}<br />
+retval = cstmt.getMoreResults();<br />
+while (true);</p>
+</blockquote>
+<h2>CallableStatement 接口</h2>
+<p>CallableStatement接口使用用于执行和检索存储过程结果的方法扩展了PreparedStatement</p>
+<h2>创建 CallableStatement 对象</h2>
+<p>与Statement和PreparedStatement对象一样，CallableStatement对象由Connection对象创建。 代码示例13-19显示了创建一个CallableStatement对象，用于调用存储过程'validate'，它具有一个返回参数和另外两个参数</p>
+<blockquote>
+<p>CallableStatement cstmt = conn.prepareCall(<br />
+“{? = call validate(?, ?)}”);</p>
+</blockquote>
+<p>本章中的所有示例都使用转义语法来调用存储过程。 请参见第116页的“存储过程和函数”</p>
+<h3>设置参数</h3>
+<p>CallableStatement对象可以采用三种类型的参数：IN，OUT和INOUT。 该参数可以被指定为序数参数或命名参数。 必须为表示IN或INOUT参数的语句中的每个参数标记设置一个值。 必须为表示OUT或INOUT参数的每个参数标记调用registerOutParameter方法</p>
+<p>可以使用DatabaseMetaData方法getProcedureColumns来确定存储过程的参数的数量，类型和属性</p>
+<p>参数ordinals（它们是传递给适当setter方法的整数）引用语句中的参数标记（“？”），从一开始。 语句中的文字参数值不会增加参数标记的序数值。 在代码示例13-20中，两个参数标记具有序数值1和2。</p>
+<blockquote>
+<p>CallableStatement cstmt = con.prepareCall(<br />
+"{CALL PROC(?, "Literal_Value", ?)}");<br />
+cstmt.setString(1, "First");<br />
+cstmt.setString(2, "Third");</p>
+</blockquote>
+<p>命名参数也可用于指定具体参数。 当过程具有许多具有默认值的参数时，这是特别有用的。 命名参数可用于仅指定没有默认值的值。 参数的名称对应于DatabaseMetaData.getProcedureColumns返回的COLUMN_NAME字段</p>
+<p>在代码示例13-21中，过程COMPLEX_PROC需要十个参数，但仅需要第一和第五个参数PARAM_1和PARAM_5</p>
+<blockquote>
+<p>CallableStatement cstmt = con.prepareCall(<br />
+"{CALL COMPLEX_PROC(?, ?)}";<br />
+cstmt.setString("PARAM_1", "Price");<br />
+cstmt.setFloat("PARAM_5", 150.25);</p>
+</blockquote>
+<p>可以调用DatabaseMetaData.support Named Parameters方法来确定JDBC驱动程序和底层数据源是否支持指定命名参数<br />
+不能将设置参数与序号和名称组合在同一语句中。 如果在同一语句中使用ordinals和名称作为参数，则抛出SQLException<br />
+在某些情况下，可能无法仅为一个过程提供一些参数。 例如，如果过程名称过载，则数据源根据参数数量确定要调用的过程。 必须提供足够的参数以允许数据源解决任何歧义</p>
+<h4>IN Parameters</h4>
+<p>IN参数是使用Setter方法分配的值，如第100页“设置参数”中所述。在代码示例13-22中，设置字符串参数和日期参数</p>
+<blockquote>
+<p>cstmt.setString(1, “October”);<br />
+cstmt.setDate(2, date);</p>
+</blockquote>
+<h4>OUT Parameters</h4>
+<p>在执行CallableStatement对象之前，必须调用registerOutParameter方法来设置每个OUT参数的类型。 当存储过程从执行返回时，它将使用这些类型来设置任何OUT参数的值</p>
+<p>可以使用CallableStatement接口中定义的适当的getter方法检索OUT参数的值。 代码示例13-23显示了具有两个OUT参数，一个字符串和浮点数以及OUT参数值检索的存储过程的执行</p>
+<blockquote>
+<p>CallableStatement cstmt = conn.prepareCall(<br />
+“{CALL GET_NAME_AND_NUMBER(?, ?)}");<br />
+cstmt.registerOutParameter(1, java.sql.Types.STRING);<br />
+cstmt.registerOutParameter(2, java.sql.Types.FLOAT);<br />
+cstmt.execute();<br />
+// Retrieve OUT parameters<br />
+String name = cstmt.getString(1);<br />
+float number = cstmt.getFloat(2);</p>
+</blockquote>
+<h5>INOUT Parameters</h5>
+<p>输入参数和输出参数的参数都必须使用适当的setter方法进行设置，也可以通过调用registerOutParameter方法进行注册。 setter方法隐含的类型（见附录B“数据类型转换表”中的表B-1）和提供给方法registerOutParameter的类型必须相同</p>
+<p>代码示例13-24显示了存储过程calc，它需要一个INPUT float参数</p>
+<blockquote>
+<p>CallableStatement cstmt = conn.prepareCall(“{CALL CALC(?)}”);<br />
+cstmt.setFloat(1, 1237.98f);<br />
+ctsmt.registerOutParameter(1, java.sql.Types.FLOAT);<br />
+cstmt.execute();<br />
+float f = cstmt.getFloat(1);</p>
+</blockquote>
+<h4>清除参数</h4>
+<p>通过调用clearParameters方法，可以明确地清除为CallableStatement对象IN参数标记或OUT参数标记注册的值。 CallableStatement对象用于表示集合或注册值的任何资源也将被释放。</p>
+<h3>执行 CallableStatement 对象</h3>
+<p>与Statement和PreparedStatement对象一样，用于执行CallableStatement对象的方法取决于是否返回单个ResultSet对象，更新计数或多个混合结果</p>
+<h3>返回 一个单例的 ResultSet 对象</h3>
+<p>代码示例13-25显示了一个CallableStatement对象的执行，该对象需要一个输入参数并返回单个ResultSet对象</p>
+<blockquote>
+<p>CallableStatement cstmt = conn.prepareCall(“{CALL GETINFO(?)}”);<br />
+cstmt.setLong(1, 1309944422);<br />
+ResultSet rs = cstmt.executeQuery();<br />
+// process the results<br />
+while (rs.next()) {<br />
+...<br />
+}<br />
+rs.close();<br />
+cstmt.close();</p>
+</blockquote>
+<p>如果存储过程不返回ResultSet对象，那么executeQuery将抛出SQLException。</p>
+<h4>返回一个 更新行数</h4>
+<p>代码示例13-26显示了返回更新计数的CallableStatement对象的执行</p>
+<blockquote>
+<p>CallableStatement cstmt = conn.prepareCall(“{call GETCOUNT(?)}”);<br />
+cstmt.setString(1, “Smith”);<br />
+int count = cstmt.executeUpdate();<br />
+cstmt.close();</p>
+</blockquote>
+<p>如果存储过程返回一个ResultSet，那么executeUpdate方法会抛出一个SQLException</p>
+<h4>返回未知或多个结果</h4>
+<p>如果有多个结果，或者如果CallableStatement对象返回的结果的类型或数量在运行时才不知道，那么CallableStatement对象应该使用方法execute执行。 方法getMoreResults，getUpdateCount和getResultSet可用于检索所有结果</p>
+<p>代码示例13-27显示了如何从CallableStatment对象检索所有结果</p>
+<blockquote>
+<p>CallableStatement cstmt = conn.prepareCall(procCall);<br />
+boolean retval = cstmt.execute();<br />
+ResultSet rs;<br />
+int count;<br />
+do {<br />
+if (retval == false) {<br />
+count = cstmt.getUpdateCount();<br />
+if (count == -1) {<br />
+// no more results<br />
+break;<br />
+} else {<br />
+// process update count<br />
+}<br />
+} else { // ResultSet<br />
+rs = cstmt.getResultSet();<br />
+// process ResultSet<br />
+}<br />
+retval = cstmt.getMoreResults();<br />
+while (true);</p>
+</blockquote>
+<h3>REF光游标支持</h3>
+<p>REF CURSOR数据类型由几个数据库支持。 要从存储过程返回REF CURSOR，可以使用CallableStatement方法registerOutParameter指定Types.REF_CURSOR作为要返回的数据类型。 CallableStatement方法getObject将指定ResultSet作为将返回的对象转换为的类型，将被调用来检索表示REF CURSOR的ResultSet。 返回的结果集是前向，只读结果</p>
+<p>如果调用registerOutParameter指定Types.REF CURSOR，并且JDBC驱动程序不支持此数据类型，则会抛出SQLFeatureNotSupportedException</p>
+<blockquote>
+<p>CallableStatement cstmt = conn.prepareCall(" { call mySproc(?) }");<br />
+cstmt.registerOutParameter(1, Types.REF_CURSOR);<br />
+cstmt.executeQuery();<br />
+ResultSet rs = cstmt.getObject(1, ResultSet.class);<br />
+while (rs.next ()) {<br />
+System.out.println("Name="+ rs.getString(1));<br />
+}</p>
+</blockquote>
+<h2>转义语法</h2>
+<p>Statement对象中使用的SQL字符串可能包含JDBC转义语法。 Escape语法允许驱动程序更容易地扫描需要特殊处理的语法。 在驱动层实现这一特殊处理可以提高应用的可移植性。</p>
+<p>可能需要以下特殊转义处理</p>
+<ul>
+<li>通常使用的功能不具有由SQL定义的标准语法，或者底层数据源支持的本机语法在供应商之间差异很大。 在这种情况下，驱动程序可以将转义语法转换为特定的本地语法。</li>
+<li>基础数据源不支持但由驱动程序实现的功能</li>
+</ul>
+<p>使用方法setEscapeProcessing打开或关闭Statement对象的转义处理，默认为on。 RowSet接口还包括一个setEscapeProcessing方法。 RowSet方法适用于用于填充RowSet对象的SQL字符串。 setEscapeProcessing方法对于PreparedStatement对象不起作用，因为在创建PreparedStatement对象时，它的SQL字符串可能已被预编译</p>
+<p>JDBC定义了以下的转义语法：</p>
+<ul>
+<li>scalar functions</li>
+<li>date and time literals</li>
+<li>outer joins</li>
+<li>calling stored procedures and functions</li>
+<li>escape characters for LIKE clauses</li>
+</ul>
+<h3>Scalar 函数</h3>
+<p>几乎所有底层数据源都支持标量值上的数字，字符串，时间，日期，系统和转换函数。 访问标量函数的转义语法是：<br />
+{fn <function-name> (argument list)}</p>
+<p>例如，以下代码调用带有两个参数的函数concat来连接：<br />
+{fn concat("Hot", "Java")}</p>
+<p>以下语法将获取当前数据库用户的名称：<br />
+{fn user()}</p>
+<p>Scalar函数可能由具有稍微不同的本机语法的不同数据源支持，并且所有驱动程序可能不支持Scalar函数。 驱动程序将映射转义的函数调用到本机语法或直接实现函数</p>
+<p>各种DatabaseMetaData方法列出了支持的功能。 例如，getNumericFunctions方法返回一个逗号分隔的Open Group CLI名称的数字函数列表，方法getStringFunctions返回字符串函数等等</p>
+<p>附录C“标量函数”提供了驱动程序希望支持的标量函数的列表。只有在数据源支持时才需要驱动程序来实现这些函数，但是</p>
+<p>标量函数的转义语法只能用于调用附录C“标量函数”中定义的标量函数。转义语法不用于调用用户定义或供应商特定的标量函数</p>
+<h3>日期和时间文字</h3>
+<p>数据源在日期，时间和时间戳文字中使用的语法有很大不同。 JDBC API支持这些文字的语法的ISO标准格式，使用驱动程序转换为本机语法的转义子句<br />
+日期文字的转义语法是：<br />
+{d 'yyyy-mm-dd'}</p>
+<p>驱动程序将用等效的本地表示法替换escape子句。 例如，如果这是底层数据源的适当格式，驱动程序可能会用'28 -FEB-99'替换{d'1999-02-28'}</p>
+<p>TIME和TIMESTAMP文字的转义语法是：<br />
+{t 'hh:mm:ss'}<br />
+{ts 'yyyy-mm-dd hh:mm:ss.f . . .'}</p>
+<p>备注：当指定日期或时间戳文字中的mm或dd时，前导零可能会被省略</p>
+<h3>Outer Joins</h3>
+<p>外部连接是高级功能，并且不受所有数据源的支持。 有关外部联接的说明，请参阅相关的SQL文档<br />
+外连接的转义语法是：<br />
+{oj <outer-join>}<br />
+where <outer-join> has the form:<br />
+table {LEFT|RIGHT|FULL} OUTER JOIN {table | <outer-join>} ON search-condition</p>
+<p>（注意，前一行中的花括号（{}）表示必须使用它们之间的项之一;它们不是语法的一部分。）以下SELECT语句使用外连接的转义语法。</p>
+<blockquote>
+<p>Statement stmt = con.createStatement();<br />
+stmt.executeQuery("SELECT * FROM {oj TABLE1 " +<br />
+"LEFT OUTER JOIN TABLE2 ON DEPT_NO = 003420930}");</p>
+</blockquote>
+<p>JDBC API提供了三个DatabaseMetaData方法来确定驱动程序支持的外部连接的种类：supportsOuterJoins，supportsFullOuterJoins和supportsLimitedOuterJoins</p>
+<h3>存储过程和功能</h3>
+<p>如果数据库支持存储过程，则可以使用JDBC转义语法调用它们，如下所示：<br />
+{call <procedure_name> [(<argument-list>)]}<br />
+or, where a procedure returns a result parameter:<br />
+{? = call <procedure_name> [(<argument-list>)]}</p>
+<p>方括号表示（参数列表）部分是可选的。 输入参数可以是文字或参数标记。 有关参数的信息，请参见第108页上的“设置参数”</p>
+<p>如果数据库支持存储过程，则DatabaseMetaData.supportsStoredProcedures方法返回true</p>
+<p>JDBC驱动程序可以选择性地为使用存储过程的转义语法调用用户定义或供应商定义的函数提供支持</p>
+<p>如果数据库支持使用存储过程的转义语法调用用户定义或供应商定义的函数，则DatabaseMetaData.supportsStoredFunctionsUsingCallSyntax方法返回true。 有关其他信息，请参阅JDBC驱动程序的文档</p>
+<h3>LIKE 转义字符</h3>
+<p>百分号（％）和下划线（<em>）字符是SQL LIKE子句中的通配符（％匹配零个或多个字符，</em>与一个字符匹配）。 为了从字面上解释它们，它们之前可以是一个反斜杠（\），它是字符串中的一个特殊的转义字符。 可以通过在LIKE谓词的末尾包含以下语法来指定要用作转义字符的字符：<br />
+{escape '<escape-character>'}</p>
+<p>例如，以下查询使用反斜杠作为转义字符，并查找以下划线开头的标识符名称。 请注意，Java编译器将无法将该反斜杠识别为字符，除非其前面是反斜杠</p>
+<blockquote>
+<p>stmt.executeQuery("SELECT name FROM Identifiers " +<br />
+"WHERE Id LIKE '\_%' {escape '\'}");</p>
+</blockquote>
+<h3>限制返回行转义</h3>
+<p>用于限制查询返回的行数的转义语法是：</p>
+<blockquote>
+<p>{limit <limit clause>}<br />
+where the format for the <limit clause> is:<br />
+rows [offset row_offset]</p>
+</blockquote>
+<p>方括号表示“offset row_offset”部分是可选的。 为行指定的值表示从此查询返回的最大行数。 row_offset表示在开始返回行之前从查询返回的行中跳过的行数。 对于row_offset，值为0表示不跳过任何行。 rows和row_offset的值必须为0或更大的整数值</p>
+<blockquote>
+<p>The following query will return no more than 20 rows:<br />
+Statement stmt = con.createStatement();<br />
+stmt.executeQuery("SELECT * FROM TABLE1 " +<br />
+"WHERE F1 >100 {limit 20}");</p>
+</blockquote>
+<h2>性能提示</h2>
+<p>Statement接口有两种方法可用于向JDBC驱动程序提供提示：setFetchDirection和setFetchSize。 提供给这些方法的值应用于由语句生成的每个结果集。 可以使用ResultSet接口中相同名称的方法为该结果集提供提示。</p>
+<p>如果驱动程序不适合，则通过此接口提供给驱动程序的提示可能会被驱动程序忽略</p>
+<p>getFetchDirection和getFetchSize方法返回提示的当前值。 如果在调用相应的setter方法之前调用这些方法中的任一种，则返回的值是实现定义的</p>
+<h2>检索自动生成的值</h2>
+<p>许多数据库系统具有在插入行时自动生成值的机制。 根据执行的SQL，表定义和数据源的配置，生成的值可能是也可能不是唯一的或表示键值。 可以调用以获取生成的值的Statement.getGeneratedKeys方法返回一个具有每个自动生成值的列的ResultSet对象。 方法执行，executeUpdate或Connection.prepareStatement接受可选参数，可用于指示在执行或准备语句时应返回任何自动生成的值</p>
+<blockquote>
+<p>Statement stmt = conn.createStatement();// indicate that the key generated is going to be returned<br />
+int rows = stmt.executeUpdate("INSERT INTO ORDERS " +<br />
+"(ISBN, CUSTOMERID) " +<br />
+"VALUES (195123018, ’BILLG’)",<br />
+Statement.RETURN_GENERATED_KEYS);<br />
+ResultSet rs = stmt.getGeneratedKeys();<br />
+boolean b = rs.next();<br />
+if (b == true) {<br />
+// retrieve the new key value<br />
+...<br />
+}</p>
+</blockquote>
+<p>其他方法允许将应返回的列的序数或名称指定为数组。 如果未指定列，则JDBC驱动程序实现将确定要返回的列或值</p>
+<p>在代码示例13-31中，使用两个参数调用Statement方法executeUpdate，第一个是要执行的SQL语句，第二个是String数组，该数组包含调用getGeneratedKeys时应返回的列名称</p>
+<blockquote>
+<p>String keyColumn[] = {"ORDER_ID"};<br />
+...<br />
+Statement stmt = conn.createStatement();<br />
+int rows = stmt.executeUpdate("INSERT INTO ORDERS " +<br />
+"(ISBN, CUSTOMERID) " +<br />
+"VALUES (966431502, ’BILLG’)",<br />
+keyColumn);<br />
+ResultSet rs = stmt.getGeneratedKeys();</p>
+</blockquote>
+<p>在auto-commit为true时调用getGeneratedKeys方法的结果是实现定义的。 为了在检索自动生成的值时增加应用程序可移植性，Connection auto-commit属性应设置为false</p>
+<p>关于getGeneratedKeys是否将在调用executeBatch方法后返回生成的值是实现定义的</p>
+<p>有关详细信息，请参阅API规范</p>
+<p>在getGeneratedKeys返回的ResultSet对象上调用ResultSet.getMetaData将生成一个ResultSetMetaData对象，该对象可用于确定生成值的数量，类型和属性</p>
+<p>在某些情况下，例如在insert select语句中，可能会返回多个值。 getGeneratedKeys返回的ResultSet对象将包含一条语句生成的每个值。 如果未生成任何值，则返回空结果集</p>
+<p>getGeneratedKeys返回的ResultSet对象的并发性必须是CONCUR_READ_ONLY。 ResultSet对象的类型必须是TYPE_FORWARD_ONLY或TYPE_SCROLL_INSENSITIVE</p>
+<p>如果JDBC驱动程序和底层数据源支持检索自动生成的值，则DatabaseMetaData.supportsGetGeneratedKeys的方法返回true。 如果通过对supportsGetGeneratedKeys的调用返回true值，则JDBC驱动程序必须支持为SQL INSERT语句返回自动生成的值。 一些JDBC驱动程序实现也可能支持使用除INSERT之外的SQL语句的自动生成的值。 有关详细信息，请参阅JDBC驱动程序文档</p>

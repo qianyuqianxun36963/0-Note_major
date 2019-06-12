@@ -1,0 +1,258 @@
+<h1>ResultMap详解</h1>
+<h2><strong>前言</strong></h2>
+<p>MyBatis是基于“数据库结构不可控”的思想建立的，也就是我们希望数据库遵循第三范式或BCNF，但实际事与愿违，那么结果集映射就是MyBatis为我们提供这种理想与现实间转换的手段了，而resultMap就是结果集映射的配置标签了。 <br />
+在深入ResultMap标签前，我们需要了解从SQL查询结果集到JavaBean或POJO实体的过程。</p>
+<p><strong>从SQL查询结果到领域模型实体</strong>　</p>
+<ol>
+<li>通过JDBC查询得到ResultSet对象</li>
+<li>遍历ResultSet对象并将每行数据暂存到HashMap实例中，以结果集的字段名或字段别名为键，以字段值为值</li>
+<li>根据ResultMap标签的type属性通过反射实例化领域模型</li>
+<li>根据ResultMap标签的type属性和id、result等标签信息将HashMap中的键值对，填充到领域模型实例中并返回</li>
+</ol>
+<p><span style="font-size:14px"><strong>  [ JDBC获取ResultSet ]  ==>  [ 遍历ResultMap放到HashMap中 ]  ==>  [ 通过标签type反实例化领域模型 ]  ==>  [ 填充HashMap到领域模型 ]</strong></span></p>
+<h2><strong>1、属性说明</strong></h2>
+<ul>
+<li>id属性 ，resultMap标签的标识。</li>
+<li>type属性 ，返回值的全限定类名，或类型别名。</li>
+<li>autoMapping属性 ，值范围true（默认值）|false, 设置是否启动自动映射功能，自动映射功能就是自动查找与字段名小写同名的属性名，并调用setter方法。而设置为false后，则需要在<code>resultMap</code>内明确注明映射关系才会调用对应的setter方法。</li>
+</ul>
+<h2><strong>2、基本作用：建立SQL查询结果字段与实体属性的映射关系</strong> </h2>
+<p>示例1：通过setter构造领域模型</p>
+<pre>
+<code>public class EStudent{
+private long id;
+private String name;
+private int age;
+// getter,setter方法
+/**
+* 必须提供一个无参数的构造函数
+*/
+public EStudent(){}
+}</code></pre>
+<pre>
+<code><select id="getStudent" resultMap="getStudentRM">
+SELECT ID, Name, Age
+FROM TStudent
+</select>
+<resultMap id="getStudentRM" type="EStudnet">
+<id property="id" column="ID"/>
+<result property="studentName" column="Name"/>
+<result property="studentAge" column="Age"/>
+</resultMap></code></pre>
+<p>子元素说明：</p>
+<ul>
+<li>id元素 ，用于设置主键字段与领域模型属性的映射关系</li>
+<li>result元素 ，用于设置普通字段与领域模型属性的映射关系</li>
+</ul>
+<p>id、result语句属性配置细节：</p>
+<table>
+<thead>
+<tr>
+<th>属性</th>
+<th>描述</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>property</td>
+<td>需要映射到JavaBean 的属性名称。</td>
+</tr>
+<tr>
+<td>column</td>
+<td>数据表的列名或者标签别名。</td>
+</tr>
+<tr>
+<td>javaType</td>
+<td>一个完整的类名，或者是一个类型别名。如果你匹配的是一个JavaBean，那MyBatis 通常会自行检测到。然后，如果你是要映射到一个HashMap，那你需要指定javaType 要达到的目的。</td>
+</tr>
+<tr>
+<td>jdbcType</td>
+<td>数据表支持的类型列表。这个属性只在insert,update 或delete 的时候针对允许空的列有用。JDBC 需要这项，但MyBatis 不需要。如果你是直接针对JDBC 编码，且有允许空的列，而你要指定这项。</td>
+</tr>
+<tr>
+<td>typeHandler</td>
+<td>使用这个属性可以覆写类型处理器。这项值可以是一个完整的类名，也可以是一个类型别名。</td>
+</tr>
+</tbody>
+</table>
+<p>示例2：通过构造函数构造领域模型</p>
+<pre>
+<code><select id="getStudent" resultMap="getStudentRM">
+SELECT ID, Name, Age
+FROM TStudent
+</select>
+<resultMap id="getStudentRM" type="EStudnet">
+<constructor>
+<idArg column="ID" javaType="_long"/>
+<arg column="Name" javaType="String"/>
+<arg column="Age" javaType="_int"/>
+</constructor>
+</resultMap></code></pre>
+<p>子元素说明：</p>
+<ul>
+<li>constructor元素 ，指定使用指定参数列表的构造函数来实例化领域模型。注意：其子元素顺序必须与参数列表顺序对应</li>
+<li>idArg子元素 ，标记该入参为主键</li>
+<li>arg子元素 ，标记该入参为普通字段(主键使用该子元素设置也是可以的)</li>
+</ul>
+<h2><strong>3、一对一关系、一对多关系查询</strong></h2>
+<pre>
+<code> 注意：在采用嵌套结果的方式查询一对一、一对多关系时，必须要通过resultMap下的id或result标签来显式设置属性/字段映射关系，否则在查询多条记录时会仅仅返回最后一条记录的情况。
+</code></pre>
+<h3><strong>association联合</strong></h3>
+<h4><strong>联合元素用来处理“一对一”的关系。</strong></h4>
+<p>需要指定映射的Java实体类的属性，<strong>属性的javaType</strong>（通常MyBatis 自己会识别）。对应的数据库表的列名称。如果想覆写的话返回结果的值，需要指定typeHandler。 <br />
+不同情况需要告诉MyBatis 如何加载一个联合。MyBatis 可以用两种方式加载：</p>
+<ul>
+<li>select: 执行一个其它映射的SQL 语句返回一个Java实体类型。较灵活；</li>
+<li>resultsMap: 使用一个嵌套的结果映射来处理通过join查询结果集，映射成Java实体类型。</li>
+</ul>
+<p>例如，一个班级对应一个班主任。 <br />
+首先定义好班级中的班主任 <code>private TeacherEntity teacherEntity;</code></p>
+<h4><strong>使用select实现联合</strong></h4>
+<p>例：班级实体类中有班主任的属性，通过联合在得到一个班级实体时，同时映射出班主任实体。 <br />
+这样可以直接复用在TeacherMapper.xml文件中定义好的查询teacher根据其ID的select语句。而且不需要修改写好的SQL语句，只需要直接修改resultMap即可。</p>
+<p>ClassMapper.xml文件部分内容：</p>
+<pre>
+<code><resultMap type="ClassEntity" id="classResultMap"> 
+<id property="classID" column="CLASS_ID" /> 
+<result property="className" column="CLASS_NAME" /> 
+<result property="classYear" column="CLASS_YEAR" /> 
+<association property="teacherEntity" column="TEACHER_ID" select="getTeacher"/> 
+</resultMap> 
+<select id="getClassByID" parameterType="String" resultMap="classResultMap"> 
+SELECT * FROM CLASS_TBL CT 
+WHERE CT.CLASS_ID = #{classID}; 
+</select> </code></pre>
+<p>TeacherMapper.xml文件部分内容：</p>
+<pre>
+<code><resultMap type="TeacherEntity" id="teacherResultMap"> 
+<id property="teacherID" column="TEACHER_ID" /> 
+<result property="teacherName" column="TEACHER_NAME" /> 
+<result property="teacherSex" column="TEACHER_SEX" /> 
+<result property="teacherBirthday" column="TEACHER_BIRTHDAY"/> 
+<result property="workDate" column="WORK_DATE"/> 
+<result property="professional" column="PROFESSIONAL"/> 
+</resultMap> 
+<select id="getTeacher" parameterType="String" resultMap="teacherResultMap"> 
+SELECT * 
+FROM TEACHER_TBL TT 
+WHERE TT.TEACHER_ID = #{teacherID} 
+</select> </code></pre>
+<h4><strong>使用resultMap实现联合</strong></h4>
+<p>与上面同样的功能，查询班级，同时查询器班主任。需在association中添加resultMap（在teacher的xml文件中定义好的），新写sql（查询班级表left join教师表），不需要teacher的select。</p>
+<p>修改ClassMapper.xml文件部分内容：</p>
+<pre>
+<code><resultMap type="ClassEntity" id="classResultMap"> 
+<id property="classID" column="CLASS_ID" /> 
+<result property="className" column="CLASS_NAME" /> 
+<result property="classYear" column="CLASS_YEAR" /> 
+<association property="teacherEntity" column="TEACHER_ID" resultMap="teacherResultMap"/> 
+</resultMap> 
+<select id="getClassAndTeacher" parameterType="String" resultMap="classResultMap"> 
+SELECT * 
+FROM CLASS_TBL CT LEFT JOIN TEACHER_TBL TT ON CT.TEACHER_ID = TT.TEACHER_ID 
+WHERE CT.CLASS_ID = #{classID}; 
+</select> </code></pre>
+<p>其中的teacherResultMap请见上面TeacherMapper.xml文件部分内容中。</p>
+<h3><strong>collection聚集</strong></h3>
+<h4><strong>聚集元素用来处理“一对多”的关系。</strong></h4>
+<p>需要指定映射的Java实体类的属性，属性的javaType（一般为ArrayList）；<strong>列表中对象的类型ofType（Java实体类）</strong>；对应的数据库表的列名称； <br />
+不同情况需要告诉MyBatis 如何加载一个聚集。MyBatis 可以用两种方式加载： <br />
+1. select: 执行一个其它映射的SQL 语句返回一个Java实体类型。较灵活； <br />
+2. resultsMap: 使用一个嵌套的结果映射来处理通过join查询结果集，映射成Java实体类型。</p>
+<p>例如，一个班级有多个学生。 <br />
+首先定义班级中的学生列表属性：<code>private List<StudentEntity> studentList;</code></p>
+<h4><strong>使用select实现聚集</strong></h4>
+<p>用法和联合很类似，区别在于，这是一对多，所以一般映射过来的都是列表。所以这里需要定义javaType为ArrayList，还需要定义列表中对象的类型ofType，以及必须设置的select的语句名称（需要注意的是，这里的查询student的select语句条件必须是外键classID）。</p>
+<p>ClassMapper.xml文件部分内容：</p>
+<pre>
+<code><resultMap type="ClassEntity" id="classResultMap"> 
+<id property="classID" column="CLASS_ID" /> 
+<result property="className" column="CLASS_NAME" /> 
+<result property="classYear" column="CLASS_YEAR" /> 
+<association property="teacherEntity" column="TEACHER_ID" select="getTeacher"/> 
+<collection property="studentList" column="CLASS_ID" javaType="ArrayList" ofType="StudentEntity" select="getStudentByClassID"/> 
+</resultMap> 
+<select id="getClassByID" parameterType="String" resultMap="classResultMap"> 
+SELECT * FROM CLASS_TBL CT 
+WHERE CT.CLASS_ID = #{classID}; 
+</select> </code></pre>
+<p>StudentMapper.xml文件部分内容：</p>
+<pre>
+<code><!-- java属性，数据库表字段之间的映射定义 --> 
+<resultMap type="StudentEntity" id="studentResultMap"> 
+<id property="studentID" column="STUDENT_ID" /> 
+<result property="studentName" column="STUDENT_NAME" /> 
+<result property="studentSex" column="STUDENT_SEX" /> 
+<result property="studentBirthday" column="STUDENT_BIRTHDAY" /> 
+</resultMap> 
+<!-- 查询学生list，根据班级id --> 
+<select id="getStudentByClassID" parameterType="String" resultMap="studentResultMap"> 
+<include refid="selectStudentAll" /> 
+WHERE ST.CLASS_ID = #{classID} 
+</select> </code></pre>
+<h4><strong>使用resultMap实现聚集</strong></h4>
+<p>使用resultMap，就需要重写一个sql，left join学生表。</p>
+<pre>
+<code><resultMap type="ClassEntity" id="classResultMap"> 
+<id property="classID" column="CLASS_ID" /> 
+<result property="className" column="CLASS_NAME" /> 
+<result property="classYear" column="CLASS_YEAR" /> 
+<association property="teacherEntity" column="TEACHER_ID" resultMap="teacherResultMap"/> 
+<collection property="studentList" column="CLASS_ID" javaType="ArrayList" ofType="StudentEntity" resultMap="studentResultMap"/> 
+</resultMap> 
+<select id="getClassAndTeacherStudent" parameterType="String" resultMap="classResultMap"> 
+SELECT * 
+FROM CLASS_TBL CT 
+LEFT JOIN STUDENT_TBL ST 
+ON CT.CLASS_ID = ST.CLASS_ID 
+LEFT JOIN TEACHER_TBL TT 
+ON CT.TEACHER_ID = TT.TEACHER_ID 
+WHERE CT.CLASS_ID = #{classID}; 
+</select> </code></pre>
+<p>其中的teacherResultMap请见上面TeacherMapper.xml文件部分内容中。studentResultMap请见上面StudentMapper.xml文件部分内容中。</p>
+<h2><strong>4. 动态映射关系</strong></h2>
+<p>通过 discriminator子元素 （鉴别器）可以实现动态映射关系信息的设置。具体示例如下：</p>
+<pre>
+<code>public class EStudent{
+private long id;
+private String name;
+private String juniorHighSchool;
+private String seniorHighSchool;
+private int during; // 在本校就读时间
+// getter,setter方法
+/**
+* 必须提供一个无参数的构造函数
+*/
+public EStudent(){}
+}</code></pre>
+<p>情景：查询学生信息的seniorHighSchool信息，若就读时间during字段值为4、5、6时，则以juniorHighSchool字段作所为seniorHighSchool信息。</p>
+<pre>
+<code><select id="getStundent" resultMap="rm">
+SELECT ID, Name, JuniorHighSchool, SeniorHighSchool, during
+FROM TStudent
+</select>
+<resultMap id="rm" type="EStudent">
+// 若不加这句，则当将juniorHighSchool赋予给seniorHighSchool属性时，juniorHighSchool属性将为null
+<result column="juniorHighSchool" property="juniorHighSchool"/>
+<discriminator column="during" javaType="_int">
+// 形式1：通过resultType设置动态映射信息
+<case value="4" resultType="EStudent">
+<result column="juniorHighSchool" property="seniorHighSchool"/>
+</case>
+// 形式2: 通过resultMap设置动态映射信息
+<case value="5" resultMap="dynamicRM"/>
+<case value="6" resultMap="dynamicRM"/>
+</discriminator>
+</resultMap>
+<resultMap id="dynamicRM" type="EStudent">
+<result column="juniorHighSchool" property="seniorHighSchool"/>
+</resultMap></code></pre>
+<p>注意：上面关于 discriminator子元素 的 case元素 的 resultType属性 和 resultMap元素 的 type属性 ，均不是直指返回的领域模型类型，而是指定根据判断条件后得到映射关系，可通过 id子元素 和 result子元素 重写映射关系。</p>
+<h2><strong>5. id元素,result元素,idArg元素,arg元素,discriminator元素的共同属性</strong></h2>
+<ul>
+<li>javaType属性 ：Java类的全限定名，或别名</li>
+<li>jdbcType属性 ：JDBC类型, JDBC类型为CUD操作时列可能为空时进行处理</li>
+<li>typeHandler属性 ：指定类型处理器的全限定类名或类型别名</li>
+<li>column属性 ：指定SQL查询结果的字段名或字段别名。将用于JDBC的 resultSet.getString(columnName)</li>
+</ul>

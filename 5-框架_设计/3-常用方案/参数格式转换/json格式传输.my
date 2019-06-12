@@ -1,0 +1,169 @@
+<h1>java对象和json的相互转换 --（1） 使用@JsonSerialize对javabean进行json格式化</h1>
+
+<p>以json格式输出数据是常用的方式，这次记录下项目中使用的json格式化方法，</p>
+
+<p>使用的jar包为com.fasterxml.jackson.core:jackson-databind,对应的maven依赖为  </p>
+
+<pre>
+<dependencies>
+<dependency>
+<groupId>com.fasterxml.jackson.core</groupId>
+<artifactId>jackson-databind</artifactId>
+<version>2.6.2</version>
+</dependency>
+</dependencies></pre>
+
+<h2>1 首先定义一个Student类</h2>
+
+<p>public class Student { <br />
+  private String name; <br />
+  private int age; <br />
+  private int number; <br />
+ <br />
+  public String getName() { <br />
+    return name; <br />
+  } <br />
+ <br />
+  public int getAge() { <br />
+    return age; <br />
+  } <br />
+ <br />
+  public int getNumber() { <br />
+    return number; <br />
+  } <br />
+ <br />
+  public Student(String name, int age, int number) { <br />
+ <br />
+    this.name = name; <br />
+    this.age = age; <br />
+    this.number = number; <br />
+  } <br />
+}</p>
+
+<h2>2 定义一个要格式化的类 StudentsReport</h2>
+
+<p>使用@JsonSerialize进行格式化，对应的格式化类为 StudentsReportSerializer</p>
+
+<p>import com.fasterxml.jackson.databind.annotation.JsonSerialize; <br />
+import java.util.List; <br />
+import static com.google.common.collect.Lists.newArrayList; <br />
+ <br />
+@JsonSerialize(using = StudentsReportSerializer.class) <br />
+public class StudentsReport { <br />
+  List<String> names = newArrayList(); <br />
+  List<Student> studentList = newArrayList(); <br />
+ <br />
+  public List<String> getNames() { <br />
+    return names; <br />
+  } <br />
+ <br />
+  public List<Student> getStudentList() { <br />
+    return studentList; <br />
+  } <br />
+ <br />
+  public StudentsReport(List<String> names, List<Student> studentList) { <br />
+ <br />
+    this.names = names; <br />
+    this.studentList = studentList; <br />
+  } <br />
+}</p>
+
+<h2>3  对应的格式化的类为</h2>
+
+<p>import com.fasterxml.jackson.core.JsonGenerator; <br />
+import com.fasterxml.jackson.core.JsonProcessingException; <br />
+import com.fasterxml.jackson.databind.JsonSerializer; <br />
+import com.fasterxml.jackson.databind.SerializerProvider; <br />
+ <br />
+import java.io.IOException; <br />
+ <br />
+public class StudentsReportSerializer extends JsonSerializer <StudentsReport>{ <br />
+@Override <br />
+  public void serialize(StudentsReport studentsReport, JsonGenerator jgen, SerializerProvider serializerProvider) throws IOException, JsonProcessingException { <br />
+    jgen.writeStartObject(); //start write :"{"<br />
+ <br />
+    jgen.writeFieldName("studentsName"); <br />
+    jgen.writeStartArray();// write "["<br />
+    for (String name:studentsReport.getNames() <br />
+       ) { <br />
+      jgen.writeObject(name); <br />
+    } <br />
+    jgen.writeEndArray(); <br />
+ <br />
+ <br />
+    jgen.writeFieldName("studentsData"); <br />
+    jgen.writeStartArray(); <br />
+    for (Student student : studentsReport.getStudentList()){ <br />
+      jgen.writeStartObject(); <br />
+ <br />
+      jgen.writeStringField("name",student.getName()); <br />
+      jgen.writeNumberField("age",16); <br />
+      jgen.writeNumberField("number",1); <br />
+ <br />
+      jgen.writeEndObject(); <br />
+    } <br />
+    jgen.writeEndArray(); <br />
+ <br />
+    jgen.writeEndObject(); //end :"}"<br />
+  } <br />
+ <br />
+}</p>
+
+<h2>4 进行测试</h2>
+
+<p>import com.fasterxml.jackson.core.JsonProcessingException; <br />
+import com.fasterxml.jackson.databind.ObjectMapper; <br />
+ <br />
+import java.util.List; <br />
+ <br />
+import static com.google.common.collect.Lists.newArrayList; <br />
+ <br />
+public class TestJson { <br />
+  public static void main(String[] args) throws JsonProcessingException { <br />
+    Student student1 = new Student("Tom",16,1); <br />
+    Student student2 = new Student("Jerry",17,2); <br />
+    List<Student> studentList = newArrayList(); <br />
+    studentList.add(student1); <br />
+    studentList.add(student2); <br />
+ <br />
+    List<String> studentsName = newArrayList(student1.getName(),student2.getName()); <br />
+  <br />
+    StudentsReport report = new StudentsReport(studentsName,studentList); <br />
+ <br />
+    ObjectMapper mapper = new ObjectMapper(); <br />
+ <br />
+    String jsonReport = mapper.writeValueAsString(report); <br />
+ <br />
+    System.out.println(jsonReport); <br />
+ <br />
+  } <br />
+}</p>
+
+<p>输出结果为  {"studentsName":["Tom","Jerry"],"studentsData":[{"name":"Tom","age":16,"number":1},{"name":"Jerry","age":16,"number":1}]}</p>
+
+<p>即 ：{<br />
+  "studentsName":[<br />
+    "Tom",<br />
+    "Jerry"<br />
+  ],<br />
+  "studentsData":[<br />
+    {<br />
+      "name":"Tom",<br />
+      "age":16,<br />
+      "number":1<br />
+    },<br />
+    {<br />
+      "name":"Jerry",<br />
+      "age":16,<br />
+      "number":1<br />
+    }<br />
+  ]<br />
+}</p>
+
+<p>ps：使用的newArrayList()是使用了com.google.guava这个包，对应的maven依赖为</p>
+
+<p>  <dependency><br />
+   <groupId>com.google.guava</groupId><br />
+   <artifactId>guava</artifactId><br />
+   <version>12.0.1</version><br />
+  </dependency></p>

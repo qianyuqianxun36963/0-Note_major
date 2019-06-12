@@ -1,0 +1,174 @@
+<h1>规约</h1>
+<h2>术语</h2>
+<ul>
+<li>JDBC driver implementation<br />
+JDBC技术驱动的驱动程序及其底层数据源。驱动程序可以为基础数据源未实现的特性提供支持。它还可以提供标准语法/语义和由数据源实现的本机API之间的映射</li>
+<li>Relevant specifications<br />
+本文档，API规范，以及相关的SQL规范。如果在以上文档中描述了一个特性，那么这也是优先顺序。对JDBC API，它是SQL92加SQL相关的部分：2003，X／Open SQL CLI</li>
+<li>Supported feature<br />
+JDBC实现支持相关规范中定义的该特性的标准语法和语义的特性。</li>
+<li>Extension<br />
+没有任何相关规范所涵盖的特性或覆盖的特性的非标准实现。</li>
+<li>Fully implemented<br />
+用于实现所有方法以支持相关规范中定义的语义的接口的术语。没有一个方法可以抛出异常，因为它们没有实现</li>
+<li>Must implement<br />
+虽然接口上的某些方法被认为是可选的，但接口是必须实现的。方法不执行必须抛出一个sqlfeaturenotsupportedexception表明相应的功能不支持</li>
+</ul>
+<h2>指导规范和要求</h2>
+<p>以下的准则是 JDBC API 规范要求实现者遵守的基本准则</p>
+<ul>
+<li>JDBC API 的实现者必须支持 Entry Level SQL92 标准，以及 Drop Table 命令。对 Entry Level SQL92 标准的支持是实现 JDBC API 的最小要求，对于 SQL99 和 SQL2003 特性的实现，必须遵照 SQL99 和 SQL2003 的规范</li>
+<li>JDBC 驱动必须支持转义语法，转义语法在 第十三章 中有详细解释。</li>
+<li>JDBC 驱动必须支持事务，参考 第十章。</li>
+<li>如果 DatabaseMetaData 的某个方法指明某个特性的可用的，那么驱动必须根据这个特性的相关规范中规定的标准语法实现这个特性，如果该特性需要使用到数据源的原生 API 或者是 SQL 方言，那么由驱动负责实现从标准 SQL 语法到原生 API 或者 SQL 方言的映射关系。如果支持了某个特性，那么 DatabaseMetaData 中与这个特性相关的方法也必须提供实现。比如说，如果一个驱动实现了 RowSet 接口，那么它也应该实现 RowSetMetaData 接口。</li>
+<li>驱动必须提供对底层数据源特性的访问方式，包括扩展了 JDBC API 的特性。这么规定的目的是能让使用了 JDBC API 的应用程度能像数据源的原生程序一样，访问与数据源有关的特性。</li>
+<li>如果一个 JDBC 驱动不支持，或者部分支持某个可选的数据库特性，那么 DatabaseMetaData 的方法必须指明这个特性还没受到支持，任何还没实现或者还没支持的特性，如果应用程序使用到了，那么应该给应用程序抛一个 SQLFeatureNotSupportedException</li>
+</ul>
+<blockquote>
+<p>注意 —— 根据 SQL92 的规定， JDBC 驱动需要支持 DROP TABLE 命令，不过，是否实现 CASCADE 和 RESTRICT，则是可选的，不是必须的。此外， 当数据源里需要 drop 的表定义了视图、完整性约束时，如何实现 DROP TABLE 来处理这种情况，则每个驱动允许有不同的做法。</p>
+</blockquote>
+<h2>JDBC 4.2 API 要求驱动程序遵守的准则</h2>
+<p>符合JDBC规范的驱动程序必须执行以下操作：</p>
+<ul>
+<li>遵守前一章的指导规范和要求</li>
+<li>支持自动加载所有实现了 java.sql.Driver 的驱动类</li>
+<li>ResultSet 支持 TYPE_FORWARD_ONLY 类型</li>
+<li>ResultSet 支持 CONCUR_READ_ONLY 并发级别</li>
+<li>支持批量更新</li>
+<li>完全实现以下接口<br />
+1，java.sql.DatabaseMetaData,<br />
+2，java.sql.ParameterMetaData<br />
+3，java.sql.ResultSetMetaData,<br />
+4，java.sql.Wrapper</li>
+<li>必须实现 DataSource 接口，但以下方法是可选的<br />
+1，getParentLogger</li>
+<li>除了下列可选方法外，它必须实现 Driver 接口<br />
+1，getParentLogger</li>
+<li>必须实现 Connection 接口，但以下方法是可选的<br />
+1，createArrayOf<br />
+2，createBlob,<br />
+3，createClob<br />
+4，createNClob,<br />
+5，createSQLXML<br />
+6，createStruct,<br />
+7，getNetworkTimeout<br />
+8，getTypeMap,<br />
+9，setTypeMap<br />
+9，prepareStatement(String sql, Statement.RETURN_GENERATED_KEYS),<br />
+10，prepareStatement(String sql, int[] columnIndexes)<br />
+11，prepareStatement(String sql, String[] columnNames),<br />
+12，setSavePoint<br />
+13，rollback(java.sql.SavePoint savepoint),<br />
+14，releaseSavePoint<br />
+15，setNetworkTimeout</li>
+<li>必须实现 Statement 接口，但以下方法是可选的<br />
+1，cancel,<br />
+2，execute(String sql, Statement.RETURN_GENERATED_KEYS)<br />
+3，execute(String sql, int[] columnIndexes),<br />
+4，execute(String sql, String[] columnNames)<br />
+5，executeUpdate(String sql, Statement.RETURN_GENERATED_KEYS)<br />
+6，executeUpdate(String sql, int[] columnIndexes)<br />
+7，executeUpdate(String sql, String[] columnNames),<br />
+8，getGeneratedKeys<br />
+9，getMoreResults(Statement.KEEP_CURRENT_RESULT)，除非<br />
+10，DatabasemetaData.supportsMultipleOpenResults() 返回 true，否则是可选的。<br />
+11，getMoreResults(Statement.CLOSE_ALL_RESULTS) 除非,<br />
+12，DatabasemetaData.supportsMultipleOpenResults() 返回 true，否则是可选的。<br />
+setCursorName</li>
+<li>必须实现 PreparedStatement 接口，但以下方法是可选的<br />
+1，getMetaData,<br />
+2，setArray, setBlob, setClob, setNClob, setNCharacterStream, setNString, setRef, setRowId, 3，setSQLXML and setURL,<br />
+4，setNull(int parameterIndex,int sqlType, String typeName)<br />
+5，setUnicodeStream,<br />
+6，setAsciiStream, setBinaryStream, setCharacterStream,<br />
+setNCharacterStream</li>
+<li>如果 DatabaseMetaData.supportsStoredProcedures() 返回 true, 那么必须实现 CallableStatement 接口，但以下方法是可选的<br />
+1，所有的 setXXX, getXXX 方法，以及所有支持命名参数的 registerOutputParameter 方法,<br />
+2，getArray, getBlob, getClob, getNClob, getNCharacterStream, getNString, getRef, getRowId, 3，getSQLXML and getURL,<br />
+4，getBigDecimal(int parameterIndex,int scale)<br />
+5，getObject(int i, Class<T> type)<br />
+6，getObject(String colName, Class<T> type),<br />
+7，getObject(int parameterIndex, java.util.Map<java.lang.String,java.lang.Class<?>> map)<br />
+8，registerOutputParam(String parameterName,int sqlType, String typeName),<br />
+8，setNull(String parameterName,int sqlType, String typeName)<br />
+9，setAsciiStream, setBinaryStream, setCharacterStream, setNCharacterStream</li>
+<li>必须实现 RowSet 接口，但以下方法是可选的<br />
+1，所有的 updateXXX 方法,<br />
+2，absolute<br />
+3，afterLast<br />
+4，beforeFirst,<br />
+5，cancelRowUpdates,<br />
+6，deleteRowfirst,<br />
+7，getArray, getBlob, getClob, getNClob, getNCharacterStream, getNString, getRef, getRowId, 8，getSQLXML and getURL,<br />
+9，getBigDecimal(int i,int scale)<br />
+10，getBigDecimal(String colName,int scale),<br />
+11，getCursorName<br />
+12，getObject(int i, Class<T> type)<br />
+13，getObject(String colName, Class<T> type),<br />
+14，getObject(int i, Map<String,Class<?>> map)<br />
+15，getObject(String colName, Map<String,Class<?>> map)<br />
+16，getRow<br />
+17，getUnicodeStream<br />
+18，insertRow<br />
+19，isAfterLast<br />
+20，isBeforeFirst<br />
+21，isFirst<br />
+22，isLast<br />
+23，last<br />
+24，moveToCurrentRow<br />
+25，moveToInsertRow,<br />
+26，previous<br />
+27，refreshRow,<br />
+28，relative<br />
+29，rowDeleted<br />
+r30，owInserted,<br />
+31，rowUpdated<br />
+32，updateRow</li>
+<li>如果一个 JDBC 驱动支持 ResultSet 的 CONCUR_UPDATABLE 并发级别，那么必须实现以下方法<br />
+1，除了 updateArray, updateBlob, updateClob, updateNClob, updateNCharacterstream,,<br />
+updateNString, updateRef, updateRowId, updateSQLXML, updateURL, updateBlob,<br />
+updateClob, updateNClob, updateAsciiStream, updateBinaryStream, updateCharacterStream and updateNCharacterstream 之外的所有 updateXXX 方法。<br />
+2，cancelRowUpdates<br />
+3，deleteRow<br />
+4，rowDeleted<br />
+5，rowUpdated<br />
+6，updateRow</li>
+<li>如果一个JDBC驱动程序支持的type_scroll_sensitive或type_scroll_insensitive 的 ResultSet类型，下面的ResultSet接口方法必须实现<br />
+1，absolute<br />
+2，afterLast<br />
+3，beforeFirst<br />
+4，first<br />
+5，isAfterLast<br />
+6，isBeforeFirst<br />
+7，isFirst<br />
+8，isLast<br />
+9，last<br />
+10，previous<br />
+11，relative</li>
+<li>如果实现了可选接口，则接口上的所有方法也必须完全实现，有以下例外情况<br />
+1，java.sql.SQLInput 和 java.sql.SQLOutput 接口不要求实现 Array, Blob, Clob, NClob, NString, Ref, RowId, SQLXML and URL 这些数据类型</li>
+</ul>
+<h2>Java EE 中的 JDBC 规范准则</h2>
+<p>在 Java EE 环境中使用的 JDBC 驱动，除了必须遵守前文中提到所有规定外，还必须遵守以下规定：</p>
+<ul>
+<li>驱动必须支持存储过程，DatabaseMetaData 接口的 supportsStoredProcedures 方法必须返回 true，驱动也需要在调用 Statement, PreparedStatement, and CallableStatement 的方法时，支持转义语法，这些方法是：<br />
+1， executeUpdate<br />
+2， executeQuery<br />
+3， execute</li>
+</ul>
+<p>对于存储过程的支持，仅仅需要驱动在调用 Statement, PreparedStatement, and CallableStatement 接口的 execute 方法时，要么返回一个更新数量，要么返回一个单一的 ResultSet 对象。这是因为有些数据库不支持调用存储过程后返回多个 ResultSet 对象。</p>
+<p>同时也要支持所有的参数类型，包括 IN, OUT, INOUT</p>
+<ul>
+<li>驱动必须支持下面这些函数的转义语法<br />
+ABS<br />
+CONCAT<br />
+LCASE<br />
+LENGTH<br />
+LOCATE (two argument version only)<br />
+LTRIM<br />
+MOD<br />
+RTRIM<br />
+SQRT<br />
+SUBSTRING<br />
+UCASE</li>
+</ul>

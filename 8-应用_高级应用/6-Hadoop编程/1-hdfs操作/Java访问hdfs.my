@@ -1,0 +1,134 @@
+<h1>Java访问Hadoop实践</h1>
+
+<p>此处记录用java访问Hadoop集群HDFS,简单操作</p>
+
+<p>源码下载地址:</p>
+
+<p><a href="http://download.csdn.net/detail/admin1973/9774470" rel="nofollow" target="_blank">http://download.csdn.net/detail/admin1973/9774470</a></p>
+
+<p>首先你需要创建一个java项目并导入所必须的jar包:</p>
+
+<p>这些都是访问hdfs所必须的jar</p>
+
+<p>然我就开始贴代码了</p>
+
+<p>前面说了这么多东西都是为Java和Hadoop结合做准备的，下面我们正式进入主题。我们新建一个类，叫HDFSDemo1，如下图所示，我们先来<a href="http://lib.csdn.net/base/softwaretest" rel="nofollow" target="_blank" title="软件测试知识库">测试</a>一下从HDFS上下载的功能。我们在HDFS系统的根目录下有一个sougou_pinyin_80k.exe的文件，我们现在想把它下载到本F://sougou_pinyin_80k.exe目录下。下面代码中，IOUtils的第三个参数值4096是很多大师级人物在写文件读取时常用的值（4k），第四个参数true的意思是文件写完后返回true。</p>
+
+<blockquote>package com.sct.hadoop;
+<p>import org.apache.hadoop.conf.Configuration;<br />
+import org.apache.hadoop.fs.FileSystem;<br />
+import org.apache.hadoop.fs.Path;<br />
+import org.apache.hadoop.io.IOUtils;</p>
+
+<p>import java.io.FileOutputStream;<br />
+import java.io.InputStream;<br />
+import java.io.OutputStream;<br />
+import java.net.URI;</p>
+
+<p>/**<br />
+* Created by leitao on 2017/3/8.<br />
+*/</p>
+
+<p>public class DownloadFile {<br />
+public static void main(String[] args) throws Exception{<br />
+//FileSystem是一个抽象类,因此我们再使用它的时候要先创建FileSystem的实现类(工具类)<br />
+FileSystem fs = FileSystem.get(new URI("hdfs://192.168.113.130:9000"),new Configuration());<br />
+InputStream is = fs.open(new Path("/sogou_pinyin_80k.exe"));<br />
+OutputStream out = new FileOutputStream("E://sogou_pinyin_80k.exe");<br />
+IOUtils.copyBytes(is,out,4096,true);<br />
+System.out.println("下载完成");<br />
+}<br />
+}</p>
+</blockquote>
+
+<p><strong> 接下来我们开始执行上面那段代码，执行完之后，我们再来看一看E盘根目录下是否多了一个sougou_pinyin_80k.exe的文件，如下图所示，我们发现确实多了一个jdk1.7的文件！</strong></p>
+
+<p><strong>说明我们Java和Hadoop结合的第一个小功能成功了！！</strong></p>
+
+<p>接下来我们再测试一下上传的功能</p>
+
+<blockquote>package com.sct.hadoop;
+<p>import org.apache.hadoop.conf.Configuration;<br />
+import org.apache.hadoop.fs.FileSystem;<br />
+import org.apache.hadoop.fs.Path;<br />
+import org.apache.hadoop.io.IOUtils;</p>
+
+<p>import java.io.FileInputStream;<br />
+import java.io.InputStream;<br />
+import java.io.OutputStream;<br />
+import java.net.URI;</p>
+
+<p>/**<br />
+* Created by leitao on 2017/3/8.<br />
+*/</p>
+
+<p>public class UploadFile {<br />
+public static void main(String[] args) throws Exception{<br />
+FileSystem fs = FileSystem.get(new URI("hdfs://192.168.113.130:9000"),new Configuration(),"root");<br />
+//读取本地文件系统,并创建输入流<br />
+InputStream in = new FileInputStream("F://sogou_pinyin_80k.exe");<br />
+//在HDFS上创建一个文件返回输出流<br />
+OutputStream out = fs.create(new Path("/sogou_pinyin_80k.exe"));<br />
+//将输入流写到输出流,buffersize是4k,即每读4k数据返回一次,写完返回true<br />
+IOUtils.copyBytes(in,out,4096,true);<br />
+System.out.println("上传Hadoop文件成功!");<br />
+}</p>
+
+<p>}</p>
+</blockquote>
+
+<p>我们来看看报的错误信息，从描述中我们不难看出这是连接被拒绝的意思，也就是说我们缺乏写权限。<br />
+  既然我们没有root权限，我们不妨先来伪装一下root，让HDFS认为我就是root用户，伪装的方法是在加载fs的时候增加一个用户的参数"root"。添加完之后我们再来运行testUpload方法，发现运行成功了！这里值得说明的是，这种方式来操作HDFS显然是不好的，因为任何人都可以伪装成root来对HDFS进行写操作，很有可能出现恶意攻击。</p>
+
+<p>既然运行成功了，我们赶紧来看看HDFS的根目录下是否有我们刚才上传上去的文件。我们选择以浏览器的方式来查看HDFS根目录下的文件，我们发现根目录下确实多了一个sougou_pinyin_80k.exe文件.</p>
+
+<p>我们再来新建文件夹，执行完该方法后，到浏览器中查看HDFS的根目录，发现确实多了leitao这个文件夹。</p>
+
+<blockquote>
+<p>​​​​​​​​​​​​​​package com.sct.hadoop;</p>
+
+<p>import org.apache.hadoop.conf.Configuration;<br />
+import org.apache.hadoop.fs.FileSystem;<br />
+import org.apache.hadoop.fs.Path;</p>
+
+<p>import java.net.URI;</p>
+
+<p>/**<br />
+* Created by leitao on 2017/3/8.<br />
+*/</p>
+
+<p>public class mkdir {<br />
+public static void main(String[] args)throws Exception{<br />
+FileSystem fs = FileSystem.get(new URI("hdfs://192.168.113.130:9000"),new Configuration(),"root");<br />
+//测试创建一个文件夹,在HDFS上创建一个leitao文件夹,原根目录下使没有这个文件的<br />
+boolean flag = fs.mkdirs(new Path("/leitao"));<br />
+System.out.println(flag);<br />
+}<br />
+}</p>
+</blockquote>
+
+<p>接下来我们再尝试一下删除HDFS系统上的文件，如下图所示，我们试着把HDFS系统根目录下的jdk1.7文件给删除掉，运行后发现返回的值是true，说明我们删除成功！</p>
+
+<blockquote>​​​​​​​package com.sct.hadoop;
+<p>import org.apache.hadoop.conf.Configuration;<br />
+import org.apache.hadoop.fs.FileSystem;<br />
+import org.apache.hadoop.fs.Path;</p>
+
+<p>import java.net.URI;</p>
+
+<p>/**<br />
+* Created by leitao on 2017/3/8.<br />
+*/</p>
+
+<p>public class deleteFile {<br />
+public static void main(String[] args) throws Exception{<br />
+FileSystem fs = FileSystem.get(new URI("hdfs://192.168.113.130:9000"),new Configuration(),"root");<br />
+//测试删除文件,我们尝试删除HDFS下的sogou_pinyin_80k.exe,fs.delete()第二个参数是告诉方法是否<br />
+//递归删除,如果是文件夹,并且文件夹中有文件的话就填写true,否则填false<br />
+boolean flag =fs.delete(new Path("/sogou_pinyin_80k.exe"),false);<br />
+System.out.println(flag);<br />
+}<br />
+}</p>
+</blockquote>
+
+<p>=完结=</p>

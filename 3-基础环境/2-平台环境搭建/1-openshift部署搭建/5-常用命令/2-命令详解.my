@@ -1,0 +1,193 @@
+<h1>新手的OpenShift oc命令</h1>
+
+<p>有一天，我发现这篇关于<a href="https://zwischenzugs.com/2018/01/06/ten-things-i-wish-id-known-about-bash/" rel="nofollow" target="_blank">bash</a>帖子。如果您是专业用户，您可能已经知道所有这些技巧，但如果您是新手或不是这样的专业用户，那么该帖子很可能是您的一天。</p>
+
+<p>我认为为<code>oc</code>命令创建类似的帖子会很有用。<code>oc</code>命令是dope，每个人都应该知道。它设计精良，一致，灵活，正如您将看到的，有许多值得尝试的隐藏功能。</p>
+
+<p>如果您是OpenShift专业人士，您可能已经知道我将在这里揭示的大部分内容; 否则，如果您刚开始使用OpenShift，或者您不是经验丰富的用户，这将为您节省一些宝贵的时间。</p>
+
+<h2>1. 首先要做的事：调试</h2>
+
+<p>当我不知道发生了什么或者我收到了不友好的错误消息时，我总是使用该标志<code>--loglevel</code>。它将日志级别信息写入stderr。根据日志级别，您将获得curl API Rest调用,、API Rest正文答案，甚至更详细的信息。</p>
+
+<p><img src="//upload-images.jianshu.io/upload_images/10476447-6d06aa5f408f6eac.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/493/format/webp" style="height:350px; width:278px" /></p>
+
+<p>更详细的信息</p>
+
+<pre>
+<code>$ oc --loglevel 7 get pod
+...
+I0216 21:24:12.027793 973 cached_discovery.go:72] returning cached discovery info from /home/jtudelag/.kube/192.168.42.77_8443/v1/serverresources.json
+I0216 21:24:12.028046 973 round_trippers.go:383] GET https://192.168.42.77:8443/api/v1/namespaces/myproject/pods
+I0216 21:24:12.028052 973 round_trippers.go:390] Request Headers:
+I0216 21:24:12.028057 973 round_trippers.go:393] Accept: application/json
+I0216 21:24:12.028061 973 round_trippers.go:393] User-Agent: oc/v1.7.6+a08f5eeb62 (linux/amd64) kubernetes/c84beff
+I0216 21:24:12.053230 973 round_trippers.go:408] Response Status: 200 OK in 25 milliseconds
+I0216 21:24:12.055143 973 cached_discovery.go:119] returning cached discovery info from /home/jtudelag/.kube/192.168.42.77_8443/servergroups.json
+I0216 21:24:12.055228 973 cached_discovery.go:72] returning cached discovery info from /home/jtudelag/.kube/192.168.42.77_8443/authentication.k8s.io/v1/serverresources.json
+I0216 21:24:12.055288 973 cached_discovery.go:72]
+...
+</code></pre>
+
+<p>如果要修补OCP对象，loglevel 9非常方便，因为它显示了您需要应用的补丁（API请求体）。<br />
+假设您要更改服务对象的标签，在本例中标签为“app：hello-jorge”。</p>
+
+<pre>
+<code>$ oc --loglevel 9 edit svc hello-openshift
+...
+I0216 21:33:15.786463 1389 request.go:994] Request Body: {"metadata":{"labels":{"app":"hello-jorge"}}}
+I0216 21:33:15.786590 1389 round_trippers.go:386] curl -k -v -XPATCH -H "Accept: application/json" -H "Content-Type: application/strategic-merge-patch+json" -H "User-Agent: oc/v1.7.6+a08f5eeb62 (linux/amd64) kubernetes/c84beff" https://192.168.42.77:8443/api/v1/namespaces/myproject/services/hello-openshift
+I0216 21:33:15.797185 1389 round_trippers.go:405] PATCH https://192.168.42.77:8443/api/v1/namespaces/myproject/services/hello-openshift 200 OK in 10 milliseconds
+...
+</code></pre>
+
+<p><strong>注意：</strong>在绝望的时刻，你总是可以添加任意数量的9，结果将只有一个9，但你可能会感到宽慰。</p>
+
+<pre>
+<code>$ oc --loglevel 9999 get pod
+</code></pre>
+
+<h2>2. su -</h2>
+
+<p>是的，你没有看错。您可以替换正在运行oc命令的用户，或者在OCP术语中，您可以<a href="https://docs.openshift.com/container-platform/3.7/architecture/additional_concepts/authentication.html#authentication-impersonation" rel="nofollow" target="_blank">"模拟"(impersonate )</a>用户。显然，如果你有足够的权限进行模拟, 那么你只需要使用flag <code>--as</code>。</p>
+
+<p>例如：</p>
+
+<pre>
+<code># run the command as jorge user
+$ oc --as=jorge get pods
+</code></pre>
+
+<p>此外，可以进行组模拟，而不是用户模拟：</p>
+
+<pre>
+<code># run the command as the developers group
+$ oc --as-group=developers get pods
+</code></pre>
+
+<p>在许多情况下，它非常方便快捷，例如，检查用户是否可以执行特定操作或检查用户在运行oc时将收到的输出。在搞不清角色和权限时，它也很有用。</p>
+
+<h2>3. Whoami？</h2>
+
+<p><code>oc whoami</code> 命令众所周知，特别是加上flag <code>-t</code>用于获取当前用户/会话的持有者令牌。但是当你有一个令牌并且你不知道谁是所有者时会发生什么？</p>
+
+<p>您可以做的一件事是使用令牌登录OpenShift，然后执行<code>oc whoami</code>...等待一秒钟。<code>oc whoami</code>会给你这个信息！只需在命令行中传递令牌作为第3个参数，不需要任何标志。</p>
+
+<p>试试看：</p>
+
+<pre>
+<code># save the token
+$ token=$(oc whoami -t)
+
+# get the owner of the token
+$ oc whoami $token
+jorge
+</code></pre>
+
+<h2>4. <code>oc debug</code></h2>
+
+<p>你可以运行一个pod并获得一个shell。有时获取正在运行的pod配置的副本并使用shell对其进行故障排除很有用。这是默认行为。</p>
+
+<p>介绍下<code>oc debug</code>选项，您可以以root用户, 或任何其他用户ID身份运行容器，强制它在特定节点中运行各种命令。</p>
+
+<p>您必须针对有效的 dc 运行命令，例如：</p>
+
+<pre>
+<code># get a shell inside a pod for dc/jorge
+$ oc debug dc/jorge
+
+# same but as root user
+$ oc debug --as-root=true dc/jorge
+</code></pre>
+
+<h2>5. <code>oc explain</code></h2>
+
+<p>OpenShift / k8s对象有时很复杂，有很多字段。很多时候，我最终在OCP文档或其他来源中寻找对象定义示例。在涉及OCP / k8s对象定义时，您可以考虑用 <code>oc explain</code> 作为可信来源。</p>
+
+<p><code>oc explain</code>为您提供资源及其字段的文档。在声明新的OCP对象时，或者当您无法访问官方OCP文档时，它非常有用。</p>
+
+<p>例如，您可以获取pod文档和pod spec affinity字段描述：</p>
+
+<pre>
+<code># get pod explanation
+$ oc explain pod
+DESCRIPTION:
+Pod is a collection of containers that can run on a host. This resource is created by clients and scheduled onto hosts.
+
+FIELDS:
+metadata <Object>
+Standard object's metadata. More info:
+http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
+
+spec <Object>
+Specification of the desired behavior of the pod. More info:
+http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status
+
+status <Object>
+Most recently observed status of the pod. This data may not be up to date.
+Populated by the system. Read-only. More info:
+http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#spec-and-status
+
+apiVersion <string>
+APIVersion defines the versioned schema of this representation of an
+object. Servers should convert recognized schemas to the latest internal
+value, and may reject unrecognized values. More info:
+http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources
+
+kind <string>
+Kind is a string value representing the REST resource this object
+represents. Servers may infer this from the endpoint the client submits
+requests to. Cannot be updated. In CamelCase. More info:
+http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds
+
+# get pod spec affinity field
+$ oc explain pod.spec.affinity
+RESOURCE: affinity <Object>
+
+DESCRIPTION:
+If specified, the pod's scheduling constraints
+
+Affinity is a group of affinity scheduling rules.
+
+FIELDS:
+nodeAffinity <Object>
+Describes node affinity scheduling rules for the pod.
+
+podAffinity <Object>
+Describes pod affinity scheduling rules (e.g. co-locate this pod in the
+same node, zone, etc. as some other pod(s)).
+
+podAntiAffinity <Object>
+Describes pod anti-affinity scheduling rules (e.g. avoid putting this pod
+in the same node, zone, etc. as some other pod(s)).
+</code></pre>
+
+<h2>6. 忘掉grep，awk，cut等</h2>
+
+<p>关于oc命令的一个非常酷的事情是它具有格式化输出的内置功能。我们都知道<code>-o json</code>或者<code>-o yaml</code>，但flag <code>-o</code>为您提供了许多其他可能性。</p>
+
+<p>在我发现的所有这些输出选项中, <code>go-template</code>和<code>jsonpath</code>是最强大的输出选项：</p>
+
+<pre>
+<code>json|yaml|wide|name|custom-columns=...|custom-columns-file=...|go-template=...|go-template-file=...|jsonpath=...|jsonpath-file=...
+</code></pre>
+
+<p>例如，假设您想要获取特定路由(router)（docker registry router）所公开的服务(service)：</p>
+
+<pre>
+<code># get the service being exposed by a route, only if the hostname matches my-docker-registry.example.com
+$ oc get routes -o=go-template='{{range .items}}{{if eq .spec.host "my-docker-registry.example.com"}}{{.metadata.name}}{{end}}{{end}}'
+docker-registry
+</code></pre>
+
+<p>或者您想了解路由器DC的部署策略：</p>
+
+<pre>
+<code># get router deployment strategy
+$ oc get dc router -o=go-template='{{ .spec.strategy.type }}'
+Rolling
+</code></pre>
+
+<p>如您所见，oc命令非常棒。我鼓励你继续玩它，因为这是OpenShift最酷的事情之一。</p>
+
+<p> </p>

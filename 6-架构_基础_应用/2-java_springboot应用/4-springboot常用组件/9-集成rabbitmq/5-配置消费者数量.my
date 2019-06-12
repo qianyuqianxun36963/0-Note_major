@@ -1,0 +1,129 @@
+<h1>设置消费者数量</h1>
+
+<p> </p>
+
+<p>package com.huawei.c00466250.testbed_management.config;</p>
+
+<p><br />
+import com.huawei.c00466250.testbed_management.util.TaskOperate;</p>
+
+<p>import com.rabbitmq.client.Channel;<br />
+import org.springframework.amqp.core.AcknowledgeMode;<br />
+import org.springframework.amqp.rabbit.listener.SimpleMessageListenerContainer;<br />
+import org.springframework.amqp.rabbit.listener.adapter.MessageListenerAdapter;<br />
+import org.springframework.beans.factory.annotation.Value;<br />
+import org.springframework.amqp.rabbit.connection.CachingConnectionFactory;<br />
+import org.springframework.context.annotation.Bean;<br />
+import org.springframework.context.annotation.Configuration;<br />
+import org.springframework.amqp.core.Queue;</p>
+
+<p>import java.util.HashMap;<br />
+import java.util.Map;</p>
+
+<p><br />
+/**<br />
+ * @description:<br />
+ * @author: h00415548<br />
+ * @date: 2019-03-05 15:30<br />
+ */<br />
+@Configuration<br />
+public class RabbitConfig {<br />
+    @Value("${spring.rabbitmq.host}")<br />
+    private String host;</p>
+
+<p>    @Value("${spring.rabbitmq.port}")<br />
+    private int port;</p>
+
+<p>    @Value("${spring.rabbitmq.username}")<br />
+    private String username;</p>
+
+<p>    @Value("${spring.rabbitmq.password}")<br />
+    private String password;</p>
+
+<p>    @Value("${spring.rabbitmq.virtual-host}")<br />
+    private String virtualHost;</p>
+
+<p>    @Bean<br />
+    public Queue WorkspaceQueue(){<br />
+        return new Queue("workspace1");<br />
+    }</p>
+
+<p>    @Bean<br />
+    public Queue TestbedQueue(){<br />
+        return new Queue("testbed1");<br />
+    }</p>
+
+<p>    @Bean<br />
+    public Queue DeviceQueue(){<br />
+        return new Queue("device1");<br />
+    }</p>
+
+<p>    @Bean<br />
+    public Queue Device2Queue(){<br />
+        return new Queue("device2");<br />
+    }</p>
+
+<p>    @Bean("cachingConnectionFactory")<br />
+    public CachingConnectionFactory connectionFactory(){<br />
+        CachingConnectionFactory cachingConnectionFactory=new CachingConnectionFactory();<br />
+        cachingConnectionFactory.setHost(host);<br />
+        cachingConnectionFactory.setPort(port);<br />
+        cachingConnectionFactory.setUsername(username);<br />
+        cachingConnectionFactory.setPassword(password);<br />
+        cachingConnectionFactory.setVirtualHost(virtualHost);<br />
+        cachingConnectionFactory.setPublisherConfirms(true);</p>
+
+<p>        return cachingConnectionFactory;<br />
+    }</p>
+
+<p>    @Bean<br />
+    public Channel channel(){<br />
+        //Connection conn = factory().newConnection();<br />
+        //Channel channel = conn.createChannel();<br />
+        return connectionFactory().createConnection().createChannel(false);<br />
+    }</p>
+
+<p>    @Bean<br />
+    TaskOperate taskoperate(){<br />
+        return new TaskOperate();<br />
+    }</p>
+
+<p>    @Bean<br />
+    public SimpleMessageListenerContainer messageListenerContainer() {<br />
+        SimpleMessageListenerContainer container = new SimpleMessageListenerContainer(connectionFactory());<br />
+<strong>        //设置监听的队列<br />
+        container.setQueueNames("workspace1","testbed1","device1","device2");<br />
+        container.setExposeListenerChannel(true);<br />
+        //最大的消费者个数<br />
+        container.setMaxConcurrentConsumers(10);<br />
+        //默认的消费者的个数<br />
+        container.setConcurrentConsumers(5);</strong></p>
+
+<p>        //container.setMessageConverter(jsonMessageConverter());<br />
+        MessageListenerAdapter adapter = new MessageListenerAdapter(taskoperate());<br />
+        //设置处理器的消费消息的默认方法,如果没有设置，那么默认的处理器中的默认方式是handleMessage方法<br />
+        //adapter.setDefaultListenerMethod("onMessage");<br />
+        Map<String, String> queueOrTagToMethodName = new HashMap<>();<br />
+        queueOrTagToMethodName.put("workspace1","insertAndUpdateEnvirons");<br />
+        queueOrTagToMethodName.put("testbed1","insertAndUpdateDevices");<br />
+        queueOrTagToMethodName.put("device1","insertAndUpdatePorts");<br />
+        queueOrTagToMethodName.put("device2","insertAndUpdatePorts");<br />
+        adapter.setQueueOrTagToMethodName(queueOrTagToMethodName);<br />
+        container.setMessageListener(adapter);</p>
+
+<p>        // 设置确认模式为自动确认<br />
+        container.setAcknowledgeMode(AcknowledgeMode.AUTO);</p>
+
+<p>        return container;<br />
+    }</p>
+
+<p>    /*@Bean<br />
+    public ConnectionFactory factory() throws NoSuchAlgorithmException, KeyManagementException, URISyntaxException {<br />
+        ConnectionFactory factory = new ConnectionFactory();<br />
+        String uri = String.format("amqp://%s:%s@%s:%s",username,password,host,port);<br />
+        factory.setUri(uri);</p>
+
+<p>        return factory;<br />
+    }*/<br />
+}<br />
+ </p>

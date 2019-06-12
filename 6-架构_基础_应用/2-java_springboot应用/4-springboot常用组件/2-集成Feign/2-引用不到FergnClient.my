@@ -1,0 +1,151 @@
+<h1>Spring Boot 2下使用Feign找不到@EnableFeignClients的解决办法</h1>
+
+<p>最近在实践Spring Boot 2+Spring Cloud(Finchley.M9),在用到<code>Feign</code>的时候发现<code>@EnableFeignClients</code>注解开不了,独立使用Feign是可以的,但就是开启不了Spring对Feign的支持.经过一番摸索终于把问题解决了,在这里分享一下解决方案和思路.解决思路写得较繁琐,可以选择性阅读,结论和解决方案写在前面</p>
+
+<h2>0. 结论和解决方案</h2>
+
+<p>Spring Cloud对Feign的支持由<code>org.springframework.cloud:spring-cloud-netflix-core</code>移到<code>org.springframework.cloud:spring-cloud-openfeign-core</code>下,而<code>Finchley.M9</code>版本下的<strong>spring-cloud-starter-openfeign:2.0.0.M2</strong>的pom依赖文件中导入的是<code>spring-cloud-netflix-core</code>而非<code>spring-cloud-openfeign-core</code>,需要我们在pom文件中添加对应依赖管理使<strong>spring-cloud-starter-openfeign</strong>版本更新到<code>2.0.0.RC1</code>,如下图</p>
+
+<pre>
+<code><dependencyManagement>
+<dependencies>
+<dependency>
+<groupId>org.springframework.cloud</groupId>
+<artifactId>spring-cloud-openfeign</artifactId>
+<version>2.0.0.RC1</version>
+<type>pom</type>
+<scope>import</scope>
+</dependency>
+</dependencies>
+</dependencyManagement></code></pre>
+
+<h2>1. 创建项目</h2>
+
+<p>为了方便讲解分析,这里使用idea创建一个新的SpringBoot+Spring Cloud的Feign项目,一切设置保持默认</p>
+
+<p>项目依赖仅勾选<strong>Web</strong>和<strong>Feign</strong> <br />
+<img alt="这里写图片描述" src="https://img-blog.csdn.net/20180424205003499?watermark/2/text/aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L2FsaW55dWE=/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70" title="" /> <br />
+下面贴出项目初始化的pom文件的依赖</p>
+
+<pre>
+<code> <dependencies>
+<dependency>
+<groupId>org.springframework.boot</groupId>
+<artifactId>spring-boot-starter-web</artifactId>
+</dependency>
+<dependency>
+<groupId>org.springframework.cloud</groupId>
+<artifactId>spring-cloud-starter-openfeign</artifactId>
+</dependency>
+
+<dependency>
+<groupId>org.springframework.boot</groupId>
+<artifactId>spring-boot-starter-test</artifactId>
+<scope>test</scope>
+</dependency>
+</dependencies>
+
+<dependencyManagement>
+<dependencies>
+<dependency>
+<groupId>org.springframework.cloud</groupId>
+<artifactId>spring-cloud-dependencies</artifactId>
+<version>${spring-cloud.version}</version>
+<type>pom</type>
+<scope>import</scope>
+</dependency>
+</dependencies>
+</dependencyManagement></code></pre>
+
+<p> </p>
+
+<p>这个时候可以看到在主程序上用不了<code>@EnableFeignClients</code>注解 <br />
+<img alt="这里写图片描述" src="https://img-blog.csdn.net/20180424210013470?watermark/2/text/aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L2FsaW55dWE=/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70" title="" /></p>
+
+<h2>2. @EnableFeignClients的位置</h2>
+
+<p>问题很明显就是缺少包了,那就先找找<strong>@EnableFeignClients</strong>是在哪个包里,利用idea的工具,可以看到该注解是在</p>
+
+<pre>
+<code> <dependency>
+<groupId>org.springframework.cloud</groupId>
+<artifactId>spring-cloud-netflix-core</artifactId>
+<version>1.3.5.RELEASE</version>
+</dependency></code></pre>
+
+<p><img alt="这里写图片描述" src="https://img-blog.csdn.net/20180424210520323?watermark/2/text/aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L2FsaW55dWE=/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70" title="" /> <br />
+将其导入pom,查看import信息,这个时候@EnableFeignClients注解的全限定名是<code>org.springframework.cloud.netflix.feign.EnableFeignClients</code>(重要,后面会提到) <br />
+试一下启动,意料之中地报错了,错误是<code>org.springframework.beans.factory.BeanDefinitionStoreException</code> <br />
+不过这并不要紧,重要是找到了<strong>@EnableFeignClients</strong>注解在哪里,现在把刚才pom添加的依赖去掉再来看看项目原本的依赖树 <br />
+<img alt="这里写图片描述" src="https://img-blog.csdn.net/20180424211505109?watermark/2/text/aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L2FsaW55dWE=/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70" title="" /> <br />
+可以看到项目本来就有<code>org.springframework.cloud:spring-cloud-netflix-core:2.0.0.M8</code>. <br />
+那是不是说明<code>2.0.0.M8</code>中没有<strong>@EnableFeignClients</strong>注解而<code>1.3.5.RELEASE</code>有呢?很有可能,笔者特地去找了这两个jar包,解压后比较如下: <br />
+<img alt="这里写图片描述" src="https://img-blog.csdn.net/20180424212811291?watermark/2/text/aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L2FsaW55dWE=/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70" title="" /><br />
+很直观地看到,Spring Cloud的spring-cloud-netflix-core版本中少了很多东西,其中就包括Feign文件夹,而我们要的<strong>@EnableFeignClients</strong>和<strong>@FeignClient</strong>注解就在这个文件夹下 <br />
+<img alt="这里写图片描述" src="https://img-blog.csdn.net/20180424213157751?watermark/2/text/aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L2FsaW55dWE=/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70" title="" /> <br />
+到这里问题已经很清晰了,高版本的Spring Cloud使用的Feign注解不在原来的位置,也不在spring-cloud-openfeign下,所以自然就找不到了 <br />
+那新的问题又来了,高版本的Spring Cloud使用的Feign注解在哪里,又该如何导入呢? <br />
+这里还是从官方提供的依赖入手,下面是官方提供的<a href="https://cloud.spring.io/spring-cloud-openfeign/#quick-start" rel="nofollow" target="_blank">OpenFeign Quick Start最新教程</a></p>
+
+<pre>
+<code><dependencyManagement>
+<dependencies>
+<dependency>
+<groupId>org.springframework.cloud</groupId>
+<artifactId>spring-cloud-openfeign</artifactId>
+<version>2.0.0.RC1</version>
+<type>pom</type>
+<scope>import</scope>
+</dependency>
+</dependencies>
+</dependencyManagement>
+<dependencies>
+<dependency>
+<groupId>org.springframework.cloud</groupId>
+<artifactId>spring-cloud-starter-openfeign</artifactId>
+</dependency>
+</dependencies><repositories>
+<repository>
+<id>spring-milestones</id>
+<name>Spring Milestones</name>
+<url>https://repo.spring.io/libs-milestone</url>
+<snapshots>
+<enabled>false</enabled>
+</snapshots>
+</repository>
+</repositories></code></pre>
+
+<p>如上,与项目原本的pom相比,就只是在dependencyManagement(声明依赖，并不实现引入)下多了个<code>org.springframework.cloud: spring-cloud-openfeign:2.0.0.RC1</code>的dependency版本管理.将其引入,即在pom文件中增加如下内容</p>
+
+<pre>
+<code><dependencyManagement>
+<dependencies>
+<dependency>
+<groupId>org.springframework.cloud</groupId>
+<artifactId>spring-cloud-openfeign</artifactId>
+<version>2.0.0.RC1</version>
+<type>pom</type>
+<scope>import</scope>
+</dependency>
+</dependencies>
+</dependencyManagement></code></pre>
+
+<p>发现<code>@EnableFeignClients</code>没有提示错误了,这时候再来看看项目依赖树 <br />
+<img alt="这里写图片描述" src="https://img-blog.csdn.net/20180425183604686?watermark/2/text/aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L2FsaW55dWE=/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70" title="" /> <br />
+对比一下上面M2版本的依赖树,可以很明显地看到与Feign相关的依赖包的变化是<code>org.springframework.cloud:spring-cloud-netflix-core</code>换成了<code>org.springframework.cloud:spring-cloud-openfeign-core</code></p>
+
+<p>直接看一下import信息,发现注解的类名为<code>org.springframework.cloud.openfeign.EnableFeignClients</code>,与上面看到的做对比,就可以发现<code>@EnableFeignClients</code>注解由<code>org.springframework.cloud.netflix.feign.EnableFeignClients</code>换为<code>org.springframework.cloud.openfeign.EnableFeignClients</code></p>
+
+<p>即在M2版本中@EnableFeignClients的类已经换了,但对应的spring-cloud-starter-openfeign下的依赖却没有更新,所以就找不到对应的类了</p>
+
+<p>知道原因,那我们再来看看<code>org.springframework.cloud:spring-cloud-openfeign-core</code>这个包的内容 <br />
+<img alt="这里写图片描述" src="https://img-blog.csdn.net/20180425190526602?watermark/2/text/aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L2FsaW55dWE=/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70" title="" /> <br />
+对比一下上面<strong>org.springframework.cloud:spring-cloud-netflix-core</strong>的内容,就会发现两者几乎一样,这也验证了我们的想法 <br />
+由此,我们可以得出结论: <br />
+Spring Cloud对Feign的支持由<code>org.springframework.cloud:spring-cloud-netflix-core</code>移到<code>org.springframework.cloud:spring-cloud-openfeign-core</code>下,而<code>Finchley.M9</code>版本下的<strong>spring-cloud-starter-openfeign:2.0.0.M2</strong>的pom依赖文件中导入的是<code>spring-cloud-netflix-core</code>而非<code>spring-cloud-openfeign-core</code>,需要我们在pom文件中添加对应依赖管理使<strong>spring-cloud-starter-openfeign</strong>版本更新到<code>2.0.0.RC1</code></p>
+
+<h2>3. 官方项目日志</h2>
+
+<p>最后,再来看看官方项目日志(可以直接去github上面看): <br />
+<img alt="这里写图片描述" src="https://img-blog.csdn.net/20180425191406147?watermark/2/text/aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L2FsaW55dWE=/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70" title="" /><br />
+呃,<strong>2.0.0.M2</strong>和<strong>2.0.0.RC1</strong>都被回滚了…,现在用的还是<strong>2.0.0.BUILD-SNAPSHOT</strong>,不过现在(2018年4月25日)官方教程给的current版本是<strong>2.0.0.RC1</strong>,而且目前没发现问题(至少不会像<strong>2.0.0.M2</strong>那么坑),所以先用着应该是可以的</p>

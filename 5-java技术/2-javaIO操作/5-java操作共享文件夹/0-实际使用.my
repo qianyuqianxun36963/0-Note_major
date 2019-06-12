@@ -1,0 +1,113 @@
+<h1>JAVA操作共享文件</h1>
+<p>一开始用的网上说的方法，有问题。报错：" <strong>unknow user name or bad password </strong>"</p>
+<p><strong>后来总结了下，是权限认证的地方有点区别！</strong></p>
+<p><strong>第一种方式可以，用域账号就可以访问。</strong></p>
+<p>NtlmPasswordAuthentication auth = new NtlmPasswordAuthentication("", username, password);//第一个参数domain可以不填</p>
+<p>SmbFile smbFile = new SmbFile(remoteUrl, auth);</p>
+<p><strong>第二种方式不行，报一开始说的那种错。</strong></p>
+<p>File localFile = new File("d:/项目列表A.pdf");</p>
+<p>String host = "10.179.169.*";//远程服务器的地址<br />
+String username = "username";//用户名<br />
+String password = "password";//密码<br />
+String path = "/tempFolder/";//远程服务器共享文件夹名称</p>
+<p>String remoteUrl = "smb://" + username + ":" + password + "@" + host + path + (path.endsWith("/") ? "" : "/");<br />
+SmbFile remoteFile = new SmbFile(remoteUrl + "/" + localFile.getName());</p>
+<h2>罗列共享文件夹下文件</h2>
+<pre>
+static String defaultUsername = Constant.SHARE_FILE_USERNAME; //工号 
+static String defaultPassword = Constant.SHARE_FILE_PASSWORD; //桌面云密码
+public static List<String> listFiles(String remoteUrl){
+return listFiles(remoteUrl,defaultUsername,defaultPassword);
+}
+public static List<String> listFiles(String remoteUrl,String username,String password){
+List<String> fileList = new ArrayList<>();
+SmbFile file = null;
+SmbFile[] files = null;
+try {
+NtlmPasswordAuthentication auth = new NtlmPasswordAuthentication("", username, password);//第一个参数domain可以不填
+file = new SmbFile(remoteUrl, auth);
+files = file.listFiles();
+} catch (Exception e) {
+e.printStackTrace();
+}
+for (SmbFile smbFile : files) {
+fileList.add(smbFile.getName());
+}
+return fileList;
+}</pre>
+<h2>从共享目录下载文件</h2>
+<pre>
+public static void smbGet(String remoteUrl,String localDir) {
+InputStream in = null;
+OutputStream out = null;
+try {
+SmbFile remoteFile = new SmbFile(remoteUrl);
+if(remoteFile==null){
+System.out.println("共享文件不存在");
+return;
+}
+String fileName = remoteFile.getName();
+File localFile = new File(localDir+File.separator+fileName);
+in = new BufferedInputStream(new SmbFileInputStream(remoteFile));
+out = new BufferedOutputStream(new FileOutputStream(localFile));
+byte[] buffer = new byte[1024];
+while(in.read(buffer)!=-1){
+out.write(buffer);
+buffer = new byte[1024];
+}
+out.flush();//不写这句话目标文件可能什么也没有，只要用户调用println方法之一或写入换行字符或字节(‘\n’)后，会自动调用flush方法。
+} catch (Exception e) {
+e.printStackTrace();
+} finally {
+try {
+if(out != null) {
+out.close();
+}
+if(in != null) {
+in.close();
+}
+} catch (IOException e) {
+e.printStackTrace();
+}
+}
+}</pre>
+<h2>向共享目录上传文件</h2>
+<pre>
+/**
+* 上传文件到共享目录
+* @param remoteUrl
+* @param localFilePath
+*/
+public static void smbPut(String remoteUrl,String localFilePath) {
+smbPut(remoteUrl, localFilePath,defaultUsername,defaultPassword);
+}
+public static void smbPut(String remoteUrl,String localFilePath,String username,String password) {
+InputStream in = null;
+OutputStream out = null;
+try {
+File localFile = new File(localFilePath);
+String fileName = localFile.getName();
+SmbFile remoteFile = new SmbFile(remoteUrl+"/"+fileName);
+in = new BufferedInputStream(new FileInputStream(localFile));
+out = new BufferedOutputStream(new SmbFileOutputStream(remoteFile));
+byte[] buffer = new byte[1024];
+while(in.read(buffer)!=-1){
+out.write(buffer);
+buffer = new byte[1024];
+}
+out.flush(); //不写这句话目标文件可能什么也没有，只要用户调用println方法之一或写入换行字符或字节(‘\n’)后，会自动调用flush方法。
+} catch (Exception e) {
+e.printStackTrace();
+} finally {
+try {
+if(out != null) {
+out.close();
+}
+if(in != null) {
+in.close();
+}
+} catch (IOException e) {
+e.printStackTrace();
+}
+}
+}</pre>

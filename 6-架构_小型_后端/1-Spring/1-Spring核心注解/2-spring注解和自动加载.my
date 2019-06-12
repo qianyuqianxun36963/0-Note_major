@@ -1,0 +1,705 @@
+<h1><a href="http://www.cnblogs.com/Johness/archive/2013/04/17/3026689.html" id="cb_post_title_url">Java的注解机制——Spring自动装配的实现原理</a></h1>
+
+<p>　　JDK1.5加入了对注解机制的支持，实际上我学习Java的时候就已经使用JDK1.6了，而且除了@Override和@SuppressWarnings(后者还是IDE给生成的……)之外没接触过其他的。</p>
+
+<p>　　进入公司前的面试，技术人员就问了我关于注解的问题，我就说可以生成chm手册……现在想起来真囧，注释和注解被我搞得完全一样了。</p>
+
+<p>　　使用注解主要是在需要使用Spring框架的时候，特别是使用SpringMVC。因为这时我们会发现它的强大之处：预处理。</p>
+
+<p>　　注解实际上相当于一种标记，它允许你在运行时(源码、文档、类文件我们就不讨论了)动态地对拥有该标记的成员进行操作。</p>
+
+<p>　　实现注解需要三个条件(我们讨论的是类似于Spring自动装配的高级应用)：注解声明、使用注解的元素、操作使用注解元素的代码。</p>
+
+<p>　　首先是注解声明，注解也是一种类型，我们要定义的话也需要编写代码，如下：</p>
+
+<pre>
+1 package annotation;
+2 
+3 import java.lang.annotation.ElementType;
+4 import java.lang.annotation.Retention;
+5 import java.lang.annotation.RetentionPolicy;
+6 import java.lang.annotation.Target;
+7 
+8 /**
+9 * 自定义注解，用来配置方法
+10 * 
+11 * @author Johness
+12 *
+13 */
+14 @Retention(RetentionPolicy.RUNTIME) // 表示注解在运行时依然存在
+15 @Target(ElementType.METHOD) // 表示注解可以被使用于方法上
+16 public @interface SayHiAnnotation {
+17 String paramValue() default "johness"; // 表示我的注解需要一个参数 名为"paramValue" 默认值为"johness"
+18 }</pre>
+
+<p> </p>
+
+<p> </p>
+
+<p>　　然后是使用我们注解的元素：</p>
+
+<p> </p>
+
+<pre>
+1 package element;
+2 
+3 import annotation.SayHiAnnotation;
+4 
+5 /**
+6 * 要使用SayHiAnnotation的元素所在类
+7 * 由于我们定义了只有方法才能使用我们的注解，我们就使用多个方法来进行测试
+8 * 
+9 * @author Johness
+10 *
+11 */
+12 public class SayHiEmlement {
+13 
+14 // 普通的方法
+15 public void SayHiDefault(String name){
+16 System.out.println("Hi, " + name);
+17 }
+18 
+19 // 使用注解并传入参数的方法
+20 @SayHiAnnotation(paramValue="Jack")
+21 public void SayHiAnnotation(String name){
+22 System.out.println("Hi, " + name);
+23 }
+24 
+25 // 使用注解并使用默认参数的方法
+26 @SayHiAnnotation
+27 public void SayHiAnnotationDefault(String name){
+28 System.out.println("Hi, " + name);
+29 }
+30 }</pre>
+
+<p> </p>
+
+<p>　　最后，是我们的操作方法(值得一提的是虽然有一定的规范，但您大可不必去浪费精力，您只需要保证您的操作代码在您希望的时候执行即可)：</p>
+
+<p> </p>
+
+<pre>
+1 package Main;
+2 
+3 import java.lang.reflect.InvocationTargetException;
+4 import java.lang.reflect.Method;
+5 
+6 import element.SayHiEmlement;
+7 import annotation.SayHiAnnotation;
+8 
+9 public class AnnotionOperator {
+10 public static void main(String[] args) throws IllegalAccessException, IllegalArgumentException, InvocationTargetException, ClassNotFoundException {
+11 SayHiEmlement element = new SayHiEmlement(); // 初始化一个实例，用于方法调用
+12 Method[] methods = SayHiEmlement.class.getDeclaredMethods(); // 获得所有方法
+13 
+14 for (Method method : methods) {
+15 SayHiAnnotation annotationTmp = null;
+16 if((annotationTmp = method.getAnnotation(SayHiAnnotation.class))!=null) // 检测是否使用了我们的注解
+17 method.invoke(element,annotationTmp.paramValue()); // 如果使用了我们的注解，我们就把注解里的"paramValue"参数值作为方法参数来调用方法
+18 else
+19 method.invoke(element, "Rose"); // 如果没有使用我们的注解，我们就需要使用普通的方式来调用方法了
+20 }
+21 }
+22 }</pre>
+
+<p> </p>
+
+<p>　　结果为：Hi, Jack<br />
+　　　　　　Hi, johness<br />
+　　　　　　Hi, Rose</p>
+
+<p>　　可以看到，注解是进行预处理的很好方式(这里的预处理和编译原理有区别)！</p>
+
+<p> </p>
+
+<p>　　接下来我们看看Spring是如何使用注解机制完成自动装配的：</p>
+
+<p>　　</p>
+
+<p>　　　　首先是为了让Spring为我们自动装配要进行的操作，无外乎两种：继承org.springframework.web.context.support.SpringBeanAutowiringSupport类或者添加@Component/@Controller等注解并(只是使用注解方式需要)在Spring配置文件里声明context:component-scan元素。</p>
+
+<p>　　　　我说说继承方式是如何实现自动装配的，我们打开Spring源代码查看SpringBeanAutowiringSupport类。我们会发现以下语句：</p>
+
+<pre>
+1 public SpringBeanAutowiringSupport() {
+2 processInjectionBasedOnCurrentContext(this);
+3 }</pre>
+
+<p> </p>
+
+<p>　　　　众所周知，Java实例构造时会调用默认父类无参构造方法，Spring正是利用了这一点，让"操作元素的代码"得以执行！(我看到第一眼就震惊了！真是奇思妙想啊。果然，高手都要善于用Java来用Java)</p>
+
+<p>　　　　后面的我就不就不多说了，不过还是要纠正一些人的观点：说使用注解的自动装配来完成注入也需要setter。这明显是错误的嘛！我们看Spring注解装配(继承方式)的方法调用顺序： org.springframework.web.context.support.SpringBeanAutowiringSupport#SpringBeanAutowiringSupport=></p>
+
+<p>　　　　    org.springframework.web.context.support.SpringBeanAutowiringSupport#processInjectionBasedOnCurrentContext=></p>
+
+<p>　　　　　 org.springframework.beans.factory.annotation.AutowiredAnnotationBeanPostProcessor#processInjection=></p>
+
+<p>               org.springframework.beans.factory.annotation.InjectionMetadata#Injection(继承，方法重写)。最后看看Injection方法的方法体：</p>
+
+<p> </p>
+
+<pre>
+1 /**
+2 * Either this or {@link #getResourceToInject} needs to be overridden.
+3 */
+4 protected void inject(Object target, String requestingBeanName, PropertyValues pvs) throws Throwable {
+5 if (this.isField) {
+6 Field field = (Field) this.member;
+7 ReflectionUtils.makeAccessible(field);
+8 field.set(target, getResourceToInject(target, requestingBeanName));
+9 }
+10 else {
+11 if (checkPropertySkipping(pvs)) {
+12 return;
+13 }
+14 try {
+15 Method method = (Method) this.member;
+16 ReflectionUtils.makeAccessible(method);
+17 method.invoke(target, getResourceToInject(target, requestingBeanName));
+18 }
+19 catch (InvocationTargetException ex) {
+20 throw ex.getTargetException();
+21 }
+22 }
+23 }</pre>
+
+<p>虽然不完全，但可以基本判定此种自动装配是使用了java放射机制。</p>
+
+<h2><a href="http://blog.csdn.net/rj042/article/details/6399965">JAVA注解</a></h2>
+
+<p>分类： <a href="http://blog.csdn.net/rj042/article/category/527060">java</a>2011-05-06 15:26 7573人阅读 <a href="http://blog.csdn.net/rj042/article/details/6399965#comments">评论</a>(11) 收藏 <a href="http://blog.csdn.net/rj042/article/details/6399965#report" title="举报">举报</a></p>
+
+<p><a href="http://www.csdn.net/tag/java" target="_blank">java</a><a href="http://www.csdn.net/tag/deprecated" target="_blank">deprecated</a><a href="http://www.csdn.net/tag/class" target="_blank">class</a><a href="http://www.csdn.net/tag/interface" target="_blank">interface</a><a href="http://www.csdn.net/tag/j2se" target="_blank">j2se</a><a href="http://www.csdn.net/tag/annotations" target="_blank">annotations</a></p>
+
+<p>      本文将向你介绍J2SE5.0中的新特性之一：注解。本文将从什么是注解；J2SE5.0中预定义的注解；如何自定义注解；如何对注解进行注解以及如何在程序中读取注解5个方面进行讨论。</p>
+
+<p><strong>一、什么是注解</strong></p>
+
+<p>    说起注解，得先提一提什么是元数据(metadata)。所谓元数据就是数据的数据。也就是说，元数据是描述数据的。就象数据表中的字段一样，每个字段描述了这个字段下的数据的含义。而J2SE5.0中提供的注解就是java源代码的元数据，也就是说注解是描述java源代码的。在J2SE5.0中可以自定义注解。使用时在@后面跟注解的名字。</p>
+
+<p><strong>二、J2SE5.0中预定义的注解</strong></p>
+
+<p>    在J2SE5.0的java.lang包中预定义了三个注解。它们是Override、Deprecated和SuppressWarnings。下面分别解解它们的含义。</p>
+
+<p>   </p>
+
+<p>    <strong>Override</strong></p>
+
+<p>    这个注解的作用是标识某一个方法是否覆盖了它的父类的方法。那么为什么要标识呢？让我们来看看如果不用Override标识会发生什么事情。</p>
+
+<p>    假设有两个类Class1和ParentClass1，用Class1中的myMethod1方法覆盖ParentClass1中的myMethod1方法。</p>
+
+<p><br />
+ class ParentClass1<br />
+ {<br />
+     public void myMethod1() {}<br />
+ }</p>
+
+<p> class Class1 extends ParentClass1<br />
+ {<br />
+     public void myMethod2() {}        <br />
+ }</p>
+
+<p> 建立Class1的实例，并且调用myMethod1方法</p>
+
+<p>    ParentClass1 c1 = new Class1();</p>
+
+<p>    c1.myMethod1();</p>
+
+<p>    以上的代码可以正常编译通过和运行。但是在写Class1的代码时，误将myMethod1写成了myMethod2，然而在调用时，myMethod1并未被覆盖。因此，c1.myMethod1()调用的还是ParentClass1的myMethod1方法。更不幸的是，程序员并未意识到这一点。因此，这可能会产生bug。</p>
+
+<p>    如果我们使用Override来修饰Class1中的myMethod1方法，当myMethod1被误写成别的方法时，编译器就会报错。因此，就可以避免这类错误。</p>
+
+<p> </p>
+
+<p>class Class1 extends ParentClass1<br />
+{<br />
+    @Override   // 编译器产生一个错误<br />
+    public void myMethod2() {}        <br />
+}</p>
+
+<p><br />
+    以上代码编译不能通过，被Override注解的方法必须在父类中存在同样的方法程序才能编译通过。也就是说只有下面的代码才能正确编译。</p>
+
+<p>class Class1 extends ParentClass1<br />
+{<br />
+    @Override<br />
+    public void myMethod1() {}        <br />
+}</p>
+
+<p><strong>Deprecated</strong></p>
+
+<p>这个注解是一个标记注解。所谓标记注解，就是在源程序中加入这个标记后，并不影响程序的编译，但有时编译器会显示一些警告信息。</p>
+
+<p>那么Deprecated注解是什么意思呢？如果你经常使用eclipse等IDE编写java程序时，可能会经常在属性或方法提示中看到这个词。如果某个类成员的提示中出现了个词，就表示这个并不建议使用这个类成员。因为这个类成员在未来的JDK版本中可能被删除。之所以在现在还保留，是因为给那些已经使用了这些类成员的程序一个缓冲期。如果现在就去了，那么这些程序就无法在新的编译器中编译了。</p>
+
+<p>说到这，可能你已经猜出来了。Deprecated注解一定和这些类成员有关。说得对！使用Deprecated标注一个类成员后，这个类成员在显示上就会有一些变化。在eclipse中非常明显。让我们看看图1有哪些变化。</p>
+
+<p> </p>
+
+<p> </p>
+
+<p><img alt="Deprecated注解图片" src="http://www.blogjava.net/images/blogjava_net/nokiaguy/01_01.gif" style="height:370px; width:487px" /></p>
+
+<p>图1 加上@Deprecated后的类成员在eclipse中的变化</p>
+
+<p> </p>
+
+<p>从上图可以看出，有三个地方发生的变化。红色框里面的是变化的部分。</p>
+
+<p>1.       方法定义处</p>
+
+<p>2.       方法引用处</p>
+
+<p>3.       显示的成员列表中</p>
+
+<p> </p>
+
+<p>发生这些变化并不会影响编译，只是提醒一下程序员，这个方法以后是要被删除的，最好别用。</p>
+
+<p>Deprecated注解还有一个作用。就是如果一个类从另外一个类继承，并且override被继承类的Deprecated方法，在编译时将会出现一个警告。如test.java的内容如下：</p>
+
+<p>class Class1<br />
+{<br />
+    @Deprecated<br />
+    public void myMethod(){}<br />
+}</p>
+
+<p>class Class2 extends Class1<br />
+{<br />
+    public void myMethod(){}<br />
+}</p>
+
+<p>运行javac test.java 出现如下警告：</p>
+
+<p>注意：test.java 使用或覆盖了已过时的 API。</p>
+
+<p>注意：要了解详细信息，请使用 -Xlint:deprecation 重新编译</p>
+
+<p>使用-Xlint:deprecation显示更详细的警告信息：</p>
+
+<p>test.java:4: 警告：[deprecation] Class1 中的 myMethod() 已过时</p>
+
+<p>        public void myMethod()</p>
+
+<p>                    ^</p>
+
+<p>1 警告</p>
+
+<p>这些警告并不会影响编译，只是提醒你一下尽量不要用myMethod方法。</p>
+
+<p><strong>SuppressWarnings</strong></p>
+
+<p>这个世界的事物总是成对出现。即然有使编译器产生警告信息的，那么就有抑制编译器产生警告信息的。</p>
+
+<p>SuppressWarnings注解就是为了这样一个目的而存在的。让我们先看一看如下的代码。</p>
+
+<p> </p>
+
+<p>public void myMethod()<br />
+{<br />
+    List wordList = new ArrayList();<br />
+    wordList.add("foo");<br />
+}</p>
+
+<p>这是一个类中的方法。编译它，将会得到如下的警告。</p>
+
+<p>注意：Testannotation.java 使用了未经检查或不安全的操作。</p>
+
+<p>注意：要了解详细信息，请使用 -Xlint:unchecked 重新编译。</p>
+
+<p>这两行警告信息表示List类必须使用范型才是安全的，才可以进行类型检查。如果想不显示这个警告信息有两种方法。一个是将这个方法进行如下改写：</p>
+
+<p><br />
+public void myMethod()<br />
+{<br />
+    List<String> wordList = new ArrayList<String>();<br />
+        wordList.add("foo");<br />
+}</p>
+
+<p>另外一种方法就是使用@SuppressWarnings。</p>
+
+<p>@SuppressWarnings (value={"unchecked"})<br />
+public void myMethod()<br />
+{<br />
+    List wordList = new ArrayList();<br />
+    wordList.add("foo");<br />
+}</p>
+
+<p>要注意的是SuppressWarnings和前两个注解不一样。这个注解有一个属性。当然，还可以抑制其它警告，如@SuppressWarnings(value={"unchecked", "fallthrough"})</p>
+
+<p><strong>三、如何自定义注解</strong></p>
+
+<p>注解的强大之处是它不仅可以使java程序变成自描述的，而且允许程序员自定义注解。注解的定义和接口差不多，只是在interface前面多了一个“@”。</p>
+
+<p>public @interface MyAnnotation</p>
+
+<p>{</p>
+
+<p>}</p>
+
+<p>上面的代码是一个最简单的注解。这个注解没有属性。也可以理解为是一个标记注解。就象Serializable接口一样是一个标记接口，里面未定义任何方法。</p>
+
+<p>当然，也可以定义而有属性的注解。<br />
+public @interface MyAnnotation</p>
+
+<p>{<br />
+    String value();<br />
+}</p>
+
+<p>可以按如下格式使用MyAnnotation<br />
+@MyAnnotation(“abc”)</p>
+
+<p>public void myMethod()</p>
+
+<p>{<br />
+}</p>
+
+<p>看了上面的代码，大家可能有一个疑问。怎么没有使用value，而直接就写”abc”了。那么”abc”到底传给谁了。其实这里有一个约定。如果没有写属性名的值，而这个注解又有value属性，就将这个值赋给value属性，如果没有，就出现编译错误。</p>
+
+<p>除了可以省略属性名，还可以省略属性值。这就是默认值。<br />
+public @interface MyAnnotation</p>
+
+<p>{<br />
+    public String myMethod() default "xyz";<br />
+}</p>
+
+<p>可以直接使用MyAnnotation<br />
+@MyAnnotation // 使用默认值xyz</p>
+
+<p>public void myMethod()</p>
+
+<p>{</p>
+
+<p>}</p>
+
+<p>也可以这样使用<br />
+@MyAnnotation(myMethod=”abc”)</p>
+
+<p>public void myMethod()</p>
+
+<p>{</p>
+
+<p>}</p>
+
+<p>如果要使用多个属性的话。可以参考如下代码。</p>
+
+<p>public @interface MyAnnotation<br />
+{<br />
+    public enum MyEnum{A, B, C}<br />
+    public MyEnum value1();<br />
+    public String value2();</p>
+
+<p>}</p>
+
+<p>@MyAnnotation(value1=MyAnnotation.MyEnum.A, value2 = “xyz”)<br />
+public void myMethod()<br />
+{<br />
+}</p>
+
+<p>这一节讨论了如何自定义注解。那么定义注解有什么用呢？有什么方法对注解进行限制呢？我们能从程序中得到注解吗？这些疑问都可以从下面的内容找到答案。</p>
+
+<p><strong>四、如何对注解进行注解</strong></p>
+
+<p>这一节的题目读起来虽然有些绕口，但它所蕴涵的知识却对设计更强大的java程序有很大帮助。</p>
+
+<p>在上一节讨论了自定义注解，由此我们可知注解在J2SE5.0中也和类、接口一样。是程序中的一个基本的组成部分。既然可以对类、接口进行注解，那么当然也可以对注解进行注解。</p>
+
+<p>使用普通注解对注解进行注解的方法和对类、接口进行注解的方法一样。所不同的是，J2SE5.0为注解单独提供了4种注解，即元注解。</p>
+
+<p>元注解理解：</p>
+
+<p>注解可以用于注解类（annotate Classes）</p>
+
+<p>可以用于注解接口(annotate Interfaces)</p>
+
+<p>可以用于注解枚举类型(annotate Enums)</p>
+
+<p>因此注解同样也可以用于注解注解（annotate Annotations）</p>
+
+<p>它们是Target、Retention、Documented和Inherited。下面就分别介绍这4种注解。</p>
+
+<p><strong>Target</strong></p>
+
+<p>这个注解理解起来非常简单。由于target的中文意思是“目标”，因此，我们可能已经猜到这个注解和某一些目标相关。那么这些目标是指什么呢？大家可以先看看下面的代码。</p>
+
+<p>@Target({ElementType.METHOD})<br />
+@interface MyAnnotation {}</p>
+
+<p>@MyAnnotation         // 错误的使用<br />
+public class Class1<br />
+{<br />
+    @MyAnnotation        // 正确的使用<br />
+    public void myMethod1() {}<br />
+}</p>
+
+<p>以上代码定义了一个注解MyAnnotation和一个类Class1，并且使用MyAnnotation分别对Class1和myMethod1进行注解。如果编译这段代码是无法通过的。也许有些人感到惊讶，没错啊！但问题就出在@Target({ElementType.METHOD})上，由于Target使用了一个枚举类型属性，它的值是ElementType.METHOD。这就表明MyAnnotation只能为方法注解。而不能为其它的任何语言元素进行注解。因此，MyAnnotation自然也不能为Class1进行注解了。</p>
+
+<p>说到这，大家可能已经基本明白了。原来target所指的目标就是java的语言元素。如类、接口、方法等。当然，Target还可以对其它的语言元素进行限制，如构造函数、字段、参数等。如只允许对方法和构造函数进行注解可以写成：</p>
+
+<p>@Target({ElementType.METHOD,  ElementType.CONSTRUCTOR})</p>
+
+<p>@interface MyAnnotation {}</p>
+
+<p><strong>Retention</strong></p>
+
+<p>既然可以自定义注解，当然也可以读取程序中的注解（如何读取注解将在下一节中讨论）。但是注解只有被保存在class文件中才可以被读出来。而Retention就是为设置注解是否保存在class文件中而存在的。下面的代码是Retention的详细用法。</p>
+
+<p>@Retention(RetentionPolicy.SOURCE)</p>
+
+<p>@interface MyAnnotation1 { }</p>
+
+<p>@Retention(RetentionPolicy.CLASS)</p>
+
+<p>@interface MyAnnotation2 {}</p>
+
+<p>@Retention(RetentionPolicy.RUNTIME)</p>
+
+<p>@interface MyAnnotation3 {}</p>
+
+<p>其中第一段代码的作用是不将注解保存在class文件中，也就是说象“//”一样在编译时被过滤掉了。第二段代码的作用是只将注解保存在class文件中，而使用反射读取注解时忽略这些注解。第三段代码的作用是即将注解保存在class文件中，也可以通过反射读取注解。</p>
+
+<p><strong>Documented</strong></p>
+
+<p>这个注解和它的名子一样和文档有关。在默认的情况下在使用javadoc自动生成文档时，注解将被忽略掉。如果想在文档中也包含注解，必须使用Documented为文档注解。<br />
+@interface MyAnnotation{ }</p>
+
+<p>@MyAnnotation<br />
+class Class1<br />
+{    <br />
+    public void myMethod() { }<br />
+}<br />
+使用javadoc为这段代码生成文档时并不将@MyAnnotation包含进去。生成的文档对Class1的描述如下：</p>
+
+<p> class Class1 extends java.lang.Object</p>
+
+<p>而如果这样定义MyAnnotation将会出现另一个结果。</p>
+
+<p>@Documented</p>
+
+<p>@interface MyAnnotation {}</p>
+
+<p>生成的文档：</p>
+
+<p>@MyAnnotation // 这行是在加上@Documented后被加上的</p>
+
+<p>class Class1 extends java.lang.Object</p>
+
+<p><strong>Inherited</strong></p>
+
+<p>继承是java主要的特性之一。在类中的protected和public成员都将会被子类继承，但是父类的注解会不会被子类继承呢？很遗憾的告诉大家，在默认的情况下，父类的注解并不会被子类继承。如果要继承，就必须加上Inherited注解。</p>
+
+<p><br />
+@Inherited<br />
+@interface MyAnnotation { }</p>
+
+<p>@MyAnnotation<br />
+public class ParentClass {}</p>
+
+<p>public class ChildClass extends ParentClass { }</p>
+
+<p><br />
+在以上代码中ChildClass和ParentClass一样都已被MyAnnotation注解了。</p>
+
+<p><strong>五、如何使用反射读取注解</strong></p>
+
+<p>前面讨论了如何自定义注解。但是自定义了注解又有什么用呢？这个问题才是J2SE5.0提供注解的关键。自定义注解当然是要用的。那么如何用呢？解决这个问题就需要使用java最令人兴奋的功能之一：反射(reflect)。</p>
+
+<p>在以前的JDK版本中，我们可以使用反射得到类的方法、方法的参数以及其它的类成员等信息。那么在J2SE5.0中同样也可以象方法一样得到注解的各种信息。</p>
+
+<p>在使用反射之前必须使用import java.lang.reflect.* 来导入和反射相关的类。</p>
+
+<p>如果要得到某一个类或接口的注解信息，可以使用如下代码：</p>
+
+<p>Annotation annotation = TestAnnotation.class.getAnnotation(MyAnnotation.class);</p>
+
+<p>如果要得到全部的注解信息可使用如下语句：</p>
+
+<p>Annotation[] annotations = TestAnnotation.class.getAnnotations();</p>
+
+<p>或</p>
+
+<p>Annotation[] annotations = TestAnnotation.class.getDeclaredAnnotations();</p>
+
+<p>getDeclaredAnnotations与getAnnotations类似，但它们不同的是getDeclaredAnnotations得到的是当前成员所有的注解，不包括继承的。而getAnnotations得到的是包括继承的所有注解。</p>
+
+<p>如果要得到其它成员的注解，可先得到这个成员，然后再得到相应的注解。如得到myMethod的注解。</p>
+
+<p>Method method = TestAnnotation.class.getMethod("myMethod", null);</p>
+
+<p>Annotation annotation = method.getAnnotation(MyAnnotation.class);</p>
+
+<p>注：要想使用反射得到注解信息，这个注解必须使用</p>
+
+<p>@Retention(RetentionPolicy.RUNTIME)进行注解。</p>
+
+<p><strong>六、注解的本质：注解是一种类型</strong></p>
+
+<p>JDK5.0中的类型：1、类（class）2、接口（interface）3、枚举（enum）4、注解（Annotation）</p>
+
+<p>因此，注解与其他3种类型一样，都可以定义、使用，以及包含有自己的属性、方法</p>
+
+<p> <strong>七、注解的分类：</strong></p>
+
+<p>（1）标记注释：注解的内部没有属性，称作标记注解</p>
+
+<p>使用方法：@注解名</p>
+
+<p>使用例子：@MarkAnnotation</p>
+
+<p>（2）单值注解：注解的内部只有一个属性，称作单值注解</p>
+
+<p>使用方法：@注解名(属性名=属性值)</p>
+
+<p>使用例子：@SingleAnnotation(value="abc")  //也可以写成@SingleAnnotation("abc")</p>
+
+<p>*(属性名=属性值)可以简化为(属性值)，但是需要满足以下两个条件：</p>
+
+<p>1、该注解必须为单值注解</p>
+
+<p>2、该注解的属性名必须为value</p>
+
+<p>（3）多值注解：注解的内部有多个属性，称作多值注解</p>
+
+<p>使用方法：@注解名(属性名1=属性值1, 属性名2=属性值2……)</p>
+
+<p>使用例子：@MultipliedAnnotation(value1 = "abc", value2 = 30……)</p>
+
+<p><strong>八、自动测试机的写法：</strong></p>
+
+<p>自动测试机的原理：</p>
+
+<p>使用Annotation来Annotate元素的实质是：每一个ElementType内部的元素都有两个方法，分别为</p>
+
+<p>（注：为方便理解，以下使用的TestCase为某个特定的自定义注释）</p>
+
+<p>（1）isAnnotationPresent(TestCase.class)  //判断该元素是否被TestCase所注释</p>
+
+<p>（2）getAnnotation(TestCase.class)  //获得TestCase的类对象</p>
+
+<p> </p>
+
+<p>因此，自动测试机的工作过程是：</p>
+
+<p>（1）首先通过反射，获得被测类o中的每一个方法</p>
+
+<p>（2）对每一个方法通过使用isAnnotationPresent(TestCase.class)判断其是否被TestCase所注释<strong>（注意是.class！）</strong></p>
+
+<p>（3）如果某方法method被TestCase所注释，则通过method的getAnnotation(TestCase.class)获得TestCase的类对象tc</p>
+
+<p>（4）通过tc的value()方法，获得该类对象的属性value</p>
+
+<p>（注：此处使用的value()方法，正是在TestCase中定义的value属性，再次理解在注释中定义的<strong>value既是属性，也是方法</strong>）</p>
+
+<p>（5）调用method方法的invoke(o,value)，用value对method进行测试</p>
+
+<p> </p>
+
+<p><strong>九、注解使用实例：</strong></p>
+
+<p>要求：</p>
+
+<p>（1）定义一个单值注解TestCase，使其可以注解方法，并且可以被保留到程序运行时</p>
+
+<p>注解的属性类型为String，要求可以使用简写方式为属性赋值</p>
+
+<p>（2）定义一个类MyClass，要求有三个方法Method1、2、3</p>
+
+<p>方法的参数、返回值类型均为String类型，返回值为传入的参数</p>
+
+<p>使用（1）中的注解来注释Method1、3，并对属性参数赋值</p>
+
+<p>（3）定义一个测试类TestMyClass，要求使用反射来测试MyClass中所有的被TestCase注解的方法</p>
+
+<p>并将注解的属性值作为参数，调用相应方法来返回测试结果</p>
+
+<p>例子：</p>
+
+<p>---------------------------1---------------------------</p>
+
+<p>import java.lang.annotation.*;</p>
+
+<p>@Target ({ElementType.METHOD})</p>
+
+<p>@Retention (RetentionPolicy.RUNTIME)</p>
+
+<p>public @interface TestCase {</p>
+
+<p>  String value();</p>
+
+<p>}</p>
+
+<p>---------------------------2---------------------------</p>
+
+<p>public class MyClass {</p>
+
+<p>  @TestCase("This is Method 1")</p>
+
+<p>  public String Method1 (String s) {</p>
+
+<p>    return s;</p>
+
+<p>  }</p>
+
+<p> </p>
+
+<p>  public String Method2 (String s) {</p>
+
+<p>    return s;</p>
+
+<p>  }</p>
+
+<p>  @TestCase("This is Method 3")</p>
+
+<p>  public String Method3 (String s) {</p>
+
+<p>    return s;</p>
+
+<p>  }</p>
+
+<p>}</p>
+
+<p>---------------------------3---------------------------</p>
+
+<p> </p>
+
+<p>import java.lang.reflect.*;</p>
+
+<p> </p>
+
+<p>public class TestMyClass {</p>
+
+<p>  public static void main(String [] args) {</p>
+
+<p>    Class c = Class.forName("MyClass");</p>
+
+<p>    Method [] ms = c.getDeclaredMethods();</p>
+
+<p>    for (Method m : ms) {</p>
+
+<p>      if(m.isAnnotationPresent(TestCase.class) {</p>
+
+<p>        TestCase tc = m.getAnnotation(TestCase.class);</p>
+
+<p>        Object o = c.newInstance();</p>
+
+<p>        String s = tc.value();</p>
+
+<p>        m.invoke(o, s);</p>
+
+<p>        或者以上三句可以直接写成：</p>
+
+<p>        m.invoke(c.newInstace, tc.value());</p>
+
+<p>      }</p>
+
+<p>    }</p>
+
+<p>  }</p>
+
+<p>}</p>
+
+<p><strong>总结</strong></p>
+
+<p>注解是J2SE5.0提供的一项非常有趣的功能。它不但有趣，而且还非常有用。如即将出台的EJB3.0规范就是借助于注解实现的。这样将使EJB3.0在实现起来更简单，更人性化。还有Hibernate3.0除了使用传统的方法生成hibernate映射外，也可以使用注解来生成hibernate映射。总之，如果能将注解灵活应用到程序中，将会使你的程序更加简洁和强大。</p>

@@ -1,0 +1,171 @@
+<h1>RabbitMQ使用详解</h1>
+
+<p>刚刚用了，记录下来，以后忘了，方便能够快速想起来。</p>
+
+<p>首先说明，由于RabbitMQ服务端非JAVA,C++语言，当然也就看不懂，所以本文的理解都是过于主观的。</p>
+
+<h2><strong>一，RabbitMQ服务端搭建</strong></h2>
+
+<p>　　　　推荐最好的安装方式：去官网，去官网，去官网，重要的事情说三遍。</p>
+
+<p>　　　　我一般的操作流程是：用google右上角翻译网页，然后看个大概意思，然后再显示原网页，一个单词单词的看。</p>
+
+<p>　　　　还是总结一下Ubuntu,RabbitMQ安装步骤（依次执行下面四条命令就ok了）：</p>
+
+<pre>
+1，echo 'deb http://www.rabbitmq.com/debian/ testing main' |
+sudo tee /etc/apt/sources.list.d/rabbitmq.list
+2，wget -O- https://www.rabbitmq.com/rabbitmq-release-signing-key.asc |
+sudo apt-key add -
+3，sudo apt-get update
+4，sudo apt-get install rabbitmq-server</pre>
+
+<h2><strong>二，服务端基本配置</strong></h2>
+
+<p><strong>　　　　</strong>服务端配置，基本上不需要配置就能满足大多数需求。官网如是说，且相信他一次　　　</p>
+
+<p>　　　　<strong>2.1 界面管理插件的安装</strong></p>
+
+<p>　　　　先说一下ubuntu目录下面的日志目录，与脚本目录，一般这是我们最关心的目录：</p>
+
+<p>　　　　1,日志目录: /var/log/robbitmq-server 可以通过/etc/logrotate.d/rabbitmq-server进行配置<br />
+　　　　2,脚本目录:/usr/lib/rabbitmq/bin/</p>
+
+<p>　　　　然后进入到脚本目录也就是（cd /usr/lib/rabbitmq/bin/），执行如下命令</p>
+
+<pre>
+rabbitmq-plugins enable rabbitmq_management</pre>
+
+<p>　　　　这样管理插件算是装好了。</p>
+
+<p>　　　　<strong>2.2 用户管理</strong></p>
+
+<p>　　　　通过http://localhost:15672登录会发现（默认用户guest,密码也是guest），认证失败(登录失败去日志文件查找原因)。</p>
+
+<p>　　　　然后自然需要授权了，给一个授权的命令demo，详情自行脑补:　　　</p>
+
+<pre>
+#username就是用户名，可以随便取，pwd就是你要设置的密码
+rabbitmqctl add_user username pwd
+#administrator为用户的角色，与tomcat那种管理员配置有点像
+rabbitmqctl set_user_tags username administrator
+#授予权限 /代表vhost主机根目录，后面的*j就是读写之类的权限
+rabbitmqctl set_permissions -p / username ".*" ".*" ".*"</pre>
+
+<p>　　　　授权之后，讲道理就能登录了，可以看到下面这样的界面：</p>
+
+<p><img alt="" src="https://images2017.cnblogs.com/blog/871695/201711/871695-20171101154025966-1039426491.png" /></p>
+
+<h2><strong>三，RabbitMQ的工作原理（例子稍后奉上）</strong></h2>
+
+<p>　　　　先体验一下整个消息投递过程：</p>
+
+<p>　　　　<img alt="" src="https://images2017.cnblogs.com/blog/871695/201711/871695-20171101165531357-471890139.png" /></p>
+
+<p> </p>
+
+<p>　　　　<strong>3.1 RabbitMQ的核心：</strong></p>
+
+<p>　　　　核心官网有介绍，说的connecnton,channel之类的，到底怎么样，who care？　</p>
+
+<p>　　　　总体来看，我们关注业务实现是：1）消息怎么投递的。2）消费者怎么消费消息。3）消息是否是可靠投递。4）消息投递方式。5）消息的生命周期。6）消息队列生命周期</p>
+
+<p>　　　　<strong>3.2  消息是怎么投递的？（记住一点，生产者消息投递都是面向交换机的）</strong></p>
+
+<p><strong>　　　　R</strong>abbitMQ 是面向交换机投递消息的。交换机可能绑定有许多队列，交换机如何将消息投递给这些队列呢？</p>
+
+<p>　　　　首先说一下面向交换机的设计的优势：1）这明显借助了数据链路层那个交换机的设计思想。除了层级分明以外，还能从分提高链路利用率（可能有点抽像）。</p>
+
+<p>　　　　　　　　　　　　　　　　　　　　　2）从代码层面来看：如果没有交换机，你至少得维护一个十分庞大的路由表，然后从路由表正确投递消息，有了交互机，这里路</p>
+
+<p>　　　　　　　　　　　　　　　　　　　　　　由表就会被拆分到多个交换机里面，效果不必多说。</p>
+
+<p>　　　　　　　　　　　　　　　　　　　　   3）然后就是高度的解耦，不同的交换机可有不同的路由规则，要是没有交换机。。。。。。</p>
+
+<p>　　　　在RabbitMQ，交换机有4种投递方式，就是枚举类BuiltinExchangeType的4个枚举变量：</p>
+
+<p>　　　    DIRECT:会将所有消息先取消息的ROUTE_KEY，然后投递到与ROUTE_KEY绑定的队列里面（if(msg.routekey.equals(queue.routekey))）。</p>
+
+<p>　　　　FANOUT:此种模式下，根本不检查消息的ROUTE_KEY,直接投送到交换机所拥有的所有队列里面。</p>
+
+<p>　　　　TOPIC,HEADERS自行看一下官网怎么说的，不想码字了^_^||</p>
+
+<p>　　　　总结起来就一个函数就把消息发出去了:channel.basicPublish(excange_name,route_key,false,bs,"test".getBytes());可以去官网查一下这个API</p>
+
+<p>　　　　<strong>3.3 消费者怎么消费消息（记住一点，消费者消费消息是面向消息队列的，这与生成者有点不一样）</strong></p>
+
+<p>　　　　还不是就是TCP长连接心跳的那些事，就是这么一个API：channel.basicConsume(QUEUE_AUTODELETE, true, consumer);consumer是Consumer类的一个实例，</p>
+
+<p>　　　　你直接去处理回调接口就ok了</p>
+
+<p>　　　　<strong>3.4 消息传递是否可靠</strong></p>
+
+<p>　　　　很明显是可靠的，除非你将消息队列，声明成非持久模式，这事你又重启了机器。这会丢失消息的。还有就是他有应答机制，你可以通过设置消费者消费消息的模式，</p>
+
+<p>　　　　去手动应答。channel.basicConsume（？，autoACk,?）的autoAck参数设置</p>
+
+<p>　　　　<strong>3.5 消息的生命周期</strong></p>
+
+<p><strong>　　　　</strong>一旦受到消费者应答，标识消息已被消费，则消息被回收掉。</p>
+
+<p>　　　　<strong>3.6 队列生命周期</strong></p>
+
+<p><strong>　　　　</strong>channel.queueDeclare(QUEUE_NAME,false,false,true,null);</p>
+
+<p>　　　　第二个参数设置为true，会将消息持久化到磁盘，第四个参数设置为true表示没有消息并且没有连接则删除改队列，详情可以查一下API</p>
+
+<h2><strong>四、一个示例</strong></h2>
+
+<h3>4.1 生产者代码：</h3>
+
+<p>　          自行导入相关依赖包或相关依赖</p>
+
+<pre>
+ConnectionFactory factory = new ConnectionFactory();
+factory.setHost("localhost");
+factory.setUsername("username");
+factory.setPort(5672);//注意这里的端口与管理插件的端口不一样
+factory.setPassword("pwd");
+Connection connection = factory.newConnection();
+Channel channel = connection.createChannel();
+//声明一个dirent模式的交换机
+channel.exchangeDeclare("exchange_name",BuiltinExchangeType.DIRECT,true);
+//声明一个非持久化自动删除的队列
+channel.queueDeclare("queue_name",false,false,true,null);//如果该队列不在被使用就删除他 zhe
+//将绑定到改交换机
+channel.queueBind("queue_name","exchange_name","route_key");
+//声明一个消息头部
+Map<String,Object> header=new HashMap<>();
+AMQP.BasicProperties.Builder b= new AMQP.BasicProperties.Builder();
+header.put("charset","utf-8");
+b.headers(header);
+AMQP.BasicProperties bp=b.build();
+//将消息发出去
+channel.basicPublish("exchange_name","route_key",false,bp,"test3".getBytes());</pre>
+
+<h3>4.2 消费者代码</h3>
+
+<pre>
+ConnectionFactory factory = new ConnectionFactory();
+factory.setHost("localhost");
+factory.setUsername("username");
+factory.setPort(5672);//注意这里的端口与管理插件的端口不一样
+factory.setPassword("pwd");
+Connection connection = factory.newConnection();
+Channel channel = connection.createChannel();
+//声明一个dirent模式的交换机
+channel.exchangeDeclare("exchange_name",BuiltinExchangeType.DIRECT,true);
+//声明一个非持久化自动删除的队列
+channel.queueDeclare("queue_name",false,false,true,null);//如果该队列不在被使用就删除他 zhe
+//将绑定到改交换机
+channel.queueBind("queue_name","exchange_name","route_key");
+Consumer consumer = new DefaultConsumer(channel) {
+    @Override
+    public void handleDelivery(String consumerTag, Envelope envelope, AMQP.BasicProperties properties,
+                               byte[] body) throws IOException {
+        String message = new String(body, "UTF-8");
+        System.out.println(" [x] Received '" + message + "'");
+    }
+};
+channel.basicConsume("queue_name", true, consumer);
+</pre>

@@ -1,0 +1,122 @@
+<h1>springMVC上传文件Java使用transferTo方法事半功倍</h1>
+
+<p>        在web开发中，常常会遇到上传文件的需求，比如上传视频和图片，之前做上传功能的时候，就是使用IO流来操作，这种需要熟悉IO各种输入输出流，当然本人还是希望开发能对IO进行深度学习，如果掌握了，不妨可以尝试使用transferTo()来进行文件的上传操作。</p>
+
+<h2>前端页面写法（form表单提交）：</h2>
+
+<p><input type="file"  id="media" name="myfile" /><br />
+<input type="submit" class="btn btn-small btn-base" title="保存" value="保存"><br />
+提交就是使用jquery的ajaxSubmit函数进行整个表单的提交。</p>
+
+<h2>后端核心代码写法：</h2>
+
+<p>public void fileUpload(@RequestParam("myfile") MultipartFile[] myfile) {<br />
+        try {<br />
+            int len = myfile.length;<br />
+            for (int i = 0; i < len; i++) {<br />
+                MultipartFile file = myfile[i];<br />
+                if (file.isEmpty()) {<br />
+                    // TODO文件为空时处理<br />
+                    return;<br />
+                } else {<br />
+                    file.transferTo(new File("服务器文件上传目录" + file.getName()));<br />
+                }<br />
+            }<br />
+        } catch (Exception e) {<br />
+            e.printStackTrace();<br />
+        }<br />
+        return;<br />
+    }</p>
+
+<h2>动态给form赋值进行下载：</h2>
+
+<p>//下载导入模板<br />
+function toDownloadTemplate(fileName){<br />
+    var url = encodeURI( "downloadSpecifiedImportTemplate.do?fileName="+fileName+"&ACCESSTOKEN="+accessTokenId);<br />
+    $("#downloadTemplateForm").attr('action',url);<br />
+    $("#downloadTemplateForm").attr('target','');<br />
+    $("#downloadTemplateForm").submit();<br />
+}</p>
+
+<h2>后台对应的java代码：</h2>
+
+<h3>CommonController.java</h3>
+
+<p>CommonController extendsd BaseController {</p>
+
+<p>  /**<br />
+     * 下载导入模板<br />
+     * @param request<br />
+     * @param response<br />
+     */<br />
+    @RequestMapping(value = "/downloadSpecifiedImportTemplate",method = RequestMethod.POST)<br />
+    public void downloadSpecifiedImportTemplate(HttpServletRequest request,HttpServletResponse response) throws Exception{<br />
+         downloadImportTemplate(request,response);<br />
+         return;<br />
+    }</p>
+
+<p>}</p>
+
+<h3>BaseController.java</h3>
+
+<p>    /**<br />
+     * 下载导入模板<br />
+     * @param request<br />
+     * @param response<br />
+     */<br />
+    public void downloadImportTemplate(HttpServletRequest request,HttpServletResponse response) throws Exception{<br />
+        try{<br />
+            String fileName = URLDecoder.decode(request.getParameter("fileName"), "UTF-8");<br />
+            String path = request.getSession().getServletContext().getRealPath("template/");<br />
+            String templateFilePath = path + File.separator+fileName;<br />
+            File tpFile = new File(templateFilePath.replaceAll("\\\\", "/"));<br />
+            FileUtils.downloadFile(tpFile, fileName, response);<br />
+        } catch(Exception e){<br />
+            logger.error("下载模板失败",e);<br />
+            throw new Exception("下载模板失败");<br />
+        }<br />
+    }</p>
+
+<h3>FileUtils.java</h3>
+
+<p>    public static void downloadFile(final File file, String fileName,<br />
+            HttpServletResponse response) throws IOException <br />
+    {<br />
+        InputStream inputStream = null;<br />
+        OutputStream outputStream = null;<br />
+        try<br />
+        {<br />
+            // 设置response<br />
+            response.reset();<br />
+            response.setCharacterEncoding("UTF-8"); <br />
+            response.setContentType("multipart/form-data;charset="+ "UTF-8");<br />
+            response.setHeader( "Content-Disposition", "attachment;filename=" + new String( fileName.getBytes(System.setProperty("sun.jnu.encoding","utf-8")), "ISO8859-1" ) );</p>
+
+<p>            // 生成文件输入字节流<br />
+            inputStream = new FileInputStream(file);<br />
+            // 生成文件输出字节流<br />
+            outputStream = response.getOutputStream();<br />
+            // 字节数组<br />
+            byte[] tmp = new byte[1024];<br />
+            // 读取字节长度<br />
+            int length = 0;<br />
+            while ((length = inputStream.read(tmp)) > 0) <br />
+            {<br />
+                outputStream.write(tmp, 0, length);<br />
+            }<br />
+            outputStream.flush();<br />
+        }catch(Exception e)<br />
+        {<br />
+            e.printStackTrace();<br />
+        }finally<br />
+        {<br />
+            if(outputStream != null)<br />
+            {<br />
+                outputStream.close();<br />
+            }<br />
+            if(inputStream != null)<br />
+            {<br />
+                inputStream.close();<br />
+            }<br />
+        }<br />
+    }</p>

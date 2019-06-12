@@ -1,0 +1,308 @@
+<h1><a href="http://www.iteye.com/topic/472333">Java aio(异步网络IO)初探</a></h1>
+<p>    按照《Unix网络编程》的划分，IO模型可以分为：阻塞IO、非阻塞IO、IO复用、信号驱动IO和异步IO，按照POSIX标准来划分只分为两类：同步IO和异步IO。如何区分呢？首先一个IO操作其实分成了两个步骤：发起IO请求和实际的IO操作，同步IO和异步IO的区别就在于第二个步骤是否阻塞，如果实际的IO读写阻塞请求进程，那么就是同步IO，因此阻塞IO、非阻塞IO、IO服用、信号驱动IO都是同步IO，如果不阻塞，而是操作系统帮你做完IO操作再将结果返回给你，那么就是异步IO。阻塞IO和非阻塞IO的区别在于第一步，发起IO请求是否会被阻塞，如果阻塞直到完成那么就是传统的阻塞IO，如果不阻塞，那么就是非阻塞IO。<br />
+<br />
+   Java nio 2.0的主要改进就是引入了异步IO（包括文件和网络），这里主要介绍下异步网络IO API的使用以及框架的设计，以TCP服务端为例。首先看下为了支持AIO引入的新的类和接口：<br />
+<br />
+ <strong>java.nio.channels.AsynchronousChannel</strong><br />
+       标记一个channel支持异步IO操作。<br />
+<br />
+<strong> java.nio.channels.AsynchronousServerSocketChannel</strong><br />
+       ServerSocket的aio版本，创建TCP服务端，绑定地址，监听端口等。<br />
+<br />
+<strong> java.nio.channels.AsynchronousSocketChannel</strong><br />
+       面向流的异步socket channel，表示一个连接。<br />
+<br />
+<strong> java.nio.channels.AsynchronousChannelGroup</strong><br />
+       异步channel的分组管理，目的是为了资源共享。一个AsynchronousChannelGroup绑定一个线程池，这个线程池执行两个任务：处理IO事件和派发CompletionHandler。AsynchronousServerSocketChannel创建的时候可以传入一个 AsynchronousChannelGroup，那么通过AsynchronousServerSocketChannel创建的 AsynchronousSocketChannel将同属于一个组，共享资源。<br />
+<br />
+<strong> java.nio.channels.CompletionHandler</strong><br />
+       异步IO操作结果的回调接口，用于定义在IO操作完成后所作的回调工作。AIO的API允许两种方式来处理异步操作的结果：返回的Future模式或者注册CompletionHandler，我更推荐用CompletionHandler的方式，这些handler的调用是由 AsynchronousChannelGroup的线程池派发的。显然，线程池的大小是性能的关键因素。AsynchronousChannelGroup允许绑定不同的线程池，通过三个静态方法来创建：</p>
+<ol start="1">
+<li>public static AsynchronousChannelGroup withFixedThreadPool(int nThreads,  </li>
+<li>                                                              ThreadFactory threadFactory)  </li>
+<li>       throws IOException  </li>
+<li>  </li>
+<li>public static AsynchronousChannelGroup withCachedThreadPool(ExecutorService executor,  </li>
+<li>                                                               int initialSize)  </li>
+<li>  </li>
+<li>public static AsynchronousChannelGroup withThreadPool(ExecutorService executor)  </li>
+<li>       throws IOException  </li>
+</ol>
+<p> </p>
+<p>     需要根据具体应用相应调整，从框架角度出发，需要暴露这样的配置选项给用户。<br />
+<br />
+     在介绍完了aio引入的TCP的主要接口和类之后，我们来设想下一个aio框架应该怎么设计。参考非阻塞nio框架的设计，一般都是采用<strong>Reactor</strong>模式，Reacot负责事件的注册、select、事件的派发；相应地，异步IO有个<strong>Proactor</strong>模式，Proactor负责 CompletionHandler的派发，查看一个典型的IO写操作的流程来看两者的区别：<br />
+<br />
+     Reactor:  send(msg) -> 消息队列是否为空，如果为空  -> 向Reactor注册OP_WRITE，然后返回 -> Reactor select -> 触发Writable，通知用户线程去处理 ->先注销Writable(很多人遇到的cpu 100%的问题就在于没有注销）,处理Writeable，如果没有完全写入，继续注册OP_WRITE。注意到，写入的工作还是用户线程在处理。<br />
+     Proactor: send(msg) -> 消息队列是否为空，如果为空,发起read异步调用，并注册CompletionHandler，然后返回。 -> 操作系统负责将你的消息写入，并返回结果（写入的字节数）给Proactor -> Proactor派发CompletionHandler。可见，写入的工作是操作系统在处理，无需用户线程参与。事实上在aio的API 中,<strong>AsynchronousChannelGroup就扮演了Proactor的角色</strong>。<br />
+<br />
+    CompletionHandler有三个方法，分别对应于处理成功、失败、被取消（通过返回的Future)情况下的回调处理：</p>
+<ol start="1">
+<li>public interface CompletionHandler<V,A> {  </li>
+<li>  </li>
+<li>     void completed(V result, A attachment);  </li>
+<li>  </li>
+<li>    void failed(Throwable exc, A attachment);  </li>
+<li>  </li>
+<li>     </li>
+<li>    void cancelled(A attachment);  </li>
+<li>}  </li>
+</ol>
+<p> </p>
+<p><br />
+    其中的泛型参数V表示IO调用的结果，而A是发起调用时传入的attchment。<br />
+<br />
+    在初步介绍完aio引入的类和接口后，我们看看一个典型的tcp服务端是怎么启动的，怎么接受连接并处理读和写，这里引用的代码都是yanf4j 的aio分支中的代码，可以从svn checkout，svn地址: <a href="http://yanf4j.googlecode.com/svn/branches/yanf4j-aio">http://yanf4j.googlecode.com/svn/branches/yanf4j-aio</a><br />
+<br />
+    第一步，创建一个AsynchronousServerSocketChannel，创建之前先创建一个 AsynchronousChannelGroup，上文提到AsynchronousServerSocketChannel可以绑定一个 AsynchronousChannelGroup，那么通过这个AsynchronousServerSocketChannel建立的连接都将同属于一个AsynchronousChannelGroup并共享资源：</p>
+<ol start="1">
+<li>this.asynchronousChannelGroup = AsynchronousChannelGroup  </li>
+<li>                    .withCachedThreadPool(Executors.newCachedThreadPool(),  </li>
+<li>                            this.threadPoolSize);  </li>
+</ol>
+<p>     然后初始化一个AsynchronousServerSocketChannel，通过open方法：</p>
+<ol start="1">
+<li>this.serverSocketChannel = AsynchronousServerSocketChannel  </li>
+<li>                .open(this.asynchronousChannelGroup);  </li>
+</ol>
+<p> </p>
+<p>    通过nio 2.0引入的SocketOption类设置一些TCP选项：</p>
+<ol start="1">
+<li>this.serverSocketChannel  </li>
+<li>                    .setOption(  </li>
+<li>                            StandardSocketOption.SO_REUSEADDR,true);  </li>
+<li>this.serverSocketChannel  </li>
+<li>                    .setOption(  </li>
+<li>                            StandardSocketOption.SO_RCVBUF,16*1024);  </li>
+</ol>
+<p> </p>
+<p><br />
+    绑定本地地址：</p>
+<ol start="1">
+<li>this.serverSocketChannel  </li>
+<li>                    .bind(new InetSocketAddress("localhost",8080), 100);  </li>
+</ol>
+<p> </p>
+<p>   <br />
+    其中的100用于指定等待连接的队列大小(backlog)。完了吗？还没有，最重要的<strong>监听</strong>工作还没开始，监听端口是为了等待连接上来以便accept产生一个AsynchronousSocketChannel来表示一个新建立的连接，因此需要发起一个accept调用，调用是异步的，操作系统将在连接建立后，将最后的结果——<strong>AsynchronousSocketChannel</strong>返回给你：</p>
+<ol start="1">
+<li>public void pendingAccept() {  </li>
+<li>        if (this.started && this.serverSocketChannel.isOpen()) {  </li>
+<li>            this.acceptFuture = this.serverSocketChannel.accept(null,  </li>
+<li>                    new AcceptCompletionHandler());  </li>
+<li>  </li>
+<li>        } else {  </li>
+<li>            throw new IllegalStateException("Controller has been closed");  </li>
+<li>        }  </li>
+<li>    }  </li>
+</ol>
+<p> </p>
+<p><br />
+   注意，重复的accept调用将会抛出PendingAcceptException，后文提到的read和write也是如此。accept方法的第一个参数是你想传给CompletionHandler的attchment，第二个参数就是注册的用于回调的CompletionHandler，最后返回结果Future<AsynchronousSocketChannel>。你可以对future做处理，这里采用更推荐的方式就是注册一个CompletionHandler。那么accept的CompletionHandler中做些什么工作呢？显然一个赤裸裸的 AsynchronousSocketChannel是不够的，我们需要将它封装成session，一个session表示一个连接（mina里就叫 IoSession了），里面带了一个缓冲的消息队列以及一些其他资源等。在连接建立后，除非你的服务器只准备接受一个连接，不然你需要在后面<strong>继续调用pendingAccept来发起另一个accept请求</strong>：</p>
+<ol start="1">
+<li>private final class AcceptCompletionHandler implements  </li>
+<li>            CompletionHandler<AsynchronousSocketChannel, Object> {  </li>
+<li>  </li>
+<li>        @Override  </li>
+<li>        public void cancelled(Object attachment) {  </li>
+<li>            logger.warn("Accept operation was canceled");  </li>
+<li>        }  </li>
+<li>  </li>
+<li>        @Override  </li>
+<li>        public void completed(AsynchronousSocketChannel socketChannel,  </li>
+<li>                Object attachment) {  </li>
+<li>            try {  </li>
+<li>                logger.debug("Accept connection from "  </li>
+<li>                        + socketChannel.getRemoteAddress());  </li>
+<li>                configureChannel(socketChannel);  </li>
+<li>                AioSessionConfig sessionConfig = buildSessionConfig(socketChannel);  </li>
+<li>                Session session = new AioTCPSession(sessionConfig,  </li>
+<li>                        AioTCPController.this.configuration  </li>
+<li>                                .getSessionReadBufferSize(),  </li>
+<li>                        AioTCPController.this.sessionTimeout);  </li>
+<li>                session.start();  </li>
+<li>                registerSession(session);  </li>
+<li>            } catch (Exception e) {  </li>
+<li>                e.printStackTrace();  </li>
+<li>                logger.error("Accept error", e);  </li>
+<li>                notifyException(e);  </li>
+<li>            } finally {  </li>
+<li>                <strong>pendingAccept</strong>();  </li>
+<li>            }  </li>
+<li>        }  </li>
+<li>  </li>
+<li>        @Override  </li>
+<li>        public void failed(Throwable exc, Object attachment) {  </li>
+<li>            logger.error("Accept error", exc);  </li>
+<li>            try {  </li>
+<li>                notifyException(exc);  </li>
+<li>            } finally {  </li>
+<li>                <strong>pendingAccept</strong>();  </li>
+<li>            }  </li>
+<li>        }  </li>
+<li>    }  </li>
+</ol>
+<p> </p>
+<p>  <br />
+    注意到了吧，我们在failed和completed方法中在最后都调用了pendingAccept来继续发起accept调用，等待新的连接上来。有的同学可能要说了，这样搞是不是递归调用，会不会堆栈溢出？实际上不会，因为发起accept调用的线程与CompletionHandler回调的线程并非同一个，不是一个上下文中，两者之间没有耦合关系。要注意到，CompletionHandler的回调共用的是 AsynchronousChannelGroup绑定的线程池，因此<strong>千万别在CompletionHandler回调方法中调用阻塞或者长时间的操作</strong>，例如sleep，回调方法最好能支持超时，防止线程池耗尽。<br />
+<br />
+    连接建立后，怎么读和写呢？回忆下在nonblocking nio框架中，连接建立后的第一件事是干什么？注册OP_READ事件等待socket可读。异步IO也同样如此，连接建立后马上发起一个异步read调用，等待socket可读，这个是Session.start方法中所做的事情：</p>
+<ol start="1">
+<li>public class AioTCPSession {  </li>
+<li>    protected void start0() {  </li>
+<li>        pendingRead();  </li>
+<li>    }  </li>
+<li>  </li>
+<li>    protected final void pendingRead() {  </li>
+<li>        if (!isClosed() && this.asynchronousSocketChannel.isOpen()) {  </li>
+<li>            if (!this.readBuffer.hasRemaining()) {  </li>
+<li>                this.readBuffer = ByteBufferUtils  </li>
+<li>                        .increaseBufferCapatity(this.readBuffer);  </li>
+<li>            }  </li>
+<li>            this.readFuture = this.asynchronousSocketChannel.read(  </li>
+<li>                    this.readBuffer, this, this.readCompletionHandler);  </li>
+<li>        } else {  </li>
+<li>            throw new IllegalStateException(  </li>
+<li>                    "Session Or Channel has been closed");  </li>
+<li>        }  </li>
+<li>    }  </li>
+<li>     </li>
+<li>}  </li>
+</ol>
+<p> </p>
+<p>     AsynchronousSocketChannel的read调用与AsynchronousServerSocketChannel的accept调用类似，同样是非阻塞的，返回结果也是一个Future，但是写的结果是整数，表示写入了多少字节，因此read调用返回的是 <strong>Future<Integer></strong>，方法的第一个参数是读的缓冲区，操作系统将IO读到数据拷贝到这个缓冲区，第二个参数是传递给 CompletionHandler的attchment，第三个参数就是注册的用于回调的CompletionHandler。这里保存了read的结果Future，这是为了在关闭连接的时候能够主动取消调用，accept也是如此。现在可以看看read的CompletionHandler的实现：</p>
+<ol start="1">
+<li>public final class ReadCompletionHandler implements  </li>
+<li>        CompletionHandler<Integer, AbstractAioSession> {  </li>
+<li>  </li>
+<li>    private static final Logger log = LoggerFactory  </li>
+<li>            .getLogger(ReadCompletionHandler.class);  </li>
+<li>    protected final AioTCPController controller;  </li>
+<li>  </li>
+<li>    public ReadCompletionHandler(AioTCPController controller) {  </li>
+<li>        this.controller = controller;  </li>
+<li>    }  </li>
+<li>  </li>
+<li>    @Override  </li>
+<li>    public void cancelled(AbstractAioSession session) {  </li>
+<li>        log.warn("Session(" + session.getRemoteSocketAddress()  </li>
+<li>                + ") read operation was canceled");  </li>
+<li>    }  </li>
+<li>  </li>
+<li>    @Override  </li>
+<li>    public void completed(Integer result, AbstractAioSession session) {  </li>
+<li>        if (log.isDebugEnabled())  </li>
+<li>            log.debug("Session(" + session.getRemoteSocketAddress()  </li>
+<li>                    + ") read +" + result + " bytes");  </li>
+<li>        if (result < 0) {  </li>
+<li>            session.close();  </li>
+<li>            return;  </li>
+<li>        }  </li>
+<li>        try {  </li>
+<li>            if (result > 0) {  </li>
+<li>                session.updateTimeStamp();  </li>
+<li>                session.getReadBuffer().flip();  </li>
+<li>                session.decode();  </li>
+<li>                session.getReadBuffer().compact();  </li>
+<li>            }  </li>
+<li>        } finally {  </li>
+<li>            try {  </li>
+<li>                session.pendingRead();  </li>
+<li>            } catch (IOException e) {  </li>
+<li>                session.onException(e);  </li>
+<li>                session.close();  </li>
+<li>            }  </li>
+<li>        }  </li>
+<li>        controller.checkSessionTimeout();  </li>
+<li>    }  </li>
+<li>  </li>
+<li>    @Override  </li>
+<li>    public void failed(Throwable exc, AbstractAioSession session) {  </li>
+<li>        log.error("Session read error", exc);  </li>
+<li>        session.onException(exc);  </li>
+<li>        session.close();  </li>
+<li>    }  </li>
+<li>  </li>
+<li>}  </li>
+</ol>
+<p> </p>
+<p>   如果IO读失败，会返回失败产生的异常，这种情况下我们就主动关闭连接，通过session.close()方法，这个方法干了两件事情：关闭channel和取消read调用：</p>
+<ol start="1">
+<li>if (null != this.readFuture) {  </li>
+<li>            this.readFuture.cancel(true);  </li>
+<li>        }  </li>
+<li>this.asynchronousSocketChannel.close();  </li>
+</ol>
+<p> </p>
+<p>   在读成功的情况下，我们还需要判断结果result是否小于0，<strong>如果小于0就表示对端关闭了</strong>，这种情况下我们也主动关闭连接并返回。如果读到一定字节，也就是result大于0的情况下，我们就尝试从读缓冲区中decode出消息，并派发给业务处理器的回调方法，最终<strong>通过pendingRead继续发起read调用等待socket的下一次可读</strong>。可见，我们并不需要自己去调用channel来进行IO读，而是操作系统帮你直接读到了缓冲区，然后给你一个结果表示读入了多少字节，你处理这个结果即可。而nonblocking IO框架中，是reactor通知用户线程socket可读了，然后用户线程自己去调用read进行实际读操作。这里还有个需要注意的地方，就是decode出来的消息的派发给业务处理器工作最好交给一个线程池来处理，避免阻塞group绑定的线程池。<br />
+  <br />
+   IO写的操作与此类似，不过通常写的话我们会在session中关联一个缓冲队列来处理，没有完全写入或者等待写入的消息都存放在队列中，队列为空的情况下发起write调用：</p>
+<ol start="1">
+<li>protected void write0(WriteMessage message) {  </li>
+<li>      boolean needWrite = false;  </li>
+<li>      synchronized (this.writeQueue) {  </li>
+<li>          needWrite = this.writeQueue.isEmpty();  </li>
+<li>          this.writeQueue.offer(message);  </li>
+<li>      }  </li>
+<li>      if (needWrite) {  </li>
+<li>          pendingWrite(message);  </li>
+<li>      }  </li>
+<li>  }  </li>
+<li>  </li>
+<li>  protected final void pendingWrite(WriteMessage message) {  </li>
+<li>      message = preprocessWriteMessage(message);  </li>
+<li>      if (!isClosed() && this.asynchronousSocketChannel.isOpen()) {  </li>
+<li>          this.asynchronousSocketChannel.write(message.getWriteBuffer(),  </li>
+<li>                  this, this.writeCompletionHandler);  </li>
+<li>      } else {  </li>
+<li>          throw new IllegalStateException(  </li>
+<li>                  "Session Or Channel has been closed");  </li>
+<li>      }  </li>
+<li>  }  </li>
+</ol>
+<p> </p>
+<p>    write调用返回的结果与read一样是一个Future<Integer>，而write的CompletionHandler处理的核心逻辑大概是这样：</p>
+<ol start="1">
+<li>@Override  </li>
+<li>    public void completed(Integer result, AbstractAioSession session) {  </li>
+<li>        if (log.isDebugEnabled())  </li>
+<li>            log.debug("Session(" + session.getRemoteSocketAddress()  </li>
+<li>                    + ") writen " + result + " bytes");  </li>
+<li>                  </li>
+<li>        WriteMessage writeMessage;  </li>
+<li>        Queue<WriteMessage> writeQueue = session.getWriteQueue();  </li>
+<li>        synchronized (writeQueue) {  </li>
+<li>            writeMessage = writeQueue.peek();  </li>
+<li>            if (writeMessage.getWriteBuffer() == null  </li>
+<li>                    || !writeMessage.getWriteBuffer().hasRemaining()) {  </li>
+<li>                writeQueue.remove();  </li>
+<li>                if (writeMessage.getWriteFuture() != null) {  </li>
+<li>                    writeMessage.getWriteFuture().setResult(Boolean.TRUE);  </li>
+<li>                }  </li>
+<li>                try {  </li>
+<li>                    session.getHandler().onMessageSent(session,  </li>
+<li>                            writeMessage.getMessage());  </li>
+<li>                } catch (Exception e) {  </li>
+<li>                    session.onException(e);  </li>
+<li>                }  </li>
+<li>                writeMessage = writeQueue.peek();  </li>
+<li>            }  </li>
+<li>        }  </li>
+<li>        if (writeMessage != null) {  </li>
+<li>            try {  </li>
+<li>                session.pendingWrite(writeMessage);  </li>
+<li>            } catch (IOException e) {  </li>
+<li>                session.onException(e);  </li>
+<li>                session.close();  </li>
+<li>            }  </li>
+<li>        }  </li>
+<li>    }  </li>
+</ol>
+<p> </p>
+<p><br />
+   compete方法中的result就是实际写入的字节数，然后我们判断消息的缓冲区是否还有剩余，如果没有就将消息从队列中移除，如果队列中还有消息，那么继续发起write调用。<br />
+<br />
+   重复一下，这里引用的代码都是yanf4j aio分支中的源码，感兴趣的朋友可以直接check out出来看看: <a href="http://yanf4j.googlecode.com/svn/branches/yanf4j-aio">http://yanf4j.googlecode.com/svn/branches/yanf4j-aio</a>。<br />
+   在引入了aio之后，java对于网络层的支持已经非常完善，该有的都有了，java也已经成为服务器开发的首选语言之一。java的弱项在于对内存的管理上，由于这一切都交给了GC，因此在高性能的网络服务器上还是Cpp的天下。java这种单一堆模型比之erlang的进程内堆模型还是有差距，很难做到高效的垃圾回收和细粒度的内存管理。<br />
+<br />
+   这里仅仅是介绍了aio开发的核心流程，对于一个网络框架来说，还需要考虑超时的处理、缓冲buffer的处理、业务层和网络层的切分、可扩展性、性能的可调性以及一定的通用性要求</p>

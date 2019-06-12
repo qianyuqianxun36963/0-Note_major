@@ -1,0 +1,172 @@
+<h1>JDBC API 预览</h1>
+<p>JDBC API 给 Java 程序提供了一种访问一个或者多个数据源的途径，在大多数情况下，数据源是关系型数据库，使用 SQL 语言来访问。但是，JDBC Driver 也可以实现为能够访问其它类型的数据源，比如说文件系统或面向对象的系统。 JDBC API 最主要的动机就是提供一种标准的 API ，让应用程序访问多种多样的数据源</p>
+<p>这一章介绍了 JDBC API 的一些关键概念，此外，也介绍 JDBC 程序的两种使用场景，分别是两层模型和三层模型，在不同的场景中，JDBC API 的功能是不一样的</p>
+<h2>建立连接</h2>
+<p>JDBC API定义了一个Connect 的接口 来代表 与某个数据源的连接<br />
+典型情况下，JDBC 应用可以使用以下两种机制来与目标数据源建立连接：</p>
+<ul>
+<li>
+<p>DriverManager<br />
+这个类从 JDBC API 1.0 版本开始就有了，当应用程序第一次尝试去连接一个数据源时，它需要指定一个url，DriverManager 将会自动加载所有它能在 CLASSPATH 下找到的 JDBC 驱动（任何 JDBC API 4.0 版本前的驱动，需要手动去加载）</p>
+</li>
+<li>
+<p>DataSource<br />
+这个接口在 JDBC 2.0 Optionnal Package API 中首次被引进，更推荐使用 DataSource， 因为它允许关于底层数据源的具体信息对于应用来说是透明的。需要设置 DataSource 对象的一些属性，这样才能让它代表某个数据源。当这个接口的 getConnection 方法被调用时，这个方法会返回一条与数据源建立好的连接。应用程序可以通过改变 DataSource 对象的属性，从而让它指向不同的数据源，无须改动应用代码；同时 DataSource 接口的具体实现类也可以在不改动应用程序代码的情况下，进行改变。</p>
+</li>
+</ul>
+<p>JDBC API还定义了两个重要的扩展的DataSource接口支持企业应用。这些扩展是以下两个接口</p>
+<ul>
+<li>
+<p>ConnectionPoolDataSource<br />
+支持对物理连接的缓存和重用，这能提高应用的性能和可扩展性</p>
+</li>
+<li>
+<p>XADataSource<br />
+使连接能在分布式事务中使用</p>
+</li>
+</ul>
+<h3>执行 SQL 并操作结果集</h3>
+<p>一旦建立好一个连接，应用程序便可以通过这条连接，调用响应的 API 来对底层的数据源执行查询或者更新操作， JDBC API 提供了对于 SQL2003 标准的实现的访问。由于不同的厂商对这个标准的支持程度不同，所以 JDBC API 提供了 DatabaseMetadata 这个接口，应用程序可以使用这个接口来查看某个特性是否受到底层数据库的支持。JDBC API 也定义了转义语法，允许应用程序去访问一些非标准的、某个数据库厂商独有的特性。使用转义语法能够让使用 JDBC API 的应用程序像原生应用程序一样去访问某些特性，并且也提高了应用的可移植性。</p>
+<p>应用可以使用 Connection 接口中定义的方法，去指定事务的属性，并创建 Statement 对象、PreparedStatement 对象，或者 CallableStatement 对象。 这些 statement 用来执行 SQL 语句，并获取执行结果。ResultSet 接口包装一次 SQL 查询的结果。 statements 可以是批量的，应用能够在一次执行中，向数据库提交多条更新语句，作为一个执行单元。</p>
+<p>JDBC API 的 ResultSet 接口扩展了 RowSet 接口，提供了一个功能更全面的对表格型数据进行封装和访问的容器。一个 RowSet 对象是一个 Java Bean 组件，在于底层数据源断开连接的情况下，也能对数据进行操作，比如说，一个 RowSet 对象可以被序列化，然后通过网络发送出去，这对于那些不想对表格型数据进行处理的客户端来说特别有用，并且无须在连接建立的情况下进行，就减轻了驱动程序的负担。RowSet 的另外一个特性是，它能够包含一个定制化的 reader，来对表格型数据进行访问，并非只能访问关系型数据库的数据。此外，一个 RowSet 对象，能在与数据源断开连接的情况下，对行数据进行改写，并且能够包含一个定制化的 writer，把改写后的数据写回底层的数据源。</p>
+<h3>对 SQL 高级数据类型的支持</h3>
+<p>JDBC API 定义了 SQL 数据类型到 JDBC 数据类型的相互转化规则，包括对 SQL2003 的高级数据类型的支持，比如说 BLOB, CLOB, ARRAY, REF, STRUCT, XML, DISTINCT。 JDBC 驱动的实现也可以定义个性化的转化规则（user-defined types, UDTS）, 该用户定义的UDT能够映射到 Java 语言中的某个类。JDBC API 也提供了对外部数据的访问，比如说存储在文件里，但不受数据源管理的数据。</p>
+<h2>两层模型</h2>
+<p>两层模型定义了客户端层和服务端层，不同层实现不同的功能，如下图所示:</p>
+<p><img src="//upload-images.jianshu.io/upload_images/1619194-b4c04b7c976c59aa.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/463/format/webp" /></p>
+<p>Paste_Image.png</p>
+<p>客户端层包含应用程序以及一个或者多个 JDBC 驱动，这一层的主要职责是：</p>
+<ul>
+<li>表现层逻辑</li>
+<li>业务逻辑</li>
+<li>对于多语句事务或者分布式事务的事务管理</li>
+<li>资源管理</li>
+</ul>
+<p>在这种模型中，应用程序直接与 JDBC 驱动交互，包括创建和管理物理连接，处理底层数据库的细节。应用程序可能会基于对底层数据源的类型的认知，去访问一些特有的、非标准的特性，以此来获得性能上的提升</p>
+<p>这个模型有一些缺点，如下所示：</p>
+<ul>
+<li>将表现层和业务层逻辑与底层的功能直接混合，这会使代码变得难以维护。</li>
+<li>应用程序不具有可移植性，因为应用程序会使用到底层特定数据库的一些独有的特性，对于需要与多种数据源进行连接的应用程序来说，要特别注意不同厂商的数据库实现以及不同的特性。</li>
+<li>限制了可扩展性。典型地，应用程序将会一直持久与数据库的连接，直到应用程序退出，这就限制了并发访问数据库的并发数，在这种模型中，所谓的性能、可扩展性以及可用性，需要 JDBC 驱动以及底层的数据库来共同保证。如果应用程序使用的 JDBC 驱动不止一种，那么情况就会更加复杂。</li>
+</ul>
+<h2>三层模型</h2>
+<p>三层模型引进了一个中间层，来处理业务逻辑并作为基础设施，如下图所示</p>
+<p><img src="//upload-images.jianshu.io/upload_images/1619194-f409c63d55828bd1.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/695/format/webp" /></p>
+<p>Paste_Image.png</p>
+<p>这种架构对于企业应用来说，性能、可扩展性和可用性都得到提升，各层的职责如下所示：<br />
+1，客户端层 — 仅作为表现层，只需要与中间层交互，而不须了解中间层的基础架构以及底层数据源的功能细节<br />
+2，中间层服务器 — 包含以下几个组成部分：</p>
+<ul>
+<li>实现了业务逻辑，并与客户端进行交互的应用程序。如果应用程序需要与底层数据源交互，它只需要关注高层次的抽象和逻辑连接，若不是底层的驱动 API。</li>
+<li>为应用程序提供基础设施的应用服务器。这些基础设施包括对物理数据库连接的池化和管理、事务管理，以及对不同驱动 API 的不同点进行屏蔽，最后一点使得我们很容易写出可移植的应用程序，应用服务器这个角色可以由 Java EE 服务器来承担，应用服务器主要实现提供给应用程序使用的抽象层，并负责与 JDBC 驱动交互。</li>
+<li>能够与底层数据源建立连接的 JDBC 驱动。每个驱动根据其底层数据源的特性，去实现标准的 JDBC API，驱动层可能会屏蔽掉 SQL2003 标准与数据源支持的 SQL 方言之间的不同。如果底层数据源并不是一个关系型的数据库，驱动需要去实现对应的关系层逻辑，提供给应用服务器使用。</li>
+</ul>
+<p>3，底层的数据源 — 这一层是数据所在的一层，可以包含关系型数据库，文件系统，面向对象数据库，数据仓库等等任何能组织和表现数据的东西，但它们都需要提供符合 JDBC API 规范的驱动。</p>
+<h2>JDBC 与 JavaEE 平台</h2>
+<p>Java EE 组件，比如说 JavaServer Pages、Servlets以及 EJB 组件，通常都需要使用 JDBC API 来访问关系型的数据，当 Java EE 组件使用 JDBC API 时，它们的容器会管理事务以及数据源。这意味着 Java EE 组件的开发者不会直接使用 JDBC API 的事务管理和数据源管理的能力。更多内容，请参考 Java EE 平台规范。</p>
+<p> </p>
+<h2>类与接口</h2>
+<h3>java.sql Package</h3>
+<p>核心的JDBC API是包含在包java.sql。在java.sql的枚举、类和接口如下。枚举和类是粗体；接口是标准体：</p>
+<p>java.sql.Array<br />
+<strong>java.sql.BatchUpdateException</strong><br />
+java.sql.Blob<br />
+java.sql.CallableStatement<br />
+java.sql.Clob<br />
+java.sql.ClientinfoStatus<br />
+java.sql.Connection<br />
+<strong><em>java.sql.DataTruncation</em></strong><br />
+java.sql.DatabaseMetaData<br />
+<strong><em>java.sql.Date</em></strong><br />
+java.sql.Driver<br />
+java.sql.DriverAction<br />
+<strong><em>java.sql.DriverManager<br />
+java.sql.DriverPropertyInfo<br />
+java.sql.JDBCType</em></strong><br />
+java.sql.NClob<br />
+java.sql.ParameterMetaData<br />
+java.sql.PreparedStatement<br />
+<strong><em>java.sql.PseudoColumnUsage</em></strong><br />
+java.sql.Ref<br />
+java.sql.ResultSet<br />
+java.sql.ResultSetMetaData<br />
+java.sql.RowId<br />
+<strong><em>java.sql.RowIdLifeTime</em></strong><br />
+java.sql.Savepoint<br />
+<strong><em>java.sql.SQLClientInfoException</em></strong><br />
+java.sql.SQLData<br />
+<strong><em>java.sql.SQLDataException<br />
+java.sql.SQLException<br />
+java.sql.SQLFeatureNotSupportedException</em></strong><br />
+java.sql.SQLInput<br />
+<strong><em>java.sql.SQLIntegrityConstraintViolationException<br />
+java.sql.SQLInvalidAuthorizationSpecException<br />
+java.sql.SQLNonTransientConnectionException<br />
+java.sql.SQLNonTransientException</em></strong><br />
+java.sql.SQLOutput<br />
+java.sql.SQLPermission<br />
+<strong><em>java.sql.SQLSyntaxErrorException<br />
+java.sql.SQLTimeoutException<br />
+java.sql.SQLTransactionRollbackException<br />
+java.sql.SQLTransientConnectionException<br />
+java.sql.SQLTransientException</em></strong><br />
+java.sql.SQLType<br />
+java.sql.SQLXML<br />
+<strong><em>java.sql.SQLWarning</em></strong><br />
+java.sql.Statement<br />
+java.sql.Struct<br />
+<strong><em>java.sql.Time<br />
+java.sql.Timestamp<br />
+java.sql.Types</em></strong><br />
+java.sql.Wrapper</p>
+<p>以下类和接口在JDBC 4.2 API中是新的或更新的。新的类和接口以粗体突出显示</p>
+<p>java.sql.BatchUpdateException<br />
+java.sql.CallableStatement<br />
+java.sql.Connection<br />
+java.sql.DatabaseMetaData<br />
+java.sql.Date<br />
+java.sql.Driver<br />
+<strong><em>java.sql.DriverAction</em></strong><br />
+java.sql.DriverManager<br />
+<strong><em>java.sql.JDBCType</em></strong><br />
+java.sql.Permission<br />
+java.sql.PreparedStatement<br />
+java.sql.ResultSet<br />
+java.sql.SQLInput<br />
+java.sql.SQLOutput<br />
+<strong><em>java.sql.SQLType</em></strong><br />
+java.sql.SQLXML<br />
+java.sql.Statement<br />
+java.sql.Types<br />
+java.sql.Timestamp<br />
+javax.sql.XADataSource</p>
+<p>显示java.sql包在关键的类和接口之间的相互作用和关系。还显示了创建语句、设置参数和检索结果所涉及的方法</p>
+<p><img src="//upload-images.jianshu.io/upload_images/1619194-a34ce7cf599088a2.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/773/format/webp" /></p>
+<p>Paste_Image.png</p>
+<h3>javax.sql Package</h3>
+<p>javax.sql.CommonDataSource<br />
+<strong><em>javax.sql.ConnectionEvent</em></strong><br />
+javax.sql.ConnectionEventListener<br />
+javax.sql.ConnectionPoolDataSource<br />
+javax.sql.DataSource<br />
+javax.sql.PooledConnection<br />
+javax.sql.RowSet<br />
+<strong><em>javax.sql.RowSetEvent</em></strong><br />
+javax.sql.RowSetInternal<br />
+javax.sql.RowSetListener<br />
+javax.sql.RowSetMetaData<br />
+javax.sql.RowSetReader<br />
+javax.sql.RowSetWriter<br />
+<strong><em>javax.sql.StatementEvent</em></strong><br />
+javax.sql.StatementEventListener<br />
+javax.sql.XAConnection<br />
+javax.sql.XADataSource</p>
+<p>注意 — javax.sql 这个包中的类和接口在 JDBC 2.0 API 中初次使用，在 J2SE 1.2 中，并没有包含这个包，这个包是作为 J2SE 1.2 平台的一个可选包。但在 J2SE 1.4 后，javax.sql 和 java.sql 一样，也成为了 Java 平台的一部分。</p>
+<p>以下的图展示了 javax.sql.DataSource 与 java.sql.Connection 的关系</p>
+<p><img src="//upload-images.jianshu.io/upload_images/1619194-44c5f47c562dd1cb.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/419/format/webp" /></p>
+<p>下图展示了与连接池有关的组成部分</p>
+<p><img src="//upload-images.jianshu.io/upload_images/1619194-cd00ca8765181dc7.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/495/format/webp" /></p>
+<p>下图展示了分布式事务有关的组成部分</p>
+<p><img src="//upload-images.jianshu.io/upload_images/1619194-7331a02618b49eda.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/702/format/webp" /></p>
+<p>下图展示与 RowSet 有关的组成部分</p>
+<p><img src="//upload-images.jianshu.io/upload_images/1619194-3fbcef2b6f21bac1.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/726/format/webp" /></p>

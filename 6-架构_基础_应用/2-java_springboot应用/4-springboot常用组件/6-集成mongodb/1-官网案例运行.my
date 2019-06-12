@@ -1,0 +1,164 @@
+<h1>官方使用mongodb的案例</h1>
+
+<h2>启动类</h2>
+
+<pre>
+package com.forezp;
+<strong>import com.forezp.dao.CustomerRepository;
+import com.forezp.entity.Customer;</strong>
+import org.springframework.beans.factory.annotation.Autowired;
+<strong>import org.springframework.boot.CommandLineRunner;</strong>
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+/**
+* 启动mongodb
+* C:\Program Files\MongoDB\Server\3.4\bin
+* mongod.exe --dbpath E:\mongdb\data\db
+*/
+@SpringBootApplication
+public class SpringbootMongodbApplication implements CommandLineRunner {
+
+@Autowired
+private CustomerRepository repository;
+
+public static void main(String[] args) {
+SpringApplication.run(SpringbootMongodbApplication.class, args);
+}
+
+@Override
+public void run(String... args) throws Exception {
+repository.deleteAll();
+
+// save a couple of customers
+repository.save(new Customer("Alice", "Smith"));
+repository.save(new Customer("Bob", "Smith"));
+
+// fetch all customers
+System.out.println("Customers found with findAll():");
+System.out.println("-------------------------------");
+for (Customer customer : repository.findAll()) {
+System.out.println(customer);
+}
+System.out.println();
+
+// fetch an individual customer
+System.out.println("Customer found with findByFirstName('Alice'):");
+System.out.println("--------------------------------");
+System.out.println(repository.findByFirstName("Alice"));
+
+System.out.println("Customers found with findByLastName('Smith'):");
+System.out.println("--------------------------------");
+for (Customer customer : repository.findByLastName("Smith")) {
+System.out.println(customer);
+}
+}
+/**
+* Customers found with findAll():
+-------------------------------
+Customer[id=58f880f589ffb696b8a6077e, firstName='Alice', lastName='Smith']
+Customer[id=58f880f589ffb696b8a6077f, firstName='Bob', lastName='Smith']
+
+Customer found with findByFirstName('Alice'):
+--------------------------------
+Customer[id=58f880f589ffb696b8a6077e, firstName='Alice', lastName='Smith']
+Customers found with findByLastName('Smith'):
+--------------------------------
+Customer[id=58f880f589ffb696b8a6077e, firstName='Alice', lastName='Smith']
+Customer[id=58f880f589ffb696b8a6077f, firstName='Bob', lastName='Smith']
+*/
+}</pre>
+
+<p> </p>
+
+<h2>DAO操作类</h2>
+
+<pre>
+package com.forezp.dao;
+import java.util.List;
+import com.forezp.entity.Customer;
+import org.springframework.data.mongodb.repository.MongoRepository;
+public interface CustomerRepository extends MongoRepository<Customer, String> {
+Customer findByFirstName(String firstName);
+List<Customer> findByLastName(String lastName);
+}</pre>
+
+<p> </p>
+
+<h2>实体类</h2>
+
+<pre>
+package com.forezp.entity;
+import org.springframework.data.annotation.Id;
+public class Customer {
+@Id
+public String id;
+public String firstName;
+public String lastName;
+public Customer() {}
+public Customer(String firstName, String lastName) {
+this.firstName = firstName;
+this.lastName = lastName;
+}
+@Override
+public String toString() {
+return String.format(
+"Customer[id=%s, firstName='%s', lastName='%s']",
+id, firstName, lastName);
+}
+}</pre>
+
+<h2>配置类</h2>
+
+<p>application.properties</p>
+
+<pre>
+spring.data.mongodb.uri=mongodb://localhost:27017/testDB
+</pre>
+
+<p> </p>
+
+<h2>pom依赖</h2>
+
+<pre>
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+<modelVersion>4.0.0</modelVersion>
+<groupId>com.forezp</groupId>
+<artifactId>springboot-mongodb</artifactId>
+<version>0.0.1-SNAPSHOT</version>
+<packaging>jar</packaging>
+<name>springboot-mongodb</name>
+<description>Demo project for Spring Boot</description>
+<parent>
+<groupId>org.springframework.boot</groupId>
+<artifactId>spring-boot-starter-parent</artifactId>
+<version>1.5.2.RELEASE</version>
+<relativePath/> <!-- lookup parent from repository -->
+</parent>
+<properties>
+<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+<project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+<java.version>1.8</java.version>
+</properties>
+<dependencies>
+<strong> <dependency>
+<groupId>org.springframework.boot</groupId>
+<artifactId>spring-boot-starter-data-mongodb</artifactId>
+</dependency></strong>
+<dependency>
+<groupId>org.springframework.boot</groupId>
+<artifactId>spring-boot-starter-test</artifactId>
+<scope>test</scope>
+</dependency>
+</dependencies>
+<build>
+<plugins>
+<plugin>
+<groupId>org.springframework.boot</groupId>
+<artifactId>spring-boot-maven-plugin</artifactId>
+</plugin>
+</plugins>
+</build>
+</project>
+</pre>

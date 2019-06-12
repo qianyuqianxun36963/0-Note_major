@@ -1,0 +1,143 @@
+<h1>实际使用</h1>
+
+<h2>springboot使用slf4j和log4j2</h2>
+
+<h3>第一步 添加pom依赖</h3>
+
+<p>这里，我没将依赖放在base的jar包里面，而是放在了每个springboot子项目里。每个项目放了一份。。</p>
+
+<pre>
+<!-- log4j2 和 slf4j 日志 -->
+<dependency>
+<groupId>org.springframework.boot</groupId>
+<artifactId>spring-boot-starter</artifactId>
+<exclusions>
+<exclusion>
+<groupId>org.springframework.boot</groupId>
+<artifactId>spring-boot-starter-logging</artifactId>
+</exclusion>
+</exclusions>
+</dependency>
+<dependency>
+<groupId>org.springframework.boot</groupId>
+<artifactId>spring-boot-starter-log4j2</artifactId>
+</dependency></pre>
+
+<h3>第二步 添加配置文件</h3>
+
+<p>log4j2.xml</p>
+
+<pre>
+<?xml version="1.0" encoding="UTF-8"?>
+<!--日志级别以及优先级排序: OFF > FATAL > ERROR > WARN > INFO > DEBUG > TRACE > ALL -->
+<!--Configuration后面的status，这个用于设置log4j2自身内部的信息输出，可以不设置，当设置成trace时，你会看到log4j2内部各种详细输出-->
+<!--monitorInterval：Log4j能够自动检测修改配置 文件和重新配置本身，设置间隔秒数-->
+<configuration status="WARN" monitorInterval="30">
+<!--先定义所有的appender-->
+<appenders>
+<!--这个输出控制台的配置-->
+<console name="Console" target="SYSTEM_OUT">
+<!--输出日志的格式-->
+<PatternLayout pattern="[%d{HH:mm:ss:SSS}] [%p] - %l - %m%n"/>
+</console>
+<!--文件会打印出所有信息，这个log每次运行程序会自动清空，由append属性决定，这个也挺有用的，适合临时测试用-->
+<File name="log" fileName="log/manager/test.log" append="false">
+<PatternLayout pattern="%d{HH:mm:ss.SSS} %-5level %class{36} %L %M - %msg%xEx%n"/>
+</File>
+<!-- 这个会打印出所有的info及以下级别的信息，每次大小超过size，则这size大小的日志会自动存入按年份-月份建立的文件夹下面并进行压缩，作为存档-->
+<RollingFile name="RollingFileInfo" fileName="${sys:user.home}/logs/manager/info.log"
+filePattern="${sys:user.home}/logs/manager/$${date:yyyy-MM}/info-%d{yyyy-MM-dd}-%i.log">
+<!--控制台只输出level及以上级别的信息（onMatch），其他的直接拒绝（onMismatch）-->
+<ThresholdFilter level="info" onMatch="ACCEPT" onMismatch="DENY"/>
+<PatternLayout pattern="[%d{HH:mm:ss:SSS}] [%p] - %l - %m%n"/>
+<Policies>
+<TimeBasedTriggeringPolicy/>
+<SizeBasedTriggeringPolicy size="100 MB"/>
+</Policies>
+</RollingFile>
+<RollingFile name="RollingFileWarn" fileName="${sys:user.home}/logs/manager/warn.log"
+filePattern="${sys:user.home}/logs/manager/$${date:yyyy-MM}/warn-%d{yyyy-MM-dd}-%i.log">
+<ThresholdFilter level="warn" onMatch="ACCEPT" onMismatch="DENY"/>
+<PatternLayout pattern="[%d{HH:mm:ss:SSS}] [%p] - %l - %m%n"/>
+<Policies>
+<TimeBasedTriggeringPolicy/>
+<SizeBasedTriggeringPolicy size="100 MB"/>
+</Policies>
+<!-- DefaultRolloverStrategy属性如不设置，则默认为最多同一文件夹下7个文件，这里设置了20 -->
+<DefaultRolloverStrategy max="20"/>
+</RollingFile>
+<RollingFile name="RollingFileError" fileName="${sys:user.home}/logs/manager/error.log"
+filePattern="${sys:user.home}/logs/manager/$${date:yyyy-MM}/error-%d{yyyy-MM-dd}-%i.log">
+<ThresholdFilter level="error" onMatch="ACCEPT" onMismatch="DENY"/>
+<PatternLayout pattern="[%d{HH:mm:ss:SSS}] [%p] - %l - %m%n"/>
+<Policies>
+<TimeBasedTriggeringPolicy/>
+<SizeBasedTriggeringPolicy size="100 MB"/>
+</Policies>
+</RollingFile>
+</appenders>
+<!--然后定义logger，只有定义了logger并引入的appender，appender才会生效-->
+<loggers>
+<!--过滤掉spring和mybatis的一些无用的DEBUG信息-->
+<logger name="org.springframework" level="INFO"></logger>
+<logger name="org.mybatis" level="INFO"></logger>
+<root level="all">
+<appender-ref ref="Console"/>
+<appender-ref ref="RollingFileInfo"/>
+<appender-ref ref="RollingFileWarn"/>
+<appender-ref ref="RollingFileError"/>
+</root>
+</loggers>
+</configuration></pre>
+
+<h3>第三步 添加配置读取</h3>
+
+<p>application.yml里面添加</p>
+
+<pre>
+logging:
+config = classpath:log4j2.xml</pre>
+
+<h3>第四步 代码中使用logger类</h3>
+
+<pre>
+<code>import org.slf4j.Logger; 
+import org.slf4j.LoggerFactory;</code></pre>
+
+<pre>
+private static final Logger logger = <code>LoggerFactory</code>.getLogger(AppointmentController.class);</pre>
+
+<h2>非springboot项目</h2>
+
+<h3>添加依赖</h3>
+
+<pre>
+<!-- slf4j和log4j2日志 -->
+<dependency>
+<groupId>org.slf4j</groupId>
+<artifactId>slf4j-api</artifactId>
+<version>${slf4j.version}</version>
+</dependency>
+<dependency>
+<groupId>org.apache.logging.log4j</groupId>
+<artifactId>log4j-slf4j-impl</artifactId>
+<version>${log4j.version}</version>
+</dependency>
+<dependency>
+<groupId>org.apache.logging.log4j</groupId>
+<artifactId>log4j-web</artifactId>
+<version>${log4j.version}</version>
+<scope>runtime</scope>
+</dependency>
+<dependency>
+<groupId>org.apache.logging.log4j</groupId>
+<artifactId>log4j-api</artifactId>
+<version>${log4j.version}</version>
+</dependency>
+<dependency>
+<groupId>org.apache.logging.log4j</groupId>
+<artifactId>log4j-core</artifactId>
+<version>${log4j.version}</version>
+</dependency></pre>
+
+<p> </p>

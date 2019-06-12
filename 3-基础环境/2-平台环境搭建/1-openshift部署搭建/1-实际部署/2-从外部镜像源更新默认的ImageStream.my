@@ -1,0 +1,43 @@
+<h1>从外部镜像源更新默认的ImageStream</h1>
+
+<p>在Master节点执行以下脚本：</p>
+
+<pre>
+#!/bin/bash
+
+oc get is --all-namespaces | grep -v NAMESPACE | grep -v dotnet | grep -v openshift-node | grep -v openshift-sdn | while read line; do
+    is_namespace=$(echo "${line}" | awk '{print $1}')
+    is_name=$(echo "${line}" | awk '{print $2}')
+    is_repo=$(echo "${line}" | awk '{print $3}')
+    echo "[${is_namespace}] begin update imagestream ${is_name}, repo is ${is_repo}"
+    tag_array=()
+    source_array=()
+    is_tag_and_source=$(oc describe is -n $is_namespace $is_name | grep '  tagged from' -B1)
+    OLD_IFS="$IFS"
+    IFS=$'\x0A'
+    is_tag_and_source_list=($is_tag_and_source)
+    for l in ${is_tag_and_source_list[*]}; do
+        if [ $(echo "${l}" | grep tagged | wc -l) -eq 1 ]; then
+            source=$(echo "${l}" | cut -d" " -f5)
+            source_array=(${source_array[*]} $source)
+        elif [ $(echo "${l}" | grep -E '^\w' | wc -l) -eq 1 ]; then
+            tag=$(echo "${l}" | cut -d" " -f1)
+            tag_array=(${tag_array[*]} $tag)
+        fi
+    done
+    #echo ${tag_array[*]}
+    #echo ${source_array[*]}
+    IFS="$OLD_IFS"
+    for i in ${!tag_array[*]}; do
+        tag=${tag_array[$i]}
+        source=${source_array[$i]}
+        echo "begin upadte tag: $tag, source: $source"
+        docker pull $source
+        docker tag $source $is_repo:$tag
+        docker push $is_repo:$tag
+    done
+done</pre>
+
+<p>（1）dotnet，因为dotnet的镜像不在docker官方仓库中，docker pull的时候会提示证书有问题，这个问题还没解决，反正dotnet的镜像也用不着，就直接忽略了。忽略的镜像： </p>
+
+<p>（2）openshift-node和openshift-sdn忽略了。</p>

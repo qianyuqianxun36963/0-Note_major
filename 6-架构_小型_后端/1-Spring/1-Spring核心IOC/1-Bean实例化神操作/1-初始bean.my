@@ -1,0 +1,178 @@
+<h1>前置初始化bean</h1>
+
+<p>BeanPostProcessor，BeanNameAware，<strong>BeanClassLoaderAware</strong>，BeanFactoryAware接口是如何起作用的</p>
+
+<h2>1. 首先说下BeanPostProcessor接口中的两个方法，如下：</h2>
+
+<p>package org.springframework.beans.factory.config;<br />
+<br />
+import org.springframework.beans.BeansException;</p>
+
+<p>public interface BeanPostProcessor {<br />
+ <br />
+        //Bean初始化的前置处理器<br />
+    Object postProcessBeforeInitialization(Object bean, String beanName) throws BeansException;<br />
+ <br />
+    //Bean初始化的后置处理器<br />
+    Object postProcessAfterInitialization(Object bean, String beanName) throws BeansException;<br />
+ <br />
+}<br />
+应用中自定义的Bean，可以实现这个接口，并覆盖这两个方法来控制Bean的初始化过程，即在Bean的初始化之前做一件事，即调用postProcessBeforeInitialization方法，也可以在Bean的初始化之后做一件事，即调用postProcessAfterInitialization方法。那么这两个方法究竟是如何被Spring调用的呢？</p>
+
+<h2>2. 在Bean的初始化过程中，会调用initializeBean方法，该方法的源码如下：</h2>
+
+<p>protected Object initializeBean(final String beanName, final Object bean, RootBeanDefinition mbd) {<br />
+        if (System.getSecurityManager() != null) {<br />
+            AccessController.doPrivileged(new PrivilegedAction<Object>() {<br />
+                @Override<br />
+                public Object run() {<br />
+                    invokeAwareMethods(beanName, bean);<br />
+                    return null;<br />
+                }<br />
+            }, getAccessControlContext());<br />
+        }<br />
+        else {<br />
+            invokeAwareMethods(beanName, bean);<br />
+        }<br />
+ <br />
+        Object wrappedBean = bean;<br />
+        if (mbd == null || !mbd.isSynthetic()) {<br />
+            //执行BeanPostProcessor扩展点的PostProcessBeforeInitialization进行修改实例化Bean<br />
+            wrappedBean = applyBeanPostProcessorsBeforeInitialization(wrappedBean, beanName);<br />
+        }<br />
+ <br />
+        try {<br />
+            //调用Bean的初始化方法,这个初始化方法是在BeanDefinition中通过定义init-method属性指定的<br />
+            //同时,如果Bean实现了InitializingBean接口,那么这个Bean的afterPropertiesSet实现也不会被调用<br />
+            invokeInitMethods(beanName, wrappedBean, mbd);<br />
+        }<br />
+        catch (Throwable ex) {<br />
+            throw new BeanCreationException(<br />
+                    (mbd != null ? mbd.getResourceDescription() : null),<br />
+                    beanName, "Invocation of init method failed", ex);<br />
+        }<br />
+ <br />
+        if (mbd == null || !mbd.isSynthetic()) {<br />
+            //执行BeanPostProcessor扩展点的PostProcessAfterInitialization进行修改实例化Bean<br />
+            wrappedBean = applyBeanPostProcessorsAfterInitialization(wrappedBean, beanName);<br />
+        }<br />
+        return wrappedBean;<br />
+    }</p>
+
+<h2>3. BeanPostProcessor起作用的方式</h2>
+
+<p>先说下invokeInitMethods方法，这个是真正的Bean的初始化方法，我们可以看到在该方法之前有一个方法applyBeanPostProcessorsBeforeInitialization，该方法实现Bean初始化的前置处理，可以看下该方法的源码：</p>
+
+<p><br />
+@Override<br />
+    public Object applyBeanPostProcessorsBeforeInitialization(Object existingBean, String beanName)<br />
+            throws BeansException {<br />
+ <br />
+        Object result = existingBean;<br />
+        for (BeanPostProcessor beanProcessor : getBeanPostProcessors()) {<br />
+            result = beanProcessor.postProcessBeforeInitialization(result, beanName);<br />
+            if (result == null) {<br />
+                return result;<br />
+            }<br />
+        }<br />
+        return result;<br />
+    }</p>
+
+<p>这个方法中会通过getBeanPostProcessors方法去获取Bean所实现的所有的BeanPostProcessor接口，并调用其postProcessBeforeInitialization方法来实现在Bean的初始化之前做一些预处理<br />
+在invokeInitMethods方法之后，有一个applyBeanPostProcessorsAfterInitialization方法，该方法实现Bean的初始化的后置处理，可以看下该方法的源码：</p>
+
+<p><br />
+@Override<br />
+    public Object applyBeanPostProcessorsAfterInitialization(Object existingBean, String beanName)<br />
+            throws BeansException {<br />
+ <br />
+        Object result = existingBean;<br />
+        for (BeanPostProcessor beanProcessor : getBeanPostProcessors()) {<br />
+            result = beanProcessor.postProcessAfterInitialization(result, beanName);<br />
+            if (result == null) {<br />
+                return result;<br />
+            }<br />
+        }<br />
+        return result;<br />
+    }</p>
+
+<p>与前置处理类似，也是获取Bean实现的所有BeanPostProcessor接口，然后调用所有接口的postProcessAfterInitialization后置处理方法</p>
+
+<h2>4. BeanNameAware，BeanClassLoaderAware，BeanFactoryAware接口起作用的方式</h2>
+
+<p>大家注意到initializebean方法中有一个invokeAwareMethods方法，先看下这个方法的源码：</p>
+
+<p><br />
+private void invokeAwareMethods(final String beanName, final Object bean) {<br />
+        if (bean instanceof Aware) {<br />
+            if (bean instanceof BeanNameAware) {<br />
+                ((BeanNameAware) bean).setBeanName(beanName);<br />
+            }<br />
+            if (bean instanceof BeanClassLoaderAware) {<br />
+                ((BeanClassLoaderAware) bean).setBeanClassLoader(getBeanClassLoader());<br />
+            }<br />
+            if (bean instanceof BeanFactoryAware) {<br />
+                ((BeanFactoryAware) bean).setBeanFactory(AbstractAutowireCapableBeanFactory.this);<br />
+            }<br />
+        }<br />
+    }</p>
+
+<p>举例来说，当应用自定义的Bean实现了BeanNameAware接口，如下：</p>
+
+<p>public class MyBean implements BeanNameAware {<br />
+    private String beanName;<br />
+ <br />
+    void setBeanName(String name) {<br />
+        this.beanName = name;<br />
+    }<br />
+ <br />
+}</p>
+
+<p>这样就可以获取到该Bean在Spring容器中的名字，原理就是上述invokeAwareMethods方法中，判断了如果bean实现了BeanNameAware接口，就会调用该Bean覆盖的BeanNameAware接口的setBeanName方法，这样MyBean中就获取到了该Bean在Spring容器中的名字。<br />
+BeanClassLoaderAware接口和BeanFactoryAware接口同理，可以分别获取Bean的类装载器和bean工厂</p>
+
+<h2>5. InitializeBean接口起作用的方式</h2>
+
+<p>最后来说下真正的初始化方法invokeInitMethods，该方法的源码如下：</p>
+
+<p><br />
+protected void invokeInitMethods(String beanName, final Object bean, RootBeanDefinition mbd)<br />
+            throws Throwable {<br />
+ <br />
+        boolean isInitializingBean = (bean instanceof InitializingBean);<br />
+        if (isInitializingBean && (mbd == null || !mbd.isExternallyManagedInitMethod("afterPropertiesSet"))) {<br />
+            if (logger.isDebugEnabled()) {<br />
+                logger.debug("Invoking afterPropertiesSet() on bean with name '" + beanName + "'");<br />
+            }<br />
+            if (System.getSecurityManager() != null) {<br />
+                try {<br />
+                    AccessController.doPrivileged(new PrivilegedExceptionAction<Object>() {<br />
+                        @Override<br />
+                        public Object run() throws Exception {<br />
+                            ((InitializingBean) bean).afterPropertiesSet();<br />
+                            return null;<br />
+                        }<br />
+                    }, getAccessControlContext());<br />
+                }<br />
+                catch (PrivilegedActionException pae) {<br />
+                    throw pae.getException();<br />
+                }<br />
+            }<br />
+            else {<br />
+                ((InitializingBean) bean).afterPropertiesSet();    //启动afterPropertiesSet,afterPropertiesSet是InitializingBean接口的方法<br />
+            }<br />
+        }<br />
+ <br />
+        if (mbd != null) {<br />
+            String initMethodName = mbd.getInitMethodName();    //获取用户自定义的初始化方法<br />
+            if (initMethodName != null && !(isInitializingBean && "afterPropertiesSet".equals(initMethodName)) &&<br />
+                    !mbd.isExternallyManagedInitMethod(initMethodName)) {<br />
+                invokeCustomInitMethod(beanName, bean, mbd);    //调用自定义的初始化方法<br />
+            }<br />
+        }</p>
+
+<p>可以看到方法中判断了如果该Bean实现了InitializeBean接口，即bean instanceof InitializingBean == true，就会调用该Bean实现的Initializebean接口的afterPropertiesSet方法</p>
+
+<h2>6. 自定义的初始化方法起作用的方式</h2>
+
+<p>上述代码中有一个方法getInitMethodName，可以获取用户自定义的初始化方法，然后通过调用invokeCustomInitMethod方法来执行用户自定义的初始化方法</p>

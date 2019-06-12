@@ -1,0 +1,29 @@
+<h1>quartz_job</h1>
+<p>quartz--job</p>
+<p>　　job是执行任务所需的Java类。</p>
+<p>　　在quartz中job分为两种，有状态和无状态的。job是无状态的，statefuljob是有状态的。</p>
+<p>　　通过实现job或者statefuljob接口就能定义一个自己的工作类。这两个接口都要求实现类实现execute方法</p>
+<pre>
+public void execute(JobExecutionContext context) 
+throws JobExecutionException;</pre>
+<p>　　在job被Scheduler调用时，会传递一个JobExecutionContext给execute方法，它能访问job的信息。</p>
+<p>　　jobExecutionContext能获取到JobDetail对象，jobDerail对象保存了job的信息，job注册到JobDetail中，然后JobDetail注册进Scheduler中去。</p>
+<p>　　　<strong>　</strong><strong>当要执行job是job才会被实例化，每次执行job都会实例化一个新的job对象，不必担心job的线程安全问题。</strong>　</p>
+<pre>
+　　Scheduler scheduler = StdSchedulerFactory.getDefaultScheduler();
+　　scheduler.start();
+　　JobDetail jobDetail = new JobDetail("PrintJobDataMapJob",Scheduler.DEFAULT_GROUP,TestJob.class);//把job类--TestJob注册进JobDetail中
+　　Trigger trigger = TriggerUtils.makeImmediateTrigger(0, 1000);
+　　trigger.setName("PrintJobDataMapJobTrigger");
+scheduler.scheduleJob(jobDetail,trigger);//把JobDetail注册进Scheduler中
+</pre>
+<p>　　使用JobDetail对象的getJObDataMap()方法获取存储job要保存的自定义属性的map集合，JobDataMap实现了Map集合，具有Map的特性，JobDataMap中的数据可以在job类中进行传递和访问。</p>
+<p>　　实现job接口的job类是无状态的，要想job有状态，需要实现stateFulJob接口。</p>
+<p> </p>
+<p>　　StateFulJob是job的一个扩展接口，与job一样需要实现execute方法。</p>
+<p>　　job和stateFulJob的区别：</p>
+<p>　　　　多个有状态StateFulJob的JobDetail无法并发执行。或者两个trigger触发stateFulJob的条件是同时发生的，有一个trigger会被一直阻塞，直到另外的trigger处理完毕才会执行。</p>
+<p><strong>job的易失性、持久性和可恢复性</strong>　　</p>
+<p>　　易失性：易失性的job在程序关闭后不会被持久化。可以通过JobDetail的setVolaility(true)来把job设置为易失性的。默认是false的。</p>
+<p>　　持久性：持久的job保存在jobstore中，当一个job是连续性的，没有trigger触发job，job还会保存在jobstore中，如果不是连续性的，就回被移除jobstore。通过JobDetail的setDurability(boolean)方法设置是否是连续性的，为true时不会被移除。</p>
+<p>　　可恢复性：在job还在执行是，Scheduler被意外关闭，在Scheduler重启之后job还可以恢复，在次重头开始执行。通过setRequestRecovery(boolean shuldRecovery)设置是否是可恢复的。默认是false不可恢复。</p>

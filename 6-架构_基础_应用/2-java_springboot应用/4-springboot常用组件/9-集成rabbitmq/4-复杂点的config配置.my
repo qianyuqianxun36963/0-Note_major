@@ -1,0 +1,378 @@
+<h1>RabbitMQ ——与SpringBoot集成并实现消息确认机制</h1>
+
+<h2>pom.xml</h2>
+
+<p><project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"<br />
+    xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd"><br />
+    <modelVersion>4.0.0</modelVersion><br />
+ <br />
+    <groupId>com.test</groupId><br />
+    <artifactId>RabbitMQ_MQTT</artifactId><br />
+    <version>0.0.1-SNAPSHOT</version><br />
+    <packaging>jar</packaging><br />
+ <br />
+    <name>RabbitMQ_MQTT</name><br />
+    <url>http://maven.apache.org</url><br />
+ <br />
+    <parent><br />
+        <groupId>org.springframework.boot</groupId><br />
+        <artifactId>spring-boot-starter-parent</artifactId><br />
+        <version>1.5.6.RELEASE</version><br />
+        <relativePath /> <!-- lookup parent from repository --><br />
+    </parent><br />
+ <br />
+    <properties><br />
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding><br />
+        <java.version>1.8</java.version><br />
+    </properties><br />
+ <br />
+    <dependencies><br />
+        <dependency><br />
+            <groupId>org.springframework.boot</groupId><br />
+            <artifactId>spring-boot-starter</artifactId><br />
+        </dependency><br />
+        <dependency><br />
+            <groupId>org.springframework.boot</groupId><br />
+            <artifactId>spring-boot-starter-test</artifactId><br />
+            <scope>test</scope><br />
+        </dependency><br />
+ <br />
+        <dependency><br />
+            <groupId>org.springframework.boot</groupId><br />
+            <artifactId>spring-boot-starter-amqp</artifactId><br />
+        </dependency><br />
+        <dependency><br />
+            <groupId>org.springframework.boot</groupId><br />
+            <artifactId>spring-boot-devtools</artifactId><br />
+            <optional>true</optional><br />
+        </dependency><br />
+        <dependency><br />
+            <groupId>org.springframework.boot</groupId><br />
+            <artifactId>spring-boot-starter-web</artifactId><br />
+        </dependency><br />
+        <!-- <dependency> <groupId>org.fusesource.mqtt-client</groupId> <artifactId>mqtt-client</artifactId> <br />
+            <version>1.12</version> </dependency> --><br />
+    </dependencies><br />
+    <build><br />
+        <plugins><br />
+            <plugin><br />
+                <groupId>org.springframework.boot</groupId><br />
+                <artifactId>spring-boot-maven-plugin</artifactId><br />
+                <configuration><br />
+                    <fork>true</fork><br />
+                </configuration><br />
+            </plugin><br />
+        </plugins><br />
+    </build><br />
+</project></p>
+
+<h2>application.properties</h2>
+
+<p>servier.port=8080<br />
+<br />
+spring.rabbitmq.queues=topic.1,mqtt.test.*,mqtt.test.dd<br />
+spring.rabbitmq.host=127.0.0.1<br />
+spring.rabbitmq.port=5672<br />
+spring.rabbitmq.username=guest<br />
+spring.rabbitmq.password=guest<br />
+spring.rabbitmq.publisher-confirms=true<br />
+spring.rabbitmq.virtual-host=/</p>
+
+<h2><br />
+Application.java</h2>
+
+<p>package com.gm;<br />
+ <br />
+import org.springframework.beans.factory.annotation.Autowired;<br />
+import org.springframework.boot.SpringApplication;<br />
+import org.springframework.boot.autoconfigure.EnableAutoConfiguration;<br />
+import org.springframework.boot.autoconfigure.SpringBootApplication;<br />
+import org.springframework.context.annotation.ComponentScan;<br />
+import org.springframework.context.annotation.Configuration;<br />
+import org.springframework.web.bind.annotation.PostMapping;<br />
+import org.springframework.web.bind.annotation.RequestMapping;<br />
+import org.springframework.web.bind.annotation.RestController;<br />
+ <br />
+import com.gm.rabbit.CallBackSender;<br />
+ <br />
+@Configuration<br />
+@RestController  <br />
+@EnableAutoConfiguration  <br />
+@ComponentScan<br />
+@SpringBootApplication<br />
+public class Application {<br />
+ <br />
+    @Autowired<br />
+    private CallBackSender sender;<br />
+ <br />
+    public static void main(String[] args) {<br />
+        SpringApplication.run(Application.class, args);<br />
+    }<br />
+ <br />
+     @RequestMapping("/callback")<br />
+    public void callbak() {<br />
+        sender.send("topic.baqgl.admin.1", "测试消息");<br />
+    }<br />
+}</p>
+
+<h2>RabbitConfig.java</h2>
+
+<p>package com.gm.rabbit;<br />
+ <br />
+import java.util.ArrayList;<br />
+import java.util.List;<br />
+ <br />
+import org.springframework.amqp.core.AcknowledgeMode;<br />
+import org.springframework.amqp.core.Binding;<br />
+import org.springframework.amqp.core.BindingBuilder;<br />
+import org.springframework.amqp.core.DirectExchange;<br />
+import org.springframework.amqp.core.Message;<br />
+import org.springframework.amqp.core.Queue;<br />
+import org.springframework.amqp.core.TopicExchange;<br />
+import org.springframework.context.annotation.Bean;<br />
+import org.springframework.context.annotation.Configuration;<br />
+import org.springframework.amqp.rabbit.connection.CachingConnectionFactory;<br />
+import org.springframework.amqp.rabbit.connection.ConnectionFactory;<br />
+import org.springframework.amqp.rabbit.core.ChannelAwareMessageListener;<br />
+import org.springframework.amqp.rabbit.core.RabbitTemplate;<br />
+import org.springframework.amqp.rabbit.listener.SimpleMessageListenerContainer;<br />
+import org.springframework.beans.factory.annotation.Value;<br />
+import org.springframework.beans.factory.config.ConfigurableBeanFactory;<br />
+import org.springframework.context.annotation.Scope;<br />
+ <br />
+@Configuration<br />
+public class RabbitConfig {<br />
+ <br />
+    @Value("${spring.rabbitmq.host}")<br />
+    private String addresses;<br />
+ <br />
+    @Value("${spring.rabbitmq.port}")<br />
+    private String port;<br />
+ <br />
+    @Value("${spring.rabbitmq.username}")<br />
+    private String username;<br />
+ <br />
+    @Value("${spring.rabbitmq.password}")<br />
+    private String password;<br />
+ <br />
+    @Value("${spring.rabbitmq.virtual-host}")<br />
+    private String virtualHost;<br />
+ <br />
+    @Value("${spring.rabbitmq.publisher-confirms}")<br />
+    private boolean publisherConfirms;<br />
+ <br />
+    @Value("${spring.rabbitmq.queues}")<br />
+    private String queues;<br />
+ <br />
+    final static String EXCHANGE_NAME = "amq.topic";<br />
+    final static String QUEUE_NAME = "topic.baqgl.*.*";<br />
+    final static String ROUTING_KEY = "topic.baqgl.#";<br />
+ <br />
+    @Bean<br />
+    public ConnectionFactory connectionFactory() {<br />
+ <br />
+        CachingConnectionFactory connectionFactory = new CachingConnectionFactory();<br />
+        connectionFactory.setAddresses(addresses + ":" + port);<br />
+        connectionFactory.setUsername(username);<br />
+        connectionFactory.setPassword(password);<br />
+        connectionFactory.setVirtualHost(virtualHost);<br />
+<strong>        /** 如果要进行消息回调，则这里必须要设置为true */<br />
+        connectionFactory.setPublisherConfirms(publisherConfirms);</strong><br />
+        return connectionFactory;<br />
+    }<br />
+ <br />
+<strong>    @Bean<br />
+    /** 因为要设置回调类，所以应是prototype类型，如果是singleton类型，则回调类为最后一次设置 */<br />
+    @Scope(ConfigurableBeanFactory.SCOPE_PROTOTYPE)</strong><br />
+    public RabbitTemplate rabbitTemplate() {<br />
+        RabbitTemplate template = new RabbitTemplate(connectionFactory());<br />
+        template.setMandatory(true);<br />
+        return template;<br />
+    }<br />
+ <br />
+    @Bean<br />
+    public TopicExchange exchange() {<br />
+        return new TopicExchange(EXCHANGE_NAME);<br />
+    }<br />
+ <br />
+    @Bean<br />
+    public Queue queue() {<br />
+        return new Queue(QUEUE_NAME, true);<br />
+    }<br />
+ <br />
+    @Bean<br />
+    public Binding binding() {<br />
+        return BindingBuilder.bind(queue()).to(exchange()).with(ROUTING_KEY);<br />
+    }<br />
+    <br />
+    @Bean<br />
+    public SimpleMessageListenerContainer messageContainer() {<br />
+        /*Queue[] q = new Queue[queues.split(",").length];<br />
+        for (int i = 0; i < queues.split(",").length; i++) {<br />
+            q[i] = new Queue(queues.split(",")[i]);<br />
+        }*/<br />
+        SimpleMessageListenerContainer container = new SimpleMessageListenerContainer(connectionFactory());<br />
+        container.setQueues(queue());<br />
+        container.setExposeListenerChannel(true);<br />
+        container.setMaxConcurrentConsumers(1);<br />
+        container.setConcurrentConsumers(1);<br />
+        container.setAcknowledgeMode(AcknowledgeMode.MANUAL);<br />
+        container.setMessageListener(new ChannelAwareMessageListener() {<br />
+ <br />
+            public void onMessage(Message message, com.rabbitmq.client.Channel channel) throws Exception {<br />
+                try {<br />
+                    System.out.println(<br />
+                            "消费端接收到消息:" + message.getMessageProperties() + ":" + new String(message.getBody()));<br />
+                    System.out.println("topic:"+message.getMessageProperties().getReceivedRoutingKey());<br />
+                    // deliveryTag是消息传送的次数，我这里是为了让消息队列的第一个消息到达的时候抛出异常，处理异常让消息重新回到队列，然后再次抛出异常，处理异常拒绝让消息重回队列<br />
+                    /*if (message.getMessageProperties().getDeliveryTag() == 1<br />
+                            || message.getMessageProperties().getDeliveryTag() == 2) {<br />
+                        throw new Exception();<br />
+                    }*/<br />
+ <br />
+                    channel.basicAck(message.getMessageProperties().getDeliveryTag(), false); // false只确认当前一个消息收到，true确认所有consumer获得的消息<br />
+                } catch (Exception e) {<br />
+                    e.printStackTrace();<br />
+ <br />
+                    if (message.getMessageProperties().getRedelivered()) {<br />
+                        System.out.println("消息已重复处理失败,拒绝再次接收...");<br />
+                        channel.basicReject(message.getMessageProperties().getDeliveryTag(), true); // 拒绝消息<br />
+                    } else {<br />
+                        System.out.println("消息即将再次返回队列处理...");<br />
+                        channel.basicNack(message.getMessageProperties().getDeliveryTag(), false, true); // requeue为是否重新回到队列<br />
+                    }<br />
+                }<br />
+            }<br />
+        });<br />
+        return container;<br />
+    }<br />
+ <br />
+}</p>
+
+<h2>CallBackSender.java</h2>
+
+<p>import java.util.UUID;<br />
+import org.springframework.amqp.core.Message;<br />
+import org.springframework.amqp.rabbit.core.RabbitTemplate;<br />
+import org.springframework.amqp.rabbit.support.CorrelationData;<br />
+import org.springframework.beans.factory.annotation.Autowired;<br />
+import org.springframework.stereotype.Component;<br />
+ <br />
+<strong>@Component<br />
+public class CallBackSender implements RabbitTemplate.ConfirmCallback, RabbitTemplate.ReturnCallback</strong> {<br />
+    @Autowired<br />
+    private RabbitTemplate rabbitTemplate;<br />
+ <br />
+    public void send(String topic, String message) {<br />
+        rabbitTemplate.setConfirmCallback(this);<br />
+        CorrelationData correlationData = new CorrelationData(UUID.randomUUID().toString());<br />
+ <br />
+        System.out.println("消息id:" + correlationData.getId());<br />
+        // 用RabbitMQ发送MQTT需将exchange配置为amq.topic<br />
+        this.rabbitTemplate.convertAndSend("amq.topic", topic, message, correlationData);<br />
+    }<br />
+ <br />
+    public void confirm(CorrelationData correlationData, boolean ack, String cause) {<br />
+        System.out.println("消息id:" + correlationData.getId());<br />
+        if (ack) {<br />
+            System.out.println("消息发送确认成功");<br />
+        } else {<br />
+            System.out.println("消息发送确认失败:" + cause);<br />
+        }<br />
+    }<br />
+ <br />
+    @Override<br />
+    public void returnedMessage(Message message, int replyCode, String replyText, String exchange, String routingKey) {<br />
+        System.out.println("return--message:" + new String(message.getBody()) + ",replyCode:" + replyCode<br />
+                + ",replyText:" + replyText + ",exchange:" + exchange + ",routingKey:" + routingKey);<br />
+    }<br />
+}</p>
+
+<p>总结下就是：</p>
+
+<p><strong>如果消息没有到exchange,则confirm回调,ack=false</strong></p>
+
+<p><strong>如果消息到达exchange,则confirm回调,ack=true</strong></p>
+
+<p><strong>exchange到queue成功,则不回调return</strong></p>
+
+<p><strong>exchange到queue失败,则回调return(需设置mandatory=true,否则不回回调,消息就丢了)</strong></p>
+
+<h2>ApplicationTests.java</h2>
+
+<p>package com.gm;<br />
+ <br />
+import org.junit.Test;<br />
+import org.junit.runner.RunWith;<br />
+import org.springframework.boot.test.context.SpringBootTest;<br />
+import org.springframework.test.context.junit4.SpringRunner;<br />
+ <br />
+@RunWith(SpringRunner.class)<br />
+@SpringBootTest<br />
+public class ApplicationTests {<br />
+ <br />
+    @Test<br />
+    public void contextLoads() {<br />
+        System.out.println("hello world");<br />
+    }<br />
+ <br />
+}</p>
+
+<h2>TopicTest.java</h2>
+
+<p>package com.gm.rabbit;<br />
+ <br />
+import org.junit.Test;<br />
+import org.junit.runner.RunWith;<br />
+import org.springframework.beans.factory.annotation.Autowired;<br />
+import org.springframework.boot.test.context.SpringBootTest;<br />
+import org.springframework.test.context.junit4.SpringRunner;<br />
+ <br />
+@RunWith(SpringRunner.class)<br />
+@SpringBootTest<br />
+public class TopicTest {<br />
+ <br />
+    @Autowired<br />
+    private CallBackSender sender;<br />
+ <br />
+    @Test<br />
+    public void topic() throws Exception {<br />
+        sender.send("topic.baqgl.admin.1", "测试消息");<br />
+    }<br />
+}<br />
+本文选择的是RabbitMQ集成MQTT，并实现消息持久化，如不需要集成MQTT只需修改RabbitConfig.java中的EXCHANGE_NAME即可。</p>
+
+<p>集成MQTT相关配置：</p>
+
+<p>创建用户：</p>
+
+<p>创建账号<br />
+rabbitmqctl add_user admin 123456<br />
+设置用户角色<br />
+rabbitmqctl  set_user_tags  admin  administrator<br />
+设置用户权限<br />
+rabbitmqctl set_permissions -p "/" admin ".*" ".*" ".*"<br />
+设置完成后可以查看当前用户和角色(需要开启服务)<br />
+rabbitmqctl list_users<br />
+安装插件：</p>
+
+<p>rabbitmq-plugins enable rabbitmq_management  <br />
+rabbitmq-plugins enable rabbitmq_mqtt <br />
+默认配置。window下，rabbitmq的配置文件在C:\Users\Administrator\AppData\Roaming\RabbitMQ下。没配置的情况下，采用如下配置：</p>
+
+<p>[{rabbit,        [{tcp_listeners,    [5672]}]},  <br />
+ {rabbitmq_mqtt, [{default_user,     <<"admin">>},  <br />
+                  {default_pass,     <<"123456">>},  <br />
+                  {allow_anonymous,  true},  <br />
+                  {vhost,            <<"/">>},  <br />
+                  {exchange,         <<"amq.topic">>},  <br />
+                  {subscription_ttl, 1800000},  <br />
+                  {prefetch,         10},  <br />
+                  {ssl_listeners,    []},  <br />
+                  %% Default MQTT with TLS port is 8883  <br />
+                  %% {ssl_listeners,    [8883]}  <br />
+                  {tcp_listeners,    [1883]},  <br />
+                  {tcp_listen_options, [{backlog,   128},  <br />
+                                        {nodelay,   true}]}]}  <br />
+].  <br />
+更多说明请参照官方文档</p>

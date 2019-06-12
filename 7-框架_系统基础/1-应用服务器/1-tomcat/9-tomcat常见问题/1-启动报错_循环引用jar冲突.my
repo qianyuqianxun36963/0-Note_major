@@ -1,0 +1,147 @@
+<h1>tomcat启动报错too low setting for -Xss</h1>
+
+<p>错too low setting for -Xss</p>
+
+<p>网上给的答案都是调整Xss参数，其实不是正确的做法，</p>
+
+<p>-Xss：每个线程的Stack大小，“-Xss 15120” 这使得tomcat每增加一个线程（thread)就会立即消耗15M内存，而最佳值应该是128K,默认值好像是512k. </p>
+
+<p>具体报错如下</p>
+
+<p>Caused by: java.lang.IllegalStateException: Unable to complete the scan for annotations for web application [] due to a StackOverflowError. Possible root causes include a too low setting for -Xss and illegal cyclic inheritance dependencies. The class hierarchy being processed was [org.bouncycastle.asn1.ASN1EncodableVector->org.bouncycastle.asn1.DEREncodableVector->org.bouncycastle.asn1.ASN1EncodableVe<br />
+ctor]</p>
+
+<p>因为tomcat启动会去扫描jar包，看错误信息org.bouncycastle.asn1.ASN1EncodableVector，是出在这个类</p>
+
+<p>这个类似出现在bcprov*.jar这个包</p>
+
+<p>所以在tomcat的conf目录里面catalina.properties的文件，</p>
+
+<p>在tomcat.util.scan.DefaultJarScanner.jarsToSkip=里面加上bcprov*.jar过滤</p>
+
+<p>启动不会报错了</p>
+
+<h1>下面这个家伙好像弄错了！！</h1>
+
+<p><span style="font-size:16px"><strong>其实是 bcprov-jdk14-138.jar 与 bcprov-jdk15on-1.51.jar 冲突了。</strong></span></p>
+
+<h1><s>tomcat启动内存堆栈溢出ASN1EncodableVector，DEREncodableVector循环依赖</s></h1>
+
+<p><strong>主要问题</strong></p>
+
+<p>Caused by: java.lang.IllegalStateException: Unable to complete the scan for annotations for web application [] due to a StackOverflowError. Possible root causes include a too low setting for -Xss and illegal cyclic inheritance dependencies. The class hierarchy being processed was</p>
+
+<p><strong>[org.bouncycastle.asn1.ASN1EncodableVector->org.bouncycastle.asn1.DEREncodableVector->org.bouncycastle.asn1.ASN1EncodableVector]</strong></p>
+
+<p><strong>解决的手段</strong></p>
+
+<p>1、有的说调整tomcat的xss大小，就是tomcat的启动参数，然而在这里没什么用，-xss =1024m（如果是循环依赖，内存再大也是死循环会用完）。</p>
+
+<p>2、告诉tomcat不要扫描annotations, 修改web.xml （这里没有用）</p>
+
+<ol start="1">
+<li><web-app id="WebApp_ID" version="2.4" metadata-complete="true"  </li>
+<li>        xmlns="http://java.sun.com/xml/ns/j2ee" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"  </li>
+<li>        xsi:schemaLocation="http://java.sun.com/xml/ns/javaee http://java.sun.com/xml/ns/javaee/web-app_2_5.xsd">  </li>
+</ol>
+
+<p><strong>问题原因</strong></p>
+
+<p>红色部分为报错的根本原因：是jvm的栈溢出问题；而导致栈溢出的根本原因是由于蓝色部分显示的jar包冲突，这种情况是有</p>
+
+<p>两个jar都含有上述相同的类名，且继承关系刚好相反，故造成tomcat启动的环问题。</p>
+
+<p>ASN1EncodableVector依赖DEREncodableVector，DEREncodableVector依赖ASN1EncodableVector</p>
+
+<p>形成死循环。</p>
+
+<p>解决方法</p>
+
+<p>找到lib下面的jar集，</p>
+
+<p><img alt="" src="https://img-blog.csdn.net/20180403110047493?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQvdTAxMTkzNzU2Ng==/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70/gravity/SouthEast" /></p>
+
+<p>这里打开所有的jar后，发现DEREncodableVector和ASN1EncodableVector在bcmail-jdk14-1.38.jar及下面的三个包都存在，删掉重复的，部署访问成功。</p>
+
+<p> </p>
+
+<h1><a href="http://www.cnblogs.com/lighthouse/p/8336301.html" id="cb_post_title_url">Tomcat JAR包冲突报错</a></h1>
+
+<p><span style="font-size:16px"><strong>bcprov-jdk14-138.jar 与 bcprov-jdk15on-1.58.jar</strong></span>(项目中银联缴费引入的) 冲突</p>
+
+<p><img alt="" src="https://images2017.cnblogs.com/blog/1226251/201801/1226251-20180123150834006-1619487112.png" /></p>
+
+<p>查看Tomcat下有两个PDF加密的jar包如图：</p>
+
+<p><img alt="" src="https://images2017.cnblogs.com/blog/1226251/201801/1226251-20180123151412928-1387638691.png" /></p>
+
+<p>删除这个bcprov-jdk14-138.jar包，然后重启Tomcat就好了。</p>
+
+<p>这个jar包和Tomcat中的一个包冲突，反复调用导致的。</p>
+
+<p> </p>
+
+<h1>Jar包冲突解决</h1>
+
+<p>问题：在对接TrustSQL开放测试平台时，遇到问题，对方提供的SDK工具包中报空指针异常， <br />
+原因：检查后发现是因为在选择加密曲线“secp256k1”时，没有获取到此曲线传递，一步步DEBUG后发现是由于对方提供的SDK工具包中已有方法：ECNamedCurveTable.getParameterSpec(“secp256k1”) <br />
+而项目本身已经带有一个jar包：bcprov-jdk14-136.jar，此jar包中也包含有上述方法，而且方法路径和SDK工具包中一致，在项目运行过程中，项目本身优先调用的是此jar包中的方法，而bcprov-jdk14-136.jar中的ECNamedCurveTable.getParameterSpec(“曲线”)内无法生成，secp256k1的曲线传递，故而返回一个null对象，导致在接下来的调用中，产生了空指针异常。 <br />
+总结：综上所述，原因就是说简单不简单的jar包冲突</p>
+
+<p>解决： <br />
+方法一：项目是maven项目，使用命令：dependency:tree -Dverbose -Dincludes=<em>:bcprov-jdk</em> <br />
+找出此bcprov-jdk14-136.jar包的依赖关系,如下所示： <br />
+<img alt="" src="https://img-blog.csdn.net/20180117092106937?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQvSGFuZ2VsZQ==/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70/gravity/SouthEast" title="" /></p>
+
+<p>得知此jar包是在org.xhtmlrenderer:core-renderer下依赖进入项目的，故在pom.xml中添加以下配置：</p>
+
+<pre>
+<code> <dependency>
+<groupId>org.xhtmlrenderer</groupId>
+<artifactId>core-renderer</artifactId>
+<version>R8pre2</version>
+<exclusions>
+<exclusion>
+<groupId>com.lowagie</groupId>
+<artifactId>itext</artifactId>
+</exclusion>
+<exclusion>
+<groupId>org.bouncycastle</groupId>
+<artifactId>bcprov-jdk14</artifactId>
+</exclusion>
+</exclusions>
+</dependency></code></pre>
+
+<p>即可排除bcprov-jdk14-136.jar，问题解决！ <br />
+另外注意：貌似使用maven排除jar包需一层一层往下排除，直接排除最底层依赖的jar貌似是不行，具体没有验证，有大神知道么？！ <br />
+方法二：捷径~项目打包后，直接删除bcprov-jdk14-136.jar即可，此方法不知有没有缺陷，毕竟依赖关系在那摆着！~”</p>
+
+<p> </p>
+
+<h1>bcprov-jdk15和bcprov-jdk15on冲突问题</h1>
+
+<p>bcprov-jdk15包和bcprov-jdk15on包冲突问题： <br />
+org.bouncycastle.asn1.cms.OtherRevocationInfoFormat\“‘s signer information does not match signer information of other classes in the same package； <br />
+处理方法：</p>
+
+<pre>
+<code> <dependency>
+<groupId>org.bouncycastle</groupId>
+<artifactId>bcmail-jdk15</artifactId>
+<version>1.46</version>
+</dependency>
+<dependency>
+<groupId>org.bouncycastle</groupId>
+<artifactId>bcprov-jdk15</artifactId>
+<version>1.46</version>
+</dependency>
+<dependency>
+<groupId>org.bouncycastle</groupId>
+<artifactId>bcpkix-jdk15on</artifactId>
+<version>1.49</version>
+</dependency>
+<dependency>
+<groupId>org.bouncycastle</groupId>
+<artifactId>bcprov-jdk15on</artifactId>
+<version>1.49</version>
+</dependency></code></pre>

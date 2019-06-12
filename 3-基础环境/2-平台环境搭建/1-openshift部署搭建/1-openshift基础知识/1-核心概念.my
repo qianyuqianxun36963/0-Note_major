@@ -1,0 +1,115 @@
+<h1>Openshift概念</h1>
+
+<p>Openshift是一个开源容器云平台，是一个基于主流的容器技术Docker和K8s构建的云平台。Openshift底层以Docker作为容器引擎驱动，以K8s作为容器编排引擎组件，并提供了开发语言，中间件，DevOps自动化流程工具和web console用户界面等元素，提供了一套完整的基于容器的应用云平台。</p>
+
+<h2>【重要概念】</h2>
+
+<p>system:admin为默认的集群管理员，拥有最高的权限。该用户没有密码，登陆依赖于证书密钥。</p>
+
+<p>Service Account 是 Openshift 中专门供程序和组件使用的账号。不同的用户或组关联不同的角色，同时关联不同的SCC（security context constriant）安全上下文</p>
+
+<h2>【架构】</h2>
+
+<p>自底而上包括几个层次：基础架构层，容器引擎层，容器编排层，PaaS服务层，界面及工具层。</p>
+
+<p>基础架构层：为Openshift平台的运行提供基础的运行环境。Openshift支持运行在物理机，虚拟机（kvm,vmware,virtual box等），公有云（阿里云，AWS等），私有云，混合云上。</p>
+
+<p>容器引擎层：以当前主流的Docker作为容器引擎。</p>
+
+<p>容器编排层：以Google的k8s进行容器编排。</p>
+
+<p>PaaS服务层：容器云平台的最终目的是为上层应用服务提供支持，提高开发，测试，部署，运维的速度和效率。用户在Openshift云平台上可以快速的获取和部署一个数据库，缓存等。</p>
+
+<p>界面及工具层：Openshift提供了多种用户的接入渠道：Web控制台，命令行，RestFul接口等</p>
+
+<h2>【核心组件】</h2>
+
+<h3>1. Master节点</h3>
+
+<p>主控节点。集群内的管理组件都运行在Master节点上。Master节点负责集群的配置管理，维护集群的状态。Master节点运行的服务组件：</p>
+
+<p>API Server：负责提供Web console和RESTful API。集群内所有节点都会访问API Server，更新节点的状态及其上的容器状态。</p>
+
+<p>数据源（Data store）：集群内所有状态信息都会存储在后端的一个etcd的分布式数据库中。</p>
+
+<p>调度控制器（Scheduler）：负责按用户输入的要求寻找合适的计算节点。</p>
+
+<p>复制控制器（Replication Controller）：负责监控当前容器实例的数量和用户部署指定的数量是否匹配，若有容器异常退出，复制控制器发现实际数少于部署定义数，从而触发部署新的实例。</p>
+
+<h3>2. Node节点</h3>
+
+<p>计算节点。接收Master节点的指令，运行和维护Docker容器。Master节点也可以是Node节点，只是在一般环境中，其运行容器的功能是关闭的。</p>
+
+<h3>3. Project：</h3>
+
+<p>在k8s中使用命名空间来分隔资源。同一个命名空间中，某一个对象的名称在其分类中必须唯一，但在不同命名空间中的对象则可以同名。Openshift集成了k8s命名空间的概念，而且在其上定义了Project对象的概念，每一个Project会和一个namespace相关联。</p>
+
+<h3>4. Pod：</h3>
+
+<p>在Openshift中的容器都会Pod包裹，即容器都运行在Pod内部，一个Pod可以运行一个或多个容器，绝大多少情况下，一个Pod内部运行一个容器。</p>
+
+<h3>5. Service：</h3>
+
+<p>由于容器是一个非持久化的对象，所有对容器的修改再容器销毁后都会丢失，而且每个容器的IP地址会不断变化。k8s提供了Service组件，当部署某个应用时，会创建一个Service对象，该对象与一个或多个Pod关联，同时每个Service分配一个相对恒定的IP，通过访问该IP及相应的端口，请求就会转发到对应Pod端口。除了可通过IP，也可以通过域名访问Service，格式为：..svc.cluster.local</p>
+
+<h3>6. Router和Route：</h3>
+
+<p>Service提供了一个通往后端Pod集群的稳定入口，但是Service的IP地址只是集群内部的节点和容器可见。外部需通过Router（路由器）来转发。Router组件是Openshift集群中一个重要的组件，它是外界访问集群内容器应用的入口。用户可以创建Route（路由规则）对象，一个Route会与一个Service关联，并绑定一个域名。Route规则被Router加载。当集群外部的请求通过指定域名访问应用时，域名被解析并指向Router所在的计算机节点上，Router获取该请求，然后根据Route规则定义转发给与这个域名对应的Service后端所关联的Pod容器实例。上述转发流程类似于nginx。Router负责将集群外的请求转发到集群的容器，Service则负责把来自集群内部的请求转发到指定的容器中。</p>
+
+<h3>7. Persistent Storage：</h3>
+
+<p>容器默认是非持久化的，所有的修改在容器销毁时都会丢失。Docker提供了持久化卷挂载的能力，Openshift除了提供持久化卷挂载的能力，还提供了一种持久化供给模型即PV（Persistent Volume）和PVC（Persistent Volume Claim）。在PV和PVC模型中，集群管理员会创建大量不同大小和不同特性的PV。用户在部署应用时显示的声明对持久化的需求，创建PVC，在PVC中定义所需要的存储大小，访问方式。Openshift集群会自动寻找符合要求的PV与PVC自动对接。</p>
+
+<h3>8. Registry：</h3>
+
+<p>Openshift内部的镜像仓库，主要用于存放内置的S2I构建流程所产生的镜像。</p>
+
+<h3>9. S2I：</h3>
+
+<p>Source to Image，负责将应用源码构建成镜像。</p>
+
+<p>步骤：</p>
+
+<p>1）用户输入源代码仓库的地址</p>
+
+<p>2）选择S2I构建的基础镜像</p>
+
+<p>3）触发构建</p>
+
+<p>4）S2I构建执行器从指定的源码仓库地址下载代码</p>
+
+<p>5）S2I构建执行器实例化Builder镜像，并将代码注入到Builder镜像</p>
+
+<p>6）S2I构建执行器按照预定义的逻辑执行源代码的编译，构建</p>
+
+<p>7）生成新的镜像</p>
+
+<p>8）S2I构建执行器将新镜像Push到Registry</p>
+
+<p>9）更新相关的Image Stream信息</p>
+
+<h2>【核心流程】</h2>
+
+<p>1）创建应用：用户通过web控制台或oc命令创建应用，Openshift平台根据用户输入的源码地址和Builder镜像，生成构建配置Builder config和部署配置Deployment config，Service，Route等。</p>
+
+<p>2）触发构建</p>
+
+<p>3）实例化构建：平台根据Builder config实例化Builder对象，下载代码，并将代码注入到Builder对象，执行编译，构建</p>
+
+<p>4）生成新镜像并Push到Registry</p>
+
+<p>5）更新相关的Image Stream信息</p>
+
+<p>6）触发部署：当Image Stream更新后，触发平台部署镜像</p>
+
+<p>7）实例化镜像部署：平台根据Deployment config实例化部署，生成Deploy对象</p>
+
+<p>8）生成Replication Controller</p>
+
+<p>9）部署容器：通过Replication Controller，平台将pod及容器部署到各个节点上</p>
+
+<p>10）用户访问：用户通过浏览器访问Route对象中定义的应用域名</p>
+
+<p>11）请求处理并返回：请求到达Router组件后，通过Route转发给相关联的Service，最终到对应的容器实例。</p>
+
+<p> </p>

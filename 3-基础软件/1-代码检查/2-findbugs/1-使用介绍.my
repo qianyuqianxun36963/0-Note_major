@@ -1,0 +1,95 @@
+<h1>FindBugs：Java 静态代码检查</h1>
+
+<p>在使用 Jenkins 构建 Java Web 项目时候，有一项叫做静态代码检查，是用内置的 findBugs 插件，对程序源代码进行检查，以分析程序行为的技术，应用于程序的正确性检查、</p>
+
+<p>安全缺陷检测、程序优化等，特点就是不执行程序。它有助于在项目早期发现以下问题：变量声明了但未使用、变量类型不匹配、变量在使用前未定义、不可达代码、死循环、数组越界、内存泄漏等。分为以下几种类型：</p>
+
+<p>一、Bad Practice (糟糕的写法)</p>
+
+<p>二、Correctness (不太的当)</p>
+
+<p>三、Experimental (实验)</p>
+
+<p>四、Internationalization (国际化)</p>
+
+<p>五、Malicious code vulnerability (有漏洞的代码)</p>
+
+<p>六、Multithreaded correctness (多线程问题)</p>
+
+<p>七、Performance (执行)</p>
+
+<p>八、Security (安全性)</p>
+
+<p>九、Dodgy code (可疑代码)</p>
+
+<p>具体描述，可以参加如下地址：<a href="http://findbugs.sourceforge.net/bugDescriptions.html" target="_blank" title="Java_Subin">问题列表以及描述</a></p>
+
+<p>常见的比如：</p>
+
+<h3>SBSC: Method concatenates strings using + in a loop (SBSC_USE_STRINGBUFFER_CONCATENATION)</h3>
+
+<p>问题描述已经很清楚了，尽量不要在循环中使用 String，用 StringBuffer 来代替：</p>
+
+<p>The method seems to be building a String using concatenation in a loop. In each iteration, the String is converted to a StringBuffer/StringBuilder, appended to, and converted back to a String. This can lead to a cost quadratic in the number of iterations, as the growing string is recopied in each iteration.</p>
+
+<p>Better performance can be obtained by using a StringBuffer (or StringBuilder in Java 1.5) explicitly.</p>
+
+<p>For example:</p>
+
+<pre>
+// This is bad
+String s = "";
+for (int i = 0; i < field.length; ++i) {
+s = s + field[i];
+}
+
+// This is better
+StringBuffer buf = new StringBuffer();
+for (int i = 0; i < field.length; ++i) {
+buf.append(field[i]);
+}
+String s = buf.toString();
+写段代码比较下：
+</pre>
+
+<pre>
+1 Long preSecond = System.currentTimeMillis();
+2 String str = "";
+3 int length = 10000;
+4 for (int i = 0; i < length; i++) {
+5 　　str += i;
+6 }
+7 System.out.println("cost " + (System.currentTimeMillis() - preSecond) + " seconds.");
+8 Long posSecond = System.currentTimeMillis();
+9 StringBuffer buffer = new StringBuffer();
+10 for (int i = 0; i < length; i++) {
+11 　　buffer.append(i);
+12 }
+13 System.out.println("cost " + (System.currentTimeMillis() - posSecond) + " seconds.");</pre>
+
+<p>输出结果为：</p>
+
+<p>cost 363 seconds.<br />
+cost 3 seconds.</p>
+
+<p> 还有个错误关于实体类的setter和getter方法的：</p>
+
+<h3>EI2: May expose internal representation by incorporating reference to mutable object (EI_EXPOSE_REP2)</h3>
+
+<p>This code stores a reference to an externally mutable object into the internal representation of the object.  If instances are accessed by untrusted code, and unchecked changes to the mutable object would compromise security or other important properties, you will need to do something different. Storing a copy of the object is better approach in many situations.</p>
+
+<p>报的是这种比如Date类型的字段的getter和setter方法：</p>
+
+<p><img alt="" src="https://images2015.cnblogs.com/blog/909338/201608/909338-20160814175455718-881027890.png" /></p>
+
+<p>这里的警告意思是，在进行get或者set时候，因为 Java 是引用传递，对象之间赋值，可能会导致其他对象的修改，所以建议的做法是，把对象的克隆对象赋值给需要赋值的对象。</p>
+
+<p>首先，该实体类要继承 Cloneable 接口，然后在对应的 getter 和 setter 方法更改如下即可：</p>
+
+<p><img alt="" src="https://images2015.cnblogs.com/blog/909338/201608/909338-20160814180133718-771619230.png" />在一款优秀的 Java IDE —— IntellijIDEA 中，也可以安装对应的插件，来将这些问题扼杀在项目上线之前，避免不必要的麻烦。</p>
+
+<p><img alt="" src="https://images2015.cnblogs.com/blog/909338/201608/909338-20160814171156859-216908255.png" />安装以后，右击要分析的Java文件，选择Analyzed Files 即可</p>
+
+<p><img alt="" src="https://images2015.cnblogs.com/blog/909338/201608/909338-20160814171802484-327920843.png" />分析之后，如果有bugs，就会显示，然后根据提示来修正即可</p>
+
+<p><img alt="" src="https://images2015.cnblogs.com/blog/909338/201608/909338-20160814172030078-1179326981.png" /></p>

@@ -1,0 +1,173 @@
+<h1>Spring Cloud中FeignClient添加上传文件功能</h1>
+
+<p>项目概况：Spring Cloud搭的微服务，使用了eureka，FeignClient，现在遇到FeignClient调用接口时不支持上传文件，</p>
+
+<p>百度到两种方案，一种是使用feign-form和feign-form-spring库来做，源码地址：https://github.com/OpenFeign/feign-form。</p>
+
+<h2>具体的使用方法是加入maven依赖</h2>
+
+<p>        <dependency><br />
+            <groupId>io.github.openfeign.form</groupId><br />
+            <artifactId>feign-form-spring</artifactId><br />
+            <version>3.2.2</version><br />
+        </dependency><br />
+        <dependency><br />
+            <groupId>io.github.openfeign.form</groupId><br />
+            <artifactId>feign-form</artifactId><br />
+            <version>3.2.2</version><br />
+        </dependency></p>
+
+<h2>注入SpringFormEncoder类</h2>
+
+<p>    @Bean<br />
+    @Primary<br />
+    @Scope("prototype"<br />
+    public Encoder multipartFormEncoder() {<br />
+        return new SpringFormEncoder();<br />
+    }</p>
+
+<p>FeignClient接口里方法参数是文件类型的要用@<strong>RequestPart</strong>注解，且要设置ContentType为multipart/form-data</p>
+
+<p>    @ResponseBody<br />
+    @RequestMapping(value = "/ctstestcase/updateTestCase", method = {RequestMethod.POST}, consumes = MediaType.MULTIPART_FORM_DATA_VALUE)<br />
+    Map<String, Object> updateTestCase(@RequestParam("testcaseId") String testcaseId,<br />
+            @RequestParam("name") String name, @RequestParam("assignId") String assignId,<br />
+            @RequestParam("areaId") String areaId, @RequestParam("state") Integer state,<br />
+            @RequestParam("iterationId") String iterationId,@RequestParam("priority") Integer priority,<br />
+            @RequestParam("moduleId") String moduleId,  @RequestParam("executionType") Integer executionType,<br />
+            @RequestParam("summary") String summary, @RequestParam("tcsteps") String tcsteps,<br />
+            @RequestParam("relations") String relations,@RequestParam("attachments") String attachments,<br />
+            @RequestPart("files") MultipartFile[] files);</p>
+
+<p>但遇到一个问题，就是不支持文件数组类型，我看了源码，发现源码里底层是有对MultipartFile[]类型的支持的，源码中有个类叫SpringManyMultipartFilesWriter，是专门针对文件数组类型进行操作的，但是配置到项目里的SpringFormEncoder类里却没有对文件数组类型的判断，以致不能支持文件数组的上传.。</p>
+
+<h2>SpringManyMultipartFilesWriter源码</h2>
+
+<p>@FieldDefaults(level = PRIVATE, makeFinal = true)<br />
+public class SpringManyMultipartFilesWriter extends AbstractWriter {<br />
+ <br />
+  SpringSingleMultipartFileWriter fileWriter = new SpringSingleMultipartFileWriter();<br />
+ <br />
+  @Override<br />
+  public void write (Output output, String boundary, String key, Object value) throws Exception {<br />
+    if (value instanceof MultipartFile[]) {<br />
+      val files = (MultipartFile[]) value;<br />
+      for (val file : files) {<br />
+        fileWriter.write(output, boundary, key, file);<br />
+      }<br />
+    } else if (value instanceof Iterable) {<br />
+      val iterable = (Iterable<?>) value;<br />
+      for (val file : iterable) {<br />
+        fileWriter.write(output, boundary, key, file);<br />
+      }<br />
+    }<br />
+  }<br />
+ <br />
+  @Override<br />
+  public boolean isApplicable (Object value) {<br />
+    if (value == null) {<br />
+      return false;<br />
+    }<br />
+    if (value instanceof MultipartFile[]) {<br />
+      return true;<br />
+    }<br />
+    if (value instanceof Iterable) {<br />
+      val iterable = (Iterable<?>) value;<br />
+      val iterator = iterable.iterator();<br />
+      if (iterator.hasNext() && iterator.next() instanceof MultipartFile) {<br />
+        return true;<br />
+      }<br />
+    }<br />
+    return false;<br />
+  }</p>
+
+<h2>SpringFormEncoder源码</h2>
+
+<p>public class SpringFormEncoder extends FormEncoder {<br />
+ <br />
+  /**<br />
+   * Constructor with the default Feign's encoder as a delegate.<br />
+   */<br />
+  public SpringFormEncoder () {<br />
+    this(new Encoder.Default());<br />
+  }<br />
+ <br />
+  /**<br />
+   * Constructor with specified delegate encoder.<br />
+   *<br />
+   * @param delegate  delegate encoder, if this encoder couldn't encode object.<br />
+   */<br />
+  public SpringFormEncoder (Encoder delegate) {<br />
+    super(delegate);<br />
+ <br />
+    val processor = (MultipartFormContentProcessor) getContentProcessor(MULTIPART);<br />
+    processor.addWriter(new SpringSingleMultipartFileWriter());<br />
+    processor.addWriter(new SpringManyMultipartFilesWriter());<br />
+  }<br />
+ <br />
+  @Override<br />
+  public void encode (Object object, Type bodyType, RequestTemplate template) throws EncodeException {<br />
+    if (!bodyType.equals(MultipartFile.class)) {<br />
+      super.encode(object, bodyType, template);<br />
+      return;<br />
+    }<br />
+ <br />
+    val file = (MultipartFile) object;<br />
+    val data = singletonMap(file.getName(), object);<br />
+    super.encode(data, MAP_STRING_WILDCARD, template);<br />
+  }<br />
+}<br />
+从上面SpringFormEncoder的源码上可以看到SpringFormEncoder类构造时把SpringManyMultipartFilesWriter实例添加到了处理器列表里了，但是在encode方法里又只判断了MultipartFile类型，没有判断数组类型，这就比较奇怪了，底层有对数组的支持但上层却缺少了相应判断，而且在源码里的test包里也没有对文件数组类型的测试，难道只是encode方法里漏掉了？还是说那个文件数组的支持有问题？所以encode方法里才没有加入对其的判断？</p>
+
+<p>于是我先试着对encode方法进行扩展加入对文件数组的判断，应该就可以支持文件数组的上传了，于是把SpringFormEncoder类源码复制出来重命名为FeignSpringFormEncoder,源码如下：</p>
+
+<h2>FeignSpringFormEncoder自定义类源码</h2>
+
+<p>public class FeignSpringFormEncoder extends FormEncoder {<br />
+ <br />
+    /**<br />
+     * Constructor with the default Feign's encoder as a delegate.<br />
+     */<br />
+    public FeignSpringFormEncoder() {<br />
+        this(new Encoder.Default());<br />
+    }<br />
+ <br />
+ <br />
+    /**<br />
+     * Constructor with specified delegate encoder.<br />
+     *<br />
+     * @param delegate delegate encoder, if this encoder couldn't encode object.<br />
+     */<br />
+    public FeignSpringFormEncoder(Encoder delegate) {<br />
+        super(delegate);<br />
+ <br />
+        val processor = (MultipartFormContentProcessor) getContentProcessor(MULTIPART);<br />
+        processor.addWriter(new SpringSingleMultipartFileWriter());<br />
+        processor.addWriter(new SpringManyMultipartFilesWriter());<br />
+    }<br />
+ <br />
+ <br />
+    @Override<br />
+    public void encode(Object object, Type bodyType, RequestTemplate template) throws EncodeException {<br />
+        if (bodyType.equals(MultipartFile.class)) {<br />
+            val file = (MultipartFile) object;<br />
+            val data = singletonMap(file.getName(), object);<br />
+            super.encode(data, MAP_STRING_WILDCARD, template);<br />
+            return;<br />
+        } else if (bodyType.equals(MultipartFile[].class)) {<br />
+            val file = (MultipartFile[]) object;<br />
+            if(file != null) {<br />
+                val data = singletonMap(file.length == 0 ? "" : file[0].getName(), object);<br />
+                super.encode(data, MAP_STRING_WILDCARD, template);<br />
+                return;<br />
+            }<br />
+        }<br />
+        super.encode(object, bodyType, template);<br />
+    }<br />
+}</p>
+
+<p>经过测试，已经可以支持文件数组了，完美解决。</p>
+
+<p>这里再顺便说一下当时还百度到另一个解决文件上传的方案，这个方案就不细说了，直接上我用到的那个开源代码的地址：https://github.com/pcan/feign-client-test</p>
+
+<p>这个我试过也是可以解决文件上传问题的，但问题是FeignClient不能用SpringMVC的注解，得用Feign自带的注解，也因此我才扩展了第一种方法来做的文件上传功能。</p>

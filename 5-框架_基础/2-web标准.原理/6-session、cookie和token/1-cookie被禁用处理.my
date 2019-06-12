@@ -1,0 +1,53 @@
+<h1>cookie 被禁用了怎么办</h1>
+
+<p>单点登录的原理是后端生成一个 session ID，设置到 cookie，后面所有请求浏览器都会带上cookie，然后服务端从cookie获取 session ID，查询到用户信息。<br />
+所以，保持登录的关键不是cookie，而是通过cookie 保存和传输的 session ID，本质是能获取用户信息的数据。<br />
+除了cookie，还常用 HTTP 请求头来传输。但这个请求头浏览器不会像cookie一样自动携带，需手工处理<br />
+ </p>
+
+<p>vuejs可以通过下列方式给每个请求head添加header信息。</p>
+
+<p>that.$axios.interceptors.request.use(<br />
+config => {<br />
+config.headers.key = Cookies.get("user");<br />
+return config;<br />
+},<br />
+err => {<br />
+return Promise.reject(err);<br />
+}<br />
+);</p>
+
+<p> </p>
+
+<h2>后台相关代码</h2>
+
+<p>比较乱，没整理</p>
+
+<pre>
+@ApiOperation(value = "添加用户信息到session中",notes = "添加用户信息到session中")
+@RequestMapping(value = "/saveUser2Session",method = RequestMethod.POST)
+public ResultData<SysUser> saveUser2Session(@RequestBody SysUser user,HttpServletRequest request,HttpServletResponse response) {
+try{
+request.getHeader("key");
+request.getSession().setAttribute("userName",user.getFullName() + "_" + user.getShortName());
+request.getSession().setAttribute("user",user);
+
+
+// Cookie[] cookies = request.getCookies();
+// String userName = CookieUtil.getCookie(cookies,"userName");
+// if(null == userName){
+// response.addCookie(new Cookie("userName",user.getFullName() + "_" + user.getShortName()));
+// }
+// response.getHeaders("Set-Cookie");
+return ResultDataMap.ok();
+}catch(Exception e){
+return ResultDataMap.error(e.getMessage());
+}
+}</pre>
+
+<p> </p>
+
+<pre>
+//String curUserName = (String) request.getSession().getAttribute("userName");
+//String curUserName = CookieUtil.getCookie(request.getCookies(),"userName");
+String curUserName = request.getHeader("key");</pre>

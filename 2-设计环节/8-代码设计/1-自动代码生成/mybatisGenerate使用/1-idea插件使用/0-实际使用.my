@@ -1,0 +1,585 @@
+<h1>MyBatis-generator与IDEA的集成</h1>
+
+<p>在Dao层，通过数据库表反向生成，可以节省我们很多的精力，把更多的精力投入复杂的业务中。</p>
+
+<p>数据库表反向生成，指的是通过数据库如mysql中的库表schema生成dao层读写表的基础代码，包括model(entity)和dao(mapper)。</p>
+
+<p>在本文中我先介绍java中mybatis-generator的反向生成。我们在<a href="http://www.cnblogs.com/kangoroo/p/7495880.html" target="_blank">下一篇文章</a>中会介绍django中ORM的反向生成。</p>
+
+<h2><em><strong>mybatis-generator的反向生成有两种方式</strong></em></h2>
+
+<p>1）源码打包生成mybatis-generator.jar，通过执行jar来生成代码，然后把代码拷贝到工程</p>
+
+<p>2）直接跟编辑器集成，例如IDEA。</p>
+
+<p>我们只说明第二种方式。</p>
+
+<h2><em><strong>1、在IDEA中创建一个maven工程</strong></em></h2>
+
+<h2><em><strong>2、在maven工程的pom文件中添加mybatis-generator-maven-plugin插件</strong></em></h2>
+
+<pre>
+<build>
+<plugins>
+<plugin>
+<groupId>org.mybatis.generator</groupId>
+<artifactId>mybatis-generator-maven-plugin</artifactId>
+<version>1.3.2</version>
+<configuration>
+<verbose>true</verbose>
+<overwrite>true</overwrite>
+</configuration>
+</plugin>
+</plugins>
+</build>
+</pre>
+
+<h2><em><strong>3、在src/main/resources目录下创建两个配置文件，generatorConfig.xml和generator.properties</strong></em></h2>
+
+<p><strong>generatorConfig.xml文件</strong></p>
+
+<p>内容请看注释，<table>中配置的是你要扫描的表。</p>
+
+<pre>
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE generatorConfiguration
+PUBLIC "-//mybatis.org//DTD MyBatis Generator Configuration 1.0//EN"
+"http://mybatis.org/dtd/mybatis-generator-config_1_0.dtd">
+<generatorConfiguration>
+<!--导入属性配置 -->
+<properties resource="generator.properties"></properties>
+
+<!--指定特定数据库的jdbc驱动jar包的位置 -->
+<classPathEntry location="${jdbc.driverLocation}"/>
+
+<context id="default" targetRuntime="MyBatis3">
+
+
+<!-- optional，旨在创建class时，对注释进行控制 -->
+<commentGenerator>
+<property name="suppressDate" value="true" />
+</commentGenerator>
+
+
+<!--jdbc的数据库连接 -->
+<jdbcConnection driverClass="${jdbc.driverClass}" connectionURL="${jdbc.connectionURL}" userId="${jdbc.userId}" password="${jdbc.password}">
+</jdbcConnection>
+
+
+
+<!-- 非必需，类型处理器，在数据库类型和java类型之间的转换控制-->
+<javaTypeResolver >
+<property name="forceBigDecimals" value="false" />
+</javaTypeResolver>
+
+<!-- Model模型生成器,用来生成含有主键key的类，记录类 以及查询Example类
+targetPackage 指定生成的model生成所在的包名
+targetProject 指定在该项目下所在的路径
+-->
+<javaModelGenerator targetPackage="com.xiaoju.dqa.jazz.dao.model" targetProject="src/main/java">
+<!-- 是否对model添加 构造函数 -->
+<property name="constructorBased" value="true"/>
+
+<!-- 是否允许子包，即targetPackage.schemaName.tableName -->
+<property name="enableSubPackages" value="false"/>
+
+<!-- 建立的Model对象是否 不可改变 即生成的Model对象不会有 setter方法，只有构造方法 -->
+<property name="immutable" value="true"/>
+
+<!-- 是否对类CHAR类型的列的数据进行trim操作 -->
+<property name="trimStrings" value="true"/>
+</javaModelGenerator>
+
+<!--Mapper映射文件生成所在的目录 为每一个数据库的表生成对应的SqlMap文件 -->
+<sqlMapGenerator targetPackage="mybatis-mapper" targetProject="src/main/resources">
+<property name="enableSubPackages" value="false"/>
+</sqlMapGenerator>
+
+
+<!-- 客户端代码，生成易于使用的针对Model对象和XML配置文件 的代码
+type="ANNOTATEDMAPPER",生成Java Model 和基于注解的Mapper对象
+type="MIXEDMAPPER",生成基于注解的Java Model 和相应的Mapper对象
+type="XMLMAPPER",生成SQLMap XML文件和独立的Mapper接口
+-->
+<javaClientGenerator targetPackage="com.xiaoju.dqa.jazz.dao.mapper" targetProject="src/main/java" type="MIXEDMAPPER">
+<property name="enableSubPackages" value=""/>
+<!--
+定义Maper.java 源代码中的ByExample() 方法的可视性，可选的值有：
+public;
+private;
+protected;
+default
+注意：如果 targetRuntime="MyBatis3",此参数被忽略
+-->
+<property name="exampleMethodVisibility" value=""/>
+<!--
+方法名计数器
+Important note: this property is ignored if the target runtime is MyBatis3.
+-->
+<property name="methodNameCalculator" value=""/>
+
+<!--
+为生成的接口添加父接口
+-->
+<property name="rootInterface" value=""/>
+
+</javaClientGenerator>
+
+<table tableName="hiveTable" domainObjectName="HiveTable"
+enableCountByExample="false" enableUpdateByExample="false"
+enableDeleteByExample="false" enableSelectByExample="false"
+selectByExampleQueryId="false">
+</table>
+
+<table tableName="hiveLocation" domainObjectName="HiveLocation"
+enableCountByExample="false" enableUpdateByExample="false"
+enableDeleteByExample="false" enableSelectByExample="false"
+selectByExampleQueryId="false">
+</table>
+
+</context>
+</generatorConfiguration>
+</pre>
+
+<p><strong>generator.properties文件</strong></p>
+
+<p>这个主要配置的是你的驱动程序和数据库链接，mybatis将去配置的数据库中扫描要生成的表。</p>
+
+<pre>
+jdbc.driverLocation=/Users/didi/.m2/repository/mysql/mysql-connector-java/5.1.40/mysql-connector-java-5.1.40.jar
+jdbc.driverClass=com.mysql.jdbc.Driver
+jdbc.connectionURL=jdbc:mysql://localhost:3306/jazz?useUnicode=true&characterEncoding=utf-8
+jdbc.userId=root
+jdbc.password=123456</pre>
+
+<h2><em><strong>4、在IDEA中添加Run选项，使用mybatis-generator-maven-plugin</strong></em></h2>
+
+<p><img alt="" src="https://images2017.cnblogs.com/blog/1061021/201709/1061021-20170908174202491-677084026.png" style="height:451px; width:232px" />配置如下</p>
+
+<p>1）Name写generator会在run菜单生成一个名叫generator的选项；</p>
+
+<p>2）CommandLine写要执行的命令，mybatis-generator:generate  -e</p>
+
+<p>3）working directory写你pom所在的工程，我这里是区分模块开发的，所以在dao模块下。</p>
+
+<h2><em><strong>5、run -> generator执行</strong></em></h2>
+
+<p>这样就会生成对应的代码了</p>
+
+<p>我两张表的建表语句如下：</p>
+
+<pre>
+CREATE TABLE `hiveTable` (
+`id` int(100) NOT NULL AUTO_INCREMENT COMMENT '库表唯一Id',
+`dbName` VARCHAR(100) COMMENT '库名',
+`tableName` VARCHAR(100) COMMENT '表名',
+`location` VARCHAR(500) COMMENT '路径',
+`createTime` DATETIME COMMENT '创建时间',
+`updateTime` DATETIME COMMENT '更新时间',
+PRIMARY KEY (`id`)
+) ENGINE=MyISAM DEFAULT CHARSET=utf8;
+
+CREATE TABLE `hiveLocation` (
+`id` int(100) NOT NULL AUTO_INCREMENT COMMENT '路径唯一Id',
+`location` VARCHAR(500) COMMENT '路径',
+`size` INT(10) COMMENT '大小',
+`createTime` DATETIME COMMENT '创建时间',
+`updateTime` DATETIME COMMENT '更新时间',
+PRIMARY KEY (`id`)
+) ENGINE=MyISAM DEFAULT CHARSET=utf8;
+</pre>
+
+<h3><strong>生成的代码如图</strong></h3>
+
+<p><img alt="" src="https://images2017.cnblogs.com/blog/1061021/201709/1061021-20170908175852522-1862772403.png" />我们展示一些生成的代码：</p>
+
+<p><strong>HiveTable.java</strong></p>
+
+<pre>
+package com.xiaoju.dqa.jazz.dao.model;
+
+import java.util.Date;
+
+public class HiveTable {
+/**
+* This field was generated by MyBatis Generator.
+* This field corresponds to the database column hiveTable.id
+*
+* @mbggenerated
+*/
+private Integer id;
+
+/**
+* This field was generated by MyBatis Generator.
+* This field corresponds to the database column hiveTable.dbName
+*
+* @mbggenerated
+*/
+private String dbname;
+
+/**
+* This field was generated by MyBatis Generator.
+* This field corresponds to the database column hiveTable.tableName
+*
+* @mbggenerated
+*/
+private String tablename;
+
+/**
+* This field was generated by MyBatis Generator.
+* This field corresponds to the database column hiveTable.location
+*
+* @mbggenerated
+*/
+private String location;
+
+/**
+* This field was generated by MyBatis Generator.
+* This field corresponds to the database column hiveTable.createTime
+*
+* @mbggenerated
+*/
+private Date createtime;
+
+/**
+* This field was generated by MyBatis Generator.
+* This field corresponds to the database column hiveTable.updateTime
+*
+* @mbggenerated
+*/
+private Date updatetime;
+
+/**
+* This method was generated by MyBatis Generator.
+* This method corresponds to the database table hiveTable
+*
+* @mbggenerated
+*/
+public HiveTable(Integer id, String dbname, String tablename, String location, Date createtime, Date updatetime) {
+this.id = id;
+this.dbname = dbname;
+this.tablename = tablename;
+this.location = location;
+this.createtime = createtime;
+this.updatetime = updatetime;
+}
+
+/**
+* This method was generated by MyBatis Generator.
+* This method returns the value of the database column hiveTable.id
+*
+* @return the value of hiveTable.id
+*
+* @mbggenerated
+*/
+public Integer getId() {
+return id;
+}
+
+/**
+* This method was generated by MyBatis Generator.
+* This method returns the value of the database column hiveTable.dbName
+*
+* @return the value of hiveTable.dbName
+*
+* @mbggenerated
+*/
+public String getDbname() {
+return dbname;
+}
+
+/**
+* This method was generated by MyBatis Generator.
+* This method returns the value of the database column hiveTable.tableName
+*
+* @return the value of hiveTable.tableName
+*
+* @mbggenerated
+*/
+public String getTablename() {
+return tablename;
+}
+
+/**
+* This method was generated by MyBatis Generator.
+* This method returns the value of the database column hiveTable.location
+*
+* @return the value of hiveTable.location
+*
+* @mbggenerated
+*/
+public String getLocation() {
+return location;
+}
+
+/**
+* This method was generated by MyBatis Generator.
+* This method returns the value of the database column hiveTable.createTime
+*
+* @return the value of hiveTable.createTime
+*
+* @mbggenerated
+*/
+public Date getCreatetime() {
+return createtime;
+}
+
+/**
+* This method was generated by MyBatis Generator.
+* This method returns the value of the database column hiveTable.updateTime
+*
+* @return the value of hiveTable.updateTime
+*
+* @mbggenerated
+*/
+public Date getUpdatetime() {
+return updatetime;
+}
+}
+</pre>
+
+<h3> <strong>HiveTableMapper.java</strong></h3>
+
+<pre>
+package com.xiaoju.dqa.jazz.dao.mapper;
+
+import com.xiaoju.dqa.jazz.dao.model.HiveTable;
+import org.apache.ibatis.annotations.*;
+
+@Mapper
+public interface HiveTableMapper {
+/**
+* This method was generated by MyBatis Generator.
+* This method corresponds to the database table hiveTable
+*
+* @mbggenerated
+*/
+@Delete({
+"delete from hiveTable",
+"where id = #{id,jdbcType=INTEGER}"
+})
+int deleteByPrimaryKey(Integer id);
+
+/**
+* This method was generated by MyBatis Generator.
+* This method corresponds to the database table hiveTable
+*
+* @mbggenerated
+*/
+@Insert({
+"insert into hiveTable (id, dbName, ",
+"tableName, location, ",
+"createTime, updateTime)",
+"values (#{id,jdbcType=INTEGER}, #{dbname,jdbcType=VARCHAR}, ",
+"#{tablename,jdbcType=VARCHAR}, #{location,jdbcType=VARCHAR}, ",
+"#{createtime,jdbcType=TIMESTAMP}, #{updatetime,jdbcType=TIMESTAMP})"
+})
+int insert(HiveTable record);
+
+/**
+* This method was generated by MyBatis Generator.
+* This method corresponds to the database table hiveTable
+*
+* @mbggenerated
+*/
+int insertSelective(HiveTable record);
+
+/**
+* This method was generated by MyBatis Generator.
+* This method corresponds to the database table hiveTable
+*
+* @mbggenerated
+*/
+@Select({
+"select",
+"id, dbName, tableName, location, createTime, updateTime",
+"from hiveTable",
+"where id = #{id,jdbcType=INTEGER}"
+})
+@ResultMap("BaseResultMap")
+HiveTable selectByPrimaryKey(Integer id);
+
+/**
+* This method was generated by MyBatis Generator.
+* This method corresponds to the database table hiveTable
+*
+* @mbggenerated
+*/
+int updateByPrimaryKeySelective(HiveTable record);
+
+/**
+* This method was generated by MyBatis Generator.
+* This method corresponds to the database table hiveTable
+*
+* @mbggenerated
+*/
+@Update({
+"update hiveTable",
+"set dbName = #{dbname,jdbcType=VARCHAR},",
+"tableName = #{tablename,jdbcType=VARCHAR},",
+"location = #{location,jdbcType=VARCHAR},",
+"createTime = #{createtime,jdbcType=TIMESTAMP},",
+"updateTime = #{updatetime,jdbcType=TIMESTAMP}",
+"where id = #{id,jdbcType=INTEGER}"
+})
+int updateByPrimaryKey(HiveTable record);
+}
+</pre>
+
+<h3><strong>HiveTableMapper.xml</strong></h3>
+
+<pre>
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="com.xiaoju.dqa.jazz.dao.mapper.HiveTableMapper" >
+<resultMap id="BaseResultMap" type="com.xiaoju.dqa.jazz.dao.model.HiveTable" >
+<!--
+WARNING - @mbggenerated
+This element is automatically generated by MyBatis Generator, do not modify.
+-->
+<constructor >
+<idArg column="id" jdbcType="INTEGER" javaType="java.lang.Integer" />
+<arg column="dbName" jdbcType="VARCHAR" javaType="java.lang.String" />
+<arg column="tableName" jdbcType="VARCHAR" javaType="java.lang.String" />
+<arg column="location" jdbcType="VARCHAR" javaType="java.lang.String" />
+<arg column="createTime" jdbcType="TIMESTAMP" javaType="java.util.Date" />
+<arg column="updateTime" jdbcType="TIMESTAMP" javaType="java.util.Date" />
+</constructor>
+</resultMap>
+<sql id="Base_Column_List" >
+<!--
+WARNING - @mbggenerated
+This element is automatically generated by MyBatis Generator, do not modify.
+-->
+id, dbName, tableName, location, createTime, updateTime
+</sql>
+<insert id="insertSelective" parameterType="com.xiaoju.dqa.jazz.dao.model.HiveTable" >
+<!--
+WARNING - @mbggenerated
+This element is automatically generated by MyBatis Generator, do not modify.
+-->
+insert into hiveTable
+<trim prefix="(" suffix=")" suffixOverrides="," >
+<if test="id != null" >
+id,
+</if>
+<if test="dbname != null" >
+dbName,
+</if>
+<if test="tablename != null" >
+tableName,
+</if>
+<if test="location != null" >
+location,
+</if>
+<if test="createtime != null" >
+createTime,
+</if>
+<if test="updatetime != null" >
+updateTime,
+</if>
+</trim>
+<trim prefix="values (" suffix=")" suffixOverrides="," >
+<if test="id != null" >
+#{id,jdbcType=INTEGER},
+</if>
+<if test="dbname != null" >
+#{dbname,jdbcType=VARCHAR},
+</if>
+<if test="tablename != null" >
+#{tablename,jdbcType=VARCHAR},
+</if>
+<if test="location != null" >
+#{location,jdbcType=VARCHAR},
+</if>
+<if test="createtime != null" >
+#{createtime,jdbcType=TIMESTAMP},
+</if>
+<if test="updatetime != null" >
+#{updatetime,jdbcType=TIMESTAMP},
+</if>
+</trim>
+</insert>
+<update id="updateByPrimaryKeySelective" parameterType="com.xiaoju.dqa.jazz.dao.model.HiveTable" >
+<!--
+WARNING - @mbggenerated
+This element is automatically generated by MyBatis Generator, do not modify.
+-->
+update hiveTable
+<set >
+<if test="dbname != null" >
+dbName = #{dbname,jdbcType=VARCHAR},
+</if>
+<if test="tablename != null" >
+tableName = #{tablename,jdbcType=VARCHAR},
+</if>
+<if test="location != null" >
+location = #{location,jdbcType=VARCHAR},
+</if>
+<if test="createtime != null" >
+createTime = #{createtime,jdbcType=TIMESTAMP},
+</if>
+<if test="updatetime != null" >
+updateTime = #{updatetime,jdbcType=TIMESTAMP},
+</if>
+</set>
+where id = #{id,jdbcType=INTEGER}
+</update>
+</mapper>
+</pre>
+
+<p><strong>想让xml文件生效，你可以在创建数据源的时候加入xml文件的路径</strong></p>
+
+<p><strong>例如其中的bean.setMapperLocations(new PathMatchingResourcePatternResolver().getResources("classpath:mybatis-mapper/*.xml"));</strong></p>
+
+<pre>
+package com.xiaoju.dqa.jazz.dao.configuration;
+
+import org.apache.ibatis.session.SqlSessionFactory;
+import org.mybatis.spring.SqlSessionFactoryBean;
+import org.mybatis.spring.SqlSessionTemplate;
+import org.mybatis.spring.annotation.MapperScan;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.boot.autoconfigure.jdbc.DataSourceBuilder;
+import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Primary;
+import org.springframework.core.io.support.PathMatchingResourcePatternResolver;
+import org.springframework.jdbc.datasource.DataSourceTransactionManager;
+
+import javax.sql.DataSource;
+
+@Configuration
+@MapperScan(basePackages = "com.xiaoju.dqa.jazz.dao.mapper", sqlSessionTemplateRef = "jazzSqlSessionTemplate")
+public class JazzDataSource {
+
+@Bean(name = "jazzData")
+@ConfigurationProperties(prefix = "spring.datasource.jazz")
+@Primary
+public DataSource jazzData() {
+return DataSourceBuilder.create().build();
+}
+
+@Bean(name = "jazzSqlSessionFactory")
+@Primary
+public SqlSessionFactory jazzSqlSessionFactory(@Qualifier("jazzData") DataSource dataSource) throws Exception {
+SqlSessionFactoryBean bean = new SqlSessionFactoryBean();
+bean.setDataSource(dataSource);
+bean.setMapperLocations(new PathMatchingResourcePatternResolver().getResources("classpath:mybatis-mapper/*.xml"));
+return bean.getObject();
+}
+
+@Bean(name = "jazzTransactionManager")
+@Primary
+public DataSourceTransactionManager jazzTransactionManager(@Qualifier("jazzData") DataSource dataSource) {
+return new DataSourceTransactionManager(dataSource);
+}
+
+@Bean(name = "jazzSqlSessionTemplate")
+@Primary
+public SqlSessionTemplate jazzSqlSessionTemplate(@Qualifier("jazzSqlSessionFactory") SqlSessionFactory sqlSessionFactory) throws Exception {
+return new SqlSessionTemplate(sqlSessionFactory);
+}
+
+}</pre>

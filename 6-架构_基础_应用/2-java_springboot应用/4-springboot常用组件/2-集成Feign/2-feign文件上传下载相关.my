@@ -1,0 +1,324 @@
+<h1>feign 文件上传</h1>
+
+<p>feign client multipart feign调用服务上传图片 报错 the request was rejected because no multipart boundary was</p>
+
+<p>学习spring cloud   ，些了一个图片上传的服务，直接用postman 请求这个服务，是没有问题的，</p>
+
+<p>但是在web层（comsumer层？）用feign去调用这个服务，就报错了</p>
+
+<p>the request was rejected because no multipart boundary was found</p>
+
+<h2>官方使用说明</h2>
+
+<p><a href="https://github.com/OpenFeign/feign-form">OpenFeign feign-form 官网地址</a></p>
+
+<h2>添加依赖</h2>
+
+<p>工程中需要依赖这两个东东</p>
+
+<pre>
+<dependencies>
+...
+<dependency>
+<groupId>io.github.openfeign.form</groupId>
+<artifactId>feign-form</artifactId>
+<version>3.4.1</version>
+</dependency>
+<dependency>
+<groupId>io.github.openfeign.form</groupId>
+<artifactId>feign-form-spring</artifactId>
+<version>3.4.1</version>
+</dependency>
+...
+</dependencies></pre>
+
+<h2>新建调用类</h2>
+
+<pre>
+@FeignClient(name = "file-upload-service", configuration = FileUploadServiceClient.MultipartSupportConfig.class)
+public interface FileUploadServiceClient extends IFileUploadServiceClient {
+
+public class MultipartSupportConfig {
+
+@Autowired
+private ObjectFactory<HttpMessageConverters> messageConverters;
+
+@Bean
+public Encoder feignFormEncoder() {
+return new SpringFormEncoder(new SpringEncoder(messageConverters));
+}
+}
+}</pre>
+
+<h2>Spring Cloud Feign Client 实现MultipartFile上传文件功能</h2>
+
+<p>这两天老大突然交给一个任务，就是当用户关注我们的<a href="http://lib.csdn.net/base/wechat" target="_blank" title="微信开发知识库">微信</a>号时，我们应该将其微信头像下载下来，然后上传到公司内部的服务器上。如果直接保存微信头像的链接，当用户更换微信头像时，我们的产品在获取用户头像很可能会出现404异常。</p>
+
+<p>由于公司运用的技术栈为<a href="http://lib.csdn.net/base/javaee" target="_blank" title="Java EE知识库">spring</a> Cloud（一些Eureka, Feign）进行服务注册和远程调用。</p>
+
+<p>重点来了。。。。但直接使用FeignClient去远程调用注册中心上的上传文件接口，会一直报错。</p>
+
+<p>@PostMapping<br />
+    @ApiOperation(value = "上传文件")<br />
+    public String fileUpload(@ApiParam(value = "文件", required = true) @RequestParam("file") MultipartFile multipartFile,<br />
+            @ApiParam(value = "usage(目录)", required = false) @RequestParam(value = "usage", required = false) String usage,<br />
+            @ApiParam(value = "同步(可选,默认false)") @RequestParam(value = "sync", required = false, defaultValue = "false") boolean sync) {<br />
+        if (multipartFile == null) {<br />
+            throw new IllegalArgumentException("参数异常");<br />
+        }<br />
+        String url = map.get(key).doUpload(multipartFile, usage, sync);<br />
+        return UploadResult.builder().url(url).build();<br />
+    }</p>
+
+<p>远程的上传文件的接口。</p>
+
+<p>@FeignClient("dx-commons-fileserver")<br />
+public interface FileServerService {<br />
+<br />
+<br />
+@RequestMapping(value="/file", method = RequestMethod.POST)<br />
+    public String fileUpload(<br />
+    @RequestParam("file") MultipartFile multipartFile,<br />
+    @RequestParam(value = "usage", required = false) String usage,<br />
+            @RequestParam(value = "sync", required = false, defaultValue = "false") boolean sync);<br />
+}</p>
+
+<p>普通的FeignClient远程调用代码。但是这样的实现，在去调用的时候一直抛异常：MissingServletRequestPartException，"Required request part  'file' is not present"</p>
+
+<p>这里去跟踪：fileServerService.fileUpload(multipartFile, null, true)源码发现发送的url是将multipartFile以url的方式拼接在query string上。所以这样的调用肯定是不行的。</p>
+
+<p>那从百度搜索了一下关键词: feign upload 会看到有这样一种解决方案：</p>
+
+<p>(原文转自:http://www.jianshu.com/p/dfecfbb4a215)</p>
+
+<h3>maven</h3>
+
+<pre>
+<code> <dependency>
+<groupId>io.github.openfeign.form</groupId>
+<artifactId>feign-form</artifactId>
+<version>2.1.0</version>
+</dependency>
+<dependency>
+<groupId>io.github.openfeign.form</groupId>
+<artifactId>feign-form-spring</artifactId>
+<version>2.1.0</version>
+</dependency></code></pre>
+
+<h3>feign config</h3>
+
+<pre>
+<code>@Configuration
+public class FeignMultipartSupportConfig {
+
+@Bean
+@Primary
+@Scope("prototype")
+public Encoder multipartFormEncoder() {
+return new SpringFormEncoder();
+}
+
+@Bean
+public feign.Logger.Level multipartLoggerLevel() {
+return feign.Logger.Level.FULL;
+}
+}</code></pre>
+
+<h3>feign client</h3>
+
+<pre>
+<code>@FeignClient(name = "xxx",configuration = FeignMultipartSupportConfig.class)
+public interface OpenAccountFeignClient {
+
+@RequestMapping(method = RequestMethod.POST, value = "/xxxxx",produces = {MediaType.APPLICATION_JSON_UTF8_VALUE},consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+public ResponseEntity<?> ocrIdCard(@RequestPart(value = "file") MultipartFile file);
+
+}</code></pre>
+
+<p>这种方案很好很强大，照搬过来就很好的解决了问题。也实现了文件上传的远程调用。</p>
+
+<p> </p>
+
+<p>但是问题又来了。因为上面的成功是很大一部分源于那个配置类，里面的Encoder Bean。但我的这个项目里不止需要远程调用上传的接口，还需要调用其他的接口。这样的话会发现其他FeignClient一调用，就会抛异常。真的是一波未平一波又起。心碎的感觉。跟踪源码发现：</p>
+
+<p>SpringFormEncoder的encode方法当传送的对象不是MultipartFile的时候，就会调用Encoder.Default类的encode方法。。。。。。。。。。。</p>
+
+<p>public class SpringFormEncoder extends FormEncoder {<br />
+    <br />
+    private final Encoder delegate;<br />
+<br />
+<br />
+    public SpringFormEncoder () {<br />
+        this(new Encoder.Default());<br />
+    }<br />
+<br />
+<br />
+    public SpringFormEncoder(Encoder delegate) {<br />
+        this.delegate = delegate;<br />
+    }<br />
+    <br />
+    @Override<br />
+    public void encode(Object object, Type bodyType, RequestTemplate template) throws EncodeException {<br />
+        if (!bodyType.equals(MultipartFile.class)) {<br />
+            delegate.encode(object, bodyType, template);<br />
+            return;<br />
+        }<br />
+        <br />
+        MultipartFile file = (MultipartFile) object;<br />
+        Map<String, Object> data = Collections.singletonMap(file.getName(), object);<br />
+        new SpringMultipartEncodedDataProcessor().process(data, template);<br />
+    }<br />
+<br />
+}</p>
+
+<p>而这个Encoder.Default的encode方法判断传送的类型不是String或者byte[]，就会抛异常：</p>
+
+<p>class Default implements Encoder {<br />
+<br />
+<br />
+    @Override<br />
+    public void encode(Object object, Type bodyType, RequestTemplate template) {<br />
+      if (bodyType == String.class) {<br />
+        template.body(object.toString());<br />
+      } else if (bodyType == byte[].class) {<br />
+        template.body((byte[]) object, null);<br />
+      } else if (object != null) {<br />
+        throw new EncodeException(<br />
+            format("%s is not a type supported by this encoder.", object.getClass()));<br />
+      }<br />
+    }<br />
+  }</p>
+
+<p> </p>
+
+<p>就这样，我又得继续寻找其他的方法，不然没法远程调用其他的服务了。这就很尴尬。</p>
+
+<p> </p>
+
+<p>那接下来就是各种FQ，各种谷歌，终于找到了合适的答案。</p>
+
+<p>原文转自（https://github.com/pcan/feign-client-test   可将示例代码下载下来研究，这样方便看调用的逻辑）</p>
+
+<p> </p>
+
+<h2>Feign Client Test</h2>
+
+<p> </p>
+
+<p>A Test project that uses Feign to upload Multipart files to a REST endpoint. Since Feign library does not support Multipart requests, I wrote a custom <a href="https://github.com/pcan/feign-client-test/blob/master/src/main/java/it/pcan/test/feign/client/FeignSpringFormEncoder.java" target="_blank"><code>Encoder</code></a> that enables this feature, using a <code>HttpMessageConverter</code> chain that mimics Spring's <code>RestTemplate</code>.</p>
+
+<h3>Multipart Request Types</h3>
+
+<p>A few request types are supported at the moment:</p>
+
+<ul>
+<li>Simple upload requests: One <code>MultipartFile</code> alongwith some path/query parameters:</li>
+</ul>
+
+<pre>
+interface TestUpload {
+@RequestLine("POST /upload/{folder}")
+public UploadInfo upload(@Param("folder") String folder, @Param("file") MultipartFile file);
+}</pre>
+
+<ul>
+<li>Upload one file & object(s): One <code>MultipartFile</code> alongwith some path/query parameters and one or more JSON-encoded object(s):</li>
+</ul>
+
+<pre>
+interface TestUpload {
+@RequestLine("POST /upload/{folder}")
+public UploadInfo upload(@Param("folder") String folder, @Param("file") MultipartFile file, @Param("metadata") UploadMetadata metadata);
+}</pre>
+
+<ul>
+<li>Upload multiple files & objects: An array of <code>MultipartFile</code> alongwith some path/query parameters and one or more JSON-encoded object(s):</li>
+</ul>
+
+<pre>
+interface TestUpload {
+@RequestLine("POST /uploadArray/{folder}")
+public List<UploadInfo> uploadArray(@Param("folder") String folder, @Param("files") MultipartFile[] files, @Param("metadata") UploadMetadata metadata);
+}</pre>
+
+<p> </p>
+
+<p>根据上面的示例代码的提示，我也就按照上面的修改我的代码。因为原理方面没有深入的研究，所以很多代码直接复制过来修改一下。其中有一段：</p>
+
+<p>Feign.Builder encoder = Feign.builder()<br />
+                .decoder(new JacksonDecoder())<br />
+                .encoder(new FeignSpringFormEncoder());</p>
+
+<p>这里的encoder是示例代码自己定义的（本人的代码也用到了这个类），decoder用的是JacksonDecoder，那这块我也直接复制了。然后修改好代码为：</p>
+
+<p>@Service<br />
+public class UploadService {<br />
+<br />
+<br />
+@Value("${commons.file.upload-url}")<br />
+private String HTTP_FILE_UPLOAD_URL;//此处配置上传文件接口的域名(http(s)://XXXXX.XXXXX.XX)<br />
+<br />
+public String uploadFile(MultipartFile file, String usage, boolean sync){<br />
+FileUploadResource fileUploadResource = Feign.builder()</p>
+
+<p>  .decoder(new JacksonDecoder())<br />
+                .encoder(new FeignSpringFormEncoder())<br />
+.target(FileUploadResource.class, HTTP_FILE_UPLOAD_URL);<br />
+return fileUploadResource.fileUpload(file, usage, sync);<br />
+}<br />
+}</p>
+
+<p>public interface FileUploadResource {<br />
+<br />
+@RequestLine("POST /file")<br />
+String fileUpload(@Param("file") MultipartFile file, @Param("usage") String usage, @Param("sync") boolean sync);<br />
+}</p>
+
+<p>其中调用上传文件的代码就改为上述的代码进行运行。但是这样还是抛了异常。跟踪fileUploadResource.fileUpload(file, usage, sync)代码，一步步发现远程的调用和文件的上传都是OK的，响应也是为200.但是最后的decoder时，抛异常：</p>
+
+<p>unrecognized token 'http': was expecting ('true', 'false' or 'null')</p>
+
+<p>只想说 What a fucking day!!!   这里也能出错？？心里很是郁闷。。。。没办法，这个方法还是很厉害的，因为不会影响其他远程服务的调用，虽然只是这里报错。那只有再次跟踪源码，发现在JacksonDecoder的decode方法：</p>
+
+<p>@Override<br />
+  public Object decode(Response response, Type type) throws IOException {<br />
+    if (response.status() == 404) return Util.emptyValueOf(type);<br />
+    if (response.body() == null) return null;<br />
+    Reader reader = response.body().asReader();<br />
+    if (!reader.markSupported()) {<br />
+      reader = new BufferedReader(reader, 1);<br />
+    }<br />
+    try {<br />
+      // Read the first byte to see if we have any data<br />
+      reader.mark(1);<br />
+      if (reader.read() == -1) {<br />
+        return null; // Eagerly returning null avoids "No content to map due to end-of-input"<br />
+      }<br />
+      reader.reset();<br />
+      return mapper.readValue(reader, mapper.constructType(type));<br />
+    } catch (RuntimeJsonMappingException e) {<br />
+      if (e.getCause() != null && e.getCause() instanceof IOException) {<br />
+        throw IOException.class.cast(e.getCause());<br />
+      }<br />
+      throw e;<br />
+    }<br />
+  }</p>
+
+<p>其中走到： return mapper.readValue(reader, mapper.constructType(type)); 然后就抛异常啦。郁闷啊。最后不知道一下子咋想的，就尝试把这个decoder删除，不设置decoder了。那终于万幸啊。。。。全部调通了。。。。。。。所以修改完的UploadService代码为：</p>
+
+<p>@Service<br />
+public class UploadService {<br />
+<br />
+<br />
+@Value("${commons.file.upload-url}")<br />
+private String HTTP_FILE_UPLOAD_URL;//此处配置上传文件接口的域名(http(s)://XXXXX.XXXXX.XX)<br />
+<br />
+public String uploadFile(MultipartFile file, String usage, boolean sync){<br />
+FileUploadResource fileUploadResource = Feign.builder()<br />
+                .encoder(new FeignSpringFormEncoder())                 //这里没有添加decoder了<br />
+.target(FileUploadResource.class, HTTP_FILE_UPLOAD_URL);<br />
+return fileUploadResource.fileUpload(file, usage, sync);<br />
+}<br />
+}</p>
+
+<p> </p>

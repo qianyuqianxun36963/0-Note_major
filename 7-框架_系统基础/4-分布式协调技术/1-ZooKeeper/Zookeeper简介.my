@@ -1,0 +1,149 @@
+<h1>zookeeper（一）简介&工作原理</h1>
+
+<h2>一、ZooKeeper 是什么</h2>
+
+<p>Apache ZooKeeper 由 Apache Hadoop 的子项目发展而来，于 2010 年 11 月正式成为了 Apache 的顶级项目。 <br />
+ZooKeeper 是一个开放源代码的分布式协调服务。它具有高性能、高可用的特点，同时也具有严格的顺序访问控制能力（主要是写操作的严格顺序性）。<strong>基于对 ZAB 协议</strong>（ZooKeeper Atomic Broadcast，ZooKeeper 原子消息广播协议）的实现，它能够很好地保证分布式环境中数据的一致性。也正是基于这样的特性，使得 ZooKeeper 成为了解决分布式数据一致性问题的利器。</p>
+
+<h2>二、ZooKeeper 基本概念</h2>
+
+<h3>2.1、设计目的</h3>
+
+<ul>
+<li><strong>最终一致性</strong>：client不论连接到哪个Server，展示给它都是同一个视图，这是zookeeper最重要的性能。</li>
+<li><strong>可靠性</strong>：具有简单、健壮、良好的性能，如果消息m被到一台服务器接受，那么它将被所有的服务器接受。</li>
+<li><strong>实时性</strong>：Zookeeper保证客户端将在一个时间间隔范围内获得服务器的更新信息，或者服务器失效的信息。但由于网络延时等原因，Zookeeper不能保证两个客户端能同时得到刚更新的数据，如果需要最新数据，应该在读数据之前调用sync()接口。</li>
+<li><strong>等待无关（wait-free）</strong>：慢的或者失效的client不得干预快速的client的请求，使得每个client都能有效的等待。</li>
+<li><strong>原子性</strong>：更新只能成功或者失败，没有中间状态。</li>
+<li><strong>顺序性</strong>：包括全局有序和偏序两种：全局有序是指如果在一台服务器上消息a在消息b前发布，则在所有Server上消息a都将在消息b前被发布；偏序是指如果一个消息b在消息a后被同一个发送者发布，a必将排在b前面。</li>
+</ul>
+
+<h3>2.2、ZooKeeper角色</h3>
+
+<p>Zookeeper中的角色主要有以下三类，如下表所示：</p>
+
+<p><img alt="这里写图片描述" src="https://img-blog.csdn.net/20180228143820664?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQveWpwMTk4NzEz/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70" title="" /></p>
+
+<h3>2.3、ZooKeeper 架构模型</h3>
+
+<p><img alt="这里写图片描述" src="https://img-blog.csdn.net/20180228135341745?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQveWpwMTk4NzEz/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70" title="" /></p>
+
+<p>ZooKeeper 由两部分组成：ZooKeeper 服务端和客户端。 <br />
+ZooKeeper 服务器采用集群的形式。值得一提的是，只要集群中存在超过一半的、处于正常工作状态的服务器，那么整个集群就能够正常对外服务。组成 ZooKeeper 集群的每台服务器都会在内存中维护当前的 ZooKeeeper 服务状态，并且每台服务器之间都互相保持着通信。 <br />
+客户端在连接 ZooKeeper 服务集群时，会按照一定的随机算法选择集群中的某台服务器，然后和它共同创建一个 TCP 连接，使客户端连上到那台服务器。而当那台服务器失效时，客户端自动会重新选择另一台服务器进行连接，从而保证服务的连续性。 <br />
+当其中一个客户端修改数据时，ZooKeeper 会将修改同步到集群中所有的服务器上，从而使连接到集群中其它服务器上的客户端也能立即看到修改后的数据，很好地保证了分布式环境中数据的一致性。</p>
+
+<h3>2.4、ZooKeeper 数据模型</h3>
+
+<p><img alt="这里写图片描述" src="https://img-blog.csdn.net/20180228135630894?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQveWpwMTk4NzEz/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70" title="" /></p>
+
+<p>ZooKeeper 的数据模型采用类似于文件系统的树结构。树上的每个节点称为 ZNode，而每个节点都可能有一个或者多个子节点。ZNode 的节点路径标识方式是由一系列使用斜杠”/”进行分割的路径表示。 <br />
+可以向 ZNode 节点写入、修改、读取数据，也可以创建、删除 ZNode 节点或 ZNode 节点下的子节点。值得注意的是，ZooKeeper 的设计目标不是传统的数据库存储或者大数据对象存储，而是协同数据的存储，因此在实现时 ZNode 存储的数据大小不应超过 1MB。 <br />
+另外，每一个节点都有个 ACL（Access Control List，访问控制列表），据此控制该节点的访问权限。 <br />
+ZNode 数据节点是有生命周期的，其生命周期的长短取决于数据节点的节点类型。节点类型共有 4 种：持久节点（PERSISTENT）、持久顺序节点（PERSISTENT_SEQUENTIAL）、临时节点（EPHEMERAL）、临时顺序节点（EPHEMERAL_SEQUENTIAL）。</p>
+
+<h3>2.5、Watcher——ZNode 数据变化通知</h3>
+
+<p>ZooKeeper 的 Watcher 机制，概括为三个过程：客户端注册 Watcher 成为订阅者、服务端处理 Watcher 以及客户端回调 Watcher。 <br />
+客户端在自己需要关注的位于 ZooKeeper 服务器里的 ZNode 节点上注册一个 Watcher 监听后，一旦这个 ZNode 节点发生变化，则在该节点上注册过 Watcher 监听的所有客户端会收到 ZNode 节点变化通知。在收到通知时，客户端通过回调 Watcher 做相应的处理，从而实现特定的功能。</p>
+
+<h2>三、ZooKeeper的工作原理</h2>
+
+<p><strong>Zookeeper的核心是原子广播，这个机制保证了各个Server之间的同步</strong>。实现这个机制的协议叫做Zab协议。Zab协议有两种模式，<strong>它们分别是恢复模式（选主）和广播模式（同步）</strong>。当服务启动或者在领导者崩溃后，Zab就进入了恢复模式，当领导者被选举出来，且大多数Server完成了和leader的状态同步以后，恢复模式就结束了。状态同步保证了leader和Server具有相同的系统状态。</p>
+
+<p><strong>为了保证事务的顺序一致性，zookeeper采用了递增的事务id号（zxid）来标识事务</strong>。所有的提议（proposal）都在被提出的时候加上了zxid。实现中zxid是一个64位的数字，它高32位是epoch用来标识leader关系是否改变，每次一个leader被选出来，它都会有一个新的epoch，标识当前属于那个leader的统治时期。低32位用于递增计数。</p>
+
+<p>每个Server在工作过程中有三种状态：</p>
+
+<ul>
+<li><strong>LOOKING</strong>：当前Server不知道leader是谁，正在搜寻</li>
+<li><strong>LEADING</strong>：当前Server即为选举出来的leader</li>
+<li><strong>FOLLOWING</strong>：leader已经选举出来，当前Server与之同步</li>
+</ul>
+
+<h3>3.1、选主流程</h3>
+
+<p>当leader崩溃或者leader失去大多数的follower，这时候zk进入恢复模式，恢复模式需要重新选举出一个新的leader，让所有的Server都恢复到一个正确的状态。<strong>Zk的选举算法有两种：一种是基于basic paxos实现的，另外一种是基于fast paxos算法实现的。系统默认的选举算法为fast paxos</strong>。先介绍basic paxos流程：</p>
+
+<ol>
+<li>选举线程由当前Server发起选举的线程担任，其主要功能是对投票结果进行统计，并选出推荐的Server；</li>
+<li>选举线程首先向所有Server发起一次询问(包括自己)；</li>
+<li>选举线程收到回复后，验证是否是自己发起的询问(验证zxid是否一致)，然后获取对方的id(myid)，并存储到当前询问对象列表中，最后获取对方提议的leader相关信息(id,zxid)，并将这些信息存储到当次选举的投票记录表中；</li>
+<li>收到所有Server回复以后，就计算出zxid最大的那个Server，并将这个Server相关信息设置成下一次要投票的Server；</li>
+<li>线程将当前zxid最大的Server设置为当前Server要推荐的Leader，如果此时获胜的Server获得n/2 + 1的Server票数， 设置当前推荐的leader为获胜的Server，将根据获胜的Server相关信息设置自己的状态，否则，继续这个过程，直到leader被选举出来。</li>
+</ol>
+
+<p>通过流程分析我们可以得出：要使Leader获得多数Server的支持，则Server总数必须是奇数2n+1，且存活的Server的数目不得少于n+1.</p>
+
+<p>每个Server启动后都会重复以上流程。在恢复模式下，如果是刚从崩溃状态恢复的或者刚启动的server还会从磁盘快照中恢复数据和会话信息，zk会记录事务日志并定期进行快照，方便在恢复时进行状态恢复。选主的具体流程图如下所示：</p>
+
+<p><img alt="这里写图片描述" src="https://img-blog.csdn.net/20180228145116817?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQveWpwMTk4NzEz/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70" title="" /></p>
+
+<p><strong>fast paxos流程是在选举过程中，某Server首先向所有Server提议自己要成为leader，当其它Server收到提议以后，解决epoch和zxid的冲突，并接受对方的提议，然后向对方发送接受提议完成的消息，重复这个流程，最后一定能选举出Leader</strong>。其流程图如下所示：</p>
+
+<p><img alt="这里写图片描述" src="https://img-blog.csdn.net/20180228145214325?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQveWpwMTk4NzEz/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70" title="" /></p>
+
+<h3>3.2、同步流程</h3>
+
+<p>选完leader以后，zk就进入状态同步过程。</p>
+
+<ol>
+<li>leader等待server连接；</li>
+<li>Follower连接leader，将最大的zxid发送给leader；</li>
+<li>Leader根据follower的zxid确定同步点；</li>
+<li>完成同步后通知follower 已经成为uptodate状态；</li>
+<li>Follower收到uptodate消息后，又可以重新接受client的请求进行服务了。</li>
+</ol>
+
+<p>流程图如下所示：</p>
+
+<p><img alt="这里写图片描述" src="https://img-blog.csdn.net/20180228145641896?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQveWpwMTk4NzEz/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70" title="" /></p>
+
+<h3>3.3、工作流程</h3>
+
+<h4>3.3.1、Leader工作流程</h4>
+
+<p>Leader主要有三个功能：</p>
+
+<ul>
+<li>恢复数据；</li>
+<li>维持与Learner的心跳，接收Learner请求并判断Learner的请求消息类型；</li>
+<li>Learner的消息类型主要有PING消息、REQUEST消息、ACK消息、REVALIDATE消息，根据不同的消息类型，进行不同的处理。</li>
+</ul>
+
+<p>PING消息是指Learner的心跳信息；REQUEST消息是Follower发送的提议信息，包括写请求及同步请求；ACK消息是Follower的对提议的回复，超过半数的Follower通过，则commit该提议；REVALIDATE消息是用来延长SESSION有效时间。 <br />
+Leader的工作流程简图如下所示，在实际实现中，流程要比下图复杂得多，启动了三个线程来实现功能。</p>
+
+<p><img alt="这里写图片描述" src="https://img-blog.csdn.net/20180228150256724?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQveWpwMTk4NzEz/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70" title="" /></p>
+
+<h4>3.3.2、Follower工作流程</h4>
+
+<p>Follower主要有四个功能：</p>
+
+<ul>
+<li>向Leader发送请求（PING消息、REQUEST消息、ACK消息、REVALIDATE消息）；</li>
+<li>接收Leader消息并进行处理；</li>
+<li>接收Client的请求，如果为写请求，发送给Leader进行投票；</li>
+<li>返回Client结果。</li>
+</ul>
+
+<p>Follower的消息循环处理如下几种来自Leader的消息：</p>
+
+<ol>
+<li>PING消息： 心跳消息；</li>
+<li>PROPOSAL消息：Leader发起的提案，要求Follower投票；</li>
+<li>COMMIT消息：服务器端最新一次提案的信息；</li>
+<li>UPTODATE消息：表明同步完成；</li>
+<li>REVALIDATE消息：根据Leader的REVALIDATE结果，关闭待revalidate的session还是允许其接受消息；</li>
+<li>SYNC消息：返回SYNC结果到客户端，这个消息最初由客户端发起，用来强制得到最新的更新。</li>
+</ol>
+
+<p>Follower的工作流程简图如下所示，在实际实现中，Follower是通过5个线程来实现功能的。</p>
+
+<p><img alt="这里写图片描述" src="https://img-blog.csdn.net/20180228150612765?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQveWpwMTk4NzEz/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70" title="" /></p>
+
+<p>对于observer的流程不再叙述，observer流程和Follower的唯一不同的地方就是observer不会参加leader发起的投票。</p>
+
+<h2>四、ZooKeeper 的典型应用场景</h2>
+
+<p>通过对 ZooKeeper 中丰富的数据节点类型进行交叉使用，配合 Watcher 事件通知机制，可以非常方便地构建分布式应用中都会涉及的核心功能，如：数据发布 / 订阅（即配置中心）、负载均衡、命名服务、分布式协调 / 通知、集群管理、Master 选举、分布式锁和分布式队列等。</p>

@@ -1,0 +1,97 @@
+<h1>java 通过ftpClient跨系统下载文件</h1>
+
+<h2>1.FTP服务是filezilla server</h2>
+
+<p>下载地址：</p>
+
+<p>https://filezilla-project.org/</p>
+
+<h2>2.filezilla server安装及配置教程</h2>
+
+<p>教程地址：</p>
+
+<p>https://jingyan.baidu.com/article/17bd8e521067fe85ab2bb8ee.html</p>
+
+<h2>3.依赖jar包</h2>
+
+<p>commons-net-3.1，httpclient-4.3.5，httpcore-4.4.5</p>
+
+<p>下载地址：</p>
+
+<p>http://download.csdn.net/download/zhong_jay/10180699</p>
+
+<h2>4.代码如下</h2>
+
+<p>/**<br />
+     * <br />
+     * @Title: ftpDownload<br />
+     * @Description: ftp跨服务器文件获取<br />
+     * @author jay<br />
+     * @date 2017年12月29日 下午7:05:13 <br />
+     * @return boolean<br />
+     *<br />
+     * @param ftpUrl  ftp服务地址<br />
+     * @param userName  //登录名<br />
+     * @param pass //密码<br />
+     * @param port //端口号，默认21<br />
+     * @param directory //FTP服务器上的相对路径 ,\\代表根目录<br />
+     * @param fileName  //要获取的文件名 <br />
+     * @param localPath  //获取后保存到本地的路径 <br />
+     * @return<br />
+     * @throws IOException<br />
+     */<br />
+    public static boolean ftpDownload(String ftpUrl,String userName,String pass,int port,String directory,<br />
+            String fileName,String localPath) throws IOException{<br />
+        FTPClient ftpClient = new FTPClient();<br />
+        int reply;<br />
+        try {<br />
+        ftpClient.connect(ftpUrl,port);<br />
+        ftpClient.login(userName, pass);<br />
+        ftpClient.enterLocalPassiveMode();<br />
+        ftpClient.setBufferSize(1024);<br />
+        // 设置文件类型（二进制）<br />
+        ftpClient.changeWorkingDirectory(directory);<br />
+        ftpClient.setFileType(FTPClient.BINARY_FILE_TYPE);<br />
+        //设置连接超时和数据传输超时，对于性能有要求的项目，设置这两个属性很重要。例如,设置为60秒:<br />
+        ftpClient.setDataTimeout(60000);       //设置传输超时时间为60秒 <br />
+        ftpClient.setConnectTimeout(60000);       //连接超时为60秒<br />
+        reply = ftpClient.getReplyCode();  <br />
+        if(!FTPReply.isPositiveCompletion(reply)) { //reply状态标识码，200<=reply<300登录成功 <br />
+            ftpClient.disconnect();  <br />
+            System.err.println("FTP服务连接失败,请检查相关参数是否正确!");  <br />
+            System.exit(1);  <br />
+            return false;<br />
+          }  <br />
+        //获取FTP对应路径下的文件集合<br />
+        FTPFile[] fs = ftpClient.listFiles();<br />
+        <br />
+        for(FTPFile ff:fs){  //下载当前目录下所有文件<br />
+            if(ff.getName().equals(fileName)){<br />
+                String path=localPath+"\\"+ff.getName();<br />
+                File localFile = new File(path);  <br />
+                  <br />
+                OutputStream is = new FileOutputStream(localFile);   <br />
+                ftpClient.retrieveFile(ff.getName(), is);  <br />
+                is.close();  <br />
+            }  <br />
+        }  <br />
+        <br />
+        System.out.println("FTP文件下载成功！");<br />
+        return true;<br />
+        } catch(NumberFormatException e){<br />
+        throw e;<br />
+        } catch(FileNotFoundException e){<br />
+        throw new FileNotFoundException();<br />
+        } catch (IOException e) {<br />
+        throw new IOException(e);<br />
+        } finally {<br />
+            if(ftpClient.isConnected()){<br />
+                try {<br />
+                    ftpClient.disconnect();<br />
+                    } catch (IOException e) {<br />
+                    throw new RuntimeException("关闭FTP连接发生异常！", e);<br />
+                    }<br />
+            }<br />
+        <br />
+        }<br />
+    }</p>

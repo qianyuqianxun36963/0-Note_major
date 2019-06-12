@@ -1,0 +1,958 @@
+<h1>Java中ArrayList和LinkedList的遍历与性能分析</h1>
+
+<p>通过本文你可以了解List的五种遍历方式及各自性能和foreach及Iterator的实现，加深对ArrayList和LinkedList实现的了解。下面来一起看看吧。</p>
+
+<p><strong>一、List的五种遍历方式</strong></p>
+
+<p><strong>1、for each循环</strong></p>
+
+<p><code>List<Integer> list = </code><code>new</code> <code>ArrayList<Integer>();</code></p>
+
+<p><code>for</code> <code>(Integer j : list) {</code></p>
+
+<p><code> </code><code>// use j</code></p>
+
+<p><code>}</code></p>
+
+<p><strong>2、显示调用集合迭代器</strong></p>
+
+<p><code>List<Integer> list = </code><code>new</code> <code>ArrayList<Integer>();</code></p>
+
+<p><code>for</code> <code>(Iterator<Integer> iterator = list.iterator(); iterator.hasNext();) {</code></p>
+
+<p><code> </code><code>iterator.next();</code></p>
+
+<p><code>}</code></p>
+
+<p>或<br />
+<code>List<Integer> list = new</code> <code>ArrayList<Integer>();</code></p>
+
+<p><code>Iterator<Integer> iterator = list.iterator();</code></p>
+
+<p><code>while</code> <code>(iterator.hasNext()) {</code></p>
+
+<p><code> </code><code>iterator.next();</code></p>
+
+<p><code>}</code></p>
+
+<p><strong>3、下标递增循环，终止条件为每次调用size()函数比较判断</strong><br />
+<code>List<Integer> list = new</code> <code>ArrayList<Integer>();</code></p>
+
+<p><code>for</code> <code>(</code><code>int</code> <code>j = </code><code>0</code><code>; j < list.size(); j++) {</code></p>
+
+<p><code> </code><code>list.get(j);</code></p>
+
+<p><code>}</code></p>
+
+<p> </p>
+
+<p><strong>4、下标递增循环，终止条件为和等于size()的临时变量比较判断</strong></p>
+
+<p><code>List<Integer> list = </code><code>new</code> <code>ArrayList<Integer>();</code></p>
+
+<p><code>int</code> <code>size = list.size();</code></p>
+
+<p><code>for</code> <code>(</code><code>int</code> <code>j = </code><code>0</code><code>; j < size; j++) {</code></p>
+
+<p><code> </code><code>list.get(j);</code></p>
+
+<p><code>}</code></p>
+
+<p> </p>
+
+<p><strong>5、下标递减循环</strong></p>
+
+<p><code>List<Integer> list = </code><code>new</code> <code>ArrayList<Integer>();</code></p>
+
+<p><code>for</code> <code>(</code><code>int</code> <code>j = list.size() - </code><code>1</code><code>; j >= </code><code>0</code><code>; j--) {</code></p>
+
+<p><code> </code><code>list.get(j);</code></p>
+
+<p><code>}</code></p>
+
+<p>以下是性能测试代码，会输出不同数量级大小的ArrayList和LinkedList各种遍历方式所花费的时间。<strong>List五种遍历方式的性能测试及对比</strong></p>
+
+<p><code>package</code> <code>cn.trinea.java.test;</code></p>
+
+<p><code>import</code> <code>java.text.DecimalFormat;</code></p>
+
+<p><code>import</code> <code>java.util.ArrayList;</code></p>
+
+<p><code>import</code> <code>java.util.Calendar;</code></p>
+
+<p><code>import</code> <code>java.util.Iterator;</code></p>
+
+<p><code>import</code> <code>java.util.LinkedList;</code></p>
+
+<p><code>import</code> <code>java.util.List;</code></p>
+
+<p><code>/**</code></p>
+
+<p><code> </code><code>* JavaLoopTest</code></p>
+
+<p><code> </code><code>* </code></p>
+
+<p><code> </code><code>* @author www.trinea.cn 2013-10-28</code></p>
+
+<p><code> </code><code>*/</code></p>
+
+<p><code>public</code> <code>class</code> <code>JavaLoopTest {</code></p>
+
+<p><code> </code><code>public</code> <code>static</code> <code>void</code> <code>main(String[] args) {</code></p>
+
+<p><code>  </code><code>System.out.print(</code><code>"compare loop performance of ArrayList"</code><code>);</code></p>
+
+<p><code>  </code><code>loopListCompare(getArrayLists(</code><code>10000</code><code>, </code><code>100000</code><code>, </code><code>1000000</code><code>, </code><code>9000000</code><code>));</code></p>
+
+<p><code>  </code><code>System.out.print(</code><code>"\r\n\r\ncompare loop performance of LinkedList"</code><code>);</code></p>
+
+<p><code>  </code><code>loopListCompare(getLinkedLists(</code><code>100</code><code>, </code><code>1000</code><code>, </code><code>10000</code><code>, </code><code>100000</code><code>));</code></p>
+
+<p><code> </code><code>}</code></p>
+
+<p><code> </code><code>public</code> <code>static</code> <code>List<Integer>[] getArrayLists(</code><code>int</code><code>... sizeArray) {</code></p>
+
+<p><code>  </code><code>List<Integer>[] listArray = </code><code>new</code> <code>ArrayList[sizeArray.length];</code></p>
+
+<p><code>  </code><code>for</code> <code>(</code><code>int</code> <code>i = </code><code>0</code><code>; i < listArray.length; i++) {</code></p>
+
+<p><code>   </code><code>int</code> <code>size = sizeArray[i];</code></p>
+
+<p><code>   </code><code>List<Integer> list = </code><code>new</code> <code>ArrayList<Integer>();</code></p>
+
+<p><code>   </code><code>for</code> <code>(</code><code>int</code> <code>j = </code><code>0</code><code>; j < size; j++) {</code></p>
+
+<p><code>    </code><code>list.add(j);</code></p>
+
+<p><code>   </code><code>}</code></p>
+
+<p><code>   </code><code>listArray[i] = list;</code></p>
+
+<p><code>  </code><code>}</code></p>
+
+<p><code>  </code><code>return</code> <code>listArray;</code></p>
+
+<p><code> </code><code>}</code></p>
+
+<p><code> </code><code>public</code> <code>static</code> <code>List<Integer>[] getLinkedLists(</code><code>int</code><code>... sizeArray) {</code></p>
+
+<p><code>  </code><code>List<Integer>[] listArray = </code><code>new</code> <code>LinkedList[sizeArray.length];</code></p>
+
+<p><code>  </code><code>for</code> <code>(</code><code>int</code> <code>i = </code><code>0</code><code>; i < listArray.length; i++) {</code></p>
+
+<p><code>   </code><code>int</code> <code>size = sizeArray[i];</code></p>
+
+<p><code>   </code><code>List<Integer> list = </code><code>new</code> <code>LinkedList<Integer>();</code></p>
+
+<p><code>   </code><code>for</code> <code>(</code><code>int</code> <code>j = </code><code>0</code><code>; j < size; j++) {</code></p>
+
+<p><code>    </code><code>list.add(j);</code></p>
+
+<p><code>   </code><code>}</code></p>
+
+<p><code>   </code><code>listArray[i] = list;</code></p>
+
+<p><code>  </code><code>}</code></p>
+
+<p><code>  </code><code>return</code> <code>listArray;</code></p>
+
+<p><code> </code><code>}</code></p>
+
+<p><code> </code><code>public</code> <code>static</code> <code>void</code> <code>loopListCompare(List<Integer>... listArray) {</code></p>
+
+<p><code>  </code><code>printHeader(listArray);</code></p>
+
+<p><code>  </code><code>long</code> <code>startTime, endTime;</code></p>
+
+<p><code>  </code><code>// Type 1</code></p>
+
+<p><code>  </code><code>for</code> <code>(</code><code>int</code> <code>i = </code><code>0</code><code>; i < listArray.length; i++) {</code></p>
+
+<p><code>   </code><code>List<Integer> list = listArray[i];</code></p>
+
+<p><code>   </code><code>startTime = Calendar.getInstance().getTimeInMillis();</code></p>
+
+<p><code>   </code><code>for</code> <code>(Integer j : list) {</code></p>
+
+<p><code>    </code><code>// use j</code></p>
+
+<p><code>   </code><code>}</code></p>
+
+<p><code>   </code><code>endTime = Calendar.getInstance().getTimeInMillis();</code></p>
+
+<p><code>   </code><code>printCostTime(i, listArray.length, </code><code>"for each"</code><code>, endTime - startTime);</code></p>
+
+<p><code>  </code><code>}</code></p>
+
+<p><code>  </code><code>// Type 2</code></p>
+
+<p><code>  </code><code>for</code> <code>(</code><code>int</code> <code>i = </code><code>0</code><code>; i < listArray.length; i++) {</code></p>
+
+<p><code>   </code><code>List<Integer> list = listArray[i];</code></p>
+
+<p><code>   </code><code>startTime = Calendar.getInstance().getTimeInMillis();</code></p>
+
+<p><code>   </code><code>// Iterator<Integer> iterator = list.iterator();</code></p>
+
+<p><code>   </code><code>// while(iterator.hasNext()) {</code></p>
+
+<p><code>   </code><code>// iterator.next();</code></p>
+
+<p><code>   </code><code>// }</code></p>
+
+<p><code>   </code><code>for</code> <code>(Iterator<Integer> iterator = list.iterator(); iterator.hasNext();) {</code></p>
+
+<p><code>    </code><code>iterator.next();</code></p>
+
+<p><code>   </code><code>}</code></p>
+
+<p><code>   </code><code>endTime = Calendar.getInstance().getTimeInMillis();</code></p>
+
+<p><code>   </code><code>printCostTime(i, listArray.length, </code><code>"for iterator"</code><code>, endTime - startTime);</code></p>
+
+<p><code>  </code><code>}</code></p>
+
+<p><code>  </code><code>// Type 3</code></p>
+
+<p><code>  </code><code>for</code> <code>(</code><code>int</code> <code>i = </code><code>0</code><code>; i < listArray.length; i++) {</code></p>
+
+<p><code>   </code><code>List<Integer> list = listArray[i];</code></p>
+
+<p><code>   </code><code>startTime = Calendar.getInstance().getTimeInMillis();</code></p>
+
+<p><code>   </code><code>for</code> <code>(</code><code>int</code> <code>j = </code><code>0</code><code>; j < list.size(); j++) {</code></p>
+
+<p><code>    </code><code>list.get(j);</code></p>
+
+<p><code>   </code><code>}</code></p>
+
+<p><code>   </code><code>endTime = Calendar.getInstance().getTimeInMillis();</code></p>
+
+<p><code>   </code><code>printCostTime(i, listArray.length, </code><code>"for list.size()"</code><code>, endTime - startTime);</code></p>
+
+<p><code>  </code><code>}</code></p>
+
+<p><code>  </code><code>// Type 4</code></p>
+
+<p><code>  </code><code>for</code> <code>(</code><code>int</code> <code>i = </code><code>0</code><code>; i < listArray.length; i++) {</code></p>
+
+<p><code>   </code><code>List<Integer> list = listArray[i];</code></p>
+
+<p><code>   </code><code>startTime = Calendar.getInstance().getTimeInMillis();</code></p>
+
+<p><code>   </code><code>int</code> <code>size = list.size();</code></p>
+
+<p><code>   </code><code>for</code> <code>(</code><code>int</code> <code>j = </code><code>0</code><code>; j < size; j++) {</code></p>
+
+<p><code>    </code><code>list.get(j);</code></p>
+
+<p><code>   </code><code>}</code></p>
+
+<p><code>   </code><code>endTime = Calendar.getInstance().getTimeInMillis();</code></p>
+
+<p><code>   </code><code>printCostTime(i, listArray.length, </code><code>"for size = list.size()"</code><code>, endTime - startTime);</code></p>
+
+<p><code>  </code><code>}</code></p>
+
+<p><code>  </code><code>// Type 5</code></p>
+
+<p><code>  </code><code>for</code> <code>(</code><code>int</code> <code>i = </code><code>0</code><code>; i < listArray.length; i++) {</code></p>
+
+<p><code>   </code><code>List<Integer> list = listArray[i];</code></p>
+
+<p><code>   </code><code>startTime = Calendar.getInstance().getTimeInMillis();</code></p>
+
+<p><code>   </code><code>for</code> <code>(</code><code>int</code> <code>j = list.size() - </code><code>1</code><code>; j >= </code><code>0</code><code>; j--) {</code></p>
+
+<p><code>    </code><code>list.get(j);</code></p>
+
+<p><code>   </code><code>}</code></p>
+
+<p><code>   </code><code>endTime = Calendar.getInstance().getTimeInMillis();</code></p>
+
+<p><code>   </code><code>printCostTime(i, listArray.length, </code><code>"for j--"</code><code>, endTime - startTime);</code></p>
+
+<p><code>  </code><code>}</code></p>
+
+<p><code> </code><code>}</code></p>
+
+<p><code> </code><code>static</code> <code>int</code>     <code>FIRST_COLUMN_LENGTH = </code><code>23</code><code>, OTHER_COLUMN_LENGTH = </code><code>12</code><code>, TOTAL_COLUMN_LENGTH = </code><code>71</code><code>;</code></p>
+
+<p><code> </code><code>static</code> <code>final</code> <code>DecimalFormat COMMA_FORMAT  = </code><code>new</code> <code>DecimalFormat(</code><code>"#,###"</code><code>);</code></p>
+
+<p><code> </code><code>public</code> <code>static</code> <code>void</code> <code>printHeader(List<Integer>... listArray) {</code></p>
+
+<p><code>  </code><code>printRowDivider();</code></p>
+
+<p><code>  </code><code>for</code> <code>(</code><code>int</code> <code>i = </code><code>0</code><code>; i < listArray.length; i++) {</code></p>
+
+<p><code>   </code><code>if</code> <code>(i == </code><code>0</code><code>) {</code></p>
+
+<p><code>    </code><code>StringBuilder sb = </code><code>new</code> <code>StringBuilder().append(</code><code>"list size"</code><code>);</code></p>
+
+<p><code>    </code><code>while</code> <code>(sb.length() < FIRST_COLUMN_LENGTH) {</code></p>
+
+<p><code>     </code><code>sb.append(</code><code>" "</code><code>);</code></p>
+
+<p><code>    </code><code>}</code></p>
+
+<p><code>    </code><code>System.out.print(sb);</code></p>
+
+<p><code>   </code><code>}</code></p>
+
+<p><code>   </code><code>StringBuilder sb = </code><code>new</code> <code>StringBuilder().append(</code><code>"| "</code><code>).append(COMMA_FORMAT.format(listArray[i].size()));</code></p>
+
+<p><code>   </code><code>while</code> <code>(sb.length() < OTHER_COLUMN_LENGTH) {</code></p>
+
+<p><code>    </code><code>sb.append(</code><code>" "</code><code>);</code></p>
+
+<p><code>   </code><code>}</code></p>
+
+<p><code>   </code><code>System.out.print(sb);</code></p>
+
+<p><code>  </code><code>}</code></p>
+
+<p><code>  </code><code>TOTAL_COLUMN_LENGTH = FIRST_COLUMN_LENGTH + OTHER_COLUMN_LENGTH * listArray.length;</code></p>
+
+<p><code>  </code><code>printRowDivider();</code></p>
+
+<p><code> </code><code>}</code></p>
+
+<p><code> </code><code>public</code> <code>static</code> <code>void</code> <code>printRowDivider() {</code></p>
+
+<p><code>  </code><code>System.out.println();</code></p>
+
+<p><code>  </code><code>StringBuilder sb = </code><code>new</code> <code>StringBuilder();</code></p>
+
+<p><code>  </code><code>while</code> <code>(sb.length() < TOTAL_COLUMN_LENGTH) {</code></p>
+
+<p><code>   </code><code>sb.append(</code><code>"-"</code><code>);</code></p>
+
+<p><code>  </code><code>}</code></p>
+
+<p><code>  </code><code>System.out.println(sb);</code></p>
+
+<p><code> </code><code>}</code></p>
+
+<p><code> </code><code>public</code> <code>static</code> <code>void</code> <code>printCostTime(</code><code>int</code> <code>i, </code><code>int</code> <code>size, String caseName, </code><code>long</code> <code>costTime) {</code></p>
+
+<p><code>  </code><code>if</code> <code>(i == </code><code>0</code><code>) {</code></p>
+
+<p><code>   </code><code>StringBuilder sb = </code><code>new</code> <code>StringBuilder().append(caseName);</code></p>
+
+<p><code>   </code><code>while</code> <code>(sb.length() < FIRST_COLUMN_LENGTH) {</code></p>
+
+<p><code>    </code><code>sb.append(</code><code>" "</code><code>);</code></p>
+
+<p><code>   </code><code>}</code></p>
+
+<p><code>   </code><code>System.out.print(sb);</code></p>
+
+<p><code>  </code><code>}</code></p>
+
+<p><code>  </code><code>StringBuilder sb = </code><code>new</code> <code>StringBuilder().append(</code><code>"| "</code><code>).append(costTime).append(</code><code>" ms"</code><code>);</code></p>
+
+<p><code>  </code><code>while</code> <code>(sb.length() < OTHER_COLUMN_LENGTH) {</code></p>
+
+<p><code>   </code><code>sb.append(</code><code>" "</code><code>);</code></p>
+
+<p><code>  </code><code>}</code></p>
+
+<p><code>  </code><code>System.out.print(sb);</code></p>
+
+<p><code>  </code><code>if</code> <code>(i == size - </code><code>1</code><code>) {</code></p>
+
+<p><code>   </code><code>printRowDivider();</code></p>
+
+<p><code>  </code><code>}</code></p>
+
+<p><code> </code><code>}</code></p>
+
+<p><code>}</code></p>
+
+<p>其中<code>getArrayLists</code>函数会返回不同<code>size</code>的ArrayList，<code>getLinkedLists</code>函数会返回不同<code>size</code>的LinkedList。<strong>PS：</strong>如果运行报异常<code>in thread “main” java.lang.OutOfMemoryError: Java heap space</code>，请将<code>main</code>函数里面<code>list size</code>的大小减小。</p>
+
+<p><code>loopListCompare</code>函数会分别用上面的遍历方式1-5去遍历每一个list数组(包含不同大小list)中的list。</p>
+
+<p><code>print</code>开头函数为输出辅助函数。</p>
+
+<p>测试环境为Windows7 32位系统 3.2G双核CPU 4G内存，Java 7，Eclipse -Xms512m -Xmx512m</p>
+
+<p><strong>最终测试结果如下：</strong></p>
+
+<table border="0" cellpadding="0" cellspacing="0">
+<tbody>
+<tr>
+<td>
+<p>1</p>
+
+<p>2</p>
+
+<p>3</p>
+
+<p>4</p>
+
+<p>5</p>
+
+<p>6</p>
+
+<p>7</p>
+
+<p>8</p>
+
+<p>9</p>
+
+<p>10</p>
+
+<p>11</p>
+
+<p>12</p>
+
+<p>13</p>
+
+<p>14</p>
+
+<p>15</p>
+
+<p>16</p>
+
+<p>17</p>
+
+<p>18</p>
+
+<p>19</p>
+
+<p>20</p>
+
+<p>21</p>
+
+<p>22</p>
+
+<p>23</p>
+
+<p>24</p>
+
+<p>25</p>
+
+<p>26</p>
+
+<p>27</p>
+
+<p>28</p>
+
+<p>29</p>
+</td>
+<td>
+<p><code>compare loop performance of ArrayList</code></p>
+
+<p><code>-----------------------------------------------------------------------</code></p>
+
+<p><code>list size    | </code><code>10</code><code>,</code><code>000</code> <code>| </code><code>100</code><code>,</code><code>000</code> <code>| </code><code>1</code><code>,</code><code>000</code><code>,</code><code>000</code> <code>| </code><code>10</code><code>,</code><code>000</code><code>,</code><code>000</code></p>
+
+<p><code>-----------------------------------------------------------------------</code></p>
+
+<p><code>for</code> <code>each    | </code><code>1</code> <code>ms  | </code><code>3</code> <code>ms  | </code><code>14</code> <code>ms  | </code><code>152</code> <code>ms </code></p>
+
+<p><code>-----------------------------------------------------------------------</code></p>
+
+<p><code>for</code> <code>iterator   | </code><code>0</code> <code>ms  | </code><code>1</code> <code>ms  | </code><code>12</code> <code>ms  | </code><code>114</code> <code>ms </code></p>
+
+<p><code>-----------------------------------------------------------------------</code></p>
+
+<p><code>for</code> <code>list.size()  | </code><code>1</code> <code>ms  | </code><code>1</code> <code>ms  | </code><code>13</code> <code>ms  | </code><code>128</code> <code>ms </code></p>
+
+<p><code>-----------------------------------------------------------------------</code></p>
+
+<p><code>for</code> <code>size = list.size() | </code><code>0</code> <code>ms  | </code><code>0</code> <code>ms  | </code><code>6</code> <code>ms  | </code><code>62</code> <code>ms  </code></p>
+
+<p><code>-----------------------------------------------------------------------</code></p>
+
+<p><code>for</code> <code>j--    | </code><code>0</code> <code>ms  | </code><code>1</code> <code>ms  | </code><code>6</code> <code>ms  | </code><code>63</code> <code>ms  </code></p>
+
+<p><code>-----------------------------------------------------------------------</code></p>
+
+<p><code> </code> </p>
+
+<p><code>compare loop performance of LinkedList</code></p>
+
+<p><code>-----------------------------------------------------------------------</code></p>
+
+<p><code>list size    | </code><code>100</code>  <code>| </code><code>1</code><code>,</code><code>000</code>  <code>| </code><code>10</code><code>,</code><code>000</code> <code>| </code><code>100</code><code>,</code><code>000</code></p>
+
+<p><code>-----------------------------------------------------------------------</code></p>
+
+<p><code>for</code> <code>each    | </code><code>0</code> <code>ms  | </code><code>1</code> <code>ms  | </code><code>1</code> <code>ms  | </code><code>2</code> <code>ms  </code></p>
+
+<p><code>-----------------------------------------------------------------------</code></p>
+
+<p><code>for</code> <code>iterator   | </code><code>0</code> <code>ms  | </code><code>0</code> <code>ms  | </code><code>0</code> <code>ms  | </code><code>2</code> <code>ms  </code></p>
+
+<p><code>-----------------------------------------------------------------------</code></p>
+
+<p><code>for</code> <code>list.size()  | </code><code>0</code> <code>ms  | </code><code>1</code> <code>ms  | </code><code>73</code> <code>ms  | </code><code>7972</code> <code>ms </code></p>
+
+<p><code>-----------------------------------------------------------------------</code></p>
+
+<p><code>for</code> <code>size = list.size() | </code><code>0</code> <code>ms  | </code><code>0</code> <code>ms  | </code><code>67</code> <code>ms  | </code><code>8216</code> <code>ms </code></p>
+
+<p><code>-----------------------------------------------------------------------</code></p>
+
+<p><code>for</code> <code>j--    | </code><code>0</code> <code>ms  | </code><code>1</code> <code>ms  | </code><code>67</code> <code>ms  | </code><code>8277</code> <code>ms </code></p>
+
+<p><code>-----------------------------------------------------------------------</code></p>
+</td>
+</tr>
+</tbody>
+</table>
+
+<p>第一张表为ArrayList对比结果，第二张表为LinkedList对比结果。</p>
+
+<p>表横向为同一遍历方式不同大小list遍历的时间消耗，纵向为同一list不同遍历方式遍历的时间消耗。</p>
+
+<p><strong>PS：</strong>由于首次遍历List会稍微多耗时一点，<code>for each</code>的结果稍微有点偏差，将测试代码中的几个Type顺序调换会发现，<code>for each</code>耗时和<code>for iterator</code>接近。</p>
+
+<p><strong>遍历方式性能测试结果分析</strong></p>
+
+<p><strong>1、foreach介绍</strong></p>
+
+<p>foreach是Java SE5.0引入的功能很强的循环结构，<code>for (Integer j : list)</code>应读作<code>for each int in list</code>。</p>
+
+<p><code>for (Integer j : list)</code>实现几乎等价于</p>
+
+<table border="0" cellpadding="0" cellspacing="0">
+<tbody>
+<tr>
+<td>
+<p>1</p>
+
+<p>2</p>
+
+<p>3</p>
+
+<p>4</p>
+</td>
+<td>
+<p><code>Iterator<Integer> iterator = list.iterator();</code></p>
+
+<p><code>while</code><code>(iterator.hasNext()) {</code></p>
+
+<p><code> </code><code>Integer j = iterator.next();</code></p>
+
+<p><code>}</code></p>
+</td>
+</tr>
+</tbody>
+</table>
+
+<p>foreach代码书写简单，不必关心下标初始值和终止值及越界等，所以不易出错</p>
+
+<p><strong>2、ArrayList遍历方式结果分析</strong></p>
+
+<p>a. 在ArrayList大小为十万之前，五种遍历方式时间消耗几乎一样</p>
+
+<p>b. 在十万以后，第四、五种遍历方式快于前三种，get方式优于Iterator方式，并且</p>
+
+<table border="0" cellpadding="0" cellspacing="0">
+<tbody>
+<tr>
+<td>
+<p>1</p>
+
+<p>2</p>
+
+<p>3</p>
+
+<p>4</p>
+</td>
+<td>
+<p><code>int</code> <code>size = list.size();</code></p>
+
+<p><code>for</code> <code>(</code><code>int</code> <code>j = </code><code>0</code><code>; j < size; j++) {</code></p>
+
+<p><code> </code><code>list.get(j);</code></p>
+
+<p><code>}</code></p>
+</td>
+</tr>
+</tbody>
+</table>
+
+<p>用临时变量size取代<code>list.size()</code>性能更优。我们看看ArrayList中迭代器<code>Iterator</code>和<code>get</code>方法的实现</p>
+
+<table border="0" cellpadding="0" cellspacing="0">
+<tbody>
+<tr>
+<td>
+<p>1</p>
+
+<p>2</p>
+
+<p>3</p>
+
+<p>4</p>
+
+<p>5</p>
+
+<p>6</p>
+
+<p>7</p>
+
+<p>8</p>
+
+<p>9</p>
+
+<p>10</p>
+
+<p>11</p>
+
+<p>12</p>
+
+<p>13</p>
+
+<p>14</p>
+
+<p>15</p>
+
+<p>16</p>
+
+<p>17</p>
+
+<p>18</p>
+
+<p>19</p>
+
+<p>20</p>
+
+<p>21</p>
+
+<p>22</p>
+
+<p>23</p>
+
+<p>24</p>
+
+<p>25</p>
+
+<p>26</p>
+
+<p>27</p>
+
+<p>28</p>
+
+<p>29</p>
+</td>
+<td>
+<p><code>private</code> <code>class</code> <code>Itr </code><code>implements</code> <code>Iterator<E> {</code></p>
+
+<p><code> </code><code>int</code> <code>cursor;  </code><code>// index of next element to return</code></p>
+
+<p><code> </code><code>int</code> <code>lastRet = -</code><code>1</code><code>; </code><code>// index of last element returned; -1 if no such</code></p>
+
+<p><code> </code><code>int</code> <code>expectedModCount = modCount;</code></p>
+
+<p><code> </code> </p>
+
+<p><code> </code><code>public</code> <code>boolean</code> <code>hasNext() {</code></p>
+
+<p><code>  </code><code>return</code> <code>cursor != size;</code></p>
+
+<p><code> </code><code>}</code></p>
+
+<p><code> </code> </p>
+
+<p><code> </code><code>@SuppressWarnings</code><code>(</code><code>"unchecked"</code><code>)</code></p>
+
+<p><code> </code><code>public</code> <code>E next() {</code></p>
+
+<p><code>  </code><code>checkForComodification();</code></p>
+
+<p><code>  </code><code>int</code> <code>i = cursor;</code></p>
+
+<p><code>  </code><code>if</code> <code>(i >= size)</code></p>
+
+<p><code>   </code><code>throw</code> <code>new</code> <code>NoSuchElementException();</code></p>
+
+<p><code>  </code><code>Object[] elementData = ArrayList.</code><code>this</code><code>.elementData;</code></p>
+
+<p><code>  </code><code>if</code> <code>(i >= elementData.length)</code></p>
+
+<p><code>   </code><code>throw</code> <code>new</code> <code>ConcurrentModificationException();</code></p>
+
+<p><code>  </code><code>cursor = i + </code><code>1</code><code>;</code></p>
+
+<p><code>  </code><code>return</code> <code>(E) elementData[lastRet = i];</code></p>
+
+<p><code> </code><code>}</code></p>
+
+<p><code> </code><code>……</code></p>
+
+<p><code>}</code></p>
+
+<p><code> </code> </p>
+
+<p><code>public</code> <code>E get(</code><code>int</code> <code>index) {</code></p>
+
+<p><code> </code><code>rangeCheck(index);</code></p>
+
+<p><code> </code> </p>
+
+<p><code> </code><code>return</code> <code>elementData(index);</code></p>
+
+<p><code>}</code></p>
+</td>
+</tr>
+</tbody>
+</table>
+
+<p>从中可以看出<code>get</code>和<code>Iterator</code>的<code>next</code>函数同样通过直接定位数据获取元素，只是多了几个判断而已。</p>
+
+<p>c. 从上可以看出即便在千万大小的ArrayList中，几种遍历方式相差也不过50ms左右，且在常用的十万左右时间几乎相等，考虑foreach的优点，我们大可选用foreach这种简便方式进行遍历。</p>
+
+<p><strong>3、LinkedList遍历方式结果分析</strong></p>
+
+<p>a. 在LinkedList大小接近一万时，<code>get</code>方式和<code>Iterator</code>方式就已经差了差不多两个数量级，十万时<code>Iterator</code>方式性能已经远胜于get方式。</p>
+
+<p>我们看看LinkedList中迭代器和<code>get</code>方法的实现</p>
+
+<table border="0" cellpadding="0" cellspacing="0">
+<tbody>
+<tr>
+<td>
+<p>1</p>
+
+<p>2</p>
+
+<p>3</p>
+
+<p>4</p>
+
+<p>5</p>
+
+<p>6</p>
+
+<p>7</p>
+
+<p>8</p>
+
+<p>9</p>
+
+<p>10</p>
+
+<p>11</p>
+
+<p>12</p>
+
+<p>13</p>
+
+<p>14</p>
+
+<p>15</p>
+
+<p>16</p>
+
+<p>17</p>
+
+<p>18</p>
+
+<p>19</p>
+
+<p>20</p>
+
+<p>21</p>
+
+<p>22</p>
+
+<p>23</p>
+
+<p>24</p>
+
+<p>25</p>
+
+<p>26</p>
+
+<p>27</p>
+
+<p>28</p>
+
+<p>29</p>
+
+<p>30</p>
+
+<p>31</p>
+
+<p>32</p>
+
+<p>33</p>
+
+<p>34</p>
+
+<p>35</p>
+
+<p>36</p>
+
+<p>37</p>
+
+<p>38</p>
+
+<p>39</p>
+
+<p>40</p>
+
+<p>41</p>
+
+<p>42</p>
+
+<p>43</p>
+
+<p>44</p>
+
+<p>45</p>
+
+<p>46</p>
+
+<p>47</p>
+
+<p>48</p>
+
+<p>49</p>
+
+<p>50</p>
+
+<p>51</p>
+
+<p>52</p>
+</td>
+<td>
+<p><code>private</code> <code>class</code> <code>ListItr </code><code>implements</code> <code>ListIterator<E> {</code></p>
+
+<p><code> </code><code>private</code> <code>Node<E> lastReturned = </code><code>null</code><code>;</code></p>
+
+<p><code> </code><code>private</code> <code>Node<E> next;</code></p>
+
+<p><code> </code><code>private</code> <code>int</code> <code>nextIndex;</code></p>
+
+<p><code> </code><code>private</code> <code>int</code> <code>expectedModCount = modCount;</code></p>
+
+<p><code> </code> </p>
+
+<p><code> </code><code>ListItr(</code><code>int</code> <code>index) {</code></p>
+
+<p><code>  </code><code>// assert isPositionIndex(index);</code></p>
+
+<p><code>  </code><code>next = (index == size) ? </code><code>null</code> <code>: node(index);</code></p>
+
+<p><code>  </code><code>nextIndex = index;</code></p>
+
+<p><code> </code><code>}</code></p>
+
+<p><code> </code> </p>
+
+<p><code> </code><code>public</code> <code>boolean</code> <code>hasNext() {</code></p>
+
+<p><code>  </code><code>return</code> <code>nextIndex < size;</code></p>
+
+<p><code> </code><code>}</code></p>
+
+<p><code> </code> </p>
+
+<p><code> </code><code>public</code> <code>E next() {</code></p>
+
+<p><code>  </code><code>checkForComodification();</code></p>
+
+<p><code>  </code><code>if</code> <code>(!hasNext())</code></p>
+
+<p><code>   </code><code>throw</code> <code>new</code> <code>NoSuchElementException();</code></p>
+
+<p><code> </code> </p>
+
+<p><code>  </code><code>lastReturned = next;</code></p>
+
+<p><code>  </code><code>next = next.next;</code></p>
+
+<p><code>  </code><code>nextIndex++;</code></p>
+
+<p><code>  </code><code>return</code> <code>lastReturned.item;</code></p>
+
+<p><code> </code><code>}</code></p>
+
+<p><code> </code><code>……</code></p>
+
+<p><code>}</code></p>
+
+<p><code> </code> </p>
+
+<p><code>public</code> <code>E get(</code><code>int</code> <code>index) {</code></p>
+
+<p><code> </code><code>checkElementIndex(index);</code></p>
+
+<p><code> </code><code>return</code> <code>node(index).item;</code></p>
+
+<p><code>}</code></p>
+
+<p><code> </code> </p>
+
+<p><code>/**</code></p>
+
+<p><code> </code><code>* Returns the (non-null) Node at the specified element index.</code></p>
+
+<p><code> </code><code>*/</code></p>
+
+<p><code>Node<E> node(</code><code>int</code> <code>index) {</code></p>
+
+<p><code> </code><code>// assert isElementIndex(index);</code></p>
+
+<p><code> </code> </p>
+
+<p><code> </code><code>if</code> <code>(index < (size >> </code><code>1</code><code>)) {</code></p>
+
+<p><code>  </code><code>Node<E> x = first;</code></p>
+
+<p><code>  </code><code>for</code> <code>(</code><code>int</code> <code>i = </code><code>0</code><code>; i < index; i++)</code></p>
+
+<p><code>   </code><code>x = x.next;</code></p>
+
+<p><code>  </code><code>return</code> <code>x;</code></p>
+
+<p><code> </code><code>} </code><code>else</code> <code>{</code></p>
+
+<p><code>  </code><code>Node<E> x = last;</code></p>
+
+<p><code>  </code><code>for</code> <code>(</code><code>int</code> <code>i = size - </code><code>1</code><code>; i > index; i--)</code></p>
+
+<p><code>   </code><code>x = x.prev;</code></p>
+
+<p><code>  </code><code>return</code> <code>x;</code></p>
+
+<p><code> </code><code>}</code></p>
+
+<p><code>}</code></p>
+</td>
+</tr>
+</tbody>
+</table>
+
+<p>从上面代码中可以看出LinkedList迭代器的<code>next</code>函数只是通过next指针快速得到下一个元素并返回。而get方法会从头遍历直到index下标，查找一个元素时间复杂度为哦O(n)，遍历的时间复杂度就达到了O(n2)。</p>
+
+<p>所以对于LinkedList的遍历推荐使用foreach，避免使用<code>get</code>方式遍历。</p>
+
+<p>4、ArrayList和LinkedList遍历方式结果对比分析</p>
+
+<p>从上面的数量级来看，同样是foreach循环遍历，ArrayList和LinkedList时间差不多，可将本例稍作修改加大<code>list size</code>会发现两者基本在一个数量级上。</p>
+
+<p>但<code>ArrayList get</code>函数直接定位获取的方式时间复杂度为O(1)，而LinkedList的get函数时间复杂度为O(n)。</p>
+
+<p>再结合考虑空间消耗的话，建议首选ArrayList。对于个别插入删除非常多的可以使用LinkedList。</p>
+
+<p><strong>结论总结</strong></p>
+
+<p>通过上面的分析我们基本可以总结下：</p>
+
+<ol>
+<li><strong>无论ArrayList还是LinkedList，遍历建议使用foreach，尤其是数据量较大时LinkedList避免使用get遍历。</strong></li>
+<li><strong>List使用首选ArrayList。对于个别插入删除非常多的可以使用LinkedList。</strong></li>
+<li><strong>可能在遍历List循环内部需要使用到下标，这时综合考虑下是使用foreach和自增count还是get方式。</strong></li>
+</ol>
+
+<p><strong>总结</strong></p>
+
+<p>以上就是这篇文章的全部内容了，希望本文的内容对大家学习或者使用Java的时候能有所帮助，如果有疑问大家可以留言交流。</p>

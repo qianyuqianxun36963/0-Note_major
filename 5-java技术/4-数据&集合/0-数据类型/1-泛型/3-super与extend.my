@@ -1,0 +1,216 @@
+<h1>泛型中? super T和? extends T的区别</h1>
+
+<p>经常发现有List<? super T>、Set<? extends T>的声明，是什么意思呢？<? super T>表示包括T在内的任何T的父类，<? extends T>表示包括T在内的任何T的子类，下面我们详细分析一下两种通配符具体的区别。</p>
+
+<h2>extends</h2>
+
+<p>List<? extends Number> foo3的通配符声明，意味着以下的赋值是合法的：</p>
+
+<p>extends<br />
+List<? extends Number> foo3的通配符声明，意味着以下的赋值是合法的：<br />
+// Number "extends" Number (in this context)<br />
+List<? extends Number> foo3 = new ArrayList<? extends Number>();<br />
+// Integer extends Number<br />
+List<? extends Number> foo3 = new ArrayList<? extends Integer>();<br />
+// Double extends Number<br />
+List<? extends Number> foo3 = new ArrayList<? extends Double>();</p>
+
+<p>读取操作通过以上给定的赋值语句，你一定能从foo3列表中读取到的元素的类型是什么呢？你可以读取到Number，因为以上的列表要么包含Number元素，要么包含Number的类元素。</p>
+
+<p>你不能保证读取到Integer，因为foo3可能指向的是List<Double>。</p>
+
+<p>你不能保证读取到Double，因为foo3可能指向的是List<Integer>。</p>
+
+<p>写入操作过以上给定的赋值语句，你能把一个什么类型的元素合法地插入到foo3中呢？</p>
+
+<p>你不能插入一个Integer元素，因为foo3可能指向List<Double>。</p>
+
+<p>你不能插入一个Double元素，因为foo3可能指向List<Integer>。</p>
+
+<p>你不能插入一个Number元素，因为foo3可能指向List<Integer>。</p>
+
+<p>你不能往List<? extends T>中插入任何类型的对象，因为你不能保证列表实际指向的类型是什么，你并不能保证列表中实际存储什么类型的对象。唯一可以保证的是，你可以从中读取到T或者T的子类。</p>
+
+<h2>super</h2>
+
+<p>现在考虑一下List<? super T></p>
+
+<p>List<? super Integer> foo3的通配符声明，意味着以下赋值是合法的：</p>
+
+<p>// Integer is a "superclass" of Integer (in this context)<br />
+List<? super Integer> foo3 = new ArrayList<Integer>();<br />
+// Number is a superclass of Integer<br />
+List<? super Integer> foo3 = new ArrayList<Number>();<br />
+// Object is a superclass of Integer<br />
+List<? super Integer> foo3 = new ArrayList<Object>();</p>
+
+<p>读取操作通过以上给定的赋值语句，你一定能从foo3列表中读取到的元素的类型是什么呢？你不能保证读取到Integer，因为foo3可能指向List<Number>或者List<Object>。</p>
+
+<p>你不能保证读取到Number，因为foo3可能指向List<Object>。</p>
+
+<p>唯一可以保证的是，你可以读取到Object或者Object子类的对象（你并不知道具体的子类是什么）。</p>
+
+<p>写入操作通过以上给定的赋值语句，你能把一个什么类型的元素合法地插入到foo3中呢？你可以插入Integer对象，因为上述声明的列表都支持Integer。</p>
+
+<p>你可以插入Integer的子类的对象，因为Integer的子类同时也是Integer，原因同上。</p>
+
+<p>你不能插入Double对象，因为foo3可能指向ArrayList<Integer>。</p>
+
+<p>你不能插入Number对象，因为foo3可能指向ArrayList<Integer>。</p>
+
+<p>你不能插入Object对象，因为foo3可能指向ArrayList<Integer>。</p>
+
+<h2>PECS</h2>
+
+<p>请记住PECS原则：生产者（Producer）使用extends，消费者（Consumer）使用super。</p>
+
+<ul>
+<li>生产者使用extends</li>
+</ul>
+
+<p>如果你需要一个列表提供T类型的元素（即你想从列表中读取T类型的元素），你需要把这个列表声明成<? extends T>，比如List<? extends Integer>，因此你不能往该列表中添加任何元素。</p>
+
+<ul>
+<li>消费者使用super</li>
+</ul>
+
+<p>如果需要一个列表使用T类型的元素（即你想把T类型的元素加入到列表中），你需要把这个列表声明成<? super T>，比如List<? super Integer>，因此你不能保证从中读取到的元素的类型。</p>
+
+<ul>
+<li>即是生产者，也是消费者</li>
+</ul>
+
+<p>如果一个列表即要生产，又要消费，你不能使用泛型通配符声明列表，比如List<Integer>。</p>
+
+<h3>例子</h3>
+
+<p>请参考java.util.Collections里的copy方法(JDK1.7)：</p>
+
+<p><a href="http://ifeve.com/?attachment_id=21834" rel="attachment wp-att-21834"><img alt="" src="http://ifeve.com/wp-content/uploads/2015/10/collections_copy.png" style="height:736px; width:657px" /></a></p>
+
+<h2>引用例子：</h2>
+
+<p>泛型中使用通配符有两种形式：子类型限定<? extends xxx>和超类型限定<? super xxx>。</p>
+
+<h3><strong>（1）子类型限定</strong></h3>
+
+<p>下面的代码定义了一个Pair<T>类，以及Employee，Manager和President类。</p>
+
+<ol start="1">
+<li>public class Pair<T> {  </li>
+<li>    private T first;  </li>
+<li>    private T second;  </li>
+<li>  </li>
+<li>    public Pair(T first, T second) {  </li>
+<li>        this.first = first;  </li>
+<li>        this.second = second;  </li>
+<li>    }  </li>
+<li>  </li>
+<li>    public T getFirst() {  </li>
+<li>        return first;  </li>
+<li>    }  </li>
+<li>  </li>
+<li>    public T getSecond() {  </li>
+<li>        return second;  </li>
+<li>    }  </li>
+<li>  </li>
+<li>    public void setFirst(T newValue) {  </li>
+<li>        first = newValue;  </li>
+<li>    }  </li>
+<li>  </li>
+<li>    public void setSecond(T newValue) {  </li>
+<li>        second = newValue;  </li>
+<li>    }  </li>
+<li>}  </li>
+<li>  </li>
+<li>class Employee {  </li>
+<li>    private String name;  </li>
+<li>    private double salary;  </li>
+<li>      </li>
+<li>    public Employee(String n, double s) {  </li>
+<li>        name = n;  </li>
+<li>        salary = s;  </li>
+<li>    }  </li>
+<li>      </li>
+<li>    public String getName() {  </li>
+<li>        return name;  </li>
+<li>    }  </li>
+<li>  </li>
+<li>    public double getSalary() {  </li>
+<li>        return salary;  </li>
+<li>    }  </li>
+<li>}  </li>
+<li>  </li>
+<li>class Manager extends Employee {  </li>
+<li>    public Manager(String n, double s) {  </li>
+<li>        super(n, s);  </li>
+<li>    }  </li>
+<li>}  </li>
+<li><pre name="code" class="java">  </li>
+<li>class President extends Manager {  </li>
+<li>    public President(String n, double s) {  </li>
+<li>        super(n, s);  </li>
+<li>    }  </li>
+<li>}  </li>
+</ol>
+
+<p>现在要定义一个函数可以打印Pair<Employee></p>
+
+<ol start="1">
+<li>public static void printEmployeeBoddies(Pair<Employee> pair) {  </li>
+<li>    System.out.println(pair.getFirst().getName() + ":" + pair.getSecond().getName());  </li>
+<li>}  </li>
+</ol>
+
+<p>可是有一个问题是这个函数输入参数只能传递类型Pair<Employee>，而不能传递Pair<Manager>和Pair<President>。例如下面的代码会产生编译错误</p>
+
+<ol start="1">
+<li>Manager mgr1 = new Manager("Jack", 10000.99);  </li>
+<li>Manager mgr2 = new Manager("Tom", 10001.01);  </li>
+<li>Pair<Manager> managerPair = new Pair<Manager>(mgr1, mgr2);  </li>
+<li>PairAlg.printEmployeeBoddies(managerPair);  </li>
+</ol>
+
+<p>之所以会产生编译错误，是因为Pair<Employee>和Pair<Manager>实际上是两种类型。</p>
+
+<p>由上图可以看出，类型Pair<Manager>是类型Pair<? extends Employee>的子类型，所以为了解决这个问题可以把函数定义改成<br />
+public static void printEmployeeBoddies(Pair<? extends Employee> pair)</p>
+
+<p>但是使用通配符会不会导致通过Pair<? extends Employee>的引用破坏Pair<Manager>对象呢？例如:<br />
+Pair<? extends Employee> employeePair = managePair;employeePair.setFirst(new Employee("Tony", 100));<br />
+不用担心，编译器会产生一个编译错误。Pair<? extends Employee>参数替换后，我们得到如下代码<br />
+? extends Employee getFirst()<br />
+void setFirst(? extends Employee)<br />
+对于get方法，没问题，因为编译器知道可以把返回对象转换为一个Employee类型。但是对于set方法，编译器无法知道具体的类型，所以会拒绝这个调用。</p>
+
+<h3><strong>（2）超类型限定</strong></h3>
+
+<p>超类型限定和子类型限定相反，可以给方法提供参数，但是不能使用返回值。? super Manager这个类型限定为Manager的所有超类。</p>
+
+<p><img alt="" src="http://img.blog.csdn.net/20141231181042109?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQvZncwMTI0/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70/gravity/Center" />Pair<? super Manager>参数替换后，得到如下方法</p>
+
+<p>? super Manager getFirst()<br />
+void setFirst(? super Manager)</p>
+
+<p>编译器可以用Manager的超类型，例如Employee，Object来调用setFirst方法，但是无法调用getFirst，因为不能把Manager的超类引用转换为Manager引用。</p>
+
+<p>超类型限定的存在是为了解决下面一类的问题。例如要写一个函数从Manager[]中找出工资最高和最低的两个，放在一个Pair中返回。</p>
+
+<ol start="1">
+<li>public static void minMaxSal(Manager[] mgrs, Pair<? super Manager> pair) {  </li>
+<li>    if (mgrs == null || mgrs.length == 0) {  </li>
+<li>        return;  </li>
+<li>    }  </li>
+<li>      </li>
+<li>    pair.setFirst(mgrs[0]);  </li>
+<li>    pair.setSecond(mgrs[0]);  </li>
+<li>    //TODO  </li>
+<li>}  </li>
+</ol>
+
+<p>如此就可以这样调用</p>
+
+<ol start="1">
+<li>Pair<? super Manager> pair = new Pair<Employee>(null, null);  </li>
+<li>minMaxSal(new Manager[] {mgr1, mgr2}, pair);  </li>
+</ol>

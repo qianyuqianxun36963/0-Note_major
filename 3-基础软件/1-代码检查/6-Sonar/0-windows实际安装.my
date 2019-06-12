@@ -1,0 +1,121 @@
+<h1>Windows下安装Sonar</h1>
+
+<h2>安装前准备</h2>
+
+<p>安装jdk8，SonarQube 5.6之后的版本需要安装Java8</p>
+
+<h2>1、sonar安装：</h2>
+
+<p>　　sonar有三部分组成：</p>
+
+<p>　　1、服务端：显示分析结果和sonar相关配置</p>
+
+<p>　　2、客户端：对项目运行源代码进行运算和分析</p>
+
+<p>　　3、数据库：存储sonar配置和代码分析结果的数据库</p>
+
+<p>2、sonar下载：</p>
+
+<p>　　官网地址：https://www.sonarqube.org/</p>
+
+<p>　　下载你中意版本的zip包，放在想要安装的目录，linux系统一般放在/usr/local/.</p>
+
+<p>　　ok,先来试一下吧！</p>
+
+<p>　　进入sonar/bin目录下，进入对应的系统目录，启动sonar，</p>
+
+<p>　　<img alt="" src="https://images2015.cnblogs.com/blog/1076649/201704/1076649-20170427192248381-620155673.png" /></p>
+
+<p>　　<img alt="" src="https://images2015.cnblogs.com/blog/1076649/201704/1076649-20170427192307928-1828406159.png" /></p>
+
+<p>　　等出现以下页面：</p>
+
+<p>　　<img alt="" src="https://images2015.cnblogs.com/blog/1076649/201704/1076649-20170427192500084-708058442.png" /></p>
+
+<p>　　打开浏览器，输入URL：localhost:9000</p>
+
+<p>　　<img alt="" src="https://images2015.cnblogs.com/blog/1076649/201704/1076649-20170427192810553-1679903163.png" /></p>
+
+<p>3、数据库配置</p>
+
+<p>　　大部分资料都推荐使用MySQL，因为MySQL使用最简单，这里我用的也是MySQL</p>
+
+<p>　　MySQL数据库安装这里不再介绍，我们直接从使用root登录后开始，</p>
+
+<p><strong><em>      新版的mysql，用户新建与授权分开了，也即 老版命令后面的 identified by 'sonar' 不用了</em></strong></p>
+
+<p>　　执行以下命令：</p>
+
+<blockquote>CREATE DATABASE sonar CHARACTER SET utf8 COLLATE utf8_general_ci;<br />
+CREATE USER 'sonar' IDENTIFIED BY 'sonar';<br />
+GRANT ALL PRIVILEGES ON sonar.* TO sonar@'%';       <s>IDENTIFIED BY 'sonar'</s>;<br />
+GRANT ALL PRIVILEGES ON sonar.* TO sonar@'localhost';       <s>IDENTIFIED BY 'sonar'</s>;<br />
+FLUSH PRIVILEGES;</blockquote>
+
+<p> 4、sonar配置：</p>
+
+<p>　　打开sonar/conf目录下的sonar.properties,加入以下配置项:</p>
+
+<p>　　##数据库配置</p>
+
+<p>　　sonar.jdbc.username=sonar</p>
+
+<p>　　sonar.jdbc.password=sonar</p>
+
+<p>　　sonar.jdbc.url=jdbc:mysql://localhost:3306/sonar?useUnicode=true&characterEncoding=utf8&rewriteBatchedStatements=true&useConfigs=maxPerformance&useSSL=false</p>
+
+<p>　　## 下面设定访问网址为 http://localhost:9000</p>
+
+<p>　　sonar.web.host=0.0.0.0</p>
+
+<p>　　sonar.web.port=9000</p>
+
+<p>　　sonar.web.context=</p>
+
+<p>5、插件安装</p>
+
+<p>　　打开sonar/bin，进入相对应系统的文件夹下，重启服务：StartSonar.bat</p>
+
+<p>　　由于要进行数据库初始化，所以这次会有点慢。(如果不成功，请查看数据库是否成功创建并具有相应的权限)</p>
+
+<p>　　sonar预设的管理员帐号为：admin/admin，登录后可在Administration / System / Update Center / Available Plugins找到需要的插件进行安装：</p>
+
+<p>　　- <a href="http://lib.csdn.net/base/git" target="_blank" title="Git知识库">Git</a>: 已自带安装； <br />
+　　- SVN: 已自带安装； <br />
+　　- <a href="http://lib.csdn.net/base/javase" target="_blank" title="Java SE知识库">Java</a>: 已自带安装，Java 源代码解析，计算指标等； <br />
+　　- <a href="http://lib.csdn.net/base/javascript" target="_blank" title="JavaScript知识库">JavaScript</a>: 已自带安装； </p>
+
+<p>　　我安装了以下这些插件：<br />
+　　- <a href="https://github.com/SonarQubeCommunity/sonar-l10n-zh/releases/latest" target="_blank">Chinese Pack</a>：SonarQube 页面汉化； <br />
+　　- <a href="https://github.com/SonarQubeCommunity/sonar-findbugs/releases/latest" target="_blank">Findbugs</a> <br />
+　　- <a href="https://github.com/SonarQubeCommunity/sonar-checkstyle/releases/latest" target="_blank">Checkstyle</a> <br />
+　　- <a href="https://github.com/SonarQubeCommunity/sonar-pmd/releases/latest" target="_blank">PMD</a> </p>
+
+<p>6、如果要与Jenkins集成，最好配置“disable the SCM Sensor”为“是”</p>
+
+<p>　　<img alt="" src="https://images2015.cnblogs.com/blog/1076649/201704/1076649-20170427194541381-1969414662.png" /></p>
+
+<p> </p>
+
+<p>7、生成认证令牌：</p>
+
+<p>　　Jenkins访问 SonarQube 时要用到； </p>
+
+<p>　　进入：Administration(配置) / Security(权限) / User(用户)，找到用户 admin，点击 “Tokens” 一列； </p>
+
+<p><em>　　弹出界面里：输入 TokenName=”Jenkins”, 点击 “Generate”, 生成 “8687b74188c446f2e02ec6eb5ee9d80b88048406”</em></p>
+
+<p>8、Jenkins上sonar插件的安装：</p>
+
+<p>　　1、安装SonarQube插件：</p>
+
+<p>　　 　安装<a href="http://redirect.sonarsource.com/plugins/jenkins.html">SonarQube Scanner for Jenkins</a>，可能是Jenkins版本不同，插件名称不一致，也有叫：SonarQube Plugin。</p>
+
+<p>　　2、Jenkins 会把构建结果通过 URL和认证令牌发送给 SonarQube </p>
+
+<p>　　<img alt="" src="https://images2015.cnblogs.com/blog/1076649/201704/1076649-20170427200147272-204998892.png" /></p>
+
+<p>　　3、Jenkins构建设置：</p>
+
+<p>　　　　构建设置 Build 中，指定 Maven goals: “sonar:sonar” <br />
+　　　　项目构建时就会自动上报构建报告给 Sonar</p>

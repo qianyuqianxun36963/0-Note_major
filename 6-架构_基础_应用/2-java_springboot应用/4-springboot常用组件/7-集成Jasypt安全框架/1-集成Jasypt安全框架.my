@@ -1,0 +1,131 @@
+<h1>spring配置文件加密处理</h1>
+
+<h2>概述</h2>
+
+<p>配置文件中如果包含敏感的数据，例如数据库密码，会留下安全隐患，正确的做法是对配置文件中的敏感数据进行加密，使用的时候再进行解密。<br />
+本文演示如何读取spring配置文件中的加密数据。</p>
+
+<h2>基本原理</h2>
+
+<p>jasypt-spring-boot框架可以实现在读取spring配置文件时，进行解密的功能。</p>
+
+<ol>
+<li>引入jasypt-spring-boot包：</li>
+</ol>
+
+<pre>
+<code><dependency>
+<groupId>com.github.ulisesbocchio</groupId>
+<artifactId>jasypt-spring-boot-starter</artifactId>
+<version>2.0.0</version>
+</dependency>
+</code></pre>
+
+<ol start="2">
+<li>实现解密类Resolver：</li>
+</ol>
+
+<pre>
+<code>@Slf4j
+public class ConfigDecryptResolver implements EncryptablePropertyResolver {
+
+private static final String ENCRYPT_PREFIX = "(ENC)";
+
+/**
+* 进行解密
+* @param s 加密的字符串
+* @return 解密后的字符串
+*/
+@Override
+public String resolvePropertyValue(String s) {
+if (StringUtils.isEmpty(s)) {
+return s;
+}
+
+if (encrypted(s)) {
+return SensitiveDataEncrypter.decrypt(s.substring(ENCRYPT_PREFIX.length() - 1));
+} else {
+return s;
+}
+
+}
+
+/**
+* 判断是否是加密后的数据
+*
+* @param str 字符串
+* @return 判断字符串是否是加密后的数据
+*/
+private boolean encrypted(String str) {
+if (str.startsWith(ENCRYPT_PREFIX)) {
+return true;
+} else {
+return false;
+}
+}
+}
+</code></pre>
+
+<ol start="4">
+<li>加载解密类：</li>
+</ol>
+
+<pre>
+<code>@EnableAutoConfiguration
+@SpringBootApplication
+@EnableEncryptableProperties
+public class TestEncrypt {
+
+/**
+* 加载解密类
+*/
+@Bean
+public EncryptablePropertyResolver encryptablePropertyResolver() {
+return new ConfigDecryptResolver();
+}
+
+public static void main(String[] args) {
+SpringApplication springApplication = new SpringApplication(TestEncrypt.class);
+// 非web方式启动
+springApplication.setWebEnvironment(false);
+springApplication.run(args);
+}
+
+}
+</code></pre>
+
+<ol start="6">
+<li>测试：</li>
+</ol>
+
+<pre>
+<code>// ---------------------------------------------------------配置文件的内容为：
+encrypt:
+test1: (ENC)ucSL5R/jQigQ1dxzsWi2kg==
+test2: 12345678
+
+// ---------------------------------------------------------配置文件的加载：
+
+@Component
+public class TestConfig {
+
+@Value("${encrypt.test1}")
+private String test1;
+@Value("${encrypt.test2}")
+private String test2;
+
+@PostConstruct
+public void init() {
+System.out.println("test1:" + test1);
+System.out.println("test2:" + test2);
+}
+}
+
+// ---------------------------------------------------------打印结果：
+test1:abc
+test2:12345678
+</code></pre>
+
+<h2>参考</h2>
+
+<p><a href="https://github.com/ulisesbocchio/jasypt-spring-boot" rel="nofollow" target="_blank">https://github.com/ulisesbocchio/jasypt-spring-boot</a></p>

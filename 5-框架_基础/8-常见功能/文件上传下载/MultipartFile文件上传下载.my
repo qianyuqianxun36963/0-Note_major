@@ -1,0 +1,224 @@
+<div class="article-header-box" style="-webkit-text-stroke-width:0px; border-bottom:1px solid #e0e0e0; padding:16px 0px 0px; text-align:start">
+<div class="article-header" style="padding:0px">
+<div class="article-title-box" style="margin-bottom:8px; margin-left:0px; margin-right:0px; margin-top:0px; padding:0px">
+<h1 style="margin-left:0px; margin-right:0px"><span style="font-size:14px"><span style="font-family:Lato,-apple-system,"SF UI Text",Arial,"PingFang SC","Hiragino Sans GB","Microsoft YaHei","WenQuanYi Micro Hei",sans-serif"><span style="font-size:24px">SpringMVC:用MultipartFile上传单个文件,多个文件</span></span></span></h1>
+</div>
+</div>
+</div>
+
+<div class="article_content clearfix csdn-tracking-statistics" id="article_content" style="padding:0px">
+<div class="markdown_views" id="content_views" style="padding:0px">
+<h2 style="margin-left:0px; margin-right:0px"><span style="font-family:-apple-system,"SF UI Text",Arial,"PingFang SC","Hiragino Sans GB","Microsoft YaHei","WenQuanYi Micro Hei",sans-serif">单个文件上传开发步骤：</span></h2>
+
+<h3 style="margin-left:0px; margin-right:0px"><span style="font-family:-apple-system,"SF UI Text",Arial,"PingFang SC","Hiragino Sans GB","Microsoft YaHei","WenQuanYi Micro Hei",sans-serif">1.添加Apache文件上传jar包</span></h3>
+
+<p style="margin-left:0px; margin-right:0px"><span style="font-family:-apple-system,"SF UI Text",Arial,"PingFang SC","Hiragino Sans GB","Microsoft YaHei","WenQuanYi Micro Hei",sans-serif"><span style="font-size:16px"><span style="font-family:微软雅黑"><span style="font-size:large">首先需要下载两个apache上传文件的jar包 <br />
+<code>commons-fileupload-1.3.1.jar</code> <br />
+<code>commons-io-2.4.jar</code> <br />
+具体使用版本，请根据项目进行选择。 </span></span></span></span></p>
+
+<hr />
+<h3 style="margin-left:0px; margin-right:0px"><span style="font-family:-apple-system,"SF UI Text",Arial,"PingFang SC","Hiragino Sans GB","Microsoft YaHei","WenQuanYi Micro Hei",sans-serif">2.配置MultipartResolver处理文件</span></h3>
+
+<p style="margin-left:0px; margin-right:0px"><span style="font-family:-apple-system,"SF UI Text",Arial,"PingFang SC","Hiragino Sans GB","Microsoft YaHei","WenQuanYi Micro Hei",sans-serif"><span style="font-size:16px"><span style="font-family:微软雅黑"><span style="font-size:large">SpringMVC 用的是 的MultipartFile来进行文件上传 所以我们首先要配置MultipartResolver:用于处理表单中的file。</span></span></span></span></p>
+
+<pre style="margin-left:0px; margin-right:0px">
+<span style="font-family:-apple-system,"SF UI Text",Arial,"PingFang SC","Hiragino Sans GB","Microsoft YaHei","WenQuanYi Micro Hei",sans-serif"><span style="font-size:14px"><span style="font-family:"Source Code Pro","DejaVu Sans Mono","Ubuntu Mono","Anonymous Pro","Droid Sans Mono",Menlo,Monaco,Consolas,Inconsolata,Courier,monospace,"PingFang SC","Microsoft YaHei",sans-serif"><code> <bean <span style="font-size:inherit">id</span>=<span style="font-size:inherit">"multipartResolver"</span>
+　　　　<span style="font-size:inherit">class</span>=<span style="font-size:inherit">"org.springframework.web.multipart.commons.CommonsMultipartResolver"</span>>
+<<span style="font-size:inherit">property</span> <span style="font-size:inherit">name</span>=<span style="font-size:inherit">"maxUploadSize"</span> value=<span style="font-size:inherit">"5400000"</span> />
+<<span style="font-size:inherit">property</span> <span style="font-size:inherit">name</span>=<span style="font-size:inherit">"defaultEncoding"</span> value=<span style="font-size:inherit">"UTF-8"</span> />
+</bean></code></span></span></span></pre>
+
+<p style="margin-left:0px; margin-right:0px"><span style="font-family:-apple-system,"SF UI Text",Arial,"PingFang SC","Hiragino Sans GB","Microsoft YaHei","WenQuanYi Micro Hei",sans-serif"><span style="font-size:16px"><span style="font-family:微软雅黑"><span style="font-size:large">属性介绍： <br />
+maxUploadSize：最大上传文件的大小，单位为字节； <br />
+defaultEncoding：请求的编码格式，默认为iso-8859-1。</span></span></span></span></p>
+
+<hr />
+<h3 style="margin-left:0px; margin-right:0px"><span style="font-family:-apple-system,"SF UI Text",Arial,"PingFang SC","Hiragino Sans GB","Microsoft YaHei","WenQuanYi Micro Hei",sans-serif">3.编写文件上传控制器</span></h3>
+
+<pre style="margin-left:0px; margin-right:0px">
+<span style="font-family:-apple-system,"SF UI Text",Arial,"PingFang SC","Hiragino Sans GB","Microsoft YaHei","WenQuanYi Micro Hei",sans-serif"><span style="font-size:14px"><span style="font-family:"Source Code Pro","DejaVu Sans Mono","Ubuntu Mono","Anonymous Pro","Droid Sans Mono",Menlo,Monaco,Consolas,Inconsolata,Courier,monospace,"PingFang SC","Microsoft YaHei",sans-serif"><code>@Controller
+<span style="font-size:inherit">public</span> <span style="font-size:inherit">class</span> FileUploadController {
+
+<span style="font-size:inherit">private</span> <span style="font-size:inherit">static</span> String UPLOAD_DIRECTORY = PropertiesUtil.<span style="font-size:inherit">get</span>(<span style="font-size:inherit">"fileupload.directory"</span>, <span style="font-size:inherit">""</span>);
+
+@RequestMapping(<span style="font-size:inherit">value</span> = <span style="font-size:inherit">"uploadFile"</span>, method = RequestMethod.POST)
+<span style="font-size:inherit">public</span> ModelAndView <span style="font-size:inherit">uploadFile</span>(@<span style="font-size:inherit">RequestParam</span>("file") MultipartFile file){
+<span style="font-size:inherit"><em>// 判断文件是否为空</em></span>
+<span style="font-size:inherit">if</span> (!file.isEmpty()) {
+<span style="font-size:inherit">try</span> {
+<span style="font-size:inherit"><em>//判断文件目录是否存在，否则自动生成</em></span>
+File directory = <span style="font-size:inherit">new</span> File(UPLOAD_DIRECTORY);
+<span style="font-size:inherit">if</span> (!directory.exists()){
+directory.mkdirs();
+}
+
+<span style="font-size:inherit"><em>//失败跳转视图</em></span>
+<span style="font-size:inherit">if</span> (file.getSize() > <span style="font-size:inherit">30000</span>)
+<span style="font-size:inherit">return</span> <span style="font-size:inherit">new</span> ModelAndView(<span style="font-size:inherit">"uploadFail"</span>,<span style="font-size:inherit">"msg"</span>,file.getOriginalFilename()+<span style="font-size:inherit">"超过了指定大小"</span>);
+
+<span style="font-size:inherit"><em>// 文件保存路径</em></span>
+String filePath = FilenameUtils.concat(UPLOAD_DIRECTORY, file.getOriginalFilename());
+<span style="font-size:inherit"><em>// 转存文件</em></span>
+file.transferTo(<span style="font-size:inherit">new</span> File(filePath));
+
+} <span style="font-size:inherit">catch</span> (Exception e) {
+e.printStackTrace();
+}
+}
+
+<span style="font-size:inherit"><em>//成功跳转视图</em></span>
+<span style="font-size:inherit">return</span> <span style="font-size:inherit">new</span> ModelAndView(<span style="font-size:inherit">"uploadSuccess"</span>,<span style="font-size:inherit">"msg"</span>,file.getOriginalFilename());
+}
+
+}</code></span></span></span></pre>
+
+<p style="margin-left:0px; margin-right:0px"><span style="font-family:-apple-system,"SF UI Text",Arial,"PingFang SC","Hiragino Sans GB","Microsoft YaHei","WenQuanYi Micro Hei",sans-serif"><span style="font-size:16px"><span style="font-family:微软雅黑"><span style="font-size:large">说明： <br />
+1>使用SpringMVC注解@RequestParam来获取表单中的file参数内容； <br />
+2>通过MultipartFile的transferTo(File dest)这个方法来直接转存文件到指定的路径。</span></span></span></span></p>
+
+<hr />
+<h3 style="margin-left:0px; margin-right:0px"><span style="font-family:-apple-system,"SF UI Text",Arial,"PingFang SC","Hiragino Sans GB","Microsoft YaHei","WenQuanYi Micro Hei",sans-serif">4.书写前段测试表单</span></h3>
+
+<p style="margin-left:0px; margin-right:0px"><span style="font-family:-apple-system,"SF UI Text",Arial,"PingFang SC","Hiragino Sans GB","Microsoft YaHei","WenQuanYi Micro Hei",sans-serif"><span style="font-size:16px"><span style="font-family:微软雅黑"><span style="font-size:large">upload.jsp</span></span></span></span></p>
+
+<pre style="margin-left:0px; margin-right:0px">
+<span style="font-family:-apple-system,"SF UI Text",Arial,"PingFang SC","Hiragino Sans GB","Microsoft YaHei","WenQuanYi Micro Hei",sans-serif"><span style="font-size:14px"><span style="font-family:"Source Code Pro","DejaVu Sans Mono","Ubuntu Mono","Anonymous Pro","Droid Sans Mono",Menlo,Monaco,Consolas,Inconsolata,Courier,monospace,"PingFang SC","Microsoft YaHei",sans-serif"><code><span style="font-size:inherit"><%@ page contentType=<span style="font-size:inherit">"text/html;charset=UTF-8"</span> language=<span style="font-size:inherit">"java"</span> %></span>
+<span style="font-size:inherit"><<span style="font-size:inherit">html</span>></span>
+<span style="font-size:inherit"><<span style="font-size:inherit">head</span>></span>
+<span style="font-size:inherit"><<span style="font-size:inherit">title</span>></span>Upload File<span style="font-size:inherit"></<span style="font-size:inherit">title</span>></span>
+<span style="font-size:inherit"></<span style="font-size:inherit">head</span>></span>
+<span style="font-size:inherit"><<span style="font-size:inherit">body</span>></span>
+<span style="font-size:inherit"><<span style="font-size:inherit">h2</span>></span>文件上传实例<span style="font-size:inherit"></<span style="font-size:inherit">h2</span>></span>
+<span style="font-size:inherit"><<span style="font-size:inherit">form</span> <span style="font-size:inherit">action</span>=<span style="font-size:inherit">"/uploadFile"</span> <span style="font-size:inherit">method</span>=<span style="font-size:inherit">"post"</span> <span style="font-size:inherit">enctype</span>=<span style="font-size:inherit">"multipart/form-data"</span>></span>
+选择文件:<span style="font-size:inherit"><<span style="font-size:inherit">input</span> <span style="font-size:inherit">type</span>=<span style="font-size:inherit">"file"</span> <span style="font-size:inherit">name</span>=<span style="font-size:inherit">"file"</span>></span>
+<span style="font-size:inherit"><<span style="font-size:inherit">input</span> <span style="font-size:inherit">type</span>=<span style="font-size:inherit">"submit"</span> <span style="font-size:inherit">value</span>=<span style="font-size:inherit">"提交"</span>></span>
+<span style="font-size:inherit"></<span style="font-size:inherit">form</span>></span>
+<span style="font-size:inherit"></<span style="font-size:inherit">body</span>></span>
+<span style="font-size:inherit"></<span style="font-size:inherit">html</span>></span></code></span></span></span></pre>
+
+<p style="margin-left:0px; margin-right:0px"><span style="font-family:-apple-system,"SF UI Text",Arial,"PingFang SC","Hiragino Sans GB","Microsoft YaHei","WenQuanYi Micro Hei",sans-serif"><span style="font-size:16px"><span style="font-family:微软雅黑"><span style="font-size:large">uploadSuccess.jsp</span></span></span></span></p>
+
+<pre style="margin-left:0px; margin-right:0px">
+<span style="font-family:-apple-system,"SF UI Text",Arial,"PingFang SC","Hiragino Sans GB","Microsoft YaHei","WenQuanYi Micro Hei",sans-serif"><span style="font-size:14px"><span style="font-family:"Source Code Pro","DejaVu Sans Mono","Ubuntu Mono","Anonymous Pro","Droid Sans Mono",Menlo,Monaco,Consolas,Inconsolata,Courier,monospace,"PingFang SC","Microsoft YaHei",sans-serif"><code><span style="font-size:inherit"><%@ page contentType=<span style="font-size:inherit">"text/html;charset=UTF-8"</span> language=<span style="font-size:inherit">"java"</span> %></span>
+<span style="font-size:inherit"><<span style="font-size:inherit">html</span>></span>
+<span style="font-size:inherit"><<span style="font-size:inherit">head</span>></span>
+<span style="font-size:inherit"><<span style="font-size:inherit">title</span>></span>文件上传成功<span style="font-size:inherit"></<span style="font-size:inherit">title</span>></span>
+<span style="font-size:inherit"></<span style="font-size:inherit">head</span>></span>
+<span style="font-size:inherit"><<span style="font-size:inherit">body</span>></span>
+<span style="font-size:inherit"><<span style="font-size:inherit">h1</span>></span>文件${msg}上传成功！<span style="font-size:inherit"></<span style="font-size:inherit">h1</span>></span>
+<span style="font-size:inherit"></<span style="font-size:inherit">body</span>></span>
+<span style="font-size:inherit"></<span style="font-size:inherit">html</span>></span></code></span></span></span></pre>
+
+<p style="margin-left:0px; margin-right:0px"><span style="font-family:-apple-system,"SF UI Text",Arial,"PingFang SC","Hiragino Sans GB","Microsoft YaHei","WenQuanYi Micro Hei",sans-serif"><span style="font-size:16px"><span style="font-family:微软雅黑"><span style="font-size:large">uploadFail.jsp</span></span></span></span></p>
+
+<pre style="margin-left:0px; margin-right:0px">
+<span style="font-family:-apple-system,"SF UI Text",Arial,"PingFang SC","Hiragino Sans GB","Microsoft YaHei","WenQuanYi Micro Hei",sans-serif"><span style="font-size:14px"><span style="font-family:"Source Code Pro","DejaVu Sans Mono","Ubuntu Mono","Anonymous Pro","Droid Sans Mono",Menlo,Monaco,Consolas,Inconsolata,Courier,monospace,"PingFang SC","Microsoft YaHei",sans-serif"><code><span style="font-size:inherit"><%@ page contentType=<span style="font-size:inherit">"text/html;charset=UTF-8"</span> language=<span style="font-size:inherit">"java"</span> %></span>
+<span style="font-size:inherit"><<span style="font-size:inherit">html</span>></span>
+<span style="font-size:inherit"><<span style="font-size:inherit">head</span>></span>
+<span style="font-size:inherit"><<span style="font-size:inherit">title</span>></span>文件上传失败<span style="font-size:inherit"></<span style="font-size:inherit">title</span>></span>
+<span style="font-size:inherit"></<span style="font-size:inherit">head</span>></span>
+<span style="font-size:inherit"><<span style="font-size:inherit">body</span>></span>
+<span style="font-size:inherit"><<span style="font-size:inherit">h1</span>></span>上传失败原因：${msg}<span style="font-size:inherit"></<span style="font-size:inherit">h1</span>></span>
+<span style="font-size:inherit"></<span style="font-size:inherit">body</span>></span>
+<span style="font-size:inherit"></<span style="font-size:inherit">html</span>></span></code></span></span></span></pre>
+
+<p style="margin-left:0px; margin-right:0px"><span style="font-family:-apple-system,"SF UI Text",Arial,"PingFang SC","Hiragino Sans GB","Microsoft YaHei","WenQuanYi Micro Hei",sans-serif"><span style="font-size:16px"><span style="font-family:微软雅黑"><span style="font-size:large">　　注意要在form标签中加上enctype=”multipart/form-data”表示该表单是要处理文件的,这是最基本的东西，很多人会忘记然而当上传出错后则去找程序的错误，却忘了这一点</span></span></span></span></p>
+
+<hr />
+<h3 style="margin-left:0px; margin-right:0px"><span style="font-family:-apple-system,"SF UI Text",Arial,"PingFang SC","Hiragino Sans GB","Microsoft YaHei","WenQuanYi Micro Hei",sans-serif">5.运行单个文件上传结果</span></h3>
+
+<p style="margin-left:0px; margin-right:0px"><span style="font-family:-apple-system,"SF UI Text",Arial,"PingFang SC","Hiragino Sans GB","Microsoft YaHei","WenQuanYi Micro Hei",sans-serif"><span style="font-size:16px"><span style="font-family:微软雅黑"><span style="font-size:large">成功： <br />
+<br />
+<span style="font-family:微软雅黑"><span style="font-size:large">失败： <br />
+<img alt="上传失败" src="https://img-blog.csdn.net/20171211145500136?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQvdTAxNDc0Njk2NQ==/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70/gravity/SouthEast" style="border-style:none; box-sizing:border-box; cursor:zoom-in; margin:24px 0px; max-width:100%; outline:0px; overflow-wrap:break-word; padding:0px" title="" /></span></span></span></span></span></span></p>
+
+<hr />
+<h2 style="margin-left:0px; margin-right:0px"><span style="font-family:-apple-system,"SF UI Text",Arial,"PingFang SC","Hiragino Sans GB","Microsoft YaHei","WenQuanYi Micro Hei",sans-serif">多个文件上传开发步骤：</span></h2>
+
+<p style="margin-left:0px; margin-right:0px"><span style="font-family:-apple-system,"SF UI Text",Arial,"PingFang SC","Hiragino Sans GB","Microsoft YaHei","WenQuanYi Micro Hei",sans-serif"><span style="font-size:16px"><span style="font-family:微软雅黑"><span style="font-size:large">步骤1,2都是相同的，只是步骤3,4有些许不同。</span></span></span></span></p>
+
+<h3 style="margin-left:0px; margin-right:0px"><span style="font-family:-apple-system,"SF UI Text",Arial,"PingFang SC","Hiragino Sans GB","Microsoft YaHei","WenQuanYi Micro Hei",sans-serif">3.1多个文件上传控制器</span></h3>
+
+<pre style="margin-left:0px; margin-right:0px">
+<span style="font-family:-apple-system,"SF UI Text",Arial,"PingFang SC","Hiragino Sans GB","Microsoft YaHei","WenQuanYi Micro Hei",sans-serif"><span style="font-size:14px"><span style="font-family:"Source Code Pro","DejaVu Sans Mono","Ubuntu Mono","Anonymous Pro","Droid Sans Mono",Menlo,Monaco,Consolas,Inconsolata,Courier,monospace,"PingFang SC","Microsoft YaHei",sans-serif"><code> <span style="font-size:inherit">/**
+* 多个文件上传
+*<span style="font-size:inherit"> @param</span> files
+*<span style="font-size:inherit"> @return</span>
+*/</span>
+<span style="font-size:inherit">@RequestMapping</span>(value = <span style="font-size:inherit">"uploadFiles"</span>, method = RequestMethod.POST)
+<span style="font-size:inherit">public</span> ModelAndView <span style="font-size:inherit">uploadFile</span>(@<span style="font-size:inherit">RequestParam</span>("files") MultipartFile[] files){
+<span style="font-size:inherit"><em>//判断file数组不能为空并且长度大于0</em></span>
+<span style="font-size:inherit">if</span> (files != <span style="font-size:inherit">null</span> && files.length > <span style="font-size:inherit">0</span>) {
+<span style="font-size:inherit"><em>//循环获取file数组中得文件</em></span>
+<span style="font-size:inherit">for</span> (<span style="font-size:inherit">int</span> i = <span style="font-size:inherit">0</span>; i < files.length; i++) {
+MultipartFile file = files[i];
+
+<span style="font-size:inherit"><em>//保存文件</em></span>
+String filePath = FilenameUtils.concat(UPLOAD_DIRECTORY, file.getOriginalFilename());
+<span style="font-size:inherit"><em>// 转存文件</em></span>
+<span style="font-size:inherit">try</span> {
+file.transferTo(<span style="font-size:inherit">new</span> File(filePath));
+} <span style="font-size:inherit">catch</span> (IOException e) {
+e.printStackTrace();
+}
+}
+}
+
+<span style="font-size:inherit"><em>//跳转视图</em></span>
+<span style="font-size:inherit">return</span> <span style="font-size:inherit">new</span> ModelAndView(<span style="font-size:inherit">"uploadSuccess"</span>,<span style="font-size:inherit">"msg"</span>,files.length+<span style="font-size:inherit">"个文件"</span>);
+}</code></span></span></span></pre>
+
+<hr />
+<h3 style="margin-left:0px; margin-right:0px"><span style="font-family:-apple-system,"SF UI Text",Arial,"PingFang SC","Hiragino Sans GB","Microsoft YaHei","WenQuanYi Micro Hei",sans-serif">4.1多个文件上传表单</span></h3>
+
+<pre style="margin-left:0px; margin-right:0px">
+<span style="font-family:-apple-system,"SF UI Text",Arial,"PingFang SC","Hiragino Sans GB","Microsoft YaHei","WenQuanYi Micro Hei",sans-serif"><span style="font-size:14px"><span style="font-family:"Source Code Pro","DejaVu Sans Mono","Ubuntu Mono","Anonymous Pro","Droid Sans Mono",Menlo,Monaco,Consolas,Inconsolata,Courier,monospace,"PingFang SC","Microsoft YaHei",sans-serif"><code><span style="font-size:inherit"><%@ page contentType=<span style="font-size:inherit">"text/html;charset=UTF-8"</span> language=<span style="font-size:inherit">"java"</span> %></span>
+<span style="font-size:inherit"><<span style="font-size:inherit">html</span>></span>
+<span style="font-size:inherit"><<span style="font-size:inherit">head</span>></span>
+<span style="font-size:inherit"><<span style="font-size:inherit">title</span>></span>Upload File<span style="font-size:inherit"></<span style="font-size:inherit">title</span>></span>
+<span style="font-size:inherit"></<span style="font-size:inherit">head</span>></span>
+<span style="font-size:inherit"><<span style="font-size:inherit">body</span>></span>
+<span style="font-size:inherit"><<span style="font-size:inherit">h2</span>></span>多个文件上传实例<span style="font-size:inherit"></<span style="font-size:inherit">h2</span>></span>
+<span style="font-size:inherit"><<span style="font-size:inherit">form</span> <span style="font-size:inherit">action</span>=<span style="font-size:inherit">"/uploadFiles"</span> <span style="font-size:inherit">method</span>=<span style="font-size:inherit">"post"</span> <span style="font-size:inherit">enctype</span>=<span style="font-size:inherit">"multipart/form-data"</span>></span>
+<span style="font-size:inherit"><<span style="font-size:inherit">p</span>></span> 选择文件:<span style="font-size:inherit"><<span style="font-size:inherit">input</span> <span style="font-size:inherit">type</span>=<span style="font-size:inherit">"file"</span> <span style="font-size:inherit">name</span>=<span style="font-size:inherit">"files"</span>></span>
+<span style="font-size:inherit"><<span style="font-size:inherit">p</span>></span> 选择文件:<span style="font-size:inherit"><<span style="font-size:inherit">input</span> <span style="font-size:inherit">type</span>=<span style="font-size:inherit">"file"</span> <span style="font-size:inherit">name</span>=<span style="font-size:inherit">"files"</span>></span>
+<span style="font-size:inherit"><<span style="font-size:inherit">p</span>></span> 选择文件:<span style="font-size:inherit"><<span style="font-size:inherit">input</span> <span style="font-size:inherit">type</span>=<span style="font-size:inherit">"file"</span> <span style="font-size:inherit">name</span>=<span style="font-size:inherit">"files"</span>></span>
+<span style="font-size:inherit"><<span style="font-size:inherit">input</span> <span style="font-size:inherit">type</span>=<span style="font-size:inherit">"submit"</span> <span style="font-size:inherit">value</span>=<span style="font-size:inherit">"提交"</span>></span>
+<span style="font-size:inherit"></<span style="font-size:inherit">form</span>></span>
+<span style="font-size:inherit"></<span style="font-size:inherit">body</span>></span>
+<span style="font-size:inherit"></<span style="font-size:inherit">html</span>></span>
+</code></span></span></span></pre>
+
+<p style="margin-left:0px; margin-right:0px"><br />
+<span style="font-family:-apple-system,"SF UI Text",Arial,"PingFang SC","Hiragino Sans GB","Microsoft YaHei","WenQuanYi Micro Hei",sans-serif"><span style="font-size:16px"><span style="font-family:微软雅黑"><span style="font-size:large">说明： <br />
+　　前端表单，多个文件组使用同一个name名称:files，后台控制器使用@RequestParam(“files”) MultipartFile[] files 数组来接收。</span></span></span></span></p>
+
+<hr />
+<h3 style="margin-left:0px; margin-right:0px"><span style="font-family:-apple-system,"SF UI Text",Arial,"PingFang SC","Hiragino Sans GB","Microsoft YaHei","WenQuanYi Micro Hei",sans-serif">5.1运行多个文件上传结果</span></h3>
+
+<p style="margin-left:0px; margin-right:0px"><span style="font-family:-apple-system,"SF UI Text",Arial,"PingFang SC","Hiragino Sans GB","Microsoft YaHei","WenQuanYi Micro Hei",sans-serif"><span style="font-size:16px"><span style="font-family:微软雅黑"><span style="font-size:large">上传： <br />
+<img alt="这里写图片描述" src="https://img-blog.csdn.net/20171211150806874?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQvdTAxNDc0Njk2NQ==/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70/gravity/SouthEast" style="border-style:none; box-sizing:border-box; cursor:zoom-in; margin:24px 0px; max-width:100%; outline:0px; overflow-wrap:break-word; padding:0px" title="" /> </span></span></span></span><br />
+ </p>
+
+<hr />
+<p style="margin-left:0px; margin-right:0px"><span style="font-family:-apple-system,"SF UI Text",Arial,"PingFang SC","Hiragino Sans GB","Microsoft YaHei","WenQuanYi Micro Hei",sans-serif"><span style="font-size:16px">Github上源码:<a href="https://github.com/ChasingLight/SpringDataJPA.git" rel="nofollow" style="box-sizing:border-box; outline:0px; margin:0px; padding:0px; color:#6795b5; text-decoration:none; cursor:pointer; overflow-wrap:break-word" target="_blank">https://github.com/ChasingLight/SpringDataJPA.git</a></span></span></p>
+
+<h3 style="margin-left:0px; margin-right:0px"><span style="font-family:-apple-system,"SF UI Text",Arial,"PingFang SC","Hiragino Sans GB","Microsoft YaHei","WenQuanYi Micro Hei",sans-serif">扩充：</span></h3>
+
+<h4 style="margin-left:0px; margin-right:0px"><span style="font-family:-apple-system,"SF UI Text",Arial,"PingFang SC","Hiragino Sans GB","Microsoft YaHei","WenQuanYi Micro Hei",sans-serif">1>MultipartFile常用方法</span></h4>
+
+<p style="margin-left:0px; margin-right:0px"><span style="font-family:-apple-system,"SF UI Text",Arial,"PingFang SC","Hiragino Sans GB","Microsoft YaHei","WenQuanYi Micro Hei",sans-serif"><span style="font-size:16px"><span style="font-family:微软雅黑"><span style="font-size:large">打印方法结果： <br />
+1>文件类型值，MultipartFile.getContentType():image/jpeg <br />
+2>表单中文件组件对应name值，MultipartFile.getName():file <br />
+3>文件原始名称包括后缀名，MultipartFile.getOriginalFilename():IMEI_20171204.jpg <br />
+4>文件大小单位为k，MultipartFile.getSize():27128 <br />
+5>文件是否为空，MultipartFile.isEmpty():false</span></span></span></span></p>
+
+<h4 style="margin-left:0px; margin-right:0px"><span style="font-family:-apple-system,"SF UI Text",Arial,"PingFang SC","Hiragino Sans GB","Microsoft YaHei","WenQuanYi Micro Hei",sans-serif">2>Apache文件相关jar包常用方法</span></h4>
+
+<p style="margin-left:0px; margin-right:0px"><span style="font-family:-apple-system,"SF UI Text",Arial,"PingFang SC","Hiragino Sans GB","Microsoft YaHei","WenQuanYi Micro Hei",sans-serif"><span style="font-size:16px"><span style="font-family:微软雅黑"><span style="font-size:large">1>FilenameUtils.concat(basePath, fullFileName):用于拼接目录和文件名为文件全路径，且会根据系统对应使用相应的分隔符 <br />
+2>FileUtils.copyURLToFile(URL source, File destination, int connectionTimeout, int readTimeout): <br />
+从指定的url下载文件，保存到destination为准；同时指定连接超时时长，读取文件超时时长。</span></span></span></span></p>
+</div>
+</div>

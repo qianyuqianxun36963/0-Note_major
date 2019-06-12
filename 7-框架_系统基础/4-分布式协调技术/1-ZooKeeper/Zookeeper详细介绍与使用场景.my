@@ -1,0 +1,185 @@
+<h1>zookeeper的详细介绍及使用场景</h1>
+
+<p><a href="http://blog.csdn.net/king866/article/details/53992653">原文地址</a></p>
+
+<h2><strong>Zookeeper是什么</strong></h2>
+
+<p>Zookeeper 分布式服务框架是Apache Hadoop 的一个子项目，它主要是用来解决分布式应用中经常遇到的一些数据管理问题，如：统一命名服务、状态同步服务、集群管理、分布式应用配置项的管理等</p>
+
+<p>Zookeeper 作为一个分布式的服务框架，主要用来解决分布式集群中应用系统的一致性问题，它能提供基于类似于文件系统的目录节点树方式的数据存储， Zookeeper 作用主要是用来维护和监控存储的数据的状态变化，通过监控这些数据状态的变化，从而达到基于数据的集群管理</p>
+
+<p>简单的说，zookeeper=文件系统+通知机制。</p>
+
+<p><a href="http://blog.csdn.net/baiduforum/article/details/6981456" target="_blank"><strong>Zookeeer工作原理</strong></a></p>
+
+<p> ZooKeeper是一个分布式的，开放源码的分布式应用程序协调服务，它包含一个简单的原语集，分布式应用程序可以基于它实现同步服务，配置维护和 命名服务等。Zookeeper是hadoop的一个子项目，其发展历程无需赘述。在分布式应用中，由于工程师不能很好地使用锁机制，以及基于消息的协调 机制不适合在某些应用中使用，因此需要有一种可靠的、可扩展的、分布式的、可配置的协调机制来统一系统的状态</p>
+
+<p>Zookeeper中的元素介绍</p>
+
+<p><strong><img alt="" src="http://img.blog.csdn.net/20170103113503084?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQva2luZzg2Ng==/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70/gravity/SouthEast" /></strong></p>
+
+<p><strong>1、znode节点</strong></p>
+
+<p>有四种类型的znode：<br />
+1、PERSISTENT-持久化目录节点<br />
+客户端与zookeeper断开连接后，该节点依旧存在<br />
+2、 PERSISTENT_SEQUENTIAL-持久化顺序编号目录节点<br />
+客户端与zookeeper断开连接后，该节点依旧存在，只是Zookeeper给该节点名称进行顺序编号<br />
+3、EPHEMERAL-临时目录节点<br />
+客户端与zookeeper断开连接后，该节点被删除<br />
+4、EPHEMERAL_SEQUENTIAL-临时顺序编号目录节点<br />
+客户端与zookeeper断开连接后，该节点被删除，只是Zookeeper给该节点名称进行顺序编号</p>
+
+<p><strong>2、NameService 命名服务</strong></p>
+
+<p>    这个似乎最简单，在zookeeper的文件系统里创建一个目录，即有唯一的path。在我们使用tborg无法确定上游程序的部署机器时即可与下游程序约定好path，通过path即能互相探索发现</p>
+
+<p>  这个主要是作为分布式命名服务，通过调用zk的create node api，能够很容易创建一个全局唯一的path，这个path就可以作为一个名称。</p>
+
+<p><strong>3、configuration 配置管理</strong></p>
+
+<p>现在把这些配置全部放到zookeeper上去，保存在 Zookeeper 的某个目录节点中，然后所有相关应用程序对这个目录节点进行监听，一旦配置信息发生变化，每个应用程序就会收到 Zookeeper 的通知，然后从 Zookeeper 获取新的配置信息应用到系统中就好。</p>
+
+<p><strong>4、GroupMembers 集群管理</strong></p>
+
+<p>所谓集群管理无在乎两点：是否有机器退出和加入、选举master。<br />
+对于第一点，所有机器约定在父目录GroupMembers下创建临时目录节点，然后监听父目录节点的子节点变化消息。一旦有机器挂掉，该机器与 zookeeper的连接断开，其所创建的临时目录节点被删除，所有其他机器都收到通知：某个兄弟目录被删除，于是，所有人都知道了。新机器加入也是类似，所有机器收到通知：新兄弟目录加入，highcount又有了。<br />
+对于第二点，所有机器创建临时顺序编号目录节点，通过master选举算法选举出来。</p>
+
+<p><strong>Zookeeper中的角色介绍</strong></p>
+
+<p>1、client</p>
+
+<p>分布式中的一个节点，访问服务器的配置信息，周期性向server发送心跳包，server向client回应确认，如果client没有收到回应，则重定向到另一个server</p>
+
+<p>2、server</p>
+
+<p>zookeeper中的一个节点，为client提供所需的服务，给client回应信息表明自己是存活的</p>
+
+<p>3、leader</p>
+
+<p>连接任何一个节点，如果节点出现故障，leader自动修复，在service启动时完成leader的选举</p>
+
+<p>4、follower</p>
+
+<p>听从leader的指令，完成选举工作</p>
+
+<p><strong>Leader主要有三个功能</strong>：</p>
+
+<p>  1 .恢复数据；</p>
+
+<p>  2 .维持与follower的心跳，接收follower请求并判断follower的请求消息类型；</p>
+
+<p>  3 .follower的消息类型主要有PING消息、REQUEST消息、ACK消息、REVALIDATE消息，根据不同的消息类型，进行不同的处理。</p>
+
+<p> </p>
+
+<p><img alt="" src="http://img.blog.csdn.net/20170103124350319?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQva2luZzg2Ng==/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70/gravity/SouthEast" /></p>
+
+<p> </p>
+
+<p><strong>选举流程</strong><br />
+      当leader崩溃或者leader失去大多数的follower，这时候zk进入恢复模式，恢复模式需要重新选举出一个新的leader，让所有的 Server都恢复到一个正确的状态。<strong>Zk的选举算法有两种：一种是基于basic paxos实现的，另外一种是基于fast paxos算法实现的。</strong></p>
+
+<p>系统默认的选举算法为fast paxos。</p>
+
+<p><strong>basic paxos</strong>流程：</p>
+
+<p>1 .选举线程由当前Server发起选举的线程担任，其主要功能是对投票结果进行统计，并选出推荐的Server；<br />
+2 .选举线程首先向所有Server发起一次询问(包括自己)；<br />
+3 .选举线程收到回复后，验证是否是自己发起的询问(验证zxid是否一致)，然后获取对方的id(myid)，并存储到当前询问对象列表中，最后获取对方提议的leader相关信息(id,zxid)，并将这些信息存储到当次选举的投票记录表中；<br />
+4.  收到所有Server回复以后，就计算出zxid最大的那个Server，并将这个Server相关信息设置成下一次要投票的Server；<br />
+5.  线程将当前zxid最大的Server设置为当前Server要推荐的Leader，如果此时获胜的Server获得n/2 + 1的Server票数， 设置当前推荐的leader为获胜的Server，将根据获胜的Server相关信息设置自己的状态，否则，继续这个过程，直到leader被选举出来。<br />
+<strong>通过流程分析我们可以得出：要使Leader获得多数Server的支持，则Server总数必须是奇数2n+1，且存活的Server的数目不得少于n+1.</strong><br />
+ </p>
+
+<p><strong>fast paxos</strong>流程：</p>
+
+<p>在选举过程中，某Server首先向所有Server提议自己要成为leader，当其它Server收到提议以后，解决epoch和 zxid的冲突，并接受对方的提议，然后向对方发送接受提议完成的消息，重复这个流程，最后一定能选举出Leader。</p>
+
+<p><strong>zookeeper中的watcher </strong></p>
+
+<p>Watcher是Zookeeper用来实现distribute lock, distribute configure, distribute queue等应用的主要手段。要监控data_tree上的任何节点的变化（节点本身的增加，删除，数据修改，以及孩子的变化）都可以在获取该数据时注册一个Watcher，这有很像Listener模式。一旦该节点数据变化，Follower会发送一个notification response，client收到notification响应，则会查找对应的Watcher并回调他们</p>
+
+<p>Client可以在某个ZNode上设置一个Watcher，来Watch该ZNode上的变化。如果该ZNode上有相应的变化，就会触发这个Watcher，把相应的事件通知给设置Watcher的Client。需要注意的是，ZooKeeper中的Watcher是一次性的，即触发一次就会被取消，如果想继续Watch的话，需要客户端重新设置Watcher</p>
+
+<p> </p>
+
+<p><img alt="" src="http://img.blog.csdn.net/20170103125226426?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQva2luZzg2Ng==/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70/gravity/SouthEast" /></p>
+
+<p> </p>
+
+<p><img alt="" src="http://img.blog.csdn.net/20170103125721368?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQva2luZzg2Ng==/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70/gravity/SouthEast" /></p>
+
+<p><strong>atomic broadcasts原子广播</strong></p>
+
+<p> Zookeeper的核心是原子广播，这个机制保证了各个Server之间的同步。实现这个机制的协议叫做Zab协议。Zab协议有两种模式，它们分 别是恢复模式（选主）和广播模式（同步）。当服务启动或者在领导者崩溃后，Zab就进入了恢复模式，当领导者被选举出来，且大多数Server完成了和 leader的状态同步以后，恢复模式就结束了。状态同步保证了leader和Server具有相同的系统状态</p>
+
+<p>ZooKeeper Watcher 特性总结</p>
+
+<p><strong>1. 注册只能确保一次消费</strong><br />
+无论是服务端还是客户端，一旦一个 Watcher 被触发，ZooKeeper 都会将其从相应的存储中移除。因此，开发人员在 Watcher 的使用上要记住的一点是需要反复注册。这样的设计有效地减轻了服务端的压力。如果注册一个 Watcher 之后一直有效，那么针对那些更新非常频繁的节点，服务端会不断地向客户端发送事件通知，这无论对于网络还是服务端性能的影响都非常大。</p>
+
+<p><strong>2. 客户端串行执行</strong><br />
+客户端 Watcher 回调的过程是一个串行同步的过程，这为我们保证了顺序，同时，需要开发人员注意的一点是，千万不要因为一个 Watcher 的处理逻辑影响了整个客户端的 Watcher 回调。</p>
+
+<p><strong>3. 轻量级设计</strong><br />
+WatchedEvent 是 ZooKeeper 整个 Watcher 通知机制的最小通知单元，这个数据结构中只包含三部分的内容：通知状态、事件类型和节点路径。也就是说，Watcher 通知非常简单，只会告诉客户端发生了事件，而不会说明事件的具体内容。例如针对 NodeDataChanged 事件，ZooKeeper 的 Watcher 只会通知客户指定数据节点的数据内容发生了变更，而对于原始数据以及变更后的新数据都无法从这个事件中直接获取到，而是需要客户端主动重新去获取数据，这也是 ZooKeeper 的 Watcher 机制的一个非常重要的特性。</p>
+
+<p> </p>
+
+<p><strong>设计目的</strong><br />
+1.最终一致性：client不论连接到哪个Server，展示给它都是同一个视图，这是zookeeper最重要的性能。<br />
+2 .可靠性：具有简单、健壮、良好的性能，如果消息m被到一台服务器接受，那么它将被所有的服务器接受。<br />
+3 .实时性：Zookeeper保证客户端将在一个时间间隔范围内获得服务器的更新信息，或者服务器失效的信息。但由于网络延时等原因，Zookeeper不能保证两个客户端能同时得到刚更新的数据，如果需要最新数据，应该在读数据之前调用sync()接口。<br />
+4 .等待无关（wait-free）：慢的或者失效的client不得干预快速的client的请求，使得每个client都能有效的等待。<br />
+5.原子性：更新只能成功或者失败，没有中间状态。<br />
+6 .顺序性：包括全局有序和偏序两种：全局有序是指如果在一台服务器上消息a在消息b前发布，则在所有Server上消息a都将在消息b前被发布；偏序是指如果一个消息b在消息a后被同一个发送者发布，a必将排在b前面</p>
+
+<p> </p>
+
+<p>ZooKeeper典型使用场景一览</p>
+
+<p>        ZooKeeper是一个高可用的分布式数据管理与系统协调框架。基于对Paxos算法的实现，使该框架保证了分布式环境中数据的强一致性，也正是基 于这样的特性，使得zookeeper能够应用于很多场景。<br />
+<br />
+<strong>数据发布与订阅</strong><br />
+<br />
+发布与订阅即所谓的配置管理，顾名思义就是将数据发布到zk节点上，供订阅者动态获取数据，实现配置信息的集中式管理和动态更新。例如全局的配置信息，地址列表等就非常适合使用。<br />
+<br />
+1. 索引信息和集群中机器节点状态存放在zk的一些指定节点，供各个客户端订阅使用。</p>
+
+<p>2. 系统日志（经过处理后的）存储，这些日志通常2-3天后被清除。<br />
+3. 应用中用到的一些配置信息集中管理，在应用启动的时候主动来获取一次，并且在节点上注册一个Watcher，以后每次配置有更新，实时通知到应用，获取最新配置信息。<br />
+4. 业务逻辑中需要用到的一些全局变量，比如一些消息中间件的消息队列通常有个offset，这个offset存放在zk上，这样集群中每个发送者都能知道当前的发送进度。<br />
+5. 系统中有些信息需要动态获取，并且还会存在人工手动去修改这个信息。以前通常是暴露出接口，例如JMX接口，有了zk后，只要将这些信息存放到zk节点上即可。<br />
+<br />
+<br />
+<strong>分布通知/协调</strong><br />
+<br />
+ZooKeeper 中特有watcher注册与异步通知机制，能够很好的实现分布式环境下不同系统之间的通知与协调，实现对数据变更的实时处理。使用方法通常是不同系统都对 ZK上同一个znode进行注册，监听znode的变化（包括znode本身内容及子节点的），其中一个系统update了znode，那么另一个系统能 够收到通知，并作出相应处理。<br />
+<br />
+1. 另一种心跳检测机制：检测系统和被检测系统之间并不直接关联起来，而是通过zk上某个节点关联，大大减少系统耦合。</p>
+
+<p>2. 另一种系统调度模式：某系统有控制台和推送系统两部分组成，控制台的职责是控制推送系统进行相应的推送工作。管理人员在控制台作的一些操作，实际上是修改 了ZK上某些节点的状态，而zk就把这些变化通知给他们注册Watcher的客户端，即推送系统，于是，作出相应的推送任务。</p>
+
+<p>3. 另一种工作汇报模式：一些类似于任务分发系统，子任务启动后，到zk来注册一个临时节点，并且定时将自己的进度进行汇报（将进度写回这个临时节点），这样任务管理者就能够实时知道任务进度。</p>
+
+<p><strong>总之，使用zookeeper来进行分布式通知和协调能够大大降低系统之间的耦合。</strong><br />
+<br />
+<br />
+<strong>分布式锁</strong><br />
+<br />
+分布式锁，这个主要得益于ZooKeeper为我们保证了数据的强一致性，即用户只要完全相信每时每刻，zk集群中任意节点（一个zk server）上的相同znode的数据是一定是相同的。锁服务可以分为两类，一个是保持独占，另一个是控制时序。<br />
+<strong>保持独占</strong>，就是所有试图来获取这个锁的客户端，最终只有一个可以成功获得这把锁。通常的做法是把zk上的一个znode看作是一把锁，通过create znode的方式来实现。所有客户端都去创建 /distribute_lock 节点，最终成功创建的那个客户端也即拥有了这把锁。<br />
+<strong>控制时序</strong>，就是所有视图来获取这个锁的客户端，最终都是会被安排执行，只是有个全局时序了。做法和上面基本类似，只是这里 /distribute_lock 已经预先存在，客户端在它下面创建临时有序节点（这个可以通过节点的属性控制：CreateMode.EPHEMERAL_SEQUENTIAL来指定）。Zk的父节点（/distribute_lock）维持一份sequence,保证子节点创建的时序性，从而也形成了每个客户端的全局时序。<br />
+<br />
+<br />
+<strong>集群管理</strong><br />
+<br />
+1. 集群机器监控：这通常用于那种对集群中机器状态，机器在线率有较高要求的场景，能够快速对集群中机器变化作出响应。这样的场景中，往往有一个监控系统，实时检测集群机器是否存活。过去的做法通常是：监控系统通过某种手段（比如ping）定时检测每个机器，或者每个机器自己定时向监控系统汇报“我还活着”。 这种做法可行，但是存在两个比较明显的问题：1. 集群中机器有变动的时候，牵连修改的东西比较多。2. 有一定的延时。</p>
+
+<p>利用ZooKeeper有两个特性，就可以实时另一种集群机器存活性监控系统：a. 客户端在节点 x 上注册一个Watcher，那么如果 x 的子节点变化了，会通知该客户端。b. 创建EPHEMERAL类型的节点，一旦客户端和服务器的会话结束或过期，那么该节点就会消失。</p>
+
+<p>2. Master选举则是zookeeper中最为经典的使用场景了。<br />
+在分布式环境中，相同的业务应用分布在不同的机器上，有些业务逻辑（例如一些耗时的计算，网络I/O处理），往往只需要让整个集群中的某一台机器进行执行， 其余机器可以共享这个结果，这样可以大大减少重复劳动，提高性能，于是这个master选举便是这种场景下的碰到的主要问题。<br />
+利用ZooKeeper的强一致性，能够保证在分布式高并发情况下节点创建的全局唯一性，即：同时有多个客户端请求创建 /currentMaster 节点，最终一定只有一个客户端请求能够创建成功。</p>

@@ -1,0 +1,213 @@
+<h1>glusterfs安装</h1>
+
+<h2>1、配置yum源</h2>
+
+<p>创建文件/etc/yum.repos.d/glusterfs.repo</p>
+
+<table border="0" cellpadding="0" cellspacing="0">
+<tbody>
+<tr>
+<td>
+<p><code>[gluster]</code></p>
+
+<p><code>name=gluster</code></p>
+
+<p><code>baseurl=http:</code><code>//cmc-cd-mirror.rnd.huawei.com/centos/7/storage/x86_64/gluster-4.1/</code></p>
+
+<p><code>gpgcheck=</code><code>0</code></p>
+
+<p><code>enabled=</code><code>1</code></p>
+</td>
+</tr>
+</tbody>
+</table>
+
+<p><s>使用外部源时需要在/etc/yum.conf中配置代理（记得把用户名和密码改成自己的）：</s></p>
+
+<table border="0" cellpadding="0" cellspacing="0">
+<tbody>
+<tr>
+<td>
+<p><code>proxy=http:</code><code>//proxycn2.huawei.com:8080 proxy_username=w00438280 proxy_password=123456</code></p>
+</td>
+</tr>
+</tbody>
+</table>
+
+<h2>2、关闭防火墙，禁用SELinux</h2>
+
+<table border="0" cellpadding="0" cellspacing="0">
+<tbody>
+<tr>
+<td>
+<p><code>systemctl stop firewalld</code></p>
+
+<p><code>systemctl disable firewalld</code></p>
+
+<p><code> </code> </p>
+
+<p><code>setenforce </code><code>0</code></p>
+
+<p><code>sed -i </code><code>"s/SELINUX=enforcing/SELINUX=disabled/"</code> <code>/etc/sysconfig/selinux</code></p>
+</td>
+</tr>
+</tbody>
+</table>
+
+<p>如果要开启防火墙，那么把端口24007和49152打开：</p>
+
+<table border="0" cellpadding="0" cellspacing="0">
+<tbody>
+<tr>
+<td>
+<p><code>-A INPUT -p tcp -m state --state NEW -m tcp --dport </code><code>24007</code> <code>-j ACCEPT</code></p>
+
+<p><code>-A INPUT -p tcp -m state --state NEW -m tcp --dport </code><code>49152</code> <code>-j ACCEPT</code></p>
+</td>
+</tr>
+</tbody>
+</table>
+
+<p>CentOS的防火墙默认是firewalld：</p>
+
+<table border="0" cellpadding="0" cellspacing="0">
+<tbody>
+<tr>
+<td>
+<p><code>firewall-cmd --zone=</code><code>public</code> <code>--add-port=</code><code>24007</code><code>-</code><code>24050</code><code>/tcp --permanent</code></p>
+
+<p><code>firewall-cmd --zone=</code><code>public</code> <code>--add-port=</code><code>49152</code><code>-</code><code>49251</code><code>/tcp --permanent</code></p>
+
+<p><code>firewall-cmd --reload</code></p>
+</td>
+</tr>
+</tbody>
+</table>
+
+<p>如果要开启SELinux，执行以下命令：</p>
+
+<table border="0" cellpadding="0" cellspacing="0">
+<tbody>
+<tr>
+<td>
+<p><code>audit2allow -M glusterd_centos64 -l -i /var/log/audit/audit.log</code></p>
+
+<p><code>semodule -i glusterd_centos64.pp</code></p>
+</td>
+</tr>
+</tbody>
+</table>
+
+<h2>3、安装glusterfs-server</h2>
+
+<table border="0" cellpadding="0" cellspacing="0">
+<tbody>
+<tr>
+<td>
+<p><code>yum install -y glusterfs-server</code></p>
+
+<p><code>systemctl start glusterd</code></p>
+
+<p><code>systemctl enable glusterd</code></p>
+</td>
+</tr>
+</tbody>
+</table>
+
+<h2>4、组建集群</h2>
+
+<p>将节点加入到集群中，可以使用待加入集群的节点的IP地址，也可以是主机名（集群内能ping通主机名）：</p>
+
+<table border="0" cellpadding="0" cellspacing="0">
+<tbody>
+<tr>
+<td>
+<p><code>gluster peer probe <ip_or_hostname></code></p>
+</td>
+</tr>
+</tbody>
+</table>
+
+<p>查看集群状态：</p>
+
+<table border="0" cellpadding="0" cellspacing="0">
+<tbody>
+<tr>
+<td>
+<p><code>gluster peer status</code></p>
+</td>
+</tr>
+</tbody>
+</table>
+
+<h2>5、管理卷</h2>
+
+<p>创建卷：</p>
+
+<table border="0" cellpadding="0" cellspacing="0">
+<tbody>
+<tr>
+<td>
+<p><code># TODO</code></p>
+</td>
+</tr>
+</tbody>
+</table>
+
+<p>查看卷：</p>
+
+<table border="0" cellpadding="0" cellspacing="0">
+<tbody>
+<tr>
+<td>
+<p><code># 查看卷列表（只有卷的名称）</code></p>
+
+<p><code>gluster volume list</code></p>
+
+<p><code> </code> </p>
+
+<p><code># 查看卷的详细信息</code></p>
+
+<p><code>gluster volume info</code></p>
+</td>
+</tr>
+</tbody>
+</table>
+
+<p> </p>
+
+<h1>99、OpenShift中使用Glusterfs的注意事项</h1>
+
+<p>OpenShift对外部Glusterfs集群的要求是必须使用未分区的裸盘，使用Heketi进行集群管理。</p>
+
+<p>a.清理磁盘，以/dev/xvde为例：</p>
+
+<table border="0" cellpadding="0" cellspacing="0">
+<tbody>
+<tr>
+<td>
+<p><code>wipefs -af /dev/xvde</code></p>
+</td>
+</tr>
+</tbody>
+</table>
+
+<p>b.OpenShift已使用过的磁盘已经创建device-mapper了，使用dmsetup工具进行删除：</p>
+
+<table border="0" cellpadding="0" cellspacing="0">
+<tbody>
+<tr>
+<td>
+<p><code># 查看device-mapper</code></p>
+
+<p><code>dmsetup ls</code></p>
+
+<p><code> </code> </p>
+
+<p><code># 删除device-mapper，注意先删除tpool后删除tmeta和tdata</code></p>
+
+<p><code>dmsetup remove <device-mapper-name></code></p>
+</td>
+</tr>
+</tbody>
+</table>

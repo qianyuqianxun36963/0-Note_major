@@ -1,0 +1,264 @@
+<h1>OpenShift笔记(一)：OpenShift手动安装</h1>
+
+<p>2017-11-15  2958 次阅读</p>
+
+<h2>文章目录</h2>
+
+<ul>
+<li><a href="https://blog.frognew.com/2017/11/openshift-manual-installation.html#%E7%8E%AF%E5%A2%83%E5%87%86%E5%A4%87%E5%92%8Cdocker%E5%AE%89%E8%A3%85">环境准备和Docker安装</a></li>
+<li><a href="https://blog.frognew.com/2017/11/openshift-manual-installation.html#%E5%AE%89%E8%A3%85openshift-origin">安装OpenShift Origin</a></li>
+<li><a href="https://blog.frognew.com/2017/11/openshift-manual-installation.html#openshift%E7%9A%84%E9%A1%B9%E7%9B%AE">OpenShift的项目</a></li>
+</ul>
+
+<p>【注意】最后更新于 1 year ago，文中内容可能已过时，请谨慎使用。</p>
+
+<p>OpenShift是基于Docker和Kubernetes的开源容器云平台，其开源社区版本为OpenShift Origin。 OpenShift的安装方式有很多种：</p>
+
+<ul>
+<li>使用二进制包手工安装</li>
+<li>使用Openshift Installer快速安装</li>
+<li>使用ansible进行多节点集群安装</li>
+<li>使用All in One的Docker镜像启动一个OpenShift实例</li>
+</ul>
+
+<p>本文作为我的OpenShift学习笔记的开篇，将首先学习使用二进制手动安装的方式快速启动一个OpenShift Origin实例用于学习和测试。</p>
+
+<h2>环境准备和Docker安装</h2>
+
+<p>准备一台CentOS 7.3主机，并在其上安装Docker。 这里安装是Docker 17.03.2的版本。</p>
+
+<table>
+<tbody>
+<tr>
+<td>
+<pre>
+1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+</pre>
+</td>
+<td>
+<pre>
+yum install -y yum-utils device-mapper-persistent-data lvm2
+yum-config-manager \
+--add-repo \
+https://download.docker.com/linux/centos/docker-ce.repo
+
+yum makecache fast
+
+yum install -y --setopt=obsoletes=0 \
+docker-ce-17.03.2.ce-1.el7.centos \
+docker-ce-selinux-17.03.2.ce-1.el7.centos
+
+systemctl start docker
+systemctl enable docker</pre>
+</td>
+</tr>
+</tbody>
+</table>
+
+<p>修改docker的cgroup驱动为systemd, 即修改或创建/etc/docker/daemon.json，加入下面的内容：</p>
+
+<table>
+<tbody>
+<tr>
+<td>
+<pre>
+1
+2
+3
+</pre>
+</td>
+<td>
+<pre>
+{
+"exec-opts": ["native.cgroupdriver=systemd"]
+}</pre>
+</td>
+</tr>
+</tbody>
+</table>
+
+<p>重启docker：</p>
+
+<table>
+<tbody>
+<tr>
+<td>
+<pre>
+1
+</pre>
+</td>
+<td>
+<pre>
+systemctl restart docker</pre>
+</td>
+</tr>
+</tbody>
+</table>
+
+<h2>安装OpenShift Origin</h2>
+
+<p>首先下载OpenShift Origin的二进制文件：</p>
+
+<table>
+<tbody>
+<tr>
+<td>
+<pre>
+1
+2
+3
+4
+</pre>
+</td>
+<td>
+<pre>
+cd /opt
+wget https://github.com/openshift/origin/releases/download/v3.6.1/openshift-origin-server-v3.6.1-008f2d5-linux-64bit.tar.gz
+tar -zxvf openshift-origin-server-v3.6.1-008f2d5-linux-64bit.tar.gz
+mv openshift-origin-server-v3.6.1-008f2d5-linux-64bit openshift</pre>
+</td>
+</tr>
+</tbody>
+</table>
+
+<p>先看一下下载的二进制文件：</p>
+
+<table>
+<tbody>
+<tr>
+<td>
+<pre>
+1
+2
+3
+4
+</pre>
+</td>
+<td>
+<pre>
+cd /opt/openshift
+ls
+kube-apiserver kubectl kubelet kube-scheduler oadm openshift
+kube-controller-manager kubefed kube-proxy LICENSE oc README.md</pre>
+</td>
+</tr>
+</tbody>
+</table>
+
+<p>一般以上的二进制文件是我们所熟悉，即Kubernetes的二级制文件，另外还有oadm, openshift, oc 3个二进制可执行文件。</p>
+
+<p>将/opt/openshift加入到PATH环境变量。</p>
+
+<table>
+<tbody>
+<tr>
+<td>
+<pre>
+1
+2
+3
+</pre>
+</td>
+<td>
+<pre>
+vi /etc/profile
+
+PATH=$PATH:/opt/openshift</pre>
+</td>
+</tr>
+</tbody>
+</table>
+
+<p>执行<code>source /etc/profile</code>使环境变量生效。</p>
+
+<p>查看一下openshift的版本：</p>
+
+<table>
+<tbody>
+<tr>
+<td>
+<pre>
+1
+2
+3
+4
+</pre>
+</td>
+<td>
+<pre>
+openshift version
+openshift v3.6.1+008f2d5
+kubernetes v1.6.1+5115d708d7
+etcd 3.2.1</pre>
+</td>
+</tr>
+</tbody>
+</table>
+
+<p>可以看出openshift 3.6.1使用的Kubernetes的版本为1.6.1，etcd的版本为3.2.1。</p>
+
+<p>启动openshift：</p>
+
+<table>
+<tbody>
+<tr>
+<td>
+<pre>
+1
+2
+</pre>
+</td>
+<td>
+<pre>
+cd /opt/openshift
+./openshift start --public-master=https://<ip>:8443</pre>
+</td>
+</tr>
+</tbody>
+</table>
+
+<p>控制台会打印很多log，另起一个终端会看到本地监听了8443端口。 浏览器打开<code>http://<ip>:8443</code>，打开登录页面后使用默认的用户名/密码 dev/dev登录即可。</p>
+
+<p><a href="https://blog.frognew.com/images/2017/11/openshift-homepage.jpg"><img alt="openshift-homepage" src="https://blog.frognew.com/images/2017/11/openshift-homepage.jpg" /></a></p>
+
+<h2>OpenShift的项目</h2>
+
+<p>从登录到OpenShift的首页可以看出，首先要做的就是创建一个项目。 项目是OpenShift组织资源的方式。 OpenShift的用户可以将不同类型的相关资源放到一个项目中进行管理。 Openshift的管理员可以以项目为单位进行配额管理和网络隔离。</p>
+
+<p>接下来我们创建一个名称为prj的项目后，prj项目的主页如下：</p>
+
+<p><a href="https://blog.frognew.com/images/2017/11/openshift-project.jpg"><img alt="openshift-project.jpg" src="https://blog.frognew.com/images/2017/11/openshift-project.jpg" /></a></p>
+
+<p>可以看一下左侧的菜单和Kubernetes的Dashboard的菜单挺像的，是Deployment, StatefulSet, Pod, Service这些Kubernetes中的资源对象。</p>
+
+<p>当点击<code>Add to Prject</code>并在Tab菜单<code>Deploy Image</code>的image name输入框中直接输入nginx，尝试部署docker hub中最新的nginx时报了下面的错误：</p>
+
+<table>
+<tbody>
+<tr>
+<td>
+<pre>
+1
+</pre>
+</td>
+<td>
+<pre>
+Image nginx runs as the root user which might not be permitted by your cluster administrator.</pre>
+</td>
+</tr>
+</tbody>
+</table>
+
+<p>这是因为OpenShift对容器的安全要求更加严格，OpenShift默认在启动容器时使用的是非root用户，docker hub中的nginx镜像默认是以root用户的身份执行容器内的程序的。</p>

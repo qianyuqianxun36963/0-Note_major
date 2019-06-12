@@ -1,0 +1,64 @@
+<h1>controller 文件的实际使用经验</h1>
+
+<h2>封装请求参数</h2>
+
+<p>请求的时候，经常有批量的操作，如传递多个id的数组：</p>
+
+<p>    @ApiOperation(value = "获取所以场景预约完整信息",notes = "获取所以场景预约完整信息")<br />
+    @RequestMapping(value = "/getAppointmentsFull",method = RequestMethod.POST)<br />
+    public ResultData<List<SceneAppointmentFull>> getAppointmentsFull(@RequestBody QueryParam queryParam) {<br />
+        try{<br />
+            PageHelper.startPage(queryParam.getPageNum(),queryParam.getPageSize(),queryParam.getOrderBy());<br />
+            List<SceneAppointmentFull> records=appointmentService.getListFull(queryParam);<br />
+            PageInfo<SceneAppointmentFull> pageInfo = new PageInfo<>(records);<br />
+            return ResultDataMap.resultData(records,pageInfo.getTotal());<br />
+        }catch(Exception e){<br />
+            return ResultDataMap.error(e.getMessage());<br />
+        }<br />
+    }</p>
+
+<h2>传递数组参数</h2>
+
+<p>请求的时候，经常有批量的操作，如传递多个id的数组：</p>
+
+<p>    @ApiOperation(value = "添加多个场景预约详情",notes = "添加多个场景预约详情")<br />
+    @RequestMapping(value = "/addAppointments",method = RequestMethod.POST)<br />
+    public ResultData<String> saveAppointments(@RequestBody SceneAppointment record, @RequestParam(value = "dates[]") List<String> dates) {<br />
+        try{<br />
+            Map paramWithDates = new HashMap(2);<br />
+            paramWithDates.put("record",record);<br />
+            paramWithDates.put("dates",dates);<br />
+            appointmentService.insertList(paramWithDates);<br />
+            return ResultDataMap.ok();<br />
+        }catch(Exception e){<br />
+            return ResultDataMap.error(e.getMessage());<br />
+        }<br />
+    }</p>
+
+<h2>参数是否必填</h2>
+
+<pre>
+@ApiOperation("预估脚本的执行时间")
+@PostMapping("/getTimeAssessment")
+public ResultData getTimeAssessment(
+@RequestParam @ApiParam(value = "NA客户名称",<strong> required = true</strong>) String cusName,
+@RequestParam @ApiParam(value = "例如负载场景、故障场景", <strong><s>required = false</s></strong>) String[] sceneType,
+@RequestParam @ApiParam(value = "场景名称", required = true) String scenseName,
+@RequestParam(required = false) @ApiParam(value = "取值有AR、CE、LSW、WLAN、FW、ALL或者空（取默认值）") String pdu,
+@RequestParam(required = false) @ApiParam(value = "设备型号,ALL或者空（取默认值）") String product,
+@RequestParam(required = false) @ApiParam(value = "板卡型号,预留字段") String board,
+<strong>@RequestParam(required = false)</strong> @ApiParam(value = "产品版本") String version,
+<s><strong>@RequestParam(required = true)</strong></s> @ApiParam(value = "产品补丁版本") String patch) {
+String responseStr = idataClient.getNaCustomerSceneData(cusName, sceneType, scenseName, pdu, product, board, version, patch);
+ObjectMapper mapper = new ObjectMapper();
+Map responseInfos = new HashMap();
+try {
+responseInfos = mapper.readValue(responseStr,new TypeReference<Map>(){});
+List<Map> execStrategy = (List<Map>) responseInfos.get("data");
+int time = 20 + sceneType.length * 5 + getTimeFromExecStrategy(execStrategy);
+return ResultDataMap.ok(time);
+} catch (IOException e) {
+e.printStackTrace();
+return ResultDataMap.error(e.getMessage());
+}
+}</pre>

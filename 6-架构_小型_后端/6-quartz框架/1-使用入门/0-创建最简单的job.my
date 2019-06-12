@@ -1,110 +1,80 @@
 <h1>用Quartz处理定时执行的任务</h1>
-
 <p>这次做的项目中，有一部分功能需要实现定时执行。呃，这样说可能有点笼统，打个比方吧。例如用户在登录的时候，连续输错3次密码后，系统会将该用户冻结，不再允许该用户登录系统，等到了晚上零晨时分，再为所有被冻结的用户解冻，这样，用户在第二天又可以正常登录系统了。这样做是为了用户帐号安全，可有效防止暴力破解密码。。。呃，好像跑题了，咱还是回到正题来。在这里我们只关心怎么能实现每天晚上零晨准时执行为用户解冻的程序。</p>
-
 <p>　　第一时间，我想到了JDK自带的Timer和TimerTask类，可经过测试，要想做到精准的定时，还是比较困难的。于是另寻其它解决方案，就找到了Quartz，至于Quartz是什么，我想百度会告诉大家的。二话不说，下载了Quartz包，下载的是官方最新版2.1.7。然后兴致勃勃的百度起来，关于Quartz的用法，文章还是挺多的，但是，Copy进来后，总是报错。无奈，最新版的用法，网上又很难找到。怎么办呢？自己E文又不好！哎，E文是我永远的痛啊，谁叫俺爱国呢。翻了一下下载的Quartz包，发现里面有好多例子，然后挨个挨个跑例子。哈，功夫不负有心人啊，第三个例子刚好能解决我现在的问题，再仔细推敲一下，发现Quartz原来如此好用。为了方便日后重复利用，也为了其他没用过Quartz而且E文也不怎么好的朋友不再受折磨，就决定把这次的使用心德记录下来。</p>
-
 <h2>第一步：引包</h2>
-
 <p>　　要使用Quartz，必须要引入以下这几个包：</p>
-
 <p>　　1、log4j-1.2.16</p>
-
 <p>　　2、quartz-2.1.7</p>
-
 <p>　　3、slf4j-api-1.6.1.jar</p>
-
 <p>　　4、slf4j-log4j12-1.6.1.jar</p>
-
 <p>　　这些包都在下载的Quartz包里面包含着，因此没有必要为寻找这几个包而头疼。</p>
-
 <h2>第二步：创建要被定执行的任务类</h2>
-
 <p>　　这一步也很简单，只需要创建一个实现了org.quartz.Job接口的类，并实现这个接口的唯一一个方法execute(JobExecutionContext arg0) throws JobExecutionException即可。如：</p>
-
 <pre>
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import org.quartz.Job;
 import org.quartz.JobExecutionContext;
 import org.quartz.JobExecutionException;
-
 public class myJob implements Job {
-
-	@Override
-	public void execute(JobExecutionContext arg0) throws JobExecutionException {
-		SimpleDateFormat sdf = new SimpleDateFormat(&quot;yyyy-MM-dd HH:mm:ss SSS&quot;);
-		System.out.println(sdf.format(new Date()));
-	}
-
+@Override
+public void execute(JobExecutionContext arg0) throws JobExecutionException {
+SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss SSS");
+System.out.println(sdf.format(new Date()));
+}
 }</pre>
-
 <p>　　这个例子很简单，就不用解说了。</p>
-
 <h2>第三步：创建任务调度，并执行</h2>
-
 <p>　　这一步应该算是最难的一步的，但其实是非常简单的，直接上代码</p>
-
 <pre>
 import static org.quartz.CronScheduleBuilder.cronSchedule;
 import static org.quartz.JobBuilder.newJob;
 import static org.quartz.TriggerBuilder.newTrigger;
-
 import java.text.SimpleDateFormat;
 import java.util.Date;
-
 import org.quartz.CronTrigger;
 import org.quartz.JobDetail;
 import org.quartz.Scheduler;
 import org.quartz.SchedulerFactory;
 import org.quartz.impl.StdSchedulerFactory;
-
 public class Test {
-    public void go() throws Exception {
-        // 首先，必需要取得一个Scheduler的引用
-        SchedulerFactory sf = new StdSchedulerFactory();
-        Scheduler sched = sf.getScheduler();
-        //jobs可以在scheduled的sched.start()方法前被调用
-        
-        //job 1将每隔20秒执行一次
-        JobDetail job = newJob(myJob.class).withIdentity(&quot;job1&quot;, &quot;group1&quot;).build();
-        CronTrigger trigger = newTrigger().withIdentity(&quot;trigger1&quot;, &quot;group1&quot;).withSchedule(cronSchedule(&quot;0/20 * * * * ?&quot;)).build();
-        Date ft = sched.scheduleJob(job, trigger);
-        SimpleDateFormat sdf = new SimpleDateFormat(&quot;yyyy-MM-dd HH:mm:ss SSS&quot;);
-        System.out.println(job.getKey() + &quot; 已被安排执行于: &quot; + sdf.format(ft) + &quot;，并且以如下重复规则重复执行: &quot; + trigger.getCronExpression());
+public void go() throws Exception {
+// 首先，必需要取得一个Scheduler的引用
+SchedulerFactory sf = new StdSchedulerFactory();
+Scheduler sched = sf.getScheduler();
+//jobs可以在scheduled的sched.start()方法前被调用
 
-        // job 2将每2分钟执行一次（在该分钟的第15秒)
-        job = newJob(myJob.class).withIdentity(&quot;job2&quot;, &quot;group1&quot;).build();
-        trigger = newTrigger().withIdentity(&quot;trigger2&quot;, &quot;group1&quot;).withSchedule(cronSchedule(&quot;15 0/2 * * * ?&quot;)).build();
-        ft = sched.scheduleJob(job, trigger);
-       System.out.println(job.getKey() + &quot; 已被安排执行于: &quot; + sdf.format(ft) + &quot;，并且以如下重复规则重复执行: &quot;+ trigger.getCronExpression());
-       
-        // 开始执行，start()方法被调用后，计时器就开始工作，计时调度中允许放入N个Job
-      sched.start();
-        try {
-            //主线程等待一分钟
-            Thread.sleep(60L * 1000L);
-        } catch (Exception e) {}	
-       //关闭定时调度，定时器不再工作
-       sched.shutdown(true);
+//job 1将每隔20秒执行一次
+JobDetail job = newJob(myJob.class).withIdentity("job1", "group1").build();
+CronTrigger trigger = newTrigger().withIdentity("trigger1", "group1").withSchedule(cronSchedule("0/20 * * * * ?")).build();
+Date ft = sched.scheduleJob(job, trigger);
+SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss SSS");
+System.out.println(job.getKey() + " 已被安排执行于: " + sdf.format(ft) + "，并且以如下重复规则重复执行: " + trigger.getCronExpression());
+// job 2将每2分钟执行一次（在该分钟的第15秒)
+job = newJob(myJob.class).withIdentity("job2", "group1").build();
+trigger = newTrigger().withIdentity("trigger2", "group1").withSchedule(cronSchedule("15 0/2 * * * ?")).build();
+ft = sched.scheduleJob(job, trigger);
+System.out.println(job.getKey() + " 已被安排执行于: " + sdf.format(ft) + "，并且以如下重复规则重复执行: "+ trigger.getCronExpression());
+
+// 开始执行，start()方法被调用后，计时器就开始工作，计时调度中允许放入N个Job
+sched.start();
+try {
+//主线程等待一分钟
+Thread.sleep(60L * 1000L);
+} catch (Exception e) {}	
+//关闭定时调度，定时器不再工作
+sched.shutdown(true);
 }
-
-    public static void main(String[] args) throws Exception {
-
-        Test test = new Test();
-        test.go();
-    }
+public static void main(String[] args) throws Exception {
+Test test = new Test();
+test.go();
+}
 }</pre>
-
 <p>　　OK了，Job1和Job2就会被安排为定时执行了。此时程序是可以执行的了，但是可能会输出WARN级别日志，这是因为没有加log4j的配置文件，加上配置文件，就OK了。这里需要说明的地方只有一个，其它的可以直接Copy到您的项目里面。看代码：</p>
-
 <ol>
-	<li>CronTrigger trigger = newTrigger().withIdentity(&quot;trigger1&quot;,&nbsp;&quot;group1&quot;).withSchedule(cronSchedule(&quot;0/20 * * * * ?&quot;)).build();&nbsp;</li>
+<li>CronTrigger trigger = newTrigger().withIdentity("trigger1", "group1").withSchedule(cronSchedule("0/20 * * * * ?")).build(); </li>
 </ol>
-
 <pre>
-CronTrigger trigger = newTrigger().withIdentity(&quot;trigger1&quot;, &quot;group1&quot;).withSchedule(cronSchedule(&quot;0/20 * * * * ?&quot;)).build();</pre>
-
-<p>　　&quot;0/20 * * * * ?&quot;代表什么？这是关键，搞明白这个，Quartz就能帮助你解决大部分的定时执行任务的功能。详细解释请看下面转载见容</p>
-
-<p>&nbsp;</p>
+CronTrigger trigger = newTrigger().withIdentity("trigger1", "group1").withSchedule(cronSchedule("0/20 * * * * ?")).build();</pre>
+<p>　　"0/20 * * * * ?"代表什么？这是关键，搞明白这个，Quartz就能帮助你解决大部分的定时执行任务的功能。详细解释请看下面转载见容</p>
+<p> </p>

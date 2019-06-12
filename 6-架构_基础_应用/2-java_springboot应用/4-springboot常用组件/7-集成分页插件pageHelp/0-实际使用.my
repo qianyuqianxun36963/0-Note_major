@@ -1,0 +1,96 @@
+<h1>springboot实际使用pagehelper</h1>
+
+<h2>pom文件中添加pagehelper依赖</h2>
+
+<pre>
+<!-- 分页插件 -->
+<dependency>
+<groupId>com.github.pagehelper</groupId>
+<artifactId>pagehelper-spring-boot-starter</artifactId>
+<version>1.2.3</version>
+</dependency>
+</pre>
+
+<h2>application.yml里面添加配置</h2>
+
+<pre>
+pagehelper:
+helperDialect: mysql
+reasonable: true
+supportMethodsArguments: true
+params: count=countSql</pre>
+
+<h2>在controller层添加调用</h2>
+
+<pre>
+超级方便，在正常逻辑的上下方添加代码即可，通过pageInfo可以获取总数。
+@ApiOperation(value = "获取所有场景",notes = "获取所有场景")
+@RequestMapping(value = "/getBaseinfos",method = RequestMethod.POST)
+public ResultData<List<SceneBaseinfo>> getBaseinfos(@RequestBody QueryParam queryParam) {
+try{
+<strong>PageHelper.startPage(queryParam.getPageNum(),queryParam.getPageSize(),queryParam.getOrderBy());</strong>
+List<SceneBaseinfo> baseinfos=baseinfoService.getList(queryParam);
+<strong>PageInfo<SceneBaseinfo> pageInfo = new PageInfo<>(baseinfos);</strong>
+return ResultDataMap.resultData(baseinfos,pageInfo.getTotal());
+}catch(Exception e){
+return ResultDataMap.error(e.getMessage());
+}
+}</pre>
+
+<h2>在service层添加调用（错了，后改为在controller层加）</h2>
+
+<pre>
+@Transactional
+@Override
+public List<FabricTestbed> getList(QueryParam queryParam) {
+try{
+PageHelper.startPage(queryParam.getPageNum(),queryParam.getPageSize(),queryParam.getOrderBy());
+List<FabricTestbed> testbeds=testbedMapper.getList(queryParam.getParam());
+return testbeds;
+}catch(Exception e){
+throw e;
+}
+}</pre>
+
+<h2>其中，请求参数可以统一格式</h2>
+
+<pre>
+public class QueryParam {
+private int pageNum;
+private int pageSize;
+private String orderBy;
+Map param;
+
+public int getPageNum() {
+return pageNum;
+}
+
+public void setPageNum(int pageNum) {
+this.pageNum = pageNum;
+}
+
+public int getPageSize() {
+return pageSize;
+}
+
+public void setPageSize(int pageSize) {
+this.pageSize = pageSize;
+}
+
+public String getOrderBy() {
+return orderBy;
+}
+
+public void setOrderBy(String orderBy) {
+this.orderBy = orderBy;
+}
+
+public Map getParam() {
+return param;
+}
+
+public void setParam(Map param) {
+this.param = param;
+}
+}
+</pre>

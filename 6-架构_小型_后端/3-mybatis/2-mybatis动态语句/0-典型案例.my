@@ -1,29 +1,53 @@
 <h1>典型案例</h1>
-
-<p>&nbsp;</p>
-
 <h2>foreach用法</h2>
-
-<p>&nbsp; &nbsp; &lt;!-- 新增发票与缴费记录关联信息--&gt;<br />
-&nbsp; &nbsp; &lt;insert id=&quot;addOrder2Invoice&quot; parameterType=&quot;java.util.Map&quot;&gt;<br />
-&nbsp; &nbsp; &nbsp; &nbsp; INSERT finance_invoice_order (<br />
-&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; id,<br />
-&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; invoice_id,<br />
-&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; order_id &nbsp;&lt;!-- 最后一个属性不要有逗号 --&gt;<br />
-&nbsp; &nbsp; &nbsp; &nbsp; ) VALUES<br />
-&nbsp; &nbsp; &nbsp; &nbsp; &lt;foreach collection=&quot;orderIds&quot; index=&quot;index&quot; item=&quot;orderId&quot; separator=&quot;,&quot;&gt;<br />
-&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; (replace(uuid(), &#39;-&#39;, &#39;&#39;),#{invoiceId},#{orderId})<br />
-&nbsp; &nbsp; &nbsp; &nbsp; &lt;/foreach&gt;<br />
-&nbsp; &nbsp; &lt;/insert&gt;</p>
-
-<p>&nbsp;</p>
-
-<p>&nbsp; &nbsp; &lt;!-- 修改缴费记录的发票导出状态信息 --&gt;<br />
-&nbsp; &nbsp; &lt;update id=&quot;updateOrderstatus&quot; parameterType=&quot;java.util.Map&quot;&gt;<br />
-&nbsp; &nbsp; &nbsp; &nbsp; UPDATE finance_order<br />
-&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; SET has_genInvoice = 1<br />
-&nbsp; &nbsp; &nbsp; &nbsp; WHERE id in<br />
-&nbsp; &nbsp; &nbsp; &lt;foreach collection=&quot;orderIds&quot; item=&quot;id&quot; open=&quot;(&quot; &nbsp;separator=&quot;,&quot; close=&quot;)&quot; &gt;<br />
-&nbsp; &nbsp; &nbsp; &nbsp; &nbsp;#{id}<br />
-&nbsp; &nbsp; &nbsp; &lt;/foreach&gt;<br />
-&nbsp; &nbsp; &lt;/update&gt;</p>
+<p>    <!-- 新增发票与缴费记录关联信息--><br />
+    <insert id="addOrder2Invoice" parameterType="java.util.Map"><br />
+        INSERT finance_invoice_order (<br />
+            id,<br />
+            invoice_id,<br />
+            order_id  <!-- 最后一个属性不要有逗号 --><br />
+        ) VALUES<br />
+        <foreach collection="orderIds" index="index" item="orderId" separator=","><br />
+            (replace(uuid(), '-', ''),#{invoiceId},#{orderId})<br />
+        </foreach><br />
+    </insert></p>
+<p>    <!-- 修改缴费记录的发票导出状态信息 --><br />
+    <update id="updateOrderstatus" parameterType="java.util.Map"><br />
+        UPDATE finance_order<br />
+            SET has_genInvoice = 1<br />
+        WHERE id in<br />
+      <foreach collection="orderIds" item="id" open="("  separator="," close=")" ><br />
+         #{id}<br />
+      </foreach><br />
+    </update></p>
+<h2>where用法</h2>
+<p>定义</p>
+<p>这里写的不知道正不正规，但是这样写就解决了，在where后面追加查询条件的需求。ps 尝试了定义两个where条件，然后拼一起，结果最终sql里面出现了两个where句子。</p>
+<pre>
+<sql id="Base_Where_Condition">
+<where>
+<strong> <if test="id != null and id != ''">
+id = #{id}
+</if>
+<if test="id == null or id == ''">
+1 = 1
+</if></strong>
+<if test="sceneId != null and sceneId != ''">
+AND scene_id = #{sceneId}
+</if>
+<if test="sceneUser != null and sceneUser != ''">
+AND scene_user LIKE CONCAT(CONCAT('%',#{sceneUser}),'%')
+</if>
+</where>
+</sql></pre>
+<p>引用</p>
+<pre>
+<select id="getList" resultMap="ResultMapWithBLOBs">
+select
+<include refid="Base_Column_List" />
+from scene_task
+<include refid="Base_Where_Condition" />
+<if test="createBy!= null and createBy!= ''">
+AND create_by LIKE CONCAT(CONCAT('%',#{createBy}),'%')
+</if>
+</select></pre>

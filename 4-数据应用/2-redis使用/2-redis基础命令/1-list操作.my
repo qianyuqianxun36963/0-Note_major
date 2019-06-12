@@ -1,0 +1,219 @@
+<h1>redis里的list操作</h1>
+
+<h2>Redis基本操作——List（原理篇）</h2>
+
+<p>　　学习过数据结构的同学，一定对链表（Linked List）十分的熟悉。相信我们自己也曾经使用过这种数据结构。</p>
+
+<p>　　链表分为很多种：单向链表，双向链表，循环链表，块状链表[<a href="https://zh.wikipedia.org/wiki/%E9%93%BE%E8%A1%A8" target="_blank">1</a>]等等。</p>
+
+<p>　　链表的作用也有很多。首先，链表可以存放数据。其次链表可以模拟队列、堆栈等其他的数据结构。</p>
+
+<p>　　链表的实现也有多种，以C语言为例，最常见的是构造节点node，node中又有指针，用于指向下一个node，这样就构成了单向链表，如果node中有两个指针，分别指向前一个和后一个node，则构造了双向链表，再如果链表是首尾相连的，那么就是循环链表。链表的具体算法，是数据结构里面的内容，我们这里就不专门介绍啦。</p>
+
+<p>　　那么，Redis内部的List是什么样子的链表呢？又是怎么来维护的呢？</p>
+
+<p>　　我们慢慢的剖析。</p>
+
+<pre>
+1 typedef struct listNode {
+2 
+3 // 前置节点
+4 struct listNode *prev;
+5 
+6 // 后置节点
+7 struct listNode *next;
+8 
+9 // 节点的值
+10 void *value;
+11 } listNode;
+</pre>
+
+<p> 　　上述就是Redis的节点的定义。</p>
+
+<p>　　可以看出，这是一个双向的链表。比较有意思的是，节点内存的值，是一个void *的指针，这就说明节点内部可以存放任何的内容。</p>
+
+<p>反派汪：我不能理解为什么value是void *的指针就能存任何内容？我甚至不知道为什么还有要void *这么奇怪的数据类型。</p>
+
+<p>喵太：其实很多人也有这个疑问。不过先问问你自己，指针到底是什么？int *，float *和char *的这几种指针有什么区别？</p>
+
+<p>反派汪：指针里面存的就是地址，通过地址就能访问到指定的内存。以int *指针为例，int *说明，指针指向的是一个由int型的数据组成的内存。通过指针运算符*，我们就能取到对应位置的内存中的值。通过对指针的+和-，我们就能移动到相邻的位置。</p>
+
+<p>喵太：嗯，说的不错，但是你只说对了一半。指针里面存放的是地址，无论任何类型的指针，里面存放的都只是一个32位的无符号整数。指针的类型，其实只是决定了对内存进行的操作。int *的指针，每次加1的时候，其实移动了4个字节，char *则移动1个。使用指针运算符*其实也是一样。int *会得到连续4个字节的内容，并且存进一个int变量里面，而char *则会得到一个字节的内容，并存进一个char里面。因此，任何类型的指针其实本质上是一样的。</p>
+
+<p>反派汪：那你的意思是，所有类型的指针都是一样的了。那么我还是不能理解void *的指针究竟能做什么。</p>
+
+<p>喵太：void *的指针是C语言中最简单的一种指针，它存放的是一个地址，并且没有给出任何操作上的提示。但是任何类型的指针都能赋给void *的指针。void *的指针也能强制转换成任何类型的指针。这里使用void *的指针，只是在说明，value对应的是一块内存。开发者，可以自行转换指针的类型，来做相应的操作。如果你熟悉C语言的话，malloc函数的返回值也是一个void *的指针，而我们通常会把它强制转换成我们需要的任何数据类型。</p>
+
+<p>反派汪：这样啊，那原则上这里的指针用什么类型的都是可以的了？反正就是一个地址而已。只是void *更纯粹一点，也最符合要求，毕竟它只是指向数据的地址，没有做任何的限制。</p>
+
+<p>喵太：孺狗可教也。</p>
+
+<p> 　　现在，我们有了listNode这个节点的数据结构，就可以构造我们的链表了。</p>
+
+<p> 图一 链表的结构</p>
+
+<p>　　依照上图的示意图，我们就可以使用listNode构造一个双向链表了。</p>
+
+<p>　　Redis中，为了更好地管理链表，定义了一个list的数据结构，作为链表的封装。</p>
+
+<pre>
+1 typedef struct list {
+2 
+3 // 头节点
+4 listNode *head;
+5 
+6 // 尾节点
+7 listNode *tail;
+8 
+9 // 链表中的节点数
+10 unsigned int len;
+11 
+12 // 节点值复制函数
+13 void *(*dup) (void *ptr);
+14 
+15 // 节点值释放函数
+16 void (*free) (void *ptr);
+17 
+18 // 节点值对比函数
+19 int (*match) (void *ptr, void *key);
+20 } list;
+</pre>
+
+<p>　　list结构记录了链表的头指针，尾指针，链表的节点数。dup，free和match三个成员则表示对节点的值进行复制，释放和比较的函数。由于这里的节点的value的内容是任意的，复制和释放并不一定能用类似于memcpy和free的函数来处理（不太理解的话，可以google一下浅拷贝和深拷贝）。</p>
+
+<p>　　因此，我们得到的最终的链表结构是这个样子的：</p>
+
+<p>Redis的链表的实现的主要特性如下：</p>
+
+<ol>
+<li>
+<p>双端：链表节点都有prev和next指针，这样获取一个节点的前置节点和后置节点的算法复杂度都为O(1)。</p>
+</li>
+<li>
+<p>无环：list的第一个节点（头节点）的prev和最后一个节点（尾节点）的next都指向NULL。</p>
+</li>
+<li>
+<p>带表头指针和表尾指针：通过list的head和tail两个指针，可以随意的从链表的头和尾进行操作。</p>
+</li>
+<li>
+<p>带链表长度计数器：可以通过len成员来获取链表的节点的个数，复杂度O(1)。</p>
+</li>
+<li>
+<p>多态：链表使用void *指针来保存value，并且可以通过dup，free，match来操控节点的value值，因此，该链表可以保存任意类型的值。</p>
+</li>
+</ol>
+
+<h2>一、PUSH操作</h2>
+
+<p><strong>1，RPUSH key value [value ...]</strong><br />
+从队列的右边入队一个元素或多个元素，复杂度O(1)。</p>
+
+<p>将所有指定的值插入存于key的列表的尾部（从右侧插入）。<strong>如果key不存在，那么PUSH之前，会先自动创建一个空的列表。</strong>如果key对应的值不是一个list的话，则会返回一个错误。如果同时push多个值的话，值会依次从左到右PUSH从尾部进入list。</p>
+
+<p><strong>lrange</strong>这个命令是获取指定范围的list中的数据，我们下面再具体介绍。</p>
+
+<p>这个例子中，我们依次将a、b、c、d、e、f、g从尾部(右侧)追加到queue中，最后通过lrange查看queue中的数据的顺序。</p>
+
+<p><strong>2，LPUSH key value [value ...]</strong><br />
+从队列的左边入队一个或多个元素，复杂度O(1)。</p>
+
+<p>这个指令和RPUSH几乎一样，只是插入节点的方向相反了，是从list的头部(左侧)进行插入的。</p>
+
+<p><strong>3，RPUSHX key value</strong><br />
+从队列的右边入队一个元素，仅队列存在时有效。当队列不存在时，不进行任何操作。</p>
+
+<p><strong>4，LPUSHX key value</strong><br />
+从队列的左边入队一个元素，仅队列存在时有效。当队列不存在时，不进行任何操作。</p>
+
+<h2>二、POP操作</h2>
+
+<p>PUSH操作，是从队列头部和尾部增加节点的操作。而POP是获取并删除头尾节点的操作。</p>
+
+<p><strong>1，LPOP key</strong><br />
+从队列的左边出队一个元素，复杂度O(1)。如果list为空，则返回nil。</p>
+
+<p><strong>2，RPOP key</strong><br />
+从队列的右边出队一个元素，复杂度O(1)。如果list为空，则返回nil。</p>
+
+<p><strong>3，BLPOP key [key ...] timeout</strong><br />
+删除，并获得该列表中的第一元素，或阻塞，直到有一个可用。</p>
+
+<p>这是LPOP的阻塞版本。在LPOP的时候，如果队列中没有值，则会返回一个nil。而BLPOP则会等待一段时间，如果list中有值（等待的时候，被添加的），则返回对应值；如果在给定时间内仍没有得到结果，则返回nil。</p>
+
+<p>timeout表示等待的时间，单位是秒。当设为0时，表示永远阻塞，非0时，表示等待的最长时间。</p>
+
+<p>要注意的是，LBPOP支持多个key，也就是说可以同时监听多个list，并按照key的顺序，依次检查list是否为空，如果不为空，则返回最优先的list中的值。如果都为空，则阻塞，直到有一个list不为空，那么返回这个list对应的值。这里进行试验不是特别的方便，更具体的介绍可以查看中文官网的文档：<a href="http://redis.cn/commands/blpop.html">http://redis.cn/commands/blpop.html</a>。</p>
+
+<p><strong>4，BRPOP key [key ...] timeout</strong><br />
+删除，并获得该列表中的最后一个元素，或阻塞，直到有一个可用。</p>
+
+<h2>三、POP and PUSH</h2>
+
+<p><strong>1，RPOP LPUSH source destination</strong><br />
+删除列表中的最后一个元素，将其追加到另一个列表。</p>
+
+<p>这个命令可以原子性地返回并删除source对应的列表的最后一个元素（尾部元素），并将钙元素放入destination对应的列表的第一个元素位置（列表头部）。</p>
+
+<p><strong>2，BRPOP LPUSH source destination timeout</strong><br />
+弹出一个列表的值，将它推到另一个列表，并返回它;或阻塞，直到有一个可用</p>
+
+<p>RPOPLPUSH的阻塞版本。timeout的单位是秒，当timeout为0的时候，表示无限期阻塞。</p>
+
+<p>具体使用参考RPOPLPUSH。</p>
+
+<h2>四、其他</h2>
+
+<p><strong>1，LLEN key</strong><br />
+获得队列(List)的长度</p>
+
+<p>和名字一样易懂，这里不再过多解释。</p>
+
+<p><strong>2，LRANGE key start stop</strong><br />
+从列表中获取指定返回的元素</p>
+
+<p>我们在前面用到了很多次。LRANGE可以获取list的指定范围的值。范围用start和stop表示。负数表示从右向左数。</p>
+
+<p>需要注意的是，超出范围的下标不会产生错误：如果start>end，会得到空列表，如果end超过队尾，则Redis会将其当做列表的最后一个元素。</p>
+
+<p><strong>3，LINDEX key index</strong><br />
+获取一个元素，通过其索引列表</p>
+
+<p>我们之前介绍的操作都是对list的两端进行的，所以算法复杂度都只有O(1)。而这个操作是指定位置来进行的，每次操作，list都得找到对应的位置，因此算法复杂度为O(N)。list的下表是从0开始的，index为负的时候是从右向左数。-1表示最后一个元素。当下标超出的时候，会返回nul。所以不用像操作数组一样担心范围越界的情况。</p>
+
+<p><strong>4，LSET key index value</strong></p>
+
+<p>设置队列里面一个元素的值</p>
+
+<p>这个操作和LINDEX类似，只不过LINDEX是读，而LSET是写。下标的用法和LINDX相同。不过当index越界的时候，这里会报异常。</p>
+
+<p><strong>5，LREM key count value</strong></p>
+
+<p>从列表中删除元素</p>
+
+<p>该命令用于从key对应的list中，移除前count次出现 的值为value的元素。count参数有三种情况：</p>
+
+<p>count > 0: 表示从头向尾（左到右）移除值为value的元素。</p>
+
+<p>count < 0: 表示从尾向头（右向左）移除值为value的元素。</p>
+
+<p>count = 0: 表示移除所有值为value的元素。</p>
+
+<p><strong>6，LTRIM key start stop</strong></p>
+
+<p>修剪到指定范围内的清单</p>
+
+<p>这个命令和LRANGE十分相似，LRANGE会将指定范围的元素返回给客户端，而LTRIM会对list进行修剪，使其只包含指定范围的元素。start和stop表示范围。</p>
+
+<p>超出范围的下标不会产生错误：如果start>end，会得到空列表，如果end超过队尾，则Redis会将其当做列表的最后一个元素。</p>
+
+<p><strong>7，LINSERT key BEFORE|AFTER pivot value</strong></p>
+
+<p>在列表中的另一个元素之前或之后插入一个元素</p>
+
+<p>该命令将value插入值key对应的列表的基准值pivot的前面或是后面。</p>
+
+<p>当key不存在时，这个list被视为空列表，任何操作都不会发生。</p>
+
+<p>当key存在，但保存的不是list，则会报error。</p>
+
+<p>该命令会返回修改之后的list的长度，如果找不到pivot，则会返回-1。</p>

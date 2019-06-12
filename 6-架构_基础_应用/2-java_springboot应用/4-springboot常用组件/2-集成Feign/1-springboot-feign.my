@@ -1,0 +1,99 @@
+<h1>Feign简介</h1>
+
+<p>Spring Cloud Feign是基于Netflix Feign实现，整合了Spring Cloud Riggon与Spring Cloud Hystrix，出了提供这两者的强大功能外，他还提供了一种声明式的Web服务客户端定义方式。</p>
+
+<p>在使用Spring Cloud Ribbon时，通常都会利用它对RestTemplate的请求拦截来实现对服务的调用，而RestTemplate已经实现了对HTTP请求的封装处理，形成了一套模板化的调用方法。</p>
+
+<h2>快速使用</h2>
+
+<p>添加对feign的依赖：</p>
+
+<p>        <dependency><br />
+    <groupId>org.springframework.cloud</groupId><br />
+    <artifactId>spring-cloud-starter-feign</artifactId><br />
+</dependency>   <br />
+在主类使用注解开启Feign的功能：</p>
+
+<p>@SpringBootApplication<br />
+@EnableDiscoveryClient<br />
+@EnableFeignClients<br />
+public class OwlBookstoreWebApiApplication {<br />
+ <br />
+    public static void main(String[] args) {<br />
+        SpringApplication.run(OwlBookstoreWebApiApplication.class, args);<br />
+    }<br />
+}<br />
+接着，创建调用接口，使用注解来消费服务：</p>
+
+<p>import org.springframework.cloud.netflix.feign.FeignClient;<br />
+import org.springframework.web.bind.annotation.PathVariable;<br />
+import org.springframework.web.bind.annotation.RequestMapping;<br />
+import org.springframework.web.bind.annotation.RequestMethod;<br />
+ <br />
+import cn.net.bysoft.owl.bookstore.facade.user.entity.User;<br />
+import cn.net.bysoft.owl.bookstore.web.api.fallback.UserServiceFallbackFactory;<br />
+ <br />
+@FeignClient(value = "https://my.oschina.net/u/2450666/blog/SERVICE-USER", fallbackFactory = UserServiceFallbackFactory.class)<br />
+public interface UserService {<br />
+ <br />
+    @RequestMapping(value = "https://my.oschina.net/users/{email}/", method = RequestMethod.GET)<br />
+    Boolean isExistsByEmail(@PathVariable("email") String email);<br />
+ <br />
+    @RequestMapping(value = "https://my.oschina.net/users/{id}", method = RequestMethod.GET)<br />
+    User findById(@PathVariable("id") Long id);<br />
+ <br />
+}<br />
+接口中声明的方法的参数与返回值，要与服务提供的方法一致。</p>
+
+<p>Feign自动开启了Ribbon中的负载均衡和hystrix断路器，要使用断路器先需要开启断路器：</p>
+
+<p>feign:<br />
+  hystrix:<br />
+    enabled: true<br />
+  compression:<br />
+    request:<br />
+      enabled: true<br />
+    response:<br />
+      enabled: true<br />
+我在Feign中使用的是fallbackFactory来降级服务，使用该方式可以同时处理服务抛出的异常，创建一个UserServiceFallbackFactory类：</p>
+
+<p>import org.springframework.stereotype.Component;<br />
+ <br />
+import cn.net.bysoft.owl.bookstore.facade.user.entity.User;<br />
+import cn.net.bysoft.owl.bookstore.web.api.service.UserService;<br />
+import feign.hystrix.FallbackFactory;<br />
+ <br />
+@Component<br />
+public class UserServiceFallbackFactory implements FallbackFactory<UserService> {<br />
+ <br />
+    @Override<br />
+    public UserService create(Throwable cause) {<br />
+        return new UserService() {<br />
+             <br />
+            @Override<br />
+            public Boolean isExistsByEmail(String email) {<br />
+                system.out.println(cause.getmessage());<br />
+                return false;<br />
+            }<br />
+             <br />
+            @Override<br />
+            public User findById(Long id) {<br />
+                cause.printStackTrace();<br />
+                System.out.println(cause.getMessage());<br />
+                return null;<br />
+            }<br />
+             <br />
+        };<br />
+    }<br />
+ <br />
+}</p>
+
+<h2>Feign配置</h2>
+
+<h3>Ribbon配置</h3>
+
+<p>全局配置的方法很简单：</p>
+
+<p>ribbon.ConnectTimeout=500<br />
+ribbon.ReadTimeout=5000<br />
+　　</p>

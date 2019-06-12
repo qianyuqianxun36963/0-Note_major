@@ -1,0 +1,281 @@
+<h1>C# List用法</h1>
+
+<h2># List泛型集合</h2>
+
+<p>　　集合是OOP中的一个重要概念，C#中对集合的全面支持更是该语言的精华之一。</p>
+
+<p>　　　　<strong>为什么要用泛型集合？</strong></p>
+
+<p>　　　　在C# 2.0之前，主要可以通过两种方式实现集合：</p>
+
+<p>　　　　a.使用ArrayList</p>
+
+<p>　　　　直接将对象放入ArrayList，操作直观，但由于集合中的项是Object类型，因此每次使用都必须进行繁琐的类型转换。</p>
+
+<p>　　　　b.使用自定义集合类</p>
+
+<p>　　　　比较常见的做法是从CollectionBase抽象类继承一个自定义类，通过对IList对象进行封装实现强类型集合。这种方式要求为每种集合类型写一个相应的自定义类，工作量较大。泛型集合的出现较好的解决了上述问题，只需一行代码便能创建指定类型的集合。</p>
+
+<p>　　　　<strong>什么是泛型？</strong></p>
+
+<p>　　　　泛型是C# 2.0中的新增元素(C++中称为模板)，主要用于解决一系列类似的问题。这种机制允许将类名作为参数传递给泛型类型，并生成相应的对象。将泛型(包括类、接口、方法、委托等)看作模板可能更好理解，模板中的变体部分将被作为参数传进来的类名称所代替，从而得到一个新的类型定义。泛型是一个比较大的话题，在此不作详细解析，有兴趣者可以查阅相关资料。</p>
+
+<p>　　　　<strong>怎样创建泛型集合？</strong></p>
+
+<p>　　　　主要利用System.Collections.Generic命名空间下面的List<T>泛型类创建集合，语法如下：</p>
+
+<p>　　　　定义Person类如下：</p>
+
+<p>　　　　可以看到，泛型集合大大简化了集合的实现代码，通过它，可以轻松创建指定类型的集合。非但如此，泛型集合还提供了更加强大的功能，下面看看其中的排序及搜索。</p>
+
+<pre>
+List<T> ListOfT = new List<T>();</pre>
+
+<p>其中的"T"就是所要使用的类型，既可以是简单类型，如string、int，也可以是用户自定义类型。下面看一个具体例子。</p>
+
+<pre>
+class Person
+{
+private string _name; //姓名
+private int _age; //年龄
+//创建Person对象
+public Person(string Name, int Age)
+{
+this._name= Name;
+this._age = Age;
+}
+//姓名
+public string Name
+{
+get { return _name; }
+}
+//年龄
+public int Age
+{
+get { return _age; }
+}
+}
+
+//创建Person对象
+Person p1 = new Person("张三", 30);
+Person p2 = new Person("李四", 20);
+Person p3 = new Person("王五", 50);
+//创建类型为Person的对象集合
+List<Person> persons = new List<Person>();
+//将Person对象放入集合
+persons.Add(p1);
+persons.Add(p2);
+persons.Add(p3);
+//输出第2个人的姓名
+Console.Write(persons[1].Name);
+</pre>
+
+<p>    泛型集合的排序</p>
+
+<p>    排序基于比较，要排序，首先要比较。比如有两个数1、2，要对他们排序，首先就要比较这两个数，根据比较结果来排序。如果要比较的是对象，情况就要复杂一点，比如对Person对象进行比较，则既可以按姓名进行比较，也可以按年龄进行比较，这就需要确定比较规则。一个对象可以有多个比较规则，但只能有一个默认规则，默认规则放在定义该对象的类中。默认比较规则在CompareTo方法中定义，该方法属于IComparable<T>泛型接口。请看下面的代码：</p>
+
+<pre>
+class Person ：IComparable<Person>
+{
+//按年龄比较
+public int CompareTo(Person p)
+{
+return this.Age - p.Age;
+}
+}
+</pre>
+
+<p>    CompareTo方法的参数为要与之进行比较的另一个同类型对象，返回值为int类型，如果返回值大于0，表示第一个对象大于第二个对象，如果返回值小于0,表示第一个对象小于第二个对象，如果返回0,则两个对象相等。</p>
+
+<p>定义好默认比较规则后，就可以通过不带参数的Sort方法对集合进行排序，如下所示:</p>
+
+<pre>
+//按照默认规则对集合进行排序
+persons.Sort();
+//输出所有人姓名
+
+foreach (Person p in persons)
+{
+Console.WriteLine(p.Name); //输出次序为"李四"、"张三"、"王五"
+}
+</pre>
+
+<p>    实际使用中，经常需要对集合按照多种不同规则进行排序，这就需要定义其他比较规则，可以在Compare方法中定义，该方法属于IComparer<T>泛型接口，请看下面的代码：</p>
+
+<pre>
+class NameComparer : IComparer<Person>
+{
+//存放排序器实例
+public static NameComparer Default = new NameComparer();
+//按姓名比较
+public int Compare(Person p1, Person p2)
+{
+return System.Collections.Comparer.Default.Compare(p1.Name, p2.Name);
+}
+}
+</pre>
+
+<p>    Compare方法的参数为要进行比较的两个同类型对象，返回值为int类型，返回值处理规则与CompareTo方法相同。其中的Comparer.Default返回一个内置的Comparer对象，用于比较两个同类型对象。</p>
+
+<p>    下面用新定义的这个比较器对集合进行排序：</p>
+
+<p>    还可以通过委托来进行集合排序，首先要定义一个供委托调用的方法，用于存放比较规则，可以用静态方法。请看下面的代码：然后通过内置的泛型委托System.Comparison<T>对集合进行排序：</p>
+
+<p>    可以看到，后两种方式都可以对集合按照指定规则进行排序，但笔者更偏向于使用委托方式，可以考虑把各种比较规则放在一个类中，然后进行灵活调用。</p>
+
+<pre>
+//按照姓名对集合进行排序
+persons.Sort(NameComparer.Default);
+//输出所有人姓名
+foreach (Person p in persons)
+{
+Console.WriteLine(p.Name); //输出次序为"李四"、"王五"、"张三"
+}
+
+class PersonComparison
+{
+//按姓名比较
+public static int Name(Person p1, Person p2)
+{
+return System.Collections.Comparer.Default.Compare(p1.Name, p2.Name);
+}
+}
+</pre>
+
+<p>    方法的参数为要进行比较的两个同类型对象，返回值为int类型，返回值处理规则与CompareTo方法相同。</p>
+
+<pre>
+System.Comparison<Person> NameComparison = new System.Comparison<Person>(PersonComparison.Name);
+persons.Sort(NameComparison);
+//输出所有人姓名
+foreach (Person p in persons)
+{
+Console.WriteLine(p.Name); //输出次序为"李四"、"王五"、"张三"
+
+}
+</pre>
+
+<p>可以看到，后两种方式都可以对集合按照指定规则进行排序，但笔者更偏向于使用委托方式，可以考虑把各种比较规则放在一个类中，然后进行灵活调用。</p>
+
+<p>    泛型集合的搜索</p>
+
+<p>    搜索就是从集合中找出满足特定条件的项，可以定义多个搜索条件，并根据需要进行调用。首先，定义搜索条件，如下所示：</p>
+
+<pre>
+class PersonPredicate
+{
+//找出中年人(40岁以上)
+public static bool MidAge(Person p)
+{
+
+if (p.Age >= 40)
+return true;
+else
+return false;
+}
+
+}
+</pre>
+
+<p>    上面的搜索条件放在一个静态方法中，方法的返回类型为布尔型，集合中满足特定条件的项返回true，否则返回false。</p>
+
+<pre>
+System.Predicate<Person> MidAgePredicate = new System.Predicate<Person>(PersonPredicate.MidAge);
+List<Person> MidAgePersons = persons.FindAll(MidAgePredicate);
+//输出所有的中年人姓名
+
+foreach (Person p in MidAgePersons)
+{
+Console.WriteLine(p.Name); //输出"王五"
+}
+</pre>
+
+<p>然后通过内置的泛型委托System.Predicate<T>对集合进行搜索：</p>
+
+<p>    泛型集合的扩展</p>
+
+<p>    如果要得到集合中所有人的姓名，中间以逗号隔开，那该怎么处理？</p>
+
+<p>    考虑到单个类可以提供的功能是有限的，很自然会想到对List<T>类进行扩展，泛型类也是类，因此可以通过继承来进行扩展。请看下面的代码：</p>
+
+<pre>
+//定义Persons集合类
+class Persons : List<Person>
+{
+//取得集合中所有人姓名
+public string GetAllNames()
+{
+if (this.Count == 0)
+return "";
+string val = "";
+foreach (Person p in this)
+{
+val += p.Name + ",";
+}
+return val.Substring(0, val.Length - 1);
+}
+}
+//创建并填充Persons集合
+Persons PersonCol = new Persons();
+PersonCol.Add(p1);
+PersonCol.Add(p2);
+PersonCol.Add(p3);
+//输出所有人姓名
+Console.Write(PersonCol.GetAllNames()); //输出“张三,李四,王五”
+</pre>
+
+<h2><strong>List的方法和属性 方法或属性 作用</strong></h2>
+
+<p>Capacity 用于获取或设置List可容纳元素的数量。当数量超过容量时，这个值会自动增长。您可以设置这个值以减少容量，也可以调用trin()方法来减少容量以适合实际的元素数目。</p>
+
+<p>Count 属性，用于获取数组中当前元素数量</p>
+
+<p>Item( ) 通过指定索引获取或设置元素。对于List类来说，它是一个索引器。</p>
+
+<p>Add( ) 在List中添加一个对象的公有方法</p>
+
+<p>AddRange( ) 公有方法，在List尾部添加实现了ICollection接口的多个元素</p>
+
+<p>BinarySearch( ) 重载的公有方法，用于在排序的List内使用二分查找来定位指定元素.</p>
+
+<p>Clear( ) 在List内移除所有元素</p>
+
+<p>Contains( ) 测试一个元素是否在List内</p>
+
+<p>CopyTo( ) 重载的公有方法，把一个List拷贝到一维数组内</p>
+
+<p>Exists( ) 测试一个元素是否在List内</p>
+
+<p>Find( ) 查找并返回List内的出现的第一个匹配元素</p>
+
+<p>FindAll( ) 查找并返回List内的所有匹配元素</p>
+
+<p>GetEnumerator( ) 重载的公有方法，返回一个用于迭代List的枚举器</p>
+
+<p>Getrange( ) 拷贝指定范围的元素到新的List内</p>
+
+<p>IndexOf( ) 重载的公有方法，查找并返回每一个匹配元素的索引</p>
+
+<p>Insert( ) 在List内插入一个元素</p>
+
+<p>InsertRange( ) 在List内插入一组元素</p>
+
+<p>LastIndexOf( ) 重载的公有方法，，查找并返回最后一个匹配元素的索引</p>
+
+<p>Remove( ) 移除与指定元素匹配的第一个元素</p>
+
+<p>RemoveAt( ) 移除指定索引的元素</p>
+
+<p>RemoveRange( ) 移除指定范围的元素</p>
+
+<p>Reverse( ) 反转List内元素的顺序</p>
+
+<p>Sort( ) 对List内的元素进行排序</p>
+
+<p>ToArray( ) 把List内的元素拷贝到一个新的数组内</p>
+
+<p>trimToSize( ) 将容量设置为List中元素的实际数目</p>
+
+<p>小结：</p>
+
+<p>    本文着重于介绍运用C# 2.0中的泛型来实现集合，以及对集合功能进行扩展，恰当的运用泛型集合，可以减少很多重复工作，极大的提高开发效率。实际上，集合只不过是泛型的一个典型应用，如果想了解更多关于泛型的知识，可以查阅其他相关资料。希望本文对你有用。</p>

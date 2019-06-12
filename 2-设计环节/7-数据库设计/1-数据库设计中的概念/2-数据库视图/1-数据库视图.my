@@ -1,0 +1,257 @@
+<h1>数据库视图详解</h1>
+
+<h2>- 定义：</h2>
+
+<pre>
+<code>视图（View）是从一个或多个表（或视图）导出的表。视图与表（有时为与视图区别，也称表为基本表——Base Table）不同，视图是一个虚表，即视图所对应的数据不进行实际存储，数据库中只存储视图的定义，在对视图的数据进行操作时，系统根据视图的定义去操作与视图相关联的基本表。
+</code></pre>
+
+<p><strong>视图就像一个窗口，透过它可以看到<a href="http://lib.csdn.net/base/mysql" target="_blank" title="MySQL知识库">数据库</a>中自己感兴趣的数据及其变化</strong></p>
+
+<blockquote>
+<h2>- 视图的创建</h2>
+</blockquote>
+
+<p>SQL Server创建视图的语法：</p>
+
+<pre>
+<code>
+CREATE VIEW 
+
+[ < database_name > .] [ < owner > .] 
+
+view_name [ （ column [ ,...n ] ） ] 
+
+[ WITH < view_attribute > [ ,...n ] ] 
+
+AS 
+
+select_statement 
+[ WITH CHECK OPTION ] 
+
+< view_attribute > ::= 
+
+　{ ENCRYPTION | SCHEMABINDING | 
+
+VIEW_METADATA } 
+</code></pre>
+
+<p> </p>
+
+<h3>WITH check OPTION 表示对视图进行UPDATE、INSERT、delete操作时要保证更新、删除、或插入的行满足视图定义中的谓词条件</h3>
+
+<p> </p>
+
+<ul>
+<li>例１：建立显示年龄大于20岁的学生学号、姓名、性别等信息的S_view1</li>
+</ul>
+
+<pre>
+<code>create view S_view1 
+as 
+select sno,sname,sex 
+from s 
+where age>20 ;
+</code></pre>
+
+<ul>
+<li>例２：创建v_score1，要求基本表来源：S,C,SC；选择的字段为：S表中的sno、sname；C表中的cname及SC表中score；要求查询的数据为学号为20030001的学生的考试成绩。</li>
+</ul>
+
+<pre>
+<code>
+create view v_score1 
+As 
+Select s.sno,s.sname,c.cname,sc.score 
+From s,c,sc 
+Where s.sno=sc.sno and c.cno=sc.cno and sno= “ 20030001” ;
+</code></pre>
+
+<ul>
+<li>例3：建立信息系学生的视图，并要求进行修改和插入操作时仍需保证该视图只有信息系的学生</li>
+</ul>
+
+<pre>
+<code>Create view IS_Student
+AS
+select Sno,Sname,Sage
+from Student
+where Sdept='IS'
+with check option;
+</code></pre>
+
+<pre>
+<code> 在上述视图上加了with check option子句，以后对该视图进行插入、修改和删除操作时，RDBMS都会自动加上Sdept='IS'
+
+行列子集视图： 如果一个视图只是从单个基本表导出的，并且只是去掉了某些行列，但保留了主键，称之为行列子集视图如上面例1和例3就是一个行列子集视图
+</code></pre>
+
+<h2>- 查询视图</h2>
+
+<h3> </h3>
+
+<blockquote> </blockquote>
+
+<p>视图定义好之后就可以像对基本表一样进行查询了</p>
+
+<ul>
+<li>例 4 在信息系学生中查找年龄小于20的</li>
+</ul>
+
+<pre>
+<code>select Sno,Sage
+from IS_Student
+where Sage<20;
+</code></pre>
+
+<p>对应的转换后的语句为</p>
+
+<pre>
+<code>select Sno,Sage
+from Student
+where Sdept='IS' and Sage<20;
+</code></pre>
+
+<p>有时候，单单一个视图并不能查询到需要的数据，如例5</p>
+
+<ul>
+<li>例5 查询选修了1号课程的信息系学生</li>
+</ul>
+
+<pre>
+<code>select IS_Student.Sno,Sname
+from IS_Student,SC
+where IS_Student.Sno=SC.Sno and SC.Cno='1';
+</code></pre>
+
+<p>上述查询涉及视图IS_Student和基本表SC共同查询得到结果</p>
+
+<h2>- 更新视图</h2>
+
+<h3> </h3>
+
+<blockquote> </blockquote>
+
+<p>更新视图是指通过视图来插入、删除和修改数据</p>
+
+<p>由于视图是不实际存储数据的虚表，因此对视图的更新最终要转换为对基本表的更新。所以为了防止用户对数据有意无意的操作，可在定义视图时加上 with check option 如例3</p>
+
+<ul>
+<li>例 6 将信息系学生视图IS_Student 好、中学号为200215122的学生姓名改为"张大屁"</li>
+</ul>
+
+<pre>
+<code>Update IS_Student
+set Sname='张大屁'
+where Sno='2000215122';
+</code></pre>
+
+<p>转换后对应的语句为</p>
+
+<pre>
+<code>Update Student
+set Sname='张大屁'
+where Sno='200215122' and Sdept='IS';
+</code></pre>
+
+<ul>
+<li>例7 向信息系学生视图中插入一个新的学生记录 学号为200215129 姓名为 ‘李红’ 年龄为21</li>
+</ul>
+
+<pre>
+<code>insert into
+IS_Student
+values('200215129','李红',21);
+</code></pre>
+
+<p>转换后的语句为</p>
+
+<pre>
+<code>insert into 
+Student(Sno.Sname,Sage,Sdept)
+values('200215129','李红',21,'IS');
+</code></pre>
+
+<ul>
+<li>例8 删除信息系学生学号为200215111的学生</li>
+</ul>
+
+<pre>
+<code>delete 
+from IS_Student
+where Sno='200215111';
+</code></pre>
+
+<p>转换后的语句为</p>
+
+<pre>
+<code>delete
+from Student
+where Sno='200215111' and Sdept='IS';
+</code></pre>
+
+<blockquote>
+<p>视图更新的限制</p>
+</blockquote>
+
+<p>如果视图定义中有如下子句则不能更新</p>
+
+<ul>
+<li>分组 使用group by 和 Having</li>
+<li>联结</li>
+<li>子查询</li>
+<li>并集</li>
+<li>聚集函数 MAX MIN COUNT AVG</li>
+<li>DISTINCT</li>
+<li>导出列</li>
+</ul>
+
+<h2>- 视图的删除</h2>
+
+<h3> </h3>
+
+<blockquote> </blockquote>
+
+<p>视图删除格式为</p>
+
+<pre>
+<code>DROP VIEW <视图名> [CASCADE] ;
+</code></pre>
+
+<p>视图删除后视图的定义将从数据字典中删除，使用CASCADE是级联删除，删除此视图上导出的视图</p>
+
+<ul>
+<li>例9 删除视图IS_Student</li>
+</ul>
+
+<pre>
+<code>Drop VIEW IS_Student;
+</code>
+</pre>
+
+<h2>视图的优点</h2>
+
+<h2>1简化用户操作</h2>
+
+<pre>
+<code>视图不仅可以简化用户对数据的理解，也可以简化他们的操作。那些被经常使用的查询可以被定义为视图，从而使用户不必为以后的操作每次都指定全部的条件。 
+</code></pre>
+
+<h2>2对重构数据库提供了一定程度上的逻辑独立性</h2>
+
+<pre>
+<code>视图可以使应用程序和数据库表在一定程度上独立。如果没有视图，应用一定是建立在表上的。有了视图之后，程序可以建立在视图之上，从而程序与数据库表被视图分割开来。 
+</code></pre>
+
+<h2>3安全性</h2>
+
+<pre>
+<code> 通过视图用户只能查询和修改他们所能见到的数据。数据库中的其他数据则既看不见也取不到。数据库授权命令可以使每个用户对数据库的检索限制到特定的数据库对象上，但不能授权到数据库特定行和特定的列上。通过视图，用户可以被限制在数据的不同子集上。 
+</code>
+</pre>
+
+<h2>视图的缺点</h2>
+
+<p> 性能：SQL Server必须把视图的查询转化成对基本表的查询，如果这个视图是由一个复杂的多表查询所定义，那么，即使是视图的一个简单查询，SQL Server也把它变成一个复杂的结合体，需要花费一定的时间。</p>
+
+<p>● 修改限制：当用户试图修改视图的某些行时，SQL Server必须把它转化为对基本表的某些行的修改。对于简单视图来说，这是很方便的，但是，<strong>对于比较复杂的视图，可能是不可修改的</strong>。</p>

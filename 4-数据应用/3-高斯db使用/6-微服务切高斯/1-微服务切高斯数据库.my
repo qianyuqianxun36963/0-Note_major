@@ -1,0 +1,167 @@
+<h1>微服务切换高斯数据库总结  </h1>
+
+<p>切换工程：   </p>
+
+<p>印度采集器服务 ProvisionService （C++），NCE-R18C10**分支</p>
+
+<p>采用方式：   </p>
+
+<p>标准切换（DBups框架）</p>
+
+<p>部署原理：   </p>
+
+<p>咨询了工程罗望，服务部署只负责表相关操作，数据库自动创建只能在安装服务包时，但是安装服务包比较费时，所以在部署服务时选择手动创建高斯库; 安装包中修改部署模板，自动安装数据库</p>
+
+<p>环境信息：   </p>
+
+<p>db01 100.100.63.89 <br />
+db02 100.100.62.163</p>
+
+<p>db01 为主库，db02为从库，插入时只需插入db01 </p>
+
+<p>需要将LEGACYCOLLECTORDB库 插入到analyzerdbsvr实例中</p>
+
+<p><img src="http://image.huawei.com/tiny-lts/v1/images/05c3b25de3ab8928415c_1787x95.png@900-0-90-f.png" /></p>
+
+<p> </p>
+
+<h3>切换方式</h3>
+
+<h4>1：标准切换 --- 使用平台提供的DBups框架</h4>
+
+<p>原理：依赖平台工具dbtool，配置标准化模板</p>
+
+<p><img src="http://image.huawei.com/tiny-lts/v1/images/2749e25de3a4bdbb38ca_667x236.png@900-0-90-f.png" /><br />
+<br />
+<br />
+模板source地址<br />
+http://rnd-isource.huawei.com/DatabaseMigration/Database/tree/master<br />
+<br />
+参考资料<br />
+http://3ms.huawei.com/km/blogs/details/5803201?moduleId= DBups框架使用说明书<br />
+http://3ms.huawei.com/km/blogs/details/5703955 DBups开发指南<br />
+http://3ms.huawei.com/km/blogs/details/5792761 数据库工程部署DBups框架设计说明书</p>
+
+<p><a href="http://3ms.huawei.com/km/groups/1008937/blogs/details/5748981" target="_blank">http://3ms.huawei.com/km/groups/1008937/blogs/details/5748981</a>      NCEV1R18C10版本mysql数据库切换后数据库类开发指南及注意事项</p>
+
+<p>主要完成表创建和静态数据导入的相关配置<br />
+ </p>
+
+<h4>2：特殊微服务切换 --- 脚本使用java包创建（InitTool）</h4>
+
+<p>像专线analyzerleasedlineservice 等微服务采用此种方式<br />
+原理：<br />
+1）app_define.json 中定义部署时脚本入口<br />
+"upgrade": {<br />
+"command": [<br />
+"${APP_ROOT}/upgrade/init.sh" //具体名称可以自行指定<br />
+],<br />
+"timeout": 7200<br />
+}<br />
+2）init.sh 中 配置执行java jar包相关参数，然后执行<br />
+<img src="http://image.huawei.com/tiny-lts/v1/images/9d70b25de26d8b2eea8c_1280x671.png@900-0-90-f.png" /><br />
+<br />
+好处：无需添加额外的数据库生成工具，配置高斯sql即可，而DBups框架切换的方式，需要将sql转换为xml配置<br />
+限制：需要重写com.huawei.bsp.biz.init.impl.DBInitializer 中的高斯逻辑，而且C++工程加入相关java的jar麻烦<br />
+ </p>
+
+<h3>手动创建高斯库</h3>
+
+<p>1：原生sql方式   严重不建议此种方式，这个原生sql无法和实例关联，页面上搜不到，部署微服务也找不到</p>
+
+<p>create user legacycollectordb identified by Changeme_123;    建库<br />
+grant ROLE_DBM_MYDB_RW to LEGACYCOLLECTORDB           增加权限<br />
+select * from ALL_USERS,SYS.ROLES$,SYS.USER_ROLES$ where ALL_USERS.USER_ID=SYS.USER_ROLES$.GRANTEE_ID and SYS.ROLES$.ID=SYS.USER_ROLES$.GRANTED_ROLE_ID ;<br />
+<br />
+./zsql LEGACYCOLLECTORDB/Changeme_123@127.0.0.1:32082     连接失败 需要增加白名单配置，即zhba.conf   增加相应的服务名<br />
+/opt/zenith/data/analyzerdbsvr-2-41/cfg/zhba.conf </p>
+
+<h4>2：脚本工具创建   推荐此种方式</h4>
+
+<p><a href="http://3ms.huawei.com/km/blogs/details/2165743" target="_blank">http://3ms.huawei.com/km/blogs/details/2165743</a>   dbsvc_adm基本用法和名词解释</p>
+
+<p>进入管理节点后台<br />
+su ossadm<br />
+cd /opt/oss/envs/DBAgent/service/bin<br />
+创建库<br />
+./dbsvc_adm -cmd add-database -instid analyzerdbsvr-2-41@3-41 -dbnames LEGACYCOLLECTORDB -appnames ProvisionService -datasizes 256<br />
+创建实例(同时也创建了库，zen.json中有库名配置)<br />
+./dbsvc_adm -cmd create-db-instance -type zenith -nodes 2 -tenant NCE -stage Product -file ./zen.json</p>
+
+<p> <img src="http://image.huawei.com/tiny-lts/v1/images/c477a25de2898dbce911_426x232.png@900-0-90-f.png" /><br />
+<br />
+删除库<br />
+./dbsvc_adm -cmd remove-database -instid analyzerdbsvr-2-41@3-41 -dbnames LEGACYCOLLECTORDB<br />
+ </p>
+
+<p>修改部署模板</p>
+
+<p><img src="http://image.huawei.com/tiny-lts/v1/images/8321d25df3ca6e4d600c_546x238.png@900-0-90-f.png" /><br />
+ </p>
+
+<p><img src="http://image.huawei.com/tiny-lts/v1/images/1c03a25df3cb9d0d128e_704x597.png@900-0-90-f.png" /><br />
+ </p>
+
+<p>tips</p>
+
+<p>1：别的微服务引用高斯库配置</p>
+
+<p>  正常一个微服务只能使用自己的数据库，别的服务不能连；如果SNMPService要使用 ProvisonService的db，可以修改app_define.json配置</p>
+
+<p><img src="http://image.huawei.com/tiny-lts/v1/images/c114d25df60d4aa6e31a_970x219.png@900-0-90-f.png" /><br />
+ </p>
+
+<h3>踩坑：</h3>
+
+<h4>1：一定不要用原生sql方式创建库</h4>
+
+<p>     错误方式：</p>
+
+<p>             cd /opt/zenith/app/bin<br />
+             ./zsql sys/Admin\@123@100.100.63.89:32082</p>
+
+<p>             create user legacycollectordb identified by Changeme_123;</p>
+
+<p>     正确方式：./dbsvc_adm -cmd add-database -instid analyzerdbsvr-2-41@3-41 -dbnames LEGACYCOLLECTORDB -appnames ProvisionService -datasizes 256</p>
+
+<p> </p>
+
+<p>此处踩坑时间非常长，采用原生sql方式，明明在实例中增加了库，也给了权限，客户端连接也ok，但是微服务死活说没有</p>
+
+<p><img src="http://image.huawei.com/tiny-lts/v1/images/6cffc25de28345889c38_1493x829.png@900-0-90-f.png" /></p>
+
+<p>原因：原生sql方式应该没有真正关联到微服务，虽然zhba.conf   增加相应的服务名</p>
+
+<h4>2：一定是创建库而不是创建实例，否则部署服务时依然提示找不到库</h4>
+
+<p>     错误方式：./dbsvc_adm -cmd create-db-instance -type zenith -nodes 2 -tenant NCE -stage Product -file ./zen.json</p>
+
+<p>     正确方式：./dbsvc_adm -cmd add-database -instid analyzerdbsvr-2-41@3-41 -dbnames LEGACYCOLLECTORDB -appnames ProvisionService -datasizes 256</p>
+
+<p><img src="http://image.huawei.com/tiny-lts/v1/images/0eaf325de280d5798f1a_1666x314.png@900-0-90-f.png" /><br />
+ </p>
+
+<p>原因：新创建数据库实例和数据库方式，虽然zen.json加了微服务名称，但是只是新增了几个实例，微服务中实例的数据库列表没有我们新加的</p>
+
+<p>另外，通过命令方式看可以直接修改管理节点下/opt/oss/manager/var/tenants/NCE/containerlist.json 中数据库配置</p>
+
+<h4>3：创建数据库脚本中的数据库名一定大写</h4>
+
+<p>     错误方式：./dbsvc_adm -cmd add-database -instid analyzerdbsvr-2-41@3-41 -dbnames legacycollectordb -appnames ProvisionService -datasizes 256</p>
+
+<p>     正确方式：./dbsvc_adm -cmd add-database -instid analyzerdbsvr-2-41@3-41 -dbnames LEGACYCOLLECTORDB -appnames ProvisionService -datasizes 256</p>
+
+<p>     如果脚本中的数据库名配置小写，app_define.json中 只能配置小写，但是 database包中LEGACYCOLLECTORDB.xml 配置又只能大写，运行service_init.sh 报错：</p>
+
+<p><img src="http://image.huawei.com/tiny-lts/v1/images/befb125de39de91ec9ab_707x257.png@900-0-90-f.png" /><br />
+ </p>
+
+<p><img src="http://image.huawei.com/tiny-lts/v1/images/77cfe25de292d3f2d970_1139x331.png@900-0-90-f.png" /></p>
+
+<h4>4：手动修改表中数据，从库不会同步</h4>
+
+<p>如在主库中执行  delete from TDT_INDI_EVENT_MAPPING where INDICATOR_ID=18868;</p>
+
+<p>在从库中依然能查到数据</p>
+
+<p>原因：主库要执行 commit;</p>

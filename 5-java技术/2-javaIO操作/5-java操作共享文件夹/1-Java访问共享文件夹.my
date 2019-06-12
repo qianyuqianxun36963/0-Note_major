@@ -1,0 +1,148 @@
+<h1>Java读写局域网共享文件夹，Java读写Windows共享文件夹，JCIFS</h1>
+<p>项目常常需要有访问共享文件夹的需求，例如共享文件夹存储照片、文件等。那么如何使用Java读写Windows共享文件夹呢？</p>
+<p>Java可以使用JCIFS框架对Windows共享文件夹进行读写，就这个框架可以让我们像访问本地文件夹一下访问远程文件夹。<br />
+JCIFS的网址： http://jcifs.samba.org/<br />
+JCIFS是使用纯Java开发的一个开源框架，通过smb协议访问远程文件夹。该框架同时支持Windows共享文件夹和Linux共享文件夹，不过，Linux共享文件夹需要安装Samba服务软件（官网：http://www.samba.org/）。<br />
+SMB（Server Messages Block，信息服务块）是一种在局域网上共享文件和打印机的一种通信协议，它为局域网内的不同计算机之间提供文件及打印机等资源的共享服务。SMB协议是客户机/服务器型协议，客户机通过该协议可以访问服务器上的共享文件系统、打印机及其他资源。通过设置“NetBIOS over TCP/IP”使得Samba不但能与局域网络主机分享资源，还能与全世界的电脑分享资源。</p>
+<h2>Java访问Windows共享文件夹的方法</h2>
+<p>首先找一台Windows机器，在任意位置创建文件夹：sharedFolder，并设置为共享，设置共享用户名：share，密码：admin。<br />
+不论是Windows还是Linux的共享文件夹，使用Java smb访问共享文件夹的代码都是一样的，只是Windows与Linux配置共享文件夹的方式不一样。</p>
+<h2>本地文件拷贝到共享目录</h2>
+<p>测试代码如下：</p>
+<p>package com.myb.file;<br />
+ <br />
+import java.io.BufferedInputStream;<br />
+import java.io.BufferedOutputStream;<br />
+import java.io.File;<br />
+import java.io.FileInputStream;<br />
+import java.io.InputStream;<br />
+import java.io.OutputStream;<br />
+ <br />
+import jcifs.smb.SmbFile;<br />
+import jcifs.smb.SmbFileOutputStream;<br />
+ <br />
+public class CopyFileToLan {<br />
+    <br />
+    public static void main(String[] args){<br />
+        <br />
+        InputStream in = null;<br />
+        OutputStream out = null;<br />
+        try {<br />
+            //测试文件<br />
+            File localFile = new File("d:/项目列表A.pdf");<br />
+            <br />
+            String host = "192.168.100.65";//远程服务器的地址<br />
+            String username = "administrator";//用户名<br />
+            String password = "xxxxxxxx";//密码<br />
+            String path = "/tempFolder/";//远程服务器共享文件夹名称<br />
+         <br />
+            String remoteUrl = "smb://" + username + ":" + password + "@" + host + path + (path.endsWith("/") ? "" : "/");<br />
+            SmbFile remoteFile = new SmbFile(remoteUrl + "/" + localFile.getName());<br />
+            <br />
+            remoteFile.connect(); <br />
+ <br />
+            in = new BufferedInputStream(new FileInputStream(localFile));<br />
+            out = new BufferedOutputStream(new SmbFileOutputStream(remoteFile));<br />
+ <br />
+            byte[] buffer = new byte[4096];<br />
+            int len = 0;<br />
+            while ((len = in.read(buffer, 0, buffer.length)) != -1) {<br />
+                out.write(buffer, 0, len);<br />
+            }<br />
+            out.flush();<br />
+        }<br />
+        catch (Exception e) {<br />
+            String msg = "发生错误：" + e.getLocalizedMessage();<br />
+            System.out.println(msg);<br />
+        }<br />
+        finally {<br />
+            try {<br />
+                if(out != null) {<br />
+                    out.close();<br />
+                }<br />
+                if(in != null) {<br />
+                    in.close();<br />
+                }<br />
+            }<br />
+            catch (Exception e) {}<br />
+        }<br />
+    }<br />
+}</p>
+<p>以上代码中，使用了JCIFS框架提供的SmbFile类，这个类和Java的File类比较相似，使用这个类的对象，可以处理远程文件的读写。使用File对象读取本地文件，然后使用SmbFile对象写入远程文件。SmbFile的connect()方法可以尝试连接远程文件夹，如果账号或密码错误，将抛出连接异常。</p>
+<h2>共享文件下载到本地</h2>
+<p>当下载远程文件时，使用SmbFile对象读取远程文件即可，代码如下：</p>
+<p>package com.myb.file;<br />
+ <br />
+import java.io.BufferedInputStream;<br />
+import java.io.BufferedOutputStream;<br />
+import java.io.File;<br />
+import java.io.FileOutputStream;<br />
+import java.io.InputStream;<br />
+import java.io.OutputStream;<br />
+ <br />
+import jcifs.smb.SmbFile;<br />
+import jcifs.smb.SmbFileInputStream;<br />
+ <br />
+/**<br />
+ * <br />
+ * <b>所属模块：</b>牧羊仒.测试<br/> <br />
+ * <b>类名称：</b>CopyLanFileToLocal<br/> <br />
+ * <b>类描述：</b> 读取局域网共享文件夹文件，到本地文件夹   <br/> <br />
+ * <b>版本：</b>V1.0<br/> <br />
+ * <b>创建人：</b><a href="mailto:han_huayi@163.com">牧羊仒</a><br/>  <br />
+ * <b>创建时间：</b>2016年6月8日 下午3:29:09<br/><br />
+ */<br />
+public class CopyLanFileToLocal {<br />
+ <br />
+    public static void main(String[] args) {<br />
+        InputStream in = null ;<br />
+//        ByteArrayOutputStream out = null ;<br />
+        OutputStream out = null;<br />
+        try {<br />
+            //目标文件名<br />
+            String fileName = "项目列表A.pdf";<br />
+            <br />
+            //本地文件<br />
+            String localPath = "d:/";<br />
+            <br />
+            String host = "192.168.100.65";//远程服务器的地址<br />
+            String username = "administrator";//用户名<br />
+            String password = "xxxxxx";//密码<br />
+            String path = "/tempFolder/";//远程服务器共享文件夹名称<br />
+            <br />
+            String remoteUrl = "smb://" + username + ":" + password + "@" + host + path + (path.endsWith("/") ? "" : "/");<br />
+            <br />
+            //创建远程文件对象<br />
+            SmbFile remoteFile = new SmbFile(remoteUrl + "/" + fileName);<br />
+            remoteFile.connect(); <br />
+            <br />
+            //创建文件流<br />
+            in = new BufferedInputStream(new SmbFileInputStream(remoteFile));<br />
+            out = new BufferedOutputStream(new FileOutputStream(new File(localPath+fileName)));<br />
+            <br />
+            //读取文件内容<br />
+            byte[] buffer = new byte[4096];<br />
+            int len = 0;<br />
+            while ((len = in.read(buffer, 0, buffer.length)) != - 1) {<br />
+                out.write(buffer, 0, len);<br />
+            }<br />
+            <br />
+            out.flush();<br />
+        }<br />
+        catch (Exception e) {<br />
+            String msg = "下载远程文件出错：" + e.getLocalizedMessage();<br />
+            System.out.println(msg);<br />
+        }<br />
+        finally {<br />
+            try {<br />
+                if(out != null) {<br />
+                    out.close();<br />
+                }<br />
+                if(in != null) {<br />
+                    in.close();<br />
+                }<br />
+            }<br />
+            catch (Exception e) {}<br />
+        }<br />
+    }<br />
+}</p>

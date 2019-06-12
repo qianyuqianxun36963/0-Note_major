@@ -1,0 +1,241 @@
+<h1>详解Linux中搭建一个ftp服务器</h1>
+
+<p>ftp工作是会启动两个通道：</p>
+
+<p>控制通道 ， 数据通道</p>
+
+<p>在ftp协议中，控制连接均是由客户端发起的，而数据连接有两种模式：port模式（主动模式）和pasv（被动模式）</p>
+
+<p>PORT模式：</p>
+
+<p>在客户端需要接收数据时，ftp_client(大于1024的随机端口)-PORT命令->ftp_server(21)  发送PORT命令，这个PORT命令包含了客户端是用什么端口来接收数据（大于1024的随机端口），在传送数据时，ftp_server将通过自己的TCP 20 端口和PORT中包含的端口建立新的连接来传送数据。</p>
+
+<p>PASV模式：</p>
+
+<p>传送数据时，ftp_client--PASV命令-->ftp_server(21) 发送PASV命令时，ftp_server自动打开一个1024--5000之间的随机端口并且通知ftp_client在这个端口上传送数据，然后客户端向指定的端口发出请求连接，建立一条数据链路进行数据传输。</p>
+
+<p>安装ftp</p>
+
+<p>#rpm -qa vsftpd 查看是否已经安装</p>
+
+<p>#yum install -y vsftpd</p>
+
+<p>#rpm -ql vsftpd  </p>
+
+<p>/etc/logrotate.d/vsftpd.            vsftpd的日志文件 </p>
+
+<p>/etc/pam.d/vsftpd                    PAM认证文件 </p>
+
+<p>/etc/rc.d/init.d/vsftpd              启动脚本 </p>
+
+<p>/etc/vsftpd                          vsftpd的配置文件存放的目录 </p>
+
+<p>/etc/vsftpd/ftpusers                禁止使用vsftpd的用户列表文件 </p>
+
+<p>/etc/vsftpd/user_list                禁止或允许使用vsftpd的用户列表文件 </p>
+
+<p>/etc/vsftpd/vsftpd.conf              主配置文件 </p>
+
+<p>/etc/vsftpd/vsftpd_conf_migrate.sh  vsftpd操作的一些变量和设置 </p>
+
+<p>/usr/sbin/vsftpd                    vsftpd的主程序 </p>
+
+<p>其他一些说明文档和手册文件略！ </p>
+
+<p>/var/ftp                            匿名用户主目录 </p>
+
+<p>/var/ftp/pub                        匿名用户的下载目录</p>
+
+<p>#service vsftpd start </p>
+
+<p>#chkconfig --level vsftpd </p>
+
+<p>#chkconfig --level 2345 vsftpd on</p>
+
+<p>2 匿名用户的登录名：ftp（anonymous）  密码空 ，登录的目录为/var/ftp</p>
+
+<p> 用匿名用户登录的时候默认是只有下载的权限,没有上传,创建和删除的权限：</p>
+
+<p>#vim  /etc/vsftpd/vsftpd.conf  </p>
+
+<p>anon_upload_enable=YES      上传 </p>
+
+<p>anon_mkdir_write_enable=YES    创建 </p>
+
+<p>anon_other_write_enable=YES    删除 </p>
+
+<p>#service vsftpd restart</p>
+
+<p>为了安全应该禁止匿名用户的登录：</p>
+
+<p>123456 #vim  /etc/vsftpd/vsftpd.conf </p>
+
+<p>anonymous_enable=NO </p>
+
+<p>#anon_upload_enable=YES      上传 </p>
+
+<p>#anon_mkdir_write_enable=YES    创建 </p>
+
+<p>#anon_other_write_enable=YES    删除 </p>
+
+<p>#service vsftpd restart</p>
+
+<p>3 创建一个直接登录系统用户来登录ftp：</p>
+
+<p>#useradd -s /sbin/nologin viong </p>
+
+<p>#passwd viong</p>
+
+<p>用户具有 上传 创建 下载 切换目录</p>
+
+<p>------------------------------------------------------------------</p>
+
+<p>4 加强vsftp安全设置：</p>
+
+<p>限制系统用户锁定在家目录：</p>
+
+<p>#vim  /etc/vsftpd/vsftpd.conf </p>
+
+<p>chroot_list_enable=YES </p>
+
+<p>chroot_list_file=/etc/vsftpd/chroot_list  限制更多的系统用户，把需要限制的用户加入/etc/vsftpd/chroot_list中即可 </p>
+
+<p>#touch /etc/vsftpd/chroot_list </p>
+
+<p>#cut -d: -f 1 /etc/passwd >>/etc/vsftpd/chroot_list 将本地用户都加入到chroot_list</p>
+
+<p>限制重要系统用户不能登录ftp:</p>
+
+<p>#cat /etc/vsftpd/ftpusers  默认已经添加了系统中一些比较重要的用户 </p>
+
+<p>#echo "viong" >>/etc/vsftpd/ftpusers  此时viong不能登录ftp</p>
+
+<p>利用ftp用户策略允许登录ftp的系统用户：</p>
+
+<p>/etc/vsftpd/user_list 只有在这个文件中的用户才能登录系统： </p>
+
+<p>#vim /etc/vsftpd/vsftpd.conf </p>
+
+<p>#在userlist_enable=YES 的后面添加 </p>
+
+<p>userlist_deny=NO </p>
+
+<p>userlist_file=/etc/vsftpd/user_list</p>
+
+<p>设置登录ftp目标ip地址：用iptables设置</p>
+
+<p>---------------------------------------  </p>
+
+<p>搭建支持SSL加密传输的vsftpd:</p>
+
+<p>#openssl req -x509 -nodes -days 365 -newkey rsa:1024 -keyout /etc/vsftpd/vsftpd.pem -out /etc/vsftpd/vsftpd.pem    生成证书 </p>
+
+<p>#vim /etc/vsftpd/vsftpd.conf </p>
+
+<p>ssl_enable=YES </p>
+
+<p>allow_anon_ssl=NO </p>
+
+<p>force_local_data_ssl=YES </p>
+
+<p>force_local_logins_ssl=YES </p>
+
+<p>ssl_tlsv1=YES </p>
+
+<p>ssl_sslv2=YES </p>
+
+<p>ssl_sslv3=YES </p>
+
+<p>rsa_cert_file=/etc/vsftpd/vsftpd.pem</p>
+
+<p>下面是ssl参数一些定义，根据自己需求去修改：</p>
+
+<p>ssl_enable=yes/no            //是否启用 SSL,默认为no</p>
+
+<p>allow_anon_ssl=yes/no        //是否允许匿名用户使用SSL,默认为no</p>
+
+<p>rsa_cert_file=/path/to/file      //rsa证书的位置</p>
+
+<p>dsa_cert_file=/path/to/file      //dsa证书的位置</p>
+
+<p>force_local_logins_ssl=yes/no    //非匿名用户登陆时是否加密,默认为yes</p>
+
+<p>force_local_data_ssl=yes/no    //非匿名用户传输数据时是否加密,默认为yes</p>
+
+<p>force_anon_logins_ssl=yes/no    //匿名用户登录时是否加密,默认为no</p>
+
+<p>force_anon_data_ssl=yes/no    //匿名用户数据传输时是否加密,默认为no</p>
+
+<p>ssl_sslv2=yes/no              //是否激活sslv2加密,默认no</p>
+
+<p>ssl_sslv3=yes/no                //是否激活sslv3加密,默认no</p>
+
+<p>ssl_tlsv1=yes/no                //是否激活tls v1加密,默认yes</p>
+
+<p>ssl_ciphers=加密方法            //默认是DES-CBC3-SHA</p>
+
+<p>#service vsftpd restart</p>
+
+<p>用flashftp连接：</p>
+
+<p>连接类型为：FTP使用公开SSL（验证SSL）</p>
+
+<p>地址：192.168.137.130:21</p>
+
+<p>登录类型：普通</p>
+
+<p>用户：viong  </p>
+
+<p>密码：123</p>
+
+<p>Linux平台下快速搭建FTP服务器</p>
+
+<p> </p>
+
+<p>FTP 是File Transfer Protocol（文件传输协议）的英文简称，而中文简称为“文传协议”。用于Internet上的控制文件的双向传输。同时，它也是一个应用程序（Application）。基于不同的操作系统有不同的FTP应用程序，而所有这些应用程序都遵守同一种协议以传输文件。在FTP的使用当中，用户经常遇到两个概念："下载"（Download）和"上传"（Upload）。</p>
+
+<p>一般在各种linux的发行版中，默认带有的ftp软件是vsftp，从各个linux发行版对vsftp的认可可以看出，vsftp应该是一款不错的ftp软件。</p>
+
+<p>• 1、检查安装vsftpd软件</p>
+
+<p>使用如下命令#rpm -qa |grep vsftpd可以检测出是否安装了vsftpd软件，</p>
+
+<p>如果没有安装，使用YUM命令进行安装。</p>
+
+<p> 步骤阅读</p>
+
+<p>• 2、启动服务 </p>
+
+<p>使用vsftpd软件，主要包括如下几个命令：</p>
+
+<p>启动ftp命令#service vsftpd start</p>
+
+<p>停止ftp命令#service vsftpd stop</p>
+
+<p>重启ftp命令#service vsftpd restart</p>
+
+<p>• 3、vsftpd的配置</p>
+
+<p>ftp的配置文件主要有三个，位于/etc/vsftpd/目录下，分别是：</p>
+
+<p>ftpusers    该文件用来指定那些用户不能访问ftp服务器。</p>
+
+<p>user_list   该文件用来指示的默认账户在默认情况下也不能访问ftp</p>
+
+<p>vsftpd.conf   vsftpd的主配置文件</p>
+
+<p>• 4、以匿名用户为例，我们去掉配置文件vsftpd.conf 里面以下</p>
+
+<p>anon_upload_enable=YES</p>
+
+<p>anon_mkdir_write_enable=YES</p>
+
+<p>两项前面的#号，就可以完成匿名用户的配置，此时匿名用户既可以登录上传、下载文件。记得修改配置文件后需要重启服务。</p>
+
+<p>• 5、非匿名账户的创建与使用</p>
+
+<p>vsftpd服务与系统用户是相互关联的，例如我们创建一个名为test 的系统用户，那么此用户在默认配置的情况下就可以实现登录，如图</p>
+
+<p>• 登录后在页面创建名为“aa”的文件夹，同样我们在服务器test用户 的home目录里也可以看到相同的文件。</p>
+
+<p> </p>

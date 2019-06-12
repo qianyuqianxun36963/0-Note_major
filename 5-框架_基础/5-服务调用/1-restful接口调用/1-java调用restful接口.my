@@ -1,0 +1,301 @@
+<h1>基于发布的Restful服务，下面总结几种常用的调用方法。</h1>
+
+<h2>(1)Jersey API</h2>
+
+<p>package com.restful.client;<br />
+ <br />
+import com.fasterxml.jackson.core.JsonProcessingException;<br />
+import com.fasterxml.jackson.databind.ObjectMapper;<br />
+import com.restful.entity.PersonEntity;<br />
+import com.sun.jersey.api.client.Client;<br />
+import com.sun.jersey.api.client.ClientResponse;<br />
+import com.sun.jersey.api.client.WebResource;<br />
+ <br />
+import javax.ws.rs.core.MediaType;<br />
+ <br />
+/**<br />
+ * Created by XuHui on 2017/8/7.<br />
+ */<br />
+public class JerseyClient {<br />
+ private static String REST_API = "http://localhost:8080/jerseyDemo/rest/JerseyService";<br />
+ public static void main(String[] args) throws Exception {<br />
+  getRandomResource();<br />
+  addResource();<br />
+  getAllResource();<br />
+ }<br />
+ <br />
+ public static void getRandomResource() {<br />
+  Client client = Client.create();<br />
+  WebResource webResource = client.resource(REST_API + "/getRandomResource");<br />
+  ClientResponse response = webResource.type(MediaType.APPLICATION_JSON).accept("application/json").get(ClientResponse.class);<br />
+  String str = response.getEntity(String.class);<br />
+  System.out.print("getRandomResource result is : " + str + "\n");<br />
+ }<br />
+ <br />
+ public static void addResource() throws JsonProcessingException {<br />
+  Client client = Client.create();<br />
+  WebResource webResource = client.resource(REST_API + "/addResource/person");<br />
+  ObjectMapper mapper = new ObjectMapper();<br />
+  PersonEntity entity = new PersonEntity("NO2", "Joker", "http://");<br />
+  ClientResponse response = webResource.type(MediaType.APPLICATION_JSON).accept(MediaType.APPLICATION_JSON).post(ClientResponse.class, mapper.writeValueAsString(entity));<br />
+  System.out.print("addResource result is : " + response.getEntity(String.class) + "\n");<br />
+ }<br />
+ <br />
+ public static void getAllResource() {<br />
+  Client client = Client.create();<br />
+  WebResource webResource = client.resource(REST_API + "/getAllResource");<br />
+  ClientResponse response = webResource.type(MediaType.APPLICATION_JSON).accept("application/json").get(ClientResponse.class);<br />
+  String str = response.getEntity(String.class);<br />
+  System.out.print("getAllResource result is : " + str + "\n");<br />
+ }<br />
+}<br />
+结果：</p>
+
+<p>getRandomResource result is : {"id":"NO1","name":"Joker","addr":"http:///"}<br />
+addResource result is : {"id":"NO2","name":"Joker","addr":"http://"}<br />
+getAllResource result is : [{"id":"NO2","name":"Joker","addr":"http://"}]</p>
+
+<h2>(2)HttpURLConnection</h2>
+
+<p>package com.restful.client;<br />
+ <br />
+import com.fasterxml.jackson.databind.ObjectMapper;<br />
+import com.restful.entity.PersonEntity;<br />
+ <br />
+import java.io.BufferedReader;<br />
+import java.io.InputStreamReader;<br />
+import java.io.OutputStream;<br />
+import java.net.HttpURLConnection;<br />
+import java.net.URL;<br />
+ <br />
+/**<br />
+ * Created by XuHui on 2017/8/7.<br />
+ */<br />
+public class HttpURLClient {<br />
+ private static String REST_API = "http://localhost:8080/jerseyDemo/rest/JerseyService";<br />
+ <br />
+ public static void main(String[] args) throws Exception {<br />
+  addResource();<br />
+  getAllResource();<br />
+ }<br />
+ <br />
+ public static void addResource() throws Exception {<br />
+  ObjectMapper mapper = new ObjectMapper();<br />
+  URL url = new URL(REST_API + "/addResource/person");<br />
+  HttpURLConnection httpURLConnection = (HttpURLConnection) url.openConnection();<br />
+  httpURLConnection.setDoOutput(true);<br />
+  httpURLConnection.setRequestMethod("POST");<br />
+  httpURLConnection.setRequestProperty("Accept", "application/json");<br />
+  httpURLConnection.setRequestProperty("Content-Type", "application/json");<br />
+  PersonEntity entity = new PersonEntity("NO2", "Joker", "http://");<br />
+  OutputStream outputStream = httpURLConnection.getOutputStream();<br />
+  outputStream.write(mapper.writeValueAsBytes(entity));<br />
+  outputStream.flush();<br />
+ <br />
+  BufferedReader reader = new BufferedReader(new InputStreamReader(httpURLConnection.getInputStream()));<br />
+  String output;<br />
+  System.out.print("addResource result is : ");<br />
+  while ((output = reader.readLine()) != null) {<br />
+   System.out.print(output);<br />
+  }<br />
+  System.out.print("\n");<br />
+ }<br />
+ <br />
+ public static void getAllResource() throws Exception {<br />
+  URL url = new URL(REST_API + "/getAllResource");<br />
+  HttpURLConnection httpURLConnection = (HttpURLConnection) url.openConnection();<br />
+  httpURLConnection.setRequestMethod("GET");<br />
+  httpURLConnection.setRequestProperty("Accept", "application/json");<br />
+  BufferedReader reader = new BufferedReader(new InputStreamReader(httpURLConnection.getInputStream()));<br />
+  String output;<br />
+  System.out.print("getAllResource result is :");<br />
+  while ((output = reader.readLine()) != null) {<br />
+   System.out.print(output);<br />
+  }<br />
+  System.out.print("\n");<br />
+ }<br />
+ <br />
+}<br />
+结果：</p>
+
+<p>addResource result is : {"id":"NO2","name":"Joker","addr":"http://"}<br />
+getAllResource result is :[{"id":"NO2","name":"Joker","addr":"http://"}]</p>
+
+<h2>(3)HttpClient</h2>
+
+<p>package com.restful.client;<br />
+ <br />
+ <br />
+import com.fasterxml.jackson.databind.ObjectMapper;<br />
+import com.restful.entity.PersonEntity;<br />
+import org.apache.http.HttpResponse;<br />
+import org.apache.http.client.HttpClient;<br />
+import org.apache.http.client.methods.HttpGet;<br />
+import org.apache.http.client.methods.HttpPost;<br />
+import org.apache.http.entity.StringEntity;<br />
+import org.apache.http.impl.client.DefaultHttpClient;<br />
+import org.apache.http.util.EntityUtils;<br />
+ <br />
+/**<br />
+ * Created by XuHui on 2017/8/7.<br />
+ */<br />
+public class RestfulHttpClient {<br />
+ private static String REST_API = "http://localhost:8080/jerseyDemo/rest/JerseyService";<br />
+ <br />
+ public static void main(String[] args) throws Exception {<br />
+  addResource();<br />
+  getAllResource();<br />
+ }<br />
+ <br />
+ public static void addResource() throws Exception {<br />
+  HttpClient httpClient = new DefaultHttpClient();<br />
+  PersonEntity entity = new PersonEntity("NO2", "Joker", "http://");<br />
+  ObjectMapper mapper = new ObjectMapper();<br />
+ <br />
+  HttpPost request = new HttpPost(REST_API + "/addResource/person");<br />
+  request.setHeader("Content-Type", "application/json");<br />
+  request.setHeader("Accept", "application/json");<br />
+  StringEntity requestJson = new StringEntity(mapper.writeValueAsString(entity), "utf-8");<br />
+  requestJson.setContentType("application/json");<br />
+  request.setEntity(requestJson);<br />
+  HttpResponse response = httpClient.execute(request);<br />
+  String json = EntityUtils.toString(response.getEntity());<br />
+  System.out.print("addResource result is : " + json + "\n");<br />
+ }<br />
+ <br />
+ public static void getAllResource() throws Exception {<br />
+  HttpClient httpClient = new DefaultHttpClient();<br />
+  HttpGet request = new HttpGet(REST_API + "/getAllResource");<br />
+  request.setHeader("Content-Type", "application/json");<br />
+  request.setHeader("Accept", "application/json");<br />
+  HttpResponse response = httpClient.execute(request);<br />
+  String json = EntityUtils.toString(response.getEntity());<br />
+  System.out.print("getAllResource result is : " + json + "\n");<br />
+ }<br />
+}<br />
+结果：</p>
+
+<p>addResource result is : {"id":"NO2","name":"Joker","addr":"http://"}<br />
+getAllResource result is : [{"id":"NO2","name":"Joker","addr":"http://"}]<br />
+maven：</p>
+
+<p><dependency><br />
+  <groupId>org.apache.httpcomponents</groupId><br />
+  <artifactId>httpclient</artifactId><br />
+  <version>4.1.2</version><br />
+</dependency></p>
+
+<h2>(4)JAX-RS API</h2>
+
+<p>package com.restful.client;<br />
+ <br />
+import com.restful.entity.PersonEntity;<br />
+ <br />
+import javax.ws.rs.client.Client;<br />
+import javax.ws.rs.client.ClientBuilder;<br />
+import javax.ws.rs.client.Entity;<br />
+import javax.ws.rs.core.MediaType;<br />
+import javax.ws.rs.core.Response;<br />
+import java.io.IOException;<br />
+ <br />
+/**<br />
+ * Created by XuHui on 2017/7/27.<br />
+ */<br />
+public class RestfulClient {<br />
+ private static String REST_API = "http://localhost:8080/jerseyDemo/rest/JerseyService";<br />
+ public static void main(String[] args) throws Exception {<br />
+  getRandomResource();<br />
+  addResource();<br />
+  getAllResource();<br />
+ }<br />
+ <br />
+ public static void getRandomResource() throws IOException {<br />
+  Client client = ClientBuilder.newClient();<br />
+  client.property("Content-Type","xml");<br />
+  Response response = client.target(REST_API + "/getRandomResource").request().get();<br />
+  String str = response.readEntity(String.class);<br />
+  System.out.print("getRandomResource result is : " + str + "\n");<br />
+ }<br />
+ <br />
+ public static void addResource() {<br />
+  Client client = ClientBuilder.newClient();<br />
+  PersonEntity entity = new PersonEntity("NO2", "Joker", "http://");<br />
+  Response response = client.target(REST_API + "/addResource/person").request().buildPost(Entity.entity(entity, MediaType.APPLICATION_JSON)).invoke();<br />
+  String str = response.readEntity(String.class);<br />
+  System.out.print("addResource result is : " + str + "\n");<br />
+ }<br />
+ <br />
+ public static void getAllResource() throws IOException {<br />
+  Client client = ClientBuilder.newClient();<br />
+  client.property("Content-Type","xml");<br />
+  Response response = client.target(REST_API + "/getAllResource").request().get();<br />
+  String str = response.readEntity(String.class);<br />
+  System.out.print("getAllResource result is : " + str + "\n");<br />
+ <br />
+ }<br />
+}<br />
+结果：</p>
+
+<p>getRandomResource result is : {"id":"NO1","name":"Joker","addr":"http:///"}<br />
+addResource result is : {"id":"NO2","name":"Joker","addr":"http://"}<br />
+getAllResource result is : [{"id":"NO2","name":"Joker","addr":"http://"}]</p>
+
+<h2>(5)webClient</h2>
+
+<p>package com.restful.client;<br />
+ <br />
+import com.fasterxml.jackson.databind.ObjectMapper;<br />
+import com.restful.entity.PersonEntity;<br />
+import org.apache.cxf.jaxrs.client.WebClient;<br />
+ <br />
+import javax.ws.rs.core.Response;<br />
+ <br />
+/**<br />
+ * Created by XuHui on 2017/8/7.<br />
+ */<br />
+public class RestfulWebClient {<br />
+ private static String REST_API = "http://localhost:8080/jerseyDemo/rest/JerseyService";<br />
+ public static void main(String[] args) throws Exception {<br />
+  addResource();<br />
+  getAllResource();<br />
+ }<br />
+ <br />
+ public static void addResource() throws Exception {<br />
+  ObjectMapper mapper = new ObjectMapper();<br />
+  WebClient client = WebClient.create(REST_API)<br />
+    .header("Content-Type", "application/json")<br />
+    .header("Accept", "application/json")<br />
+    .encoding("UTF-8")<br />
+    .acceptEncoding("UTF-8");<br />
+  PersonEntity entity = new PersonEntity("NO2", "Joker", "http://");<br />
+  Response response = client.path("/addResource/person").post(mapper.writeValueAsString(entity), Response.class);<br />
+  String json = response.readEntity(String.class);<br />
+  System.out.print("addResource result is : " + json + "\n");<br />
+ }<br />
+ <br />
+ public static void getAllResource() {<br />
+  WebClient client = WebClient.create(REST_API)<br />
+    .header("Content-Type", "application/json")<br />
+    .header("Accept", "application/json")<br />
+    .encoding("UTF-8")<br />
+    .acceptEncoding("UTF-8");<br />
+  Response response = client.path("/getAllResource").get();<br />
+  String json = response.readEntity(String.class);<br />
+  System.out.print("getAllResource result is : " + json + "\n");<br />
+ }<br />
+}<br />
+结果：</p>
+
+<p>addResource result is : {"id":"NO2","name":"Joker","addr":"http://"}<br />
+getAllResource result is : [{"id":"NO2","name":"Joker","addr":"http://"}<br />
+maven：</p>
+
+<p><br />
+<dependency><br />
+  <groupId>org.apache.cxf</groupId><br />
+  <artifactId>cxf-bundle-jaxrs</artifactId><br />
+  <version>2.7.0</version><br />
+</dependency><br />
+注：该jar包引入和jersey包引入有冲突，不能在一个工程中同时引用。</p>
+
+<p>以上这篇基于Restful接口调用方法总结(超详细)就是小编分享给大家的全部内容了，希望能给大家一个参考，也希望大家多多支持脚本之家。</p>

@@ -1,0 +1,95 @@
+<h1>java使用memcached的两种方式</h1>
+
+<p><strong>1. memcached client for java</strong>客户端API：memcached client for java </p>
+
+<p>引入jar包：java-memcached-2.6.2.jar </p>
+
+<pre>
+package com.pcitc.memcached;
+
+import com.danga.MemCached.*;
+
+public class TestMemcached {
+public static void main(String[] args) {
+/* 初始化SockIOPool，管理memcached的连接池 */
+String[] servers = { "192.168.1.111:11211" };
+SockIOPool pool = SockIOPool.getInstance();
+pool.setServers(servers);
+pool.setFailover(true);
+pool.setInitConn(10);
+pool.setMinConn(5);
+pool.setMaxConn(250);
+pool.setMaintSleep(30);
+pool.setNagle(false);
+pool.setSocketTO(3000);
+pool.setAliveCheck(true);
+pool.initialize();
+/* 建立MemcachedClient实例 */
+MemCachedClient memCachedClient = new MemCachedClient();
+for (int i = 0; i < 10; i++) {
+/* 将对象加入到memcached缓存 */
+boolean success = memCachedClient.set("" + i, "Hello!");
+/* 从memcached缓存中按key值取对象 */
+String result = (String) memCachedClient.get("" + i);
+System.out.println(String.format("set( %d ): %s", i, success));
+System.out.println(String.format("get( %d ): %s", i, result));
+}
+}
+}
+</pre>
+
+<p><strong>2. spymemcached</strong>客户端API：spymemcached client </p>
+
+<p>引入jar包：<a href="http://code.google.com/p/spymemcached/downloads/list" target="_blank">spymemcached-2.10.3.jar</a> </p>
+
+<pre>
+package com.pcitc.memcached;
+
+import java.net.InetSocketAddress;
+import java.util.concurrent.Future;
+
+import net.spy.memcached.MemcachedClient;
+
+public class MClient {
+
+public static void main(String[] args) {
+setValue();
+getValue();
+}
+
+// 用spymemcached将对象存入缓存
+public static void setValue() {
+try {
+/* 建立MemcachedClient 实例，并指定memcached服务的IP地址和端口号 */
+MemcachedClient mc = new MemcachedClient(new InetSocketAddress(
+"192.168.1.111", 11211));
+Future<Boolean> b = null;
+/* 将key值，过期时间(秒)和要缓存的对象set到memcached中 */
+b = mc.set("neead", 900, "someObject");
+if (b.get().booleanValue() == true) {
+mc.shutdown();
+}
+} catch (Exception ex) {
+ex.printStackTrace();
+}
+}
+
+// 用spymemcached从缓存中取得对象
+public static void getValue() {
+try {
+/* 建立MemcachedClient 实例，并指定memcached服务的IP地址和端口号 */
+MemcachedClient mc = new MemcachedClient(new InetSocketAddress(
+"192.168.1.111", 11211));
+/* 按照key值从memcached中查找缓存，不存在则返回null */
+Object b = mc.get("neead");
+mc.shutdown();
+} catch (Exception ex) {
+ex.printStackTrace();
+}
+}
+}</pre>
+
+<p><strong>3.两种API比较</strong> <br />
+memcached client for java：较早推出的memcached JAVA客户端API，应用广泛，运行比较稳定。 <br />
+spymemcached：A simple, asynchronous, single-threaded memcached client written in java. 支持异步，单线程的memcached客户端，用到了java1.5版本的concurrent和nio，存取速度会高于前者，但是稳定性不好，测试中常报timeOut等相关异常。 <br />
+由于memcached client for java发布了新版本，性能上有所提高，并且运行稳定，所以建议使用memcached client for java。</p>

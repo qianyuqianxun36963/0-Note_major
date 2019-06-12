@@ -1,0 +1,239 @@
+<h1>windows下jenkins安装使用</h1>
+
+<h2>软件下载</h2>
+
+<p>官方下载地址</p>
+
+<p><a href="https://jenkins.io/download/">https://jenkins.io/download/</a></p>
+
+<h2>软件简单安装过程</h2>
+
+<p>选择下载windows版本的安装包文件</p>
+
+<p>直接运行安装包就好。</p>
+
+<p>安装后启动，会提示安装必要的插件。</p>
+
+<h2>配置个人配置</h2>
+
+<p>jenkins安装完成后，进入使用向导。</p>
+
+<p>首先会提醒两件事：</p>
+
+<p><strong>配置用户信息  本次配置的信息：用户名密码等全为admin</strong></p>
+
+<p><strong>配置端口！     本次使用的端口是8888  （修改jenkins.xml，把8080改为8888）</strong></p>
+
+<h2>安装插件</h2>
+
+<p>首先安装maven插件 Maven Integration 这样，在创建maven项目的时候，会出现一个<span style="font-size:16px"><strong>"构建一个maven项目"</strong></span>的选项。</p>
+
+<h2>添加基础配置</h2>
+
+<h3>配置maven</h3>
+
+<p>安装的时候，不要选择自动安装，然后会提示指定mavenhome，然后路径填写maven安装目录(bin目录上一级)，如D:\c_codebuild\maven\installed</p>
+
+<p>类似上面的方式，按照提示配置好JDK等基础配置。</p>
+
+<h2>配置项目</h2>
+
+<h3>源码管理</h3>
+
+<p>勾选subversion</p>
+
+<p>Repository URL  填到项目目录，项目名为止。</p>
+
+<p>Local module directory   . </p>
+
+<p>Repository depth           infinity</p>
+
+<h2>关键部署</h2>
+
+<h3>1、Pre Steps</h3>
+
+<p>关闭指定jar包对应的进程：</p>
+
+<p>@echo off<br />
+for /f "tokens=1,2 delims= " %%a in ('jps') do (if "%%b"=="spring-boot-profiles-0.0.1-SNAPSHOT.jar" (set pid=%%a))<br />
+if DEFINED pid taskkill /pid %pid% /f</p>
+
+<p>没办法，这里多加一次停止进程的操作。。</p>
+
+<p>@echo off<br />
+for /f "tokens=1,2 delims= " %%a in ('jps') do (if "%%b"=="spring-boot-profiles-0.0.1-SNAPSHOT.jar" (set pid=%%a))<br />
+if DEFINED pid taskkill /pid %pid% /f</p>
+
+<p>关闭指定端口上的进程：</p>
+
+<p>@echo off<br />
+for /f "tokens=1-5 delims= " %%a in ('netstat -ano^|findstr 7575') do (set pid=%%e)<br />
+if DEFINED pid taskkill /pid %pid% /f</p>
+
+<h3>2、Build</h3>
+
+<p>pom.xml<br />
+clean install -Dmaven.test.skip=true</p>
+
+<h3>3、Post Steps</h3>
+
+<p>启动对应的jar包，这里由于只停止指定端口的脚本失败，干脆一次启两个profile的进程。</p>
+
+<p>第一次在家里配的时候，下面两句执行正常。</p>
+
+<p>@echo off<br />
+<strong>start javaw -jar .\target\spring-boot-profiles-0.0.1-SNAPSHOT.jar --spring.profiles.active=prod</strong><br />
+<strong>start javaw -jar .\target\spring-boot-profiles-0.0.1-SNAPSHOT.jar --spring.profiles.active=dev</strong><br />
+exit</p>
+
+<p>实际使用的时候，上面两句一直没成功，而是使用下面的方式才成功。</p>
+
+<p>@echo off<br />
+set BUILD_ID=dontKillMe<br />
+start javaw -jar C:\Users\Administrator\.jenkins\workspace\naportal-fileservice\target\naportal-fileservice-0.0.1-SNAPSHOT.jar<br />
+exit</p>
+
+<p>注意:set BUILD_ID=dontKillMe<br />
+说明一下为什么加入这条语句,jenkins构建完成后会将衍生的线程全部杀死,此次是为了防止启动的jar线程被kill</p>
+
+<h2>运行时文件位置</h2>
+
+<h3>jenkins项目构建地址</h3>
+
+<p>jenkins会从版本库将代码check到自己目录下。</p>
+
+<p>如D:\d_server\jenkins\jenkins2.155\installed\workspace</p>
+
+<p>D:\d_server\jenkins\jenkins2.155\installed\workspace</p>
+
+<p>如果是命令行启动，会默认在用户目录下，如</p>
+
+<pre>
+C:\Users\Administrator\.jenkins\workspace</pre>
+
+<h2>代理配置</h2>
+
+<h3>方式一：</h3>
+
+<h2><span style="font-size:12px"><span style="font-family:"Microsoft YaHei",宋体,arial"><span style="font-family:微软雅黑,sans-serif">1.     首先保证系统中安装了jdk，git和maven，并正确配置了环境变量，具体安装方式参考网上相关文档。</span></span></span></h2>
+
+<h2><span style="font-size:12px"><span style="font-family:"Microsoft YaHei",宋体,arial"><span style="font-family:微软雅黑,sans-serif">2.     安装Jenkins完成后<span style="font-family:微软雅黑">，免去复杂的代理配置和漫长的外网下载等待，公司内网华为开源镜像仓Jenkins插件中心，只需两步就能轻松应用Jenins插件。</span></span></span></span></h2>
+
+<h2><span style="font-size:12px"><span style="font-family:"Microsoft YaHei",宋体,arial"><span style="font-family:Myriad,Arial,微软雅黑,"Microsoft YaHei",宋体">第一步：设置/etc/hosts</span><br />
+<span style="font-family:Myriad,Arial,微软雅黑,"Microsoft YaHei",宋体">将如下内容添加到您Jenkins CI所在机器的文件 /etc/hosts ，</span><br />
+<span style="font-family:Myriad,Arial,微软雅黑,"Microsoft YaHei",宋体">10.93.238.51 cmc-cd-mirror.rnd.huawei.com</span><br />
+<span style="font-family:Myriad,Arial,微软雅黑,"Microsoft YaHei",宋体">10.93.239.208 updates.jenkins-ci.org</span><br />
+<span style="font-family:Myriad,Arial,微软雅黑,"Microsoft YaHei",宋体">第二步：替换updatecenter的URL</span><br />
+<span style="font-family:Myriad,Arial,微软雅黑,"Microsoft YaHei",宋体">进入Jenins的系统管理-->管理插件-->高级页面，将原有URL替换为如下内容，提交即可。</span><br />
+<span style="font-family:Myriad,Arial,微软雅黑,"Microsoft YaHei",宋体">http://cmc-cd-mirror.rnd.huawei.com/jenkins-updates/update-center.json</span><br />
+<span style="font-family:Myriad,Arial,微软雅黑,"Microsoft YaHei",宋体">配置后再次进入 Jenkins的系统管理-->管理插件-->高级 页面，点击“立即获取”即完成插件中心设置。</span></span></span></h2>
+
+<h2><span style="font-size:12px"><span style="font-family:"Microsoft YaHei",宋体,arial"><span style="font-family:微软雅黑,sans-serif">3.     要安装的插件：Git Plugin， Maven Integration plugin，</span><a href="https://wiki.jenkins-ci.org/display/JENKINS/Deploy+Plugin" style="padding:0px; margin:0px; list-style-type:none; outline:none 0px; color:#126ca8; text-decoration:none; border:0px">Deploy to container Plugin</a><span style="font-family:微软雅黑,sans-serif">安装完成后，在新建项目中可以看到【构建一个maven项目】的选项，新建项目后会看到【源码管理】中多了Git的配置项。</span></span></span></h2>
+
+<h2><span style="font-size:12px"><span style="font-family:"Microsoft YaHei",宋体,arial"><span style="font-family:微软雅黑,sans-serif">说明插件安装成功。</span></span></span></h2>
+
+<h2><span style="font-size:12px"><span style="font-family:"Microsoft YaHei",宋体,arial"><span style="font-family:微软雅黑,sans-serif">4.     打开【系统管理->Global Tool Configuration】，配置jdk，Git和Maven，如下图所示。</span></span></span></h2>
+
+<p style="margin-left:0px; margin-right:0px"><span style="font-size:12px"><span style="font-family:"Microsoft YaHei",宋体,arial"><span style="font-family:微软雅黑,sans-serif">5.     </span><span style="font-family:微软雅黑,sans-serif">打开【系统管理->Configure Global Security】，取消勾选【防止跨站点请求伪造】选项，这样可以保证云龙的CloudDeploy能够触发Jenkins job。</span></span></span></p>
+
+<p style="margin-left:0px; margin-right:0px"><span style="font-size:12px"><span style="font-family:"Microsoft YaHei",宋体,arial"><span style="font-family:微软雅黑,sans-serif">6.     </span><span style="font-family:微软雅黑,sans-serif">【Add->Jenkins】</span></span></span></p>
+
+<h3 style="margin-left:0px; margin-right:0px">方式二：</h3>
+
+<p style="margin-left:0px; margin-right:0px">服务器：proxy.huawei.com</p>
+
+<p style="margin-left:0px; margin-right:0px">端口： 8080</p>
+
+<p style="margin-left:0px; margin-right:0px">用户名：CHINA\w********</p>
+
+<p style="margin-left:0px; margin-right:0px">密码：********</p>
+
+<p style="margin-left:0px; margin-right:0px">上面的没生效，进一步措施：即启动时用如下命令</p>
+
+<p>java -Dhttp.auth.preference="basic" -jar jenkins.war --httpPort=8888</p>
+
+<h2>启动jenkins</h2>
+
+<h3>1、命令行启动</h3>
+
+<p>java -Dhttp.auth.preference="basic" -jar jenkins.war --httpPort=8888</p>
+
+<h3>2、新建脚本启动</h3>
+
+<p>新建一个启动jenkins的脚本 startjenkins.bat 这样可以在后台启动jenkins而不会弹出窗口。</p>
+
+<p>@echo off<br />
+start javaw -Dhttp.auth.preference="basic" -jar jenkins.war --httpPort=8888<br />
+exit</p>
+
+<h3>3、服务方式启动</h3>
+
+<p>其实windows安装jenkings后，会自动安装服务到服务里好多jenkins，启动即可。</p>
+
+<p> </p>
+
+<h2>服务方式启动不成功处理</h2>
+
+<p>默认情况下，Jenkins会使用processTreeKiller杀掉所有子进程。当一次build异常结束，或被人终止时，必然需要结束所有这次build启动的子进程。但是这也导致我们没法启动后台进程。</p>
+
+<p>一种规避方法是临时改变BUILD_ID值，使得Jenkins不会找到并结束掉我们启动的后台进程：</p>
+
+<table border="0" cellpadding="0" cellspacing="0">
+<tbody>
+<tr>
+<td>
+<p><code>#临时改变BUILD_ID值，使得Jenkins不会找到并结束掉run.sh启动的后台进程</code></p>
+
+<p><code>OLD_BUILD_ID=$BUILD_ID</code></p>
+
+<p><code>echo $OLD_BUILD_ID</code></p>
+
+<p><code>BUILD_ID=dontKillMe</code></p>
+
+<p><code>./run.sh restart</code></p>
+
+<p><code>#改回原来的BUILD_ID值</code></p>
+
+<p><code>BUILD_ID=$OLD_BUILD_ID</code></p>
+
+<p><code>echo $BUILD_ID</code></p>
+</td>
+</tr>
+</tbody>
+</table>
+
+<p>Linux下可以这样（没试过）：</p>
+
+<table border="0" cellpadding="0" cellspacing="0">
+<tbody>
+<tr>
+<td>
+<p><code>JENKINS_NODE_COOKIE=dontKillMe nohup python3 /home/among/pj/my_py/monitor/amon/amon.py >/tmp/run.log </code><code>2</code><code>>&</code><code>1</code> <code>&</code></p>
+</td>
+</tr>
+</tbody>
+</table>
+
+<p> </p>
+
+<p>一劳永逸的方法是禁用ProcessTreeKiller：</p>
+
+<table border="0" cellpadding="0" cellspacing="0">
+<tbody>
+<tr>
+<td>
+<p><code>java -Dhudson.util.ProcessTree.disable=</code><code>true</code> <code>-jar jenkins.war</code></p>
+</td>
+</tr>
+</tbody>
+</table>
+
+<p>Windows上的Jenkins Slave，在服务里找到这个服务所启动的exe文件后，到对应文件夹下修改jenkins-slave.xml内的参数配置，修改完之后重启Jenkins agent服务。：</p>
+
+<p><img src="http://wiki.inhuawei.com/download/attachments/23056416/image2018-11-16_14-51-12.png?version=1&modificationDate=1542351210000&api=v2" /></p>
+
+<p><img src="http://wiki.inhuawei.com/download/attachments/23056416/image2018-11-16_14-51-36.png?version=1&modificationDate=1542351210000&api=v2" /></p>
+
+<p><img src="http://wiki.inhuawei.com/download/attachments/23056416/image2018-11-16_14-52-5.png?version=1&modificationDate=1542351210000&api=v2" /></p>
+
+<p>修改完之后重启Jenkins agent服务。</p>

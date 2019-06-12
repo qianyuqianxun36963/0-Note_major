@@ -1,0 +1,132 @@
+<h1>HashMap深度解析</h1>
+
+<p><a href="http://blog.csdn.net/ghsau/article/details/16890151" target="_blank">Java Collections Framework</a>中实际操作的都是数组或者链表，而我们通常不需要显示的维护集合的大小，而是集合类框架中内部维护，方便的同时，也带来了性能的问题。<br />
+       HashMap有两个参数影响其性能：<strong>初始容量</strong>和<strong>加载因子</strong>。默认初始容量是16，加载因子是0.75。容量是哈希表中桶(Entry数组)的数量，初始容量只是哈希表在创建时的容量。加载因子是哈希表在其容量自动增加之前可以达到多满的一种尺度。当哈希表中的条目数超出了加载因子与当前容量的乘积时，通过调用 rehash 方法将容量翻倍。<br />
+       HashMap中定义的成员变量如下：</p>
+
+<blockquote>/** <br />
+ * The default initial capacity - MUST be a power of two. <br />
+ */  <br />
+static final int DEFAULT_INITIAL_CAPACITY = 16;// 默认初始容量为16，必须为2的幂  <br />
+  <br />
+/** <br />
+ * The maximum capacity, used if a higher value is implicitly specified <br />
+ * by either of the constructors with arguments. <br />
+ * MUST be a power of two <= 1<<30. <br />
+ */  <br />
+static final int MAXIMUM_CAPACITY = 1 << 30;// 最大容量为2的30次方  <br />
+  <br />
+/** <br />
+ * The load factor used when none specified in constructor. <br />
+ */  <br />
+static final float DEFAULT_LOAD_FACTOR = 0.75f;// 默认加载因子0.75  <br />
+  <br />
+/** <br />
+ * The table, resized as necessary. Length MUST Always be a power of two. <br />
+ */  <br />
+transient Entry<K,V>[] table;// Entry数组，哈希表，长度必须为2的幂  <br />
+  <br />
+/** <br />
+ * The number of key-value mappings contained in this map. <br />
+ */  <br />
+transient int size;// 已存元素的个数  <br />
+  <br />
+/** <br />
+ * The next size value at which to resize (capacity * load factor). <br />
+ * @serial <br />
+ */  <br />
+int threshold;// 下次扩容的临界值，size>=threshold就会扩容  <br />
+  <br />
+  <br />
+/** <br />
+ * The load factor for the hash table. <br />
+ * <br />
+ * @serial <br />
+ */  <br />
+final float loadFactor;// 加载因子  </blockquote>
+
+<p> </p>
+
+<p>       我们看字段名称大概就能知道其含义，看Doc描述就能知道其详细要求，这也是我们日常编码中特别需要注意的地方，不要写让别人看不懂的代码，除非你写的代码是一次性的。需要注意的是，<strong>HashMap中的容量MUST be a power of two</strong>，翻译过来就是必须为2的幂，这里的原因稍后再说。再来看一下HashMap初始化，HashMap一共重载了4个构造方法，分别为：</p>
+
+<table border="1" cellpadding="3" cellspacing="0" style="width:100%" summary="">
+<tbody>
+<tr>
+<th colspan="2">构造方法摘要</th>
+</tr>
+<tr>
+<td><code><strong><a href="http://blog.csdn.net/ghsau/article/details/16890151" target="_blank">HashMap</a></strong>()</code><br />
+          构造一个具有默认初始容量 (16) 和默认加载因子 (0.75) 的空 <tt>HashMap</tt>。</td>
+</tr>
+<tr>
+<td><code><strong><a href="http://blog.csdn.net/ghsau/article/details/16890151" target="_blank">HashMap</a></strong>(int initialCapacity)</code><br />
+          构造一个带指定初始容量和默认加载因子 (0.75) 的空 <tt>HashMap</tt>。</td>
+</tr>
+<tr>
+<td><code><strong><a href="http://blog.csdn.net/ghsau/article/details/16890151" target="_blank">HashMap</a></strong>(int initialCapacity, float loadFactor)</code><br />
+          构造一个带指定初始容量和加载因子的空 <tt>HashMap</tt>。</td>
+</tr>
+<tr>
+<td><code><strong><a href="http://blog.csdn.net/ghsau/article/details/16890151" target="_blank">HashMap</a></strong>(<a href="http://blog.csdn.net/ghsau/article/details/16890151" target="_blank" title="java.util 中的接口">Map</a><? extends<a href="http://blog.csdn.net/ghsau/article/details/16890151" target="_blank" title="HashMap 中的类型参数">K</a>,? extends<a href="http://blog.csdn.net/ghsau/article/details/16890151" target="_blank" title="HashMap 中的类型参数">V</a>> m)</code><br />
+          构造一个映射关系与指定 <tt>Map</tt> 相同的 <tt>HashMap</tt>。</td>
+</tr>
+</tbody>
+</table>
+
+<p>       看一下第三个构造方法源码，其它构造方法最终调用的都是它。</p>
+
+<ol start="1">
+<li>public HashMap(int initialCapacity, float loadFactor) {  </li>
+<li>    // 参数判断，不合法抛出运行时异常  </li>
+<li>    if (initialCapacity < 0)  </li>
+<li>        throw new IllegalArgumentException("Illegal initial capacity: " +  </li>
+<li>                                           initialCapacity);  </li>
+<li>    if (initialCapacity > MAXIMUM_CAPACITY)  </li>
+<li>        initialCapacity = MAXIMUM_CAPACITY;  </li>
+<li>    if (loadFactor <= 0 || Float.isNaN(loadFactor))  </li>
+<li>        throw new IllegalArgumentException("Illegal load factor: " +  </li>
+<li>                                           loadFactor);  </li>
+<li>  </li>
+<li>    // Find a power of 2 >= initialCapacity  </li>
+<li>    // 这里需要注意一下  </li>
+<li>    int capacity = 1;  </li>
+<li>    while (capacity < initialCapacity)  </li>
+<li>        capacity <<= 1;  </li>
+<li>  </li>
+<li>    // 设置加载因子  </li>
+<li>    this.loadFactor = loadFactor;  </li>
+<li>    // 设置下次扩容临界值  </li>
+<li>    threshold = (int)Math.min(capacity * loadFactor, MAXIMUM_CAPACITY + 1);  </li>
+<li>    // 初始化哈希表  </li>
+<li>    table = new Entry[capacity];  </li>
+<li>    useAltHashing = sun.misc.VM.isBooted() &&  </li>
+<li>            (capacity >= Holder.ALTERNATIVE_HASHING_THRESHOLD);  </li>
+<li>    init();  </li>
+<li>}  </li>
+</ol>
+
+<p>       我们在日常做<strong>底层</strong>开发时，必须要严格控制入参，可以参考一下Java源码及各种开源项目源码，如果参数不合法，适时的抛出一些运行时异常，最后到应用层捕获。看第14-16行代码，这里做了一个移位运算，保证了初始容量一定为2的幂，假如你传的是5，那么最终的初始容量为8。源码中的位运算随处可见啊=。=!<br />
+       到现在为止，我们有一个很强烈的问题，为什么HashMap容量一定要为2的幂呢？HashMap中的数据结构是数组+单链表的组合，我们希望的是元素存放的更均匀，最理想的效果是，Entry数组中每个位置都只有一个元素，这样，查询的时候效率最高，不需要遍历单链表，也不需要通过equals去比较K，而且空间利用率最大。那如何计算才会分布最均匀呢？我们首先想到的就是%运算，哈希值%容量=bucketIndex，SUN的大师们是否也是如此做的呢？我们阅读一下这段源码：</p>
+
+<ol start="1">
+<li>/** </li>
+<li> * Returns index for hash code h. </li>
+<li> */  </li>
+<li>static int indexFor(int h, int length) {  </li>
+<li>    return h & (length-1);  </li>
+<li>}  </li>
+</ol>
+
+<p>       又是位运算，高帅富啊！这里h是通过K的hashCode最终计算出来的哈希值，并不是hashCode本身，而是在hashCode之上又经过一层运算的hash值，length是目前容量。这块的处理很有玄机，与容量一定为2的幂环环相扣，<strong>当容量一定是2^n时，h & (length - 1) == h % length</strong>，它俩是等价不等效的，位运算效率非常高，实际开发中，很多的数值运算以及逻辑判断都可以转换成位运算，但是位运算通常是难以理解的，因为其本身就是给电脑运算的，运算的是二进制，而不是给人类运算的，人类运算的是十进制，这也是位运算在普遍的开发者中间不太流行的原因(门槛太高)。这个等式实际上可以推理出来，2^n转换成二进制就是1+n个0，减1之后就是0+n个1，如16 -> 10000，15 -> 01111，那根据&位运算的规则，都为1(真)时，才为1，那0≤运算后的结果≤15，假设h <= 15，那么运算后的结果就是h本身，h >15，运算后的结果就是最后三位二进制做&运算后的值，最终，就是%运算后的余数，我想，这就是容量必须为2的幂的原因。HashTable中的实现对容量的大小没有规定，最终的bucketIndex是通过取余来运算的。<em>注：我在考虑这样做是否真的是最好，规定容量大小一定为2的幂会浪费许多空间成本，而时间上的优化针对当今越来越牛逼的CPU是否还提升了许多，有些资料上说，CPU处理除法和取余运算是最慢的，这个应该取决于语言调用CPU指令的顺序和CPU底层实现的架构，也是有待验证，可以用Java写段程序测试一下，不过我想，CPU也是通过人来实现，人脑运算的速度应该是加法>减法>乘法>除法>取模(这里指的是正常的算法，不包括速算)，CPU也应是如此。</em><br />
+       通常，默认加载因子 (.75) 在时间和空间成本上寻求一种折衷。<strong>加载因子过高虽然减少了空间开销，但同时也增加了查询成本</strong>（在大多数 HashMap 类的操作中，包括 get 和 put 操作，都反映了这一点，可以想想为什么）。在设置初始容量时应该考虑到映射中所需的条目数及其加载因子，以便最大限度地降低 rehash 操作次数。如果初始容量大于最大条目数除以加载因子(实际上就是最大条目数小于初始容量*加载因子)，则不会发生 rehash 操作。 <br />
+       如果很多映射关系要存储在 HashMap 实例中，则相对于按需执行自动的 rehash 操作以增大表的容量来说，使用足够大的初始容量创建它将使得映射关系能更有效地存储。 当HashMap存放的元素越来越多，到达临界值(阀值)threshold时，就要对Entry数组扩容，这是Java集合类框架最大的魅力，HashMap在扩容时，新数组的容量将是原来的2倍，由于容量发生变化，原有的每个元素需要重新计算bucketIndex，再存放到新数组中去，也就是所谓的rehash。HashMap默认初始容量16，加载因子0.75，也就是说最多能放16*0.75=12个元素，当put第13个时，HashMap将发生rehash，rehash的一系列处理比较影响性能，所以当我们需要向HashMap存放较多元素时，最好指定合适的初始容量和加载因子，否则HashMap默认只能存12个元素，将会发生多次rehash操作。<br />
+       HashMap所有集合类视图所返回迭代器都是快速失败的(fail-fast)，在迭代器创建之后，如果从结构上对映射进行修改，除非通过迭代器自身的 remove 或 add 方法，其他任何时间任何方式的修改，迭代器都将抛出 ConcurrentModificationException。因此，面对并发的修改，迭代器很快就会完全失败。注意，迭代器的快速失败行为不能得到保证，一般来说，存在不同步的并发修改时，不可能作出任何坚决的保证。快速失败迭代器尽最大努力抛出 ConcurrentModificationException。至于为什么通过迭代器自身的remove或add方法就不会出现这个问题，可以参考我之前的文章<a href="http://blog.csdn.net/ghsau/article/details/9347357" target="_blank">List比较好玩的操作</a>中第三个和第四个示例。<br />
+       HashMap是线程不安全的实现，而HashTable是线程安全的实现，关于线程安全与不安全可以参考我之前的文章<a href="http://blog.csdn.net/ghsau/article/details/7421217" target="_blank">Java线程(一)：线程安全与不安全</a>，所谓线程不安全，就是在多线程情况下直接使用HashMap会出现一些莫名其妙不可预知的问题，多线程和单线程的区别：单线程只有一条执行路径，而多线程是并发执行(非并行)，会有多条执行路径。如果HashMap是只读的(加载一次，以后只有读取，不会发生结构上的修改)，那使用没有问题。那如果HashMap是可写的(会发生结构上的修改)，则会引发诸多问题，如上面的fail-fast，也可以看下<a href="http://blog.csdn.net/xiaojianpitt/article/details/7659793" target="_blank">这里</a>，这里就不去研究了。<br />
+        那在多线程下使用HashMap我们需要怎么做，几种方案：</p>
+
+<ul>
+<li>在外部包装HashMap，实现同步机制</li>
+<li>使用Map m = Collections.synchronizedMap(new HashMap(...));，这里就是对HashMap做了一次包装</li>
+<li>使用java.util.HashTable，效率最低</li>
+<li>使用java.util.concurrent.ConcurrentHashMap，相对安全，效率较高</li>
+</ul>

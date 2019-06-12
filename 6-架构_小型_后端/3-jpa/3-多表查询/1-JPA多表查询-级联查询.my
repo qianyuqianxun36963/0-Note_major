@@ -1,0 +1,276 @@
+<h1>springboot jpa 多条件查询（多表）</h1>
+<h2>实体类</h2>
+<p>    package com.syl.demo.daomain;<br />
+    <br />
+    import lombok.Data;<br />
+    <br />
+    import javax.persistence.*;</p>
+<p>    @Entity<br />
+    @Data<br />
+    public class User {<br />
+        @Id<br />
+        private String userId;<br />
+        private String userName;<br />
+        private String password;<br />
+        private String gender;//性别<br />
+        private String age;<br />
+        @ManyToOne<br />
+        private School school;<br />
+        @ManyToOne<br />
+        private Grade grade;<br />
+    }</p>
+<p>    package com.syl.demo.daomain;<br />
+    <br />
+    import lombok.Data;<br />
+    <br />
+    import javax.jws.soap.SOAPBinding;<br />
+    import javax.persistence.Entity;<br />
+    import javax.persistence.Id;<br />
+    import javax.persistence.ManyToOne;<br />
+    import javax.persistence.OneToMany;</p>
+<p>    @Data<br />
+    @Entity<br />
+    public class School {<br />
+        @Id<br />
+        private String schoolId;<br />
+        private String schoolName;<br />
+    <br />
+    <br />
+    }</p>
+<p>    package com.syl.demo.daomain;<br />
+    <br />
+    import lombok.Data;<br />
+    import javax.persistence.*;<br />
+    <br />
+    @Entity<br />
+    @Data<br />
+    public class Grade {<br />
+        @Id<br />
+        private String gradeId;<br />
+        private String gradeName;<br />
+        @ManyToOne<br />
+        private School school;<br />
+    <br />
+    <br />
+    }</p>
+<h2>查询条件类</h2>
+<p>    package com.syl.demo.daomain;<br />
+    <br />
+    import lombok.Data;<br />
+    <br />
+    import javax.persistence.Id;<br />
+    <br />
+    /**<br />
+     * Created by 孙义朗 on 2017/11/16 0016.<br />
+     */<br />
+    @Data<br />
+    public class Params {<br />
+        private String userId;<br />
+        private String userName;<br />
+        private String gender;<br />
+        private String age;<br />
+    <br />
+        private String gradeName;<br />
+    <br />
+        private String schoolName;<br />
+    <br />
+    }</p>
+<h2>Dao层</h2>
+<p>    package com.syl.demo.dao;<br />
+    <br />
+    import com.syl.demo.daomain.Grade;<br />
+    import com.syl.demo.daomain.School;<br />
+    import com.syl.demo.daomain.User;<br />
+    import org.springframework.data.domain.Pageable;<br />
+    import org.springframework.data.jpa.domain.Specification;<br />
+    import org.springframework.data.jpa.repository.JpaRepository;<br />
+    <br />
+    import java.util.List;<br />
+    <br />
+    /**<br />
+     * Created by 孙义朗 on 2017/11/16 0016.<br />
+     */<br />
+    public interface UserRepository extends JpaRepository<User,String> {<br />
+        List<User> findAll();<br />
+    <br />
+        List<User> findAll(Specification<User> spc, Pageable pageable);<br />
+    <br />
+    <br />
+    }</p>
+<h2>Service及实现</h2>
+<p>    package com.syl.demo.service;<br />
+    <br />
+    import com.syl.demo.daomain.Grade;<br />
+    import com.syl.demo.daomain.Params;<br />
+    import com.syl.demo.daomain.School;<br />
+    import com.syl.demo.daomain.User;<br />
+    import org.springframework.data.domain.Pageable;<br />
+    import org.springframework.data.jpa.domain.Specification;<br />
+    <br />
+    import java.util.List;<br />
+    <br />
+    /**<br />
+     * Created by 孙义朗 on 2017/11/16 0016.<br />
+     */<br />
+    public interface UserService {<br />
+        List<User> findAll();<br />
+    <br />
+        List<User> findAll(int pageNum, int pageSize,User user);<br />
+    <br />
+        List<User> findAll(int pageNum, int pageSize, Params params);<br />
+    <br />
+    }</p>
+<p>    package com.syl.demo.service.impl;<br />
+    <br />
+    import com.syl.demo.dao.UserRepository;<br />
+    import com.syl.demo.daomain.Grade;<br />
+    import com.syl.demo.daomain.Params;<br />
+    import com.syl.demo.daomain.School;<br />
+    import com.syl.demo.daomain.User;<br />
+    import com.syl.demo.service.UserService;<br />
+    import org.apache.commons.lang3.StringUtils;<br />
+    import org.springframework.beans.factory.annotation.Autowired;<br />
+    import org.springframework.data.domain.PageRequest;<br />
+    import org.springframework.data.domain.Pageable;<br />
+    import org.springframework.data.jpa.domain.Specification;<br />
+    import org.springframework.stereotype.Service;<br />
+    <br />
+    import javax.persistence.criteria.*;<br />
+    import java.util.ArrayList;<br />
+    import java.util.List;<br />
+    <br />
+    /**<br />
+     * Created by 孙义朗 on 2017/11/16 0016.<br />
+     */<br />
+    @Service<br />
+    public class UserServiceImpl implements UserService {<br />
+        @Autowired<br />
+        private UserRepository userRepository;<br />
+    <br />
+        @Override<br />
+        public List<User> findAll() {<br />
+            return userRepository.findAll();<br />
+        }<br />
+    <br />
+        //查询User，单表，多条件<br />
+        @Override<br />
+        public List<User> findAll(int pageNum, int pageSize, User user) {<br />
+            Pageable pageable = new PageRequest(pageNum, pageSize);<br />
+            List<User> uList = userRepository.findAll(new Specification<User>() {<br />
+                @Override<br />
+                public Predicate toPredicate(Root<User> root, CriteriaQuery<?> criteriaQuery, CriteriaBuilder cb) {<br />
+                    List<Predicate> predicates = new ArrayList<>();<br />
+                    if (user.getUserId() != null && !user.getUserId().equals("")) {<br />
+                        predicates.add(cb.like(root.get("userId").as(String.class), "%" + user.getUserId() + "%"));<br />
+                    }<br />
+                    if (user.getUserName() != null && !user.getUserName().equals("")) {<br />
+                        predicates.add(cb.like(root.get("userName").as(String.class), "%" + user.getUserName() + "%"));<br />
+                    }<br />
+                    if (user.getGender() != null && !user.getGender().equals("")) {<br />
+                        predicates.add(cb.like(root.get("gender").as(String.class), "%" + user.getGender() + "%"));<br />
+                    }<br />
+                    if (user.getAge() != null && !user.getAge().equals("")) {<br />
+                        predicates.add(cb.like(root.get("age").as(String.class), "%" + user.getAge() + "%"));<br />
+                    }<br />
+                    Predicate[] pre = new Predicate[predicates.size()];<br />
+                    criteriaQuery.where(predicates.toArray(pre));<br />
+                    return cb.and(predicates.toArray(pre));<br />
+                }<br />
+            }, pageable);<br />
+    <br />
+            return uList;<br />
+        }<br />
+    <br />
+        //查询User，多表，多条件<br />
+        @Override<br />
+        public List<User> findAll(int pageNum, int pageSize, Params params) {<br />
+            Pageable pageable = new PageRequest(pageNum, pageSize);<br />
+            List<User> uList = userRepository.findAll(new Specification<User>() {<br />
+                @Override<br />
+                public Predicate toPredicate(Root<User> root, CriteriaQuery<?> criteriaQuery, CriteriaBuilder cb) {<br />
+                    List<Predicate> list = new ArrayList<>();<br />
+                    //根据userId 查询user<br />
+                    if (StringUtils.isNotBlank(params.getUserId())) {<br />
+                        list.add(cb.equal(root.get("userId").as(String.class), params.getUserId()));<br />
+                    }<br />
+                    //根据userName 模糊查询user<br />
+                    if (StringUtils.isNotBlank(params.getUserName())) {<br />
+                        list.add(cb.like(root.get("userName").as(String.class), "%" + params.getUserName() + "%"));<br />
+                    }<br />
+                    //根据gender 查询user<br />
+                    if (StringUtils.isNotBlank(params.getGender())) {<br />
+                        list.add(cb.equal(root.get("gender").as(String.class), params.getGender()));<br />
+                    }<br />
+                    //根据age>? 查询user<br />
+                    if (StringUtils.isNotBlank(params.getAge())) {<br />
+                        list.add(cb.gt(root.get("age").as(Integer.class), Integer.valueOf(params.getAge())));<br />
+                    }<br />
+                    //根据gradeName 查询user<br />
+                    if (StringUtils.isNotBlank(params.getGradeName())) {<br />
+                        Join<Grade, User> join = root.join("grade", JoinType.LEFT);<br />
+                        list.add(cb.equal(join.get("gradeName"), params.getGradeName()));<br />
+                    }<br />
+                    //根据schoolName 查询user<br />
+                    if (StringUtils.isNotBlank(params.getSchoolName())) {<br />
+                        Join<School, User> join = root.join("grade", JoinType.LEFT);<br />
+                        list.add(cb.equal(join.get("school").get("schoolName"), params.getSchoolName()));<br />
+                    }<br />
+                    Predicate[] pre = new Predicate[list.size()];<br />
+                    criteriaQuery.where(list.toArray(pre));<br />
+                    return cb.and(list.toArray(pre));<br />
+                }<br />
+            }, pageable);<br />
+    <br />
+            return uList;<br />
+        }<br />
+    <br />
+    }</p>
+<h2>控制层</h2>
+<p> UserController</p>
+<p>    package com.syl.demo.controller;<br />
+    <br />
+    import com.syl.demo.daomain.Grade;<br />
+    import com.syl.demo.daomain.Params;<br />
+    import com.syl.demo.daomain.School;<br />
+    import com.syl.demo.daomain.User;<br />
+    import com.syl.demo.service.UserService;<br />
+    import org.springframework.beans.factory.annotation.Autowired;<br />
+    import org.springframework.web.bind.annotation.*;<br />
+    <br />
+    import java.util.List;<br />
+    <br />
+    /**<br />
+     * Created by 孙义朗 on 2017/11/16 0016.<br />
+     */<br />
+    @RestController<br />
+    public class UserController {<br />
+        @Autowired<br />
+        UserService userService;<br />
+    <br />
+        @GetMapping(value = "/getUser")<br />
+        public List<User> getUser() {<br />
+            List<User> uList = userService.findAll();<br />
+            return uList;<br />
+        }<br />
+    <br />
+        //查询User，单表，多条件<br />
+        @PostMapping(value = "/getUser/{pageNum}/{pageSize}")<br />
+        public List<User> getUser(@PathVariable("pageNum") Integer pageNum,<br />
+                                   @PathVariable("pageSize") Integer pageSize,<br />
+                                   @RequestBody User user) {<br />
+            List<User> uList = userService.findAll(pageNum, pageSize, user);<br />
+            return uList;<br />
+        }<br />
+    <br />
+        //查询User，多表，多条件<br />
+        @PostMapping(value = "/getUser2/{pageNum}/{pageSize}")<br />
+        public List<User> getUser2(@PathVariable("pageNum") Integer pageNum,<br />
+                                   @PathVariable("pageSize") Integer pageSize,<br />
+                                   @RequestBody Params params) {<br />
+            List<User> uList = userService.findAll(pageNum, pageSize, params);<br />
+            return uList;<br />
+        }<br />
+    <br />
+    }</p>
+<p><br />
+完成。</p>

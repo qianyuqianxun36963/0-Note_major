@@ -1,0 +1,27 @@
+<h1><a href="https://www.cnblogs.com/julygift/p/9445107.html" id="cb_post_title_url">RabbitMQ死循环-延长ACK时间</a></h1>
+
+<p><strong>一、应用背景</strong></p>
+
+<p>　　今天做一个需求，要将RabbitMQ中的任务取出并执行，为防止任务执行期间出错，设置NO_ACK=FALSE标志，这样、一旦任务没有应答的话，相应的任务就会被RabbitMQ自动Re-Queue,避免丢失任务。然而、由于任务执行时间较长，通常需要五、六分钟，甚至更长；我们都知道一旦一个任务被取出执行，该任务就从Ready状态更改成Unacked状态。如图所示：</p>
+
+<p>　　当这个任务执行完之后，程序将向RabbitMQ发送ACK消息确认，RabbitMQ在收到ACK消息后，会将该任务移出队列；然而、问题出在任务尚未执行完毕【执行时间太久】，RabbitMQ再等了一段时间【大约两三分钟】后，一直没有收到ACK确认消息，就将该任务自动Re-Queue了【我是一个生产者，一个消费者模式】，也就是说、我们这里发生了死循环【任务永远也执行不完，因为会一直Re-Queue】。</p>
+
+<p><strong>二、延长RabbitMQ ACK应答时间</strong></p>
+
+<p>　　到这里，我们急需解决的问题就是，怎么能设置RabbitMQ延长等待ACK的时间，百度一下、两下，各种读网络文档，研究操作RabbitMQ工作的文档，查了一圈资料也没查出怎么延长RabbitMQ ACK时间【废柴啊】。至此、一直查不出来，就想问一下网友的你，你知道怎么延长RabbitMQ接受ACK应答时间么？</p>
+
+<p><strong>三、改变解决问题方式</strong></p>
+
+<p>　　在查不出如何延长ACK应答时间后，我将注意力转向如何检测当前任务操作超时的，后来在官网看到这么一段话：</p>
+
+<p>　　链接官网位置：<a href="http://www.rabbitmq.com/heartbeats.html#heartbeats-timeout" target="_blank">http://www.rabbitmq.com/heartbeats.html#heartbeats-timeout</a></p>
+
+<p>　　后面、就简单测试下将<strong>heartbeat参数设置为0，以禁用心跳检测</strong>，这样基本解决了我的问题；虽然官方不建议这么做，但也是一种解决思路，如果大家有什么更好的解决办法，烦请在下面留言【先谢谢啦】。</p>
+
+<p>　　至此、这个问题基本阐述清楚了，如果有遇到的小伙伴，也请参考下上面的操作。</p>
+
+<p>　　测试代码：</p>
+
+<p><img alt="" src="https://images2018.cnblogs.com/blog/723676/201808/723676-20180808192403465-194716255.png" /></p>
+
+<p> </p>

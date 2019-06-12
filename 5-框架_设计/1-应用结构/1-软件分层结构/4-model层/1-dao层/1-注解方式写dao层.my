@@ -1,0 +1,69 @@
+<p>package com.huawei.auto.data.analyse.dao;</p>
+
+<p>import com.huawei.auto.data.analyse.pojo.po.CaseBaselinePo;<br />
+import com.huawei.auto.data.analyse.pojo.qo.CaseAssertListQo;<br />
+import org.apache.ibatis.annotations.Mapper;<br />
+import org.apache.ibatis.annotations.Param;<br />
+import org.apache.ibatis.annotations.Select;</p>
+
+<p>import java.util.List;</p>
+
+<p>/**<br />
+ *  用例资产，提供特定场景的查询接口，主要包括：<br />
+ * （1）一些无法通过简单查询实现的复杂的业务<br />
+ * （2）需要sql性能调优的业务<br />
+ *<br />
+ * @author q00451463<br />
+ * @date 2018/11/29 15:45<br />
+ */<br />
+@Mapper<br />
+public interface CaseAssertDao {</p>
+
+<p>    @Select("select " +<br />
+                "distinct t_tb.casenum," +<br />
+                "t_tb.casename " +<br />
+            "from " +<br />
+                "t_testcase_baseline t_tb, " +<br />
+                "t_casenum_relationship t_cr " +<br />
+            "where " +<br />
+                "t_tb.casenum = t_cr.casenum " +<br />
+                "and t_tb.pdu = #{qo.pdu} " +<br />
+                "and t_tb.version = #{qo.version} " +<br />
+                "and t_tb.product = #{qo.product} " +<br />
+                "and t_cr.version = #{abbVersion} " +<br />
+                "and t_cr.product = #{qo.product} "<br />
+    )<br />
+    List<CaseBaselinePo> listLogFileCollectedCase(@Param("qo") CaseAssertListQo qo, @Param("abbVersion") String abbVersion);</p>
+
+<p>    @Select("select " +<br />
+                "t_tb.casenum, t_tb.casename, t_cr.casenum casenumTemp " +<br />
+            "from " +<br />
+                "(" +<br />
+                    "select " +<br />
+                        "distinct casenum, casename " +<br />
+                    "from " +<br />
+                        "t_testcase_baseline " +<br />
+                    "where " +<br />
+                        "pdu = #{qo.pdu} " +<br />
+                        "and version = #{qo.version} " +<br />
+                        "and product = #{qo.product}" +<br />
+                ") t_tb " + //t_tb是查询出的用例资产基线<br />
+            "left join " +<br />
+                "(" +<br />
+                    "select " +<br />
+                        "distinct casenum " +<br />
+                    "from " +<br />
+                        "t_casenum_relationship " +<br />
+                    "where " +<br />
+                        "version = #{abbVersion} " +<br />
+                        "and product = #{qo.product}" +<br />
+                ") t_cr " + //t_cr是已经采集到命令行的用例<br />
+            "on " +<br />
+                 "t_tb.casenum = t_cr.casenum " +<br />
+            "where " +<br />
+                "t_cr.casenum is null"// 查询未采集到命令行的用例<br />
+    )<br />
+    List<CaseBaselinePo> listLogFileNotCollectedCase(@Param("qo") CaseAssertListQo qo, @Param("abbVersion") String abbVersion);</p>
+
+<p>}<br />
+ </p>

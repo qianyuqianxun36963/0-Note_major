@@ -1,0 +1,105 @@
+<h1>Ehcache与Memcached</h1>
+
+<h2>快速总结</h2>
+
+<p><strong>ehcache特点袖珍！方便！一个jar包就搞定了。</strong>单应用做缓存很方便。多应用共享缓存的内存就不可以了。</p>
+
+<p><strong>Memcached</strong><strong>绝对性能要比ehcache慢。</strong></p>
+
+<p><span style="font-size:14px"><span style="font-family:"SF Pro Display",Roboto,Noto,Arial,"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif"><span style="font-size:24px">Ehcache还是Memcached的抉择（一）</span></span></span></p>
+
+<div class="article_content clearfix csdn-tracking-statistics" id="article_content" style="padding:0px">
+<div class="htmledit_views" style="padding:0px">
+<p style="margin-left:0px; margin-right:0px"><span style="font-family:-apple-system,"SF UI Text",Arial,"PingFang SC","Hiragino Sans GB","Microsoft YaHei","WenQuanYi Micro Hei",sans-serif,SimHei,SimSun"><span style="font-size:16px">缓存的目的就是为了提高响应速度，尤其是并发访问的速度，降低数据库服务器的压力，在同等硬件配置的情况下，提供更高的系统性能。</span></span></p>
+
+<p style="margin-left:0px; margin-right:0px"><span style="font-family:-apple-system,"SF UI Text",Arial,"PingFang SC","Hiragino Sans GB","Microsoft YaHei","WenQuanYi Micro Hei",sans-serif,SimHei,SimSun"><span style="font-size:16px">总的来说，请指导原则就是：尽量用低开销的计算代替高开销的计算。比如直接从数据库查询的开销要远高于内存中的计算返回，网络请求要远高于本地（同一VM中）请求。</span></span></p>
+
+<p style="margin-left:0px; margin-right:0px"><span style="font-family:-apple-system,"SF UI Text",Arial,"PingFang SC","Hiragino Sans GB","Microsoft YaHei","WenQuanYi Micro Hei",sans-serif,SimHei,SimSun"><span style="font-size:16px">如果单从这一点上来分析的话，现在很多关于Ehcache（local）与memcached（client/server）性能PK的讨论是可以比较简单的得出一个结论的。</span></span></p>
+
+<p style="margin-left:0px; margin-right:0px"><span style="font-family:-apple-system,"SF UI Text",Arial,"PingFang SC","Hiragino Sans GB","Microsoft YaHei","WenQuanYi Micro Hei",sans-serif,SimHei,SimSun"><span style="font-size:16px">（老实说，我对memcached的了解只是一知半解。不过国内比较知名的阿里巴巴的系统就是用的memcached，AliSoft有个哥们也在这方面有比较深的研究。详细请参见：<a href="http://blog.csdn.net/cenwenchu79" rel="nofollow" style="box-sizing:border-box; outline:0px; color:#6795b5; text-decoration:none; cursor:pointer; word-break:break-all" target="_blank"><u>http://blog.csdn.net/cenwenchu79</u></a>)</span></span></p>
+
+<p style="margin-left:0px; margin-right:0px"><span style="font-family:-apple-system,"SF UI Text",Arial,"PingFang SC","Hiragino Sans GB","Microsoft YaHei","WenQuanYi Micro Hei",sans-serif,SimHei,SimSun"><span style="font-size:16px">下面图是国外一个哥们做的对比，按照Greg的测试，Ehcache的性能不memcached真的高很多，不过其试验的详细过程并没有资料，所以公证性也受到很多人的怀疑。</span></span></p>
+
+<p style="margin-left:0px; margin-right:0px"><span style="font-family:-apple-system,"SF UI Text",Arial,"PingFang SC","Hiragino Sans GB","Microsoft YaHei","WenQuanYi Micro Hei",sans-serif,SimHei,SimSun"><span style="font-size:16px">因为在Liferay框架中使用了Ehcache, 对这个缓存框架，我倒是做了一些research， 下面简单的罗列一下Ehcache在分布式缓存方面的知识点。</span></span></p>
+
+<p style="margin-left:0px; margin-right:0px"><span style="font-family:-apple-system,"SF UI Text",Arial,"PingFang SC","Hiragino Sans GB","Microsoft YaHei","WenQuanYi Micro Hei",sans-serif,SimHei,SimSun"><span style="font-size:16px"><u><strong>Ehcache的分布式缓存</strong></u></span></span></p>
+
+<p style="margin-left:0px; margin-right:0px"><span style="font-family:-apple-system,"SF UI Text",Arial,"PingFang SC","Hiragino Sans GB","Microsoft YaHei","WenQuanYi Micro Hei",sans-serif,SimHei,SimSun"><span style="font-size:16px">——在分布式情况下，一个节点的缓存发生变动，需要通过广播通知其他节点。Ehcache有两种通知策略：copy和invalidate。一个是没有就拷贝过来，比较自然；另外一个是如果没有，那就反过来连自己也取消，这样就必须重新到数据库中查询，网络负载低。</span></span></p>
+
+<p style="margin-left:0px; margin-right:0px"><span style="font-family:-apple-system,"SF UI Text",Arial,"PingFang SC","Hiragino Sans GB","Microsoft YaHei","WenQuanYi Micro Hei",sans-serif,SimHei,SimSun"><span style="font-size:16px">——发现机制。也就是发现其他节点的机制，有两种，一种是利用RFC1112进行广播，好处是可以动态增减节点，另外一种是维护一个静态列表（IP）。</span></span></p>
+
+<p style="margin-left:0px; margin-right:0px"><span style="font-family:-apple-system,"SF UI Text",Arial,"PingFang SC","Hiragino Sans GB","Microsoft YaHei","WenQuanYi Micro Hei",sans-serif,SimHei,SimSun"><span style="font-size:16px">——传递机制。(Delivery Mechanism) 支持JMS, RMI, TCP, UDP, 广播,JXTA, JGroups。 缺省是RMI。</span></span></p>
+
+<p style="margin-left:0px; margin-right:0px"><span style="font-family:-apple-system,"SF UI Text",Arial,"PingFang SC","Hiragino Sans GB","Microsoft YaHei","WenQuanYi Micro Hei",sans-serif,SimHei,SimSun"><span style="font-size:16px">——复制的缺陷和Ehcache的解决办法</span></span></p>
+
+<p style="margin-left:0px; margin-right:0px"><span style="font-family:-apple-system,"SF UI Text",Arial,"PingFang SC","Hiragino Sans GB","Microsoft YaHei","WenQuanYi Micro Hei",sans-serif,SimHei,SimSun"><span style="font-size:16px">☆ 碎嘴的通讯协议（Chatty Protocal）</span></span></p>
+
+<p style="margin-left:0px; margin-right:0px"><span style="font-family:-apple-system,"SF UI Text",Arial,"PingFang SC","Hiragino Sans GB","Microsoft YaHei","WenQuanYi Micro Hei",sans-serif,SimHei,SimSun"><span style="font-size:16px">因为是一个网状拓扑，一个节点的每个变化需要通知其他N-1个其他节点，造成网络较大的负载。<br />
+可以通过批量异步操作来降低负载。加快对客户端的响应。</span></span></p>
+
+<p style="margin-left:0px; margin-right:0px"><span style="font-family:-apple-system,"SF UI Text",Arial,"PingFang SC","Hiragino Sans GB","Microsoft YaHei","WenQuanYi Micro Hei",sans-serif,SimHei,SimSun"><span style="font-size:16px">☆ 冗余的通知<br />
+发起通知的不应该收到并处理通知。（因为是广播，所以会收到）<br />
+可以通过为每个Cache创建一个GUID来标明身份，这样如果发起的Cache GUID与自身相同，则不用处理。</span></span></p>
+
+<p style="margin-left:0px; margin-right:0px"><span style="font-family:-apple-system,"SF UI Text",Arial,"PingFang SC","Hiragino Sans GB","Microsoft YaHei","WenQuanYi Micro Hei",sans-serif,SimHei,SimSun"><span style="font-size:16px">☆ 潜在的数据不一致<br />
+这是一个比较大的问题。只要是分布式存储，就一定会遇到这个问题。造成这个问题的原因有很多，比如对同一Cache的同一数据进行并行更新等；<br />
+解决的办法是通过：同步传递。客户端请求先处于挂起状态，在同步传递并在所有缓存中数据都同步之后再返回。</span></span></p>
+
+<p style="margin-left:0px; margin-right:0px"><span style="font-family:-apple-system,"SF UI Text",Arial,"PingFang SC","Hiragino Sans GB","Microsoft YaHei","WenQuanYi Micro Hei",sans-serif,SimHei,SimSun"><span style="font-size:16px">☆ 使缓存数据失效以实现更新(Update via Invalidate)<br />
+默认的方式是一个缓存的数据被更新之后，就将新数据复制给其他所有缓存。<br />
+另外的方式是，如果缓存数据被更新，则清除所有节点缓存中对应的数据，重新到数据库中查询。并重新加载到所有的节点缓存中。(Liferay就是采用了这种方式）<br />
+另外的一种保证数据一致的方式就是：设置TTL值（time to live)， 到期之后重新从数据库中更新；</span></span></p>
+
+<p style="margin-left:0px; margin-right:0px"><span style="font-family:-apple-system,"SF UI Text",Arial,"PingFang SC","Hiragino Sans GB","Microsoft YaHei","WenQuanYi Micro Hei",sans-serif,SimHei,SimSun"><span style="font-size:16px"><u><strong>自己的一些设想</strong></u></span></span></p>
+
+<p style="margin-left:0px; margin-right:0px"><span style="font-family:-apple-system,"SF UI Text",Arial,"PingFang SC","Hiragino Sans GB","Microsoft YaHei","WenQuanYi Micro Hei",sans-serif,SimHei,SimSun"><span style="font-size:16px">在研究关于分布式缓存的时候，我不由得想起来分布式数据库存储来。这两者有很多相似的地方，最核心的问题就是保持数据的一致性问题。</span></span></p>
+
+<p style="margin-left:0px; margin-right:0px"><span style="font-family:-apple-system,"SF UI Text",Arial,"PingFang SC","Hiragino Sans GB","Microsoft YaHei","WenQuanYi Micro Hei",sans-serif,SimHei,SimSun"><span style="font-size:16px">当前，在数据的分布式存储方面的解决方案已经有很多，很多产品、技术都很成熟，是否有一些东西可以借鉴在这里呢？比如说，内存数据库，数据库锁，消息中间件等等。</span></span></p>
+
+<p style="margin-left:0px; margin-right:0px"><span style="font-family:-apple-system,"SF UI Text",Arial,"PingFang SC","Hiragino Sans GB","Microsoft YaHei","WenQuanYi Micro Hei",sans-serif,SimHei,SimSun"><span style="font-size:16px">巧的是，上面那个做对比的哥们Greg就这个问题有不同的看法。</span></span></p>
+
+<table border="1" cellspacing="0" style="border-collapse:collapse; border-spacing:0px; border:1px solid #dddddd; box-sizing:border-box; display:table; margin-bottom:24px; outline:0px; text-align:left; width:852px; word-break:break-all">
+<tbody>
+<tr>
+<td><span style="font-family:-apple-system,"SF UI Text",Arial,"PingFang SC","Hiragino Sans GB","Microsoft YaHei","WenQuanYi Micro Hei",sans-serif,SimHei,SimSun"><span style="font-size:14px">My point is that caches are not meant to have full database-like semantics. It is usually acceptable for the data to be dirty or stale to some extent. That extent depends on the app.</span></span></td>
+</tr>
+</tbody>
+</table>
+
+<p style="margin-left:0px; margin-right:0px"><span style="font-family:-apple-system,"SF UI Text",Arial,"PingFang SC","Hiragino Sans GB","Microsoft YaHei","WenQuanYi Micro Hei",sans-serif,SimHei,SimSun"><span style="font-size:16px"> </span></span><span style="font-family:-apple-system,"SF UI Text",Arial,"PingFang SC","Hiragino Sans GB","Microsoft YaHei","WenQuanYi Micro Hei",sans-serif,SimHei,SimSun"><span style="font-size:16px">确实，确保每个缓存中的数据完全的一致是不可能的，总会存在这样那样的问题，即使像memcached，也因为没有commit机制，可能出现一个node上先放入cache，而最后transaction回滚，但其他的cache node已经为其他用户提供了这个数据。</span></span></p>
+
+<p style="margin-left:0px; margin-right:0px"><span style="font-family:-apple-system,"SF UI Text",Arial,"PingFang SC","Hiragino Sans GB","Microsoft YaHei","WenQuanYi Micro Hei",sans-serif,SimHei,SimSun"><span style="font-size:16px">所以，分布式缓存还只能是具体问题具体分析了。</span></span></p>
+
+<p style="margin-left:0px; margin-right:0px"><span style="font-family:-apple-system,"SF UI Text",Arial,"PingFang SC","Hiragino Sans GB","Microsoft YaHei","WenQuanYi Micro Hei",sans-serif,SimHei,SimSun"><span style="font-size:16px">另外，简单地总结一下memcached的features如下：</span></span></p>
+
+<p style="margin-left:0px; margin-right:0px"><span style="font-family:-apple-system,"SF UI Text",Arial,"PingFang SC","Hiragino Sans GB","Microsoft YaHei","WenQuanYi Micro Hei",sans-serif,SimHei,SimSun"><span style="font-size:16px">1、请求由client端进行处理，client端维护着一个memcached服务器列表，根据用户的请求将响应指向不同的memcached服务器；（也就是说，每个缓冲值，在所有服务器中只保持着一份copy，不像ehcache每个服务器中都有）</span></span></p>
+
+<p style="margin-left:0px; margin-right:0px"><span style="font-family:-apple-system,"SF UI Text",Arial,"PingFang SC","Hiragino Sans GB","Microsoft YaHei","WenQuanYi Micro Hei",sans-serif,SimHei,SimSun"><span style="font-size:16px">2、memcached对CPU的要求不高，但对内存要求较高，因此可以与webapp server安装在一起，互补（web app server是CPU要求高，内存要求低）</span></span></p>
+
+<p style="margin-left:0px; margin-right:0px"><span style="font-family:-apple-system,"SF UI Text",Arial,"PingFang SC","Hiragino Sans GB","Microsoft YaHei","WenQuanYi Micro Hei",sans-serif,SimHei,SimSun"><span style="font-size:16px">3、可以动态地，甚至无限地增加memcached服务器的数量</span></span></p>
+</div>
+</div>
+
+<h2>Ehcache还是Memcached的抉择（二）</h2>
+
+<p>Liferay中使用的是Ehcache, 这个缓存框架不错，性能很好（参见上篇与memcached对比的文章），在Liferay中封装的也不错，很容易使用。</p>
+
+<p>可最近在项目中遇到一个问题，那就是需要有多个系统共同访问某个（某些）数据表，这种需求在一些与遗留系统进行整合的项目中也经常会有。整合是没有问题，但是在这种情况下，缓存就成了一个很大的问题。</p>
+
+<p>大家都知道，缓存有三个作用范围：事务、应用、集群。事务级缓存在session中有效；应用级缓存在多个session中可共享，因此尽可能只在read only型应用中使用，而集群缓存就需要在各个节点上进行缓存同步（Ehcache方案）。</p>
+
+<p><strong>但是这些都是在同一个应用的前提条件下的，如果是多个应用在数据层整合，那么任何一个范围都有可能出现问题。尤其是Ehcache，是一个in process的缓存方案，受Spring管理，每个Web App的缓存相互独立（抛开ClassLoader Share），基本上不可能实现多应用缓存共享。即使使用消息中间件进行监听，也不是一个完美的解决方案。</strong></p>
+
+<p>那么回过头来，再看看曾经被我抛弃的memcached。</p>
+
+<p>因为是Client/Server结构的，通过采用二级hash算法进行缓存服务器分配、缓存数据的读写；整个缓存体系中，一个key对应的value只保存在惟一的一个服务器上；而且，memcached server是deamon方式运行的，因此无论对于什么应用，只要用相同的memcached client进行配置，就能共享缓存。</p>
+
+<p>怪不得很多大网站都在使用这个缓存框架，<strong>虽然其绝对性能要比ehcache慢。</strong></p>
+
+<p>看来，需要将Liferay MDD的缓存也转到memcached上了。简单估计了一下，工作量应该不大，争取这周搞定；</p>
+
+<p>另外，在Ehcache的计划中，1.6版本也会采用与memcached类似的Cache Server方式来实现分布式缓存了。</p>
+
+<p>等不急了，先倒向Memcached吧。</p>
+
+<p> </p>

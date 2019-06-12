@@ -1,0 +1,516 @@
+<h1>Spring事务管理之几种方式实现事务</h1>
+
+<h2>1、事务认识</h2>
+
+<p>大家所了解的事务Transaction，它是一些列严密操作动作，要么都操作完成，要么都回滚撤销。Spring事务管理基于底层数据库本身的事务处理机制。数据库事务的基础，是掌握Spring事务管理的基础。这篇总结下Spring事务。<br />
+事务具备ACID四种特性，ACID是Atomic（原子性）、Consistency（一致性）、Isolation（隔离性）和Durability（持久性）的英文缩写。<br />
+（1）原子性（Atomicity）<br />
+事务最基本的操作单元，要么全部成功，要么全部失败，不会结束在中间某个环节。事务在执行过程中发生错误，会被回滚到事务开始前的状态，就像这个事务从来没有执行过一样。<br />
+（2）一致性（Consistency）<br />
+事务的一致性指的是在一个事务执行之前和执行之后数据库都必须处于一致性状态。如果事务成功地完成，那么系统中所有变化将正确地应用，系统处于有效状态。如果在事务中出现错误，那么系统中的所有变化将自动地回滚，系统返回到原始状态。<br />
+（3）隔离性（Isolation）<br />
+指的是在并发环境中，当不同的事务同时操纵相同的数据时，每个事务都有各自的完整数据空间。由并发事务所做的修改必须与任何其他并发事务所做的修改隔离。事务查看数据更新时，数据所处的状态要么是另一事务修改它之前的状态，要么是另一事务修改它之后的状态，事务不会查看到中间状态的数据。<br />
+（4）持久性（Durability）<br />
+指的是只要事务成功结束，它对数据库所做的更新就必须永久保存下来。即使发生系统崩溃，重新启动数据库系统后，数据库还能恢复到事务成功结束时的状态。</p>
+
+<h2>2、事务的传播特性</h2>
+
+<p>事务传播行为就是多个事务方法调用时，如何定义方法间事务的传播。Spring定义了7中传播行为：<br />
+（1）propagation_requierd：如果当前没有事务，就新建一个事务，如果已存在一个事务中，加入到这个事务中，这是Spring默认的选择。<br />
+（2）propagation_supports：支持当前事务，如果没有当前事务，就以非事务方法执行。<br />
+（3）propagation_mandatory：使用当前事务，如果没有当前事务，就抛出异常。<br />
+（4）propagation_required_new：新建事务，如果当前存在事务，把当前事务挂起。<br />
+（5）propagation_not_supported：以非事务方式执行操作，如果当前存在事务，就把当前事务挂起。<br />
+（6）propagation_never：以非事务方式执行操作，如果当前事务存在则抛出异常。<br />
+（7）propagation_nested：如果当前存在事务，则在嵌套事务内执行。如果当前没有事务，则执行与propagation_required类似的操作。</p>
+
+<h2>3、事务的隔离级别</h2>
+
+<p>（1）read uncommited：是最低的事务隔离级别，它允许另外一个事务可以看到这个事务未提交的数据。<br />
+（2）read commited：保证一个事物提交后才能被另外一个事务读取。另外一个事务不能读取该事物未提交的数据。<br />
+（3）repeatable read：这种事务隔离级别可以防止脏读，不可重复读。但是可能会出现幻象读。它除了保证一个事务不能被另外一个事务读取未提交的数据之外还避免了以下情况产生（不可重复读）。<br />
+（4）serializable：这是花费最高代价但最可靠的事务隔离级别。事务被处理为顺序执行。除了防止脏读，不可重复读之外，还避免了幻象读<br />
+（5）脏读、不可重复读、幻象读概念说明：<br />
+a.脏读：指当一个事务正字访问数据，并且对数据进行了修改，而这种数据还没有提交到数据库中，这时，另外一个事务也访问这个数据，然后使用了这个数据。因为这个数据还没有提交那么另外一个事务读取到的这个数据我们称之为脏数据。依据脏数据所做的操作肯能是不正确的。<br />
+b.不可重复读：指在一个事务内，多次读同一数据。在这个事务还没有执行结束，另外一个事务也访问该同一数据，那么在第一个事务中的两次读取数据之间，由于第二个事务的修改第一个事务两次读到的数据可能是不一样的，这样就发生了在一个事物内两次连续读到的数据是不一样的，这种情况被称为是不可重复读。<br />
+c.幻象读：一个事务先后读取一个范围的记录，但两次读取的纪录数不同，我们称之为幻象读（两次执行同一条 select 语句会出现不同的结果，第二次读会增加一数据行，并没有说这两次执行是在同一个事务中）</p>
+
+<h2>4、事务几种实现方式</h2>
+
+<p>（1）编程式事务管理对基于 POJO 的应用来说是唯一选择。我们需要在代码中调用beginTransaction()、commit()、rollback()等事务管理相关的方法，这就是编程式事务管理。<br />
+（2）基于 TransactionProxyFactoryBean的声明式事务管理<br />
+（3）基于 @Transactional 的声明式事务管理<br />
+（4）基于Aspectj AOP配置事务</p>
+
+<h2>5、举例说明事务不同实现</h2>
+
+<p>编程式事务基本已经OUT了，在上上家公司的老工程还能找到，所有就省略了，主要回顾 下声明式事务。<br />
+以用户购买股票为例<br />
+新建用户对象、股票对象、以及dao、service层</p>
+
+<h3>账户对象</h3>
+
+<p>public class Account {<br />
+ <br />
+    private int accountid;<br />
+    private String name;<br />
+    private String balance;<br />
+    <br />
+    <br />
+    public int getAccountid() {<br />
+        return accountid;<br />
+    }<br />
+    public void setAccountid(int accountid) {<br />
+        this.accountid = accountid;<br />
+    }<br />
+    public String getName() {<br />
+        return name;<br />
+    }<br />
+    public void setName(String name) {<br />
+        this.name = name;<br />
+    }<br />
+    public String getBalance() {<br />
+        return balance;<br />
+    }<br />
+    public void setBalance(String balance) {<br />
+        this.balance = balance;<br />
+    }<br />
+}</p>
+
+<h3>股票对象</h3>
+
+<p>public class Stock {<br />
+ <br />
+    private int stockid;<br />
+    private String name;<br />
+    private Integer count;<br />
+    <br />
+    public Stock() {<br />
+        super();<br />
+    }<br />
+     <br />
+    public Stock(int stockid, String name, Integer count) {<br />
+        super();<br />
+        this.stockid = stockid;<br />
+        this.name = name;<br />
+        this.count = count;<br />
+    }<br />
+ <br />
+    public int getStockid() {<br />
+        return stockid;<br />
+    }<br />
+ <br />
+    public void setStockid(int stockid) {<br />
+        this.stockid = stockid;<br />
+    }<br />
+ <br />
+    public String getName() {<br />
+        return name;<br />
+    }<br />
+    public void setName(String name) {<br />
+        this.name = name;<br />
+    }<br />
+    public Integer getCount() {<br />
+        return count;<br />
+    }<br />
+    public void setCount(Integer count) {<br />
+        this.count = count;<br />
+    }<br />
+    <br />
+}</p>
+
+<h3>DAO层</h3>
+
+<p>public interface AccountDao {<br />
+ <br />
+    void addAccount(String name,double money);<br />
+    <br />
+    void updateAccount(String name,double money,boolean isbuy);<br />
+    <br />
+}<br />
+public class AccountDaoImpl extends JdbcDaoSupport implements AccountDao {<br />
+ <br />
+    @Override<br />
+    public void addAccount(String name, double money) {<br />
+        String sql = "insert account(name,balance) values(?,?);";<br />
+        this.getJdbcTemplate().update(sql,name,money);<br />
+        <br />
+    }<br />
+ <br />
+    @Override<br />
+    public void updateAccount(String name, double money, boolean isbuy) {<br />
+        String sql = "update account set balance=balance+? where name=?";<br />
+        if(isbuy)<br />
+            sql = "update account set balance=balance-? where name=?";<br />
+        this.getJdbcTemplate().update(sql, money,name);<br />
+    }<br />
+    <br />
+}<br />
+public interface StockDao {<br />
+    <br />
+    void addStock(String sname,int count);<br />
+    <br />
+    void updateStock(String sname,int count,boolean isbuy);<br />
+ <br />
+}<br />
+public class StockDaoImpl extends JdbcDaoSupport implements StockDao {<br />
+ <br />
+    @Override<br />
+    public void addStock(String sname, int count) {<br />
+        String sql = "insert into stock(name,count) values(?,?)";<br />
+        this.getJdbcTemplate().update(sql,sname,count);<br />
+    }<br />
+ <br />
+    @Override<br />
+    public void updateStock(String sname, int count, boolean isbuy) {<br />
+        String sql = "update stock set count = count-? where name = ?";<br />
+        if(isbuy)<br />
+            sql = "update stock set count = count+? where name = ?";<br />
+        this.getJdbcTemplate().update(sql, count,sname);<br />
+    }<br />
+    <br />
+}</p>
+
+<h3>Service</h3>
+
+<p>public interface BuyStockService {<br />
+ <br />
+    public void addAccount(String accountname, double money);<br />
+    <br />
+    public void addStock(String stockname, int amount);<br />
+    <br />
+    public void buyStock(String accountname, double money, String stockname, int amount) throws BuyStockException;<br />
+    <br />
+}</p>
+
+<p>public class BuyStockServiceImpl implements BuyStockService{<br />
+    <br />
+    private AccountDao accountDao;<br />
+    private StockDao stockDao;<br />
+    <br />
+    @Override<br />
+    public void addAccount(String accountname, double money) {<br />
+        accountDao.addAccount(accountname,money);<br />
+    }<br />
+ <br />
+    @Override<br />
+    public void addStock(String stockname, int amount) {<br />
+        stockDao.addStock(stockname,amount);<br />
+    }<br />
+ <br />
+    @Override<br />
+    public void buyStock(String accountname, double money, String stockname, int amount) throws BuyStockException {<br />
+        boolean isBuy = true;<br />
+        accountDao.updateAccount(accountname, money, isBuy);<br />
+        if(isBuy==true){<br />
+            throw new BuyStockException("购买股票发生异常");<br />
+        }<br />
+            stockDao.updateStock(stockname, amount, isBuy);<br />
+    }<br />
+ <br />
+    public AccountDao getAccountDao() {<br />
+        return accountDao;<br />
+    }<br />
+ <br />
+    public void setAccountDao(AccountDao accountDao) {<br />
+        this.accountDao = accountDao;<br />
+    }<br />
+ <br />
+    public StockDao getStockDao() {<br />
+        return stockDao;<br />
+    }<br />
+ <br />
+    public void setStockDao(StockDao stockDao) {<br />
+        this.stockDao = stockDao;<br />
+    }<br />
+    <br />
+}<br />
+自定义异常类</p>
+
+<p>public class BuyStockException extends Exception {<br />
+ <br />
+    public BuyStockException() {<br />
+        super();<br />
+    }<br />
+ <br />
+    public BuyStockException(String message) {<br />
+        super(message);<br />
+    }<br />
+ <br />
+}</p>
+
+<h3>（1）基于 TransactionProxyFactoryBean的声明式事务管理</h3>
+
+<p><?xml version="1.0" encoding="UTF-8"?><br />
+<beans xmlns="http://www.springframework.org/schema/beans"<br />
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"<br />
+    xmlns:context="http://www.springframework.org/schema/context"<br />
+    xmlns:mvc="http://www.springframework.org/schema/mvc"<br />
+    xmlns:aop="http://www.springframework.org/schema/aop"<br />
+    xmlns:tx="http://www.springframework.org/schema/tx"<br />
+    xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd<br />
+        http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context-4.0.xsd<br />
+        http://www.springframework.org/schema/mvc http://www.springframework.org/schema/mvc/spring-mvc-4.0.xsd<br />
+        http://www.springframework.org/schema/aop http://www.springframework.org/schema/aop/spring-aop-4.2.xsd<br />
+        http://www.springframework.org/schema/tx http://www.springframework.org/schema/tx/spring-aop-4.2.xsd<br />
+        "><br />
+    <br />
+    <context:property-placeholder location="classpath:jdbc.properties"/><br />
+    <br />
+    <!-- 注册数据源 C3P0 --><br />
+    <bean id="dataSource" class="com.mchange.v2.c3p0.ComboPooledDataSource"  ><br />
+         <property name="driverClass" value="${jdbc.driverClass}"></property><br />
+         <property name="jdbcUrl"  value="${jdbc.url}"></property><br />
+         <property name="user"  value="${jdbc.username}"></property><br />
+         <property name="password" value="${jdbc.password}"></property><br />
+    </bean><br />
+    <br />
+    <bean id="accountDao" class="transaction.test2.dao.AccountDaoImpl"><br />
+        <property name="dataSource" ref="dataSource"/><br />
+    </bean><br />
+    <br />
+    <bean id="stockDao" class="transaction.test2.dao.StockDaoImpl"><br />
+        <property name="dataSource" ref="dataSource"/><br />
+    </bean><br />
+    <br />
+    <bean id="buyStockService" class="transaction.test2.service.BuyStockServiceImpl"><br />
+        <property name="accountDao" ref="accountDao"></property><br />
+        <property name="stockDao" ref="stockDao"></property><br />
+    </bean><br />
+    <br />
+    <br />
+    <!-- 事务管理器 --><br />
+    <br />
+    <bean id="myTracnsactionManager" class="org.springframework.jdbc.datasource.DataSourceTransactionManager"><br />
+        <property name="dataSource" ref="dataSource"></property><br />
+    </bean><br />
+    <br />
+    <!-- 事务代理工厂 --><br />
+    <!-- 生成事务代理对象 --><br />
+    <bean id="serviceProxy" class="org.springframework.transaction.interceptor.TransactionProxyFactoryBean"><br />
+        <property name="transactionManager" ref="myTracnsactionManager"></property><br />
+        <property name="target" ref="buyStockService"></property><br />
+        <property name="transactionAttributes"><br />
+            <props><br />
+                <!-- 主要 key 是方法   <br />
+                    ISOLATION_DEFAULT  事务的隔离级别<br />
+                    PROPAGATION_REQUIRED  传播行为<br />
+                --><br />
+                <prop key="add*">ISOLATION_DEFAULT,PROPAGATION_REQUIRED</prop><br />
+                <!-- -Exception 表示发生指定异常回滚，+Exception 表示发生指定异常提交 --><br />
+                <prop key="buyStock">ISOLATION_DEFAULT,PROPAGATION_REQUIRED,-BuyStockException</prop><br />
+            </props><br />
+        </property><br />
+        <br />
+    </bean><br />
+    <br />
+    <br />
+</beans>  <br />
+测试入口</p>
+
+<p>    public static void main(String[] args) {<br />
+        String resouce = "transaction/test2/applicationContext.xml";<br />
+        ApplicationContext applicationContext = new ClassPathXmlApplicationContext(resouce);<br />
+        BuyStockService buyStockService =  (BuyStockService) applicationContext.getBean("serviceProxy");<br />
+ <br />
+//        buyStockService.openAccount("小郑", 5000);<br />
+        <br />
+//        buyStockService.openStock("知晓科技", 0);<br />
+        <br />
+        try {<br />
+            buyStockService.buyStock("小郑", 1000, "知晓科技", 100);<br />
+        } catch (BuyStockException e) {<br />
+            e.printStackTrace();<br />
+        }<br />
+        <br />
+    }<br />
+发生异常账户金额不能减，股票不能增加</p>
+
+<h3>（2）基于 @Transactional 的声明式事务管理</h3>
+
+<p>其他类不做改变，只改变购买股票接口实现类和配置文件</p>
+
+<p>public class BuyStockServiceImpl implements BuyStockService{<br />
+ <br />
+    private AccountDao accountDao;<br />
+    private StockDao stockDao;<br />
+    <br />
+    @Transactional(isolation=Isolation.DEFAULT,propagation=Propagation.REQUIRED)<br />
+    @Override<br />
+    public void addAccount(String accountname, double money) {<br />
+        accountDao.addAccount(accountname,money);<br />
+        <br />
+    }<br />
+ <br />
+    @Transactional(isolation=Isolation.DEFAULT,propagation=Propagation.REQUIRED)<br />
+    @Override<br />
+    public void addStock(String stockname, int amount) {<br />
+        stockDao.addStock(stockname,amount);<br />
+        <br />
+    }<br />
+ <br />
+    public BuyStockServiceImpl() {<br />
+        // TODO Auto-generated constructor stub<br />
+    }<br />
+    <br />
+    @Transactional(isolation=Isolation.DEFAULT,propagation=Propagation.REQUIRED,rollbackFor=BuyStockException.class)<br />
+    @Override<br />
+    public void buyStock(String accountname, double money, String stockname, int amount) throws BuyStockException {<br />
+        boolean isBuy = true;<br />
+        accountDao.updateAccount(accountname, money, isBuy);<br />
+        if(isBuy==true){<br />
+            throw new BuyStockException("购买股票发生异常");<br />
+        }<br />
+            stockDao.updateStock(stockname, amount, isBuy);<br />
+        <br />
+    }<br />
+ <br />
+    public AccountDao getAccountDao() {<br />
+        return accountDao;<br />
+    }<br />
+ <br />
+    public void setAccountDao(AccountDao accountDao) {<br />
+        this.accountDao = accountDao;<br />
+    }<br />
+ <br />
+    public StockDao getStockDao() {<br />
+        return stockDao;<br />
+    }<br />
+ <br />
+    public void setStockDao(StockDao stockDao) {<br />
+        this.stockDao = stockDao;<br />
+    }<br />
+    <br />
+}<br />
+    <context:property-placeholder location="classpath:jdbc.properties"/><br />
+    <br />
+    <!-- 注册数据源 C3P0 --><br />
+    <bean id="dataSource" class="com.mchange.v2.c3p0.ComboPooledDataSource"  ><br />
+         <property name="driverClass" value="${jdbc.driverClass}"></property><br />
+         <property name="jdbcUrl"  value="${jdbc.url}"></property><br />
+         <property name="user"  value="${jdbc.username}"></property><br />
+         <property name="password" value="${jdbc.password}"></property><br />
+    </bean><br />
+    <br />
+    <bean id="accountDao" class="transaction.test3.dao.AccountDaoImpl"><br />
+        <property name="dataSource" ref="dataSource"/><br />
+    </bean><br />
+    <br />
+    <bean id="stockDao" class="transaction.test3.dao.StockDaoImpl"><br />
+        <property name="dataSource" ref="dataSource"/><br />
+    </bean><br />
+    <br />
+    <bean id="buyStockService" class="transaction.test3.service.BuyStockServiceImpl"><br />
+        <property name="accountDao" ref="accountDao"></property><br />
+        <property name="stockDao" ref="stockDao"></property><br />
+    </bean><br />
+    <br />
+    <br />
+    <!-- 事务管理器 --><br />
+    <bean id="myTracnsactionManager" class="org.springframework.jdbc.datasource.DataSourceTransactionManager"><br />
+        <property name="dataSource" ref="dataSource"></property><br />
+    </bean><br />
+    <br />
+    <!-- 启用事务注解 --><br />
+    <tx:annotation-driven transaction-manager="myTracnsactionManager"/></p>
+
+<p>可以看出，使用@Transactional注解的方式配置文件要简单的多，将事务交给事务注解驱动。它有个缺陷是他会把所有的连接点都作为切点将事务织入进去，显然只需要在buyStock()方法织入事务即可。下面看看最后一种实现，它就可以精准的织入到指定的连接点</p>
+
+<h3>（3）基于Aspectj AOP配置事务</h3>
+
+<p><br />
+public class BuyStockServiceImpl implements BuyStockService{<br />
+ <br />
+    private AccountDao accountDao;<br />
+    private StockDao stockDao;<br />
+    <br />
+    @Override<br />
+    public void addAccount(String accountname, double money) {<br />
+        accountDao.addAccount(accountname,money);<br />
+        <br />
+    }<br />
+ <br />
+    @Override<br />
+    public void addStock(String stockname, int amount) {<br />
+        stockDao.addStock(stockname,amount);<br />
+        <br />
+    }<br />
+ <br />
+    public BuyStockServiceImpl() {<br />
+        // TODO Auto-generated constructor stub<br />
+    }<br />
+    <br />
+    @Override<br />
+    public void buyStock(String accountname, double money, String stockname, int amount) throws BuyStockException {<br />
+        boolean isBuy = true;<br />
+        accountDao.updateAccount(accountname, money, isBuy);<br />
+        if(isBuy==true){<br />
+            throw new BuyStockException("购买股票发生异常");<br />
+        }<br />
+            stockDao.updateStock(stockname, amount, isBuy);<br />
+        <br />
+    }<br />
+ <br />
+    public AccountDao getAccountDao() {<br />
+        return accountDao;<br />
+    }<br />
+ <br />
+    public void setAccountDao(AccountDao accountDao) {<br />
+        this.accountDao = accountDao;<br />
+    }<br />
+ <br />
+    public StockDao getStockDao() {<br />
+        return stockDao;<br />
+    }<br />
+ <br />
+    public void setStockDao(StockDao stockDao) {<br />
+        this.stockDao = stockDao;<br />
+    }<br />
+    <br />
+}</p>
+
+<p>    <context:property-placeholder location="classpath:jdbc.properties"/><br />
+    <br />
+    <!-- 注册数据源 C3P0 --><br />
+    <bean id="dataSource" class="com.mchange.v2.c3p0.ComboPooledDataSource"  ><br />
+         <property name="driverClass" value="${jdbc.driverClass}"></property><br />
+         <property name="jdbcUrl"  value="${jdbc.url}"></property><br />
+         <property name="user"  value="${jdbc.username}"></property><br />
+         <property name="password" value="${jdbc.password}"></property><br />
+    </bean><br />
+    <br />
+    <bean id="accountDao" class="transaction.test4.dao.AccountDaoImpl"><br />
+        <property name="dataSource" ref="dataSource"/><br />
+    </bean><br />
+    <br />
+    <bean id="stockDao" class="transaction.test4.dao.StockDaoImpl"><br />
+        <property name="dataSource" ref="dataSource"/><br />
+    </bean><br />
+    <br />
+    <bean id="buyStockService" class="transaction.test4.service.BuyStockServiceImpl"><br />
+        <property name="accountDao" ref="accountDao"></property><br />
+        <property name="stockDao" ref="stockDao"></property><br />
+    </bean><br />
+    <br />
+    <br />
+    <!-- 事务管理器 --><br />
+    <bean id="myTracnsactionManager" class="org.springframework.jdbc.datasource.DataSourceTransactionManager"><br />
+        <property name="dataSource" ref="dataSource"></property><br />
+    </bean><br />
+    <br />
+    <tx:advice id="txAdvice" transaction-manager="myTracnsactionManager"><br />
+        <tx:attributes><br />
+            <!-- 为连接点指定事务属性 --><br />
+            <tx:method name="add*" isolation="DEFAULT" propagation="REQUIRED"/><br />
+            <tx:method name="buyStock" isolation="DEFAULT" propagation="REQUIRED" rollback-for="BuyStockException"/><br />
+        </tx:attributes><br />
+    </tx:advice><br />
+    <br />
+    <aop:config><br />
+        <!-- 切入点配置 --><br />
+        <aop:pointcut expression="execution(* *..service.*.*(..))" id="point"/><br />
+        <aop:advisor advice-ref="txAdvice" pointcut-ref="point"/><br />
+    </aop:config></p>
+
+<p>执行接口与其他方式一样。<br />
+好了今天的博客写到这里，明天继续加油！</p>

@@ -1,0 +1,311 @@
+<h1><a href="http://blog.csdn.net/u012702547/article/details/53740047">初识Spring Boot框架</a></h1>
+
+<p>前面的铺垫文章已经连着写了六篇了，主要是介绍了Spring和SpringMVC框架，小伙伴们在学习的过程中大概也发现了这两个框架需要我们手动配置的地方非常多，不过做JavaEE开发的小伙伴们肯定也听说过“约定大于配置”这样一句话，就是说系统，类库，框架应该假定合理的默认值，而非要求提供不必要的配置，可是使用Spring或者SpringMVC的话依然有许多这样的东西需要我们进行配置，这样不仅徒增工作量而且在跨平台部署时容易出问题。OK，由于这些已经存在的问题，Spring Boot应运而生，使用Spring Boot可以让我们快速创建一个基于Spring的项目，而让这个Spring项目跑起来我们只需要很少的配置就可以了。Spring Boot主要有如下核心功能：</p>
+
+<blockquote>
+<p>1.独立运行的Spring项目</p>
+</blockquote>
+
+<p>Spring Boot可以以jar包的形式来运行，运行一个Spring Boot项目我们只需要通过java -jar xx.jar类运行。非常方便。</p>
+
+<blockquote>
+<p>2.内嵌Servlet容器</p>
+</blockquote>
+
+<p>Spring Boot可以内嵌Tomcat，这样我们无需以war包的形式部署项目。</p>
+
+<blockquote>
+<p>3.提供starter简化Maven配置</p>
+</blockquote>
+
+<p>使用Spring或者SpringMVC我们需要添加大量的依赖，而这些依赖很多都是固定的，这里Spring Boot 通过starter能够帮助我们简化Maven配置。</p>
+
+<blockquote>
+<p>4.自动配置Spring <br />
+5.准生产的应用监控 <br />
+6.无代码生成和xml配置</p>
+</blockquote>
+
+<p>OK，关于SpringBoot更详细的优缺点小伙伴们也可以自行搜索，我这里不再罗列，我们还是来看看代码。</p>
+
+<h2>项目创建</h2>
+
+<p>初次接触，我们先来看看如何创建一个Spring Boot项目，这里以IntelliJ IDEA为例，其他的IDE工具小伙伴们自行搜索创建方式:</p>
+
+<p>首先创建一个项目，创建时选择Spring Initializr，然后Next，如下图：</p>
+
+<p>填写项目信息，如下图：</p>
+
+<p>填写项目使用到的技术，上面的Spring Boot版本建议选择最新的稳定版，下面勾选上Web就可以了，如下图：</p>
+
+<p>最后一步，填写工程名字点击finish：</p>
+
+<p>OK，第一次创建时系统会去下载需要的依赖等，耗时稍长，以后每次都会很快创建好。 <br />
+OK，项目创建成功之后接下来我们来看看这个东西要怎么样去运行。首先我们看到在项目创建成功之后，在项目的根目录下会有一个artifactId+Application命名规则的入口类，如下图: </p>
+
+<p>就是这个Test19SpringBoot2Application类，这是我们整个项目的入口类，这个类有一个@SpringBootApplication注解，这是整个Spring Boot的核心注解，它的目的就是开启Spring Boot的自动配置。OK，那么我在这个类上再添加一个@RestController注解，使之变为一个Controller，然后里边提供一个地址转换方法，如下：</p>
+
+<pre>
+<code>@RestController
+@SpringBootApplication
+public class Test19SpringBoot2Application {
+
+public static void main(String[] args) {
+SpringApplication.run(Test19SpringBoot2Application.class, args);
+}
+
+@RequestMapping(value = "/",produces = "text/plain;charset=UTF-8")
+String index(){
+return "Hello Spring Boot!";
+}
+}</code></pre>
+
+<p>然后点击项目启动按钮运行，在IntelliJ中就是这个按钮： </p>
+
+<p>启动成功之后我们就可以直接在浏览器中访问了，如下： </p>
+
+<p>OK，至此，我们一个简单的Spring Boot工程已经创建出来了，并且成功的从浏览器中访问到了，但是为什么它最终会跑起来呢？想必小伙伴们还有许多疑问，我们来分析下。</p>
+
+<h2>入口类和@SpringBootApplication注解</h2>
+
+<p>上文说过，我们新建一个Project系统都会帮我们创建一个名为artifactId+Application的入口类，这个类中有一个main方法，这个main方法就是一个标准的Java应用程序的入口方法。而这里的@SpringBootApplication则是一个组合注解，我们可以看看它的源码：</p>
+
+<pre>
+<code>@Target({ElementType.TYPE})
+@Retention(RetentionPolicy.RUNTIME)
+@Documented
+@Inherited
+@SpringBootConfiguration
+@EnableAutoConfiguration
+@ComponentScan(
+excludeFilters = {@Filter(
+type = FilterType.CUSTOM,
+classes = {TypeExcludeFilter.class}
+)}
+)
+public @interface SpringBootApplication {
+
+}</code></pre>
+
+<p>我们可以看到它组合了@SpringBootConfiguration、@EnableAutoConfiguration以及@ComponentScan，我们在开发的过程中如果不使用@SpringBootApplication，则可以组合使用这三个注解。这三个注解中，@SpringBootConfiguration实际上就是我们前面几篇博客提到的@Configuration注解，表明这个类是一个配置类，@EnableAutoConfiguration则表示让Spring Boot根据类路径中的jar包依赖为当前项目进行自动配置，最后一个@ComponentScan的作用我也不赘述了，唯一要注意的是如果我们使用了@SpringBootApplication注解的话，系统会去入口类的同级包以及下级包中去扫描实体类，因此我们建议入口类的位置在groupId+arctifactID组合的包名下。</p>
+
+<h2>关闭特定的自动配置</h2>
+
+<p>在上面一小节中我们看到@ComponentScan注解是有一个过滤器的，如果我们只想要@SpringBootApplication去扫描特定的类而不是全部类，那么就可以关闭自动配置，如下：</p>
+
+<pre>
+<code>@SpringBootApplication(exclude = DataSourceAutoConfiguration.class)</code>
+</pre>
+
+<h2>定制Banner</h2>
+
+<h3>修改Banner</h3>
+
+<p>我们在启动Spring Boot项目的时候，在控制台会默认输出一个启动图案，如下： </p>
+
+<p>当然，这个图案如果你需要的话是可以自己修改的，修改方式很简单：</p>
+
+<blockquote>
+<p>1.在src/main/resources下新建一个banner.txt文档 <br />
+2.通过<a href="http://patorjk.com/software/taag/" target="_blank">http://patorjk.com/software/taag</a>网站生成需要的字符，将字符拷贝到步骤1所创建的txt文档中，比如我这里为Hello Sang！生成字符，如下：</p>
+</blockquote>
+
+<p>点击左下角的选择和拷贝按钮，将这个字符拷贝到txt文档中，然后再启动项目，这个时候控制台输出的文本就会自动改变，如下： </p>
+
+<h3>关闭Banner</h3>
+
+<p>可以修改当然也可以关闭，关闭Banner需要我们稍微修改一下main方法中的代码，如下：</p>
+
+<pre>
+<code>public static void main(String[] args) {
+SpringApplicationBuilder builder = new SpringApplicationBuilder(Test19SpringBoot2Application.class);
+//修改Banner的模式为OFF
+builder.bannerMode(Banner.Mode.OFF).run(args);
+}</code></pre>
+
+<p>OK，如此修改之后当我们再次启动Project的时候就看不到Banner了。</p>
+
+<h2>Spring Boot的配置文件</h2>
+
+<p>Spring Boot使用一个全局的配置文件application.properties或者application.yml，配置文件放在src/main/resources目录下。properties是我们常见的一种配置文件，Spring Boot不仅支持properties这种类型的配置文件，也支持yaml语言的配置文件，我这里以properties类型的配置文件为例来看几个案例。</p>
+
+<blockquote>
+<p>1.修改Tomcat默认端口和默认访问路径</p>
+</blockquote>
+
+<p>Tomcat默认端口是8080，我将之改为8081，默认访问路径是<a href="http://localhost:8080/" target="_blank">http://localhost:8080</a>，我将之改为<a href="http://localhost:8081/helloboot" target="_blank">http://localhost:8081/helloboot</a>,我们来看看这两个需求要怎么样通过简单的配置来实现。 <br />
+很简单，在application.properties文件中添加如下代码：</p>
+
+<pre>
+<code>server.context-path=/helloboot
+server.port=8081</code></pre>
+
+<p>然后再启动Project，在浏览器中就得这样来访问了： </p>
+
+<h2>常规属性配置</h2>
+
+<p>在前面的博客(<a href="http://blog.csdn.net/u012702547/article/details/53633872" target="_blank"> Spring常用配置 </a>)中我们介绍了如何在使用Spring容器框架下注入properties文件里的值。如果我们使用了Spring Boot，这项工作将会变得更加简单，我们只需要在application.properties中定义属性，然后在代码中直接使用@Value注入即可。 <br />
+如下：</p>
+
+<pre>
+<code>book.author=罗贯中
+book.name=三国演义
+book.pinyin=sanguoyanyi</code></pre>
+
+<p>我这里专门设置了中文，因为中文不做特殊处理会乱码，处理方式为继续在application.properties中添加如下代码：</p>
+
+<pre>
+<code>server.tomcat.uri-encoding=UTF-8
+spring.http.encoding.charset=UTF-8
+spring.http.encoding.enabled=true
+spring.http.encoding.force=true
+spring.messages.encoding=UTF-8</code></pre>
+
+<p>然后 在IntelliJ IDEA中依次点击File -> Settings -> Editor -> File Encodings <br />
+将Properties Files (*.properties)下的Default encoding for properties files设置为UTF-8，将Transparent native-to-ascii conversion前的勾选上。（参考【<a href="http://www.zslin.com/web/article/detail/47" target="_blank">Springboot 之 解决IDEA读取properties配置文件的中文乱码问题</a>】【<a href="http://blog.csdn.net/nimeijian/article/details/53464908" target="_blank">Springboot 之 解决IDEA读取properties配置文件的中文乱码问题</a>】）。 <br />
+然后在变量中通过@Value直接注入就行了，如下：</p>
+
+<pre>
+<code> @Value(value = "${book.author}")
+private String bookAuthor;
+@Value("${book.name}")
+private String bookName;
+@Value("${book.pinyin}")
+private String bookPinYin;</code></pre>
+
+<p>改index方法，使之返回这些值：</p>
+
+<pre>
+<code>@RequestMapping(value = "/",produces = "text/plain;charset=UTF-8")
+String index(){
+return "Hello Spring Boot! The BookName is "+bookName+";and Book Author is "+bookAuthor+";and Book PinYin is "+bookPinYin;
+}
+</code>
+然后在浏览器中访问，结果如下： 
+</pre>
+
+<p>很简单吧。</p>
+
+<h2>类型安全的配置</h2>
+
+<p>刚刚说的这种方式我们在实际项目中使用的时候工作量略大，因为每个项目要注入的变量的值太多了，这种时候我们可以使用基于类型安全的配置方式，就是将properties属性和一个Bean关联在一起，这样使用起来会更加方便。我么来看看这种方式怎么实现。</p>
+
+<blockquote>
+<p>1.在src/main/resources文件夹下创建文件book.properties</p>
+</blockquote>
+
+<p>文件内容如下：</p>
+
+<pre>
+<code>book.name=红楼梦
+book.author=曹雪芹
+book.price=28
+
+</code>2.创建Book Bean,并注入properties文件中的值</pre>
+
+<p>代码如下：</p>
+
+<pre>
+<code>@Component
+@ConfigurationProperties(prefix = "book",locations = "classpath:book.properties")
+public class BookBean {
+private String name;
+private String author;
+private String price;
+
+public String getName() {
+return name;
+}
+
+public void setName(String name) {
+this.name = name;
+}
+
+public String getAuthor() {
+return author;
+}
+
+public void setAuthor(String author) {
+this.author = author;
+}
+
+public String getPrice() {
+return price;
+}
+
+public void setPrice(String price) {
+this.price = price;
+}
+}
+</code>prefix是指前缀，location指定要注入文件的位置。</pre>
+
+<blockquote>
+<p>3.添加路径映射</p>
+</blockquote>
+
+<p>在Controller中添加如下代码注入Bean：</p>
+
+<pre>
+<code>@Autowired
+private BookBean bookBean;</code>
+</pre>
+
+<p>添加路径映射：</p>
+
+<pre>
+<code>@RequestMapping("/book")
+public String book() {
+return "Hello Spring Boot! The BookName is "+bookBean.getName()+";and Book Author is "+bookBean.getAuthor()+";and Book price is "+bookBean.getPrice();
+}</code>
+</pre>
+
+<p>运行效果如下： <br />
+<img alt="" src="http://img.blog.csdn.net/20161219200915131?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQvdTAxMjcwMjU0Nw==/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70/gravity/SouthEast" title="" /></p>
+
+<h2>日志配置</h2>
+
+<p>默认情况下Spring Boot使用Logback作为日志框架，也就是我们前面几篇博客中用到的打印日志方式，当然如果有需要我们可以手动配置日志级别以及日志输出位置，相比于我们在Spring容器中写的日志输出代码，这里的配置简直就是小儿科了，只需要在application.properties中添加如下代码：</p>
+
+<pre>
+<code>logging.file=/home/sang/workspace/log.log
+logging.level.org.springframework.web=debug</code>
+</pre>
+
+<p>上面表示配置日志输出位置，下面配置日志级别。</p>
+
+<h2>Profile配置问题</h2>
+
+<p>在<a href="http://blog.csdn.net/u012702547/article/details/53633872" target="_blank"> Spring常用配置 </a>这篇文章中，我们已经介绍了Profile的作用，已经如何在Spring框架下使用Profile，但是当时小伙伴们看到了还是稍微有点麻烦，在Spring Boot 中系统提供了更为简洁的方式。全局Profile配置我们使用application-{profile}.properties来定义，然后在application.properties中通过spring.profiles.active来指定使用哪个Profile。OK，那么接下来我们来看一个简单的案例。</p>
+
+<blockquote>
+<p>1.在src/main/resources文件夹下定义不同环境下的Profile配置文件，文件名分别为application-prod.properties和application-dev.properties，这两个前者表示生产环境下的配置，后者表示开发环境下的配置，如下：</p>
+</blockquote>
+
+<p>application-prod.properties:</p>
+
+<pre>
+<code>server.port=8081</code>
+</pre>
+
+<p>application-dev.properties:</p>
+
+<pre>
+<code>server.port=8080</code>
+</pre>
+
+<p>然后在application.properties中进行简单配置，如下：</p>
+
+<pre>
+<code>spring.profiles.active=dev</code>
+</pre>
+
+<p>这个表示使用开发环境下的配置。然后运行项目，我们得通过8080端口才可以访问： </p>
+
+<p>如果想换为生产环境，只需要把<code>spring.profiles.active=dev</code>改为<code>spring.profiles.active=prod</code>即可，当然访问端口这是也变为8081了，如下： </p>
+
+<p>本案例下载地址： <br />
+<a href="https://github.com/lenve/JavaEETest/tree/master/Test19-SpringBoot2" target="_blank">本项目GitHub地址</a></p>
+
+<p>以上。</p>
+
+<p>参考资料： </p>

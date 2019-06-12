@@ -1,0 +1,166 @@
+<h1>连接（Connection）</h1>
+<p>Connection对象表示通过启用JDBC技术的驱动程序与数据源的连接。 数据源可以是DBMS，传统文件系统或其他具有相应JDBC驱动程序的其他数据源。 使用JDBC API的单个应用程序可能会维护多个连接。 这些连接可以访问多个数据源，或者它们都可以访问单个数据源</p>
+<p>从JDBC驱动程序的角度来看，Connection对象表示客户端会话。 它具有关联的状态信息，例如用户ID，在该会话中使用的一组SQL语句和结果集，以及什么事务语义有效</p>
+<p>要获得连接，应用程序可能与之相互作用：</p>
+<ul>
+<li>DriverManager类与一个或多个驱动程序实现或DataSource实现</li>
+</ul>
+<p>使用DataSource对象是首选方法，因为它增强了应用程序的可移植性，使得代码维护更加容易，并且使得应用程序可以透明地利用连接池和分布式事务。 建立与数据源连接的所有Java EE组件都使用DataSource对象来获取连接</p>
+<p>本章介绍了各种类型的JDBC驱动程序以及Driver接口的使用，DriverManager类和基本的DataSource接口。 第11章“连接池”和第12章“分布式事务”中讨论了支持连接池和分布式事务的DataSource实现。</p>
+<h2>驱动类型（Types of Drivers）</h2>
+<p>JDBC驱动程序有许多可能的实现。 这些实现分类如下：</p>
+<ul>
+<li>类型1：实现JDBC API作为映射到另一个数据访问API（如ODBC）的驱动程序。 这种类型的驱动程序通常取决于本机库，这限制了其可移植性。 JDBC-ODBC Bridge驱动程序是Type 1驱动程序的示例</li>
+<li>类型2：部分以Java编程语言编写的驱动程序，以本地代码编写。 这些驱动程序使用特定于其连接的数据源的本地客户端库。 再次，由于本地代码，它们的可移植性是有限的</li>
+<li>类型3：使用纯Java客户端并使用独立于数据库的协议与中间件服务器通信的驱动程序。 然后中间件服务器将客户端的请求传达给数据源</li>
+<li>类型4：纯Java的驱动程序通常使用网络协议或文件I / O来与特定数据源进行通信。 客户端直接连接到数据源</li>
+</ul>
+<h2>Driver 接口（The Driver Interface）</h2>
+<p>JDBC驱动程序必须实现驱动程序接口，并且实现必须包含一个静态的初始化程序，当加载驱动程序时它将被调用。 该初始化程序使用DriverManager注册了一个新的实例</p>
+<blockquote>
+<p>public class AcmeJdbcDriver implements java.sql.Driver {<br />
+static {<br />
+java.sql.DriverManager.registerDriver(new AcmeJdbcDriver());<br />
+}<br />
+...<br />
+}</p>
+</blockquote>
+<p>当加载驱动程序实现时，静态初始化程序将自动注册驱动程序的实例</p>
+<p>为了确保使用这种机制可以加载驱动程序，驱动程序需要提供一个无参数的构造函数</p>
+<p>当DriverManager类希望与注册的驱动程序进行交互时，调用Driver方法。 驱动程序接口还包括方法acceptURL。 DriverManager可以使用此方法来确定哪个注册的驱动程序应该用于给定的URL</p>
+<p>当DriverManager尝试建立连接时，它会调用该驱动程序的connect方法并传递该驱动程序的URL。<br />
+如果驱动程序实现了解URL，它将返回一个Connection对象,或者一个连接不能到达数据库，它将返回一个Connection对象或抛出一个SQLException，如果Driver实现不了解URL，它将返回null</p>
+<h2>加载实现java.sql.Driver的驱动程序</h2>
+<p>作为其初始化的一部分，DriverManager类将尝试加载在系统属性“jdbc.drivers”中引用的任何JDBC驱动程序类</p>
+<blockquote>
+<p>jdbc.drivers=com.acme.jdbc.AcmeJdbcDriver</p>
+</blockquote>
+<p>DriverManager.getConnection方法已得到增强，以支持Java Standard Edition服务提供者机制。 JDBC 4.0驱动程序必须包含文件META-INF / services / java.sql.Driver。 该文件包含JDBC驱动程序的java.sql.Driver实现的名称。 代码示例9-3显示了META-INF / services / java.sql.Driver文件的内容，以加载my.sql.driver类</p>
+<p>备注：当前使用Class.forName（）加载JDBC驱动程序的现有应用程序将继续工作，无需修改</p>
+<h2>DriverAction 接口</h2>
+<p>当驱动程序想要被DriverManager方法deregisterDriver通知时，JDBC驱动程序可以实现DriverAction接口</p>
+<p>DriverAction实现不是直接由应用程序使用。 JDBC驱动程序可以选择在私有类中创建其DriverAction实现，以避免直接调用它<br />
+JDBC驱动程序的静态初始化块必须调用DriverManager.registerDriver（java.sql.Driver，java.sql.DriverAction）才能通知DriverManager当JDBC驱动程序被注册时调用那个DriverAction实现</p>
+<blockquote>
+<p>public class AcmeJdbcDriver implements java.sql.Driver {<br />
+static DriverAction da;<br />
+static {<br />
+java.sql.DriverManager.registerDriver(new AcmeJdbcDriver(), da);<br />
+}<br />
+...<br />
+}</p>
+</blockquote>
+<h2>DriverManager 类</h2>
+<p>DriverManager类与Driver接口一起使用来管理JDBC客户端可用的驱动程序集。 当客户端请求连接并提供URL时，DriverManager负责查找识别URL的驱动程序，并使用该驱动程序连接到相应的数据源</p>
+<p>DriverManager 方法包括：</p>
+<ul>
+<li>registerDriver ：该方法将驱动程序添加到可用驱动程序集中，并在加载驱动程序时隐式调用。 registerDriver方法通常由每个驱动程序提供的静态初始化程序调用</li>
+<li>getConnection ：JDBC客户端调用以建立连接的方法。 调用包括一个JDBC URL，DriverManager传递给列表中的每个驱动程序，直到找到一个Driver.connect方法识别URL的URL。 该驱动程序将一个Connection对象返回给DriverManager，DriverManager又将其传递给应用程序</li>
+</ul>
+<blockquote>
+<p>Connection con = DriverManager.getConnection(url, user, passwd);</p>
+</blockquote>
+<h2>SQLPermission 类</h2>
+<p>SQLPermission类表示可以授予代码库的一组权限<br />
+目前唯一定义的权限是setLog。 当Applet调用其中一个DriverManager方法setLogWriter和setLogStream时，SecurityManager将检查setLog权限。 如果代码库没有setLog权限，将抛出java.lang.SecurityException异常</p>
+<h2>DataSource 接口</h2>
+<p>JDBC 2.0可选包中引入的DataSource接口是获取数据源连接的首选方法。 实现Datasource接口的JDBC驱动程序返回实现与DriverManager使用Driver接口返回的连接相同的接口Connection的连接。 使用Datasource对象可以通过使应用程序使用数据源的逻辑名称而不是提供特定于特定驱动程序的信息来提高应用程序的可移植性。 逻辑名称通过使用Java命名和目录接口（JNDI）的命名服务映射到DataSource对象。 DataSource对象表示物理数据源，并提供与该数据源的连接。 如果数据源或其相关信息发生变化，则可以简单地修改DataSource对象的属性以反映更改; 应用代码不需要更改</p>
+<p>可以实现DataSource接口，以便透明地提供以下内容</p>
+<ul>
+<li>通过连接池提高性能和可扩展性</li>
+<li>通过XADataSource接口支持分布式事务</li>
+</ul>
+<p>备注：DataSource实现必须包含无参数的构造函数</p>
+<p>接下来的三个部分讨论（1）基本的DataSource属性，（2）使用JNDI API的逻辑命名如何提高应用程序的可移植性并使其更容易维护，（3）如何获取连接</p>
+<h3>DataSource Properties</h3>
+<p>JDBC API定义了一组属性来标识和描述DataSource实现。 特定实现所需的实际集合取决于DataSource对象的类型，即它是基本的DataSource对象，ConnectionPoolDataSource对象还是XADataSource对象。 所有DataSource实现所需的唯一属性是描述<br />
+下表描述了标准DataSource属性：</p>
+<table>
+<thead>
+<tr>
+<th>属性名称</th>
+<th>类型</th>
+<th>描述</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>databaseNam</td>
+<td>String</td>
+<td>服务器上特定数据库的名称</td>
+</tr>
+<tr>
+<td>dataSourceName</td>
+<td>String</td>
+<td>数据源名称; 用于在连接池进行时命名底层的XADataSource对象或ConnectionPoolDataSource对象</td>
+</tr>
+<tr>
+<td>description</td>
+<td>String</td>
+<td>data source描述</td>
+</tr>
+<tr>
+<td>networkProtoco</td>
+<td>String</td>
+<td>用于与服务器通信的网络协议</td>
+</tr>
+<tr>
+<td>password</td>
+<td>String</td>
+<td>密码</td>
+</tr>
+<tr>
+<td>portNumber</td>
+<td>int</td>
+<td>服务器正在侦听请求的端口号</td>
+</tr>
+<tr>
+<td>roleName</td>
+<td>String</td>
+<td>角色名</td>
+</tr>
+<tr>
+<td>serverName</td>
+<td>int</td>
+<td>数据库服务名称</td>
+</tr>
+<tr>
+<td>user</td>
+<td>String</td>
+<td>账户名</td>
+</tr>
+</tbody>
+</table>
+<p>DataSource属性遵循JavaBeans 1.01规范中为JavaBeansTM组件的属性指定的约定。 DataSource实现可以使用实现特定的属性来扩充该集合。 如果添加了新的属性，它们必须被赋予与标准属性名称不冲突的名称</p>
+<p>DataSource实现必须为其支持的每个属性提供“getter”和“setter”方法。 这些属性通常在部署DataSource对象时初始化，如CODE示例9-6中，VendorDataSource对象实现DataSource接口。</p>
+<blockquote>
+<p>VendorDataSource vds = new VendorDataSource();<br />
+vds.setServerName("my_database_server");<br />
+String name = vds.getServerName();</p>
+</blockquote>
+<p>DataSource属性不能直接由JDBC客户端访问。 通过在实现类上定义访问方法而不是应用程序使用的公共DataSource接口来加强此设计。 此外，客户端操作的对象可以是仅实现DataSource接口的包装器。 属性的setter和getter方法不需要暴露给客户端</p>
+<h3>JNDI API和应用程序可移植性</h3>
+<p>Java命名和目录接口（JNDI）API为应用程序通过网络访问远程服务提供了一种统一的方式。 本节介绍如何用于注册和访问JDBC DataSource对象。 有关此接口的完整说明，请参阅JNDI规范</p>
+<p>使用JNDI API，应用程序可以通过指定其逻辑名称来访问DataSource对象。 使用JNDI API的命名服务将此逻辑名称映射到相应的数据源。 该方案大大增强了可移植性，因为可以更改任何DataSource属性（如portNumber或serverName），而不影响JDBC客户端代码。 事实上，应用程序可以以完全透明的方式重新定向到不同的底层数据源。 这在三层环境中特别有用，其中应用服务器隐藏访问不同数据源的细节</p>
+<blockquote>
+<p>VendorDataSource vds = new VendorDataSource();<br />
+vds.setServerName("my_database_server");<br />
+vds.setDatabaseName("my_database");<br />
+vds.setDescription("data source for inventory and personnel");<br />
+Context ctx = new InitialContext();<br />
+ctx.bind("jdbc/AcmeDB", vds);</p>
+</blockquote>
+<p>备注：Java EE组件使用特殊约定来命名其数据源 - 有关更多详细信息，请参阅Java EE平台规范中的第5章“命名”</p>
+<h3>获取一个连接来自DataSource对象</h3>
+<blockquote>
+<p>Context ctx = new InitialContext();<br />
+DataSource ds = (DataSource)ctx.lookup("jdbc/AcmeDB");<br />
+Connection con = ds.getConnection("user", "pwd");</p>
+</blockquote>
+<h3>关闭Connection 对象</h3>
+<p>Connection.close（），Connection.isclosed（）和Connection.isValid（）可能用于关闭Connection并确定Connection是否已关闭或仍然有效<br />
+一旦连接已经关闭，除了close（），isClosed（）或isValid（）方法之外，任何访问其任何方法的尝试将导致抛出SQLException</p>
+<h4>Connection.isClosed</h4>
+<p>Connection.isClosed（）方法指示应用程序是否调用了Connection.close（）方法。 该方法通常不能用于确定与数据库的连接是否有效</p>
+<h4>Connection.isValid</h4>
+<p>Connection.isValid（）方法指示Connection是否仍然有效。 如果Connection.isValid（）返回true，则Connection仍然有效。 如果返回值为false，则连接无效，除了close（），isClosed（）或isValid（）方法之外，任何访问其任何方法的尝试将导致抛出SQLException。</p>

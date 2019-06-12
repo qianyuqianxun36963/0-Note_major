@@ -1,0 +1,165 @@
+<h1>连接池（Connection Pooling）</h1>
+<p>在基本的DataSource实现中，客户端的Connection对象和物理数据库连接之间存在1：1的对应关系。 当Connection对象关闭时，物理连接被丢弃。 因此，每个客户端会话都会产生打开，初始化和关闭物理连接的开销</p>
+<p>连接池通过维护可跨客户端会话重用的物理数据库连接缓存来解决此问题。 连接池大大提高了性能和可扩展性，特别是在三层环境中，多个客户端可以共享较少数量的物理数据库连接。 在图11-1中，JDBC驱动程序提供了应用程序服务器用于构建和管理连接池的ConnectionPoolDataSource的实现。</p>
+<p>用于管理连接池的算法的实现事特定的，随应用服务器而异。 应用程序服务器为其客户端提供DataSource接口的实现，使连接池对客户端透明。 因此，客户端在使用与之前相同的JNDI和DataSource API时可以获得更好的性能和可扩展性</p>
+<p><img src="//upload-images.jianshu.io/upload_images/1619194-f3940b180e469067.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/736/format/webp" /></p>
+<p>Paste_Image.png</p>
+<p>以下部分介绍ConnectionPoolDataSource接口，PooledConnection接口和ConnectionEvent类。 这些在客户端使用的DataSource和Connection接口下运行的程序被并入到典型连接池实现的逐步描述中</p>
+<p>本章还介绍了基本的DataSource对象与实现连接池的一些重要区别。 此外，它还讨论了池连接如何维护可重用的PreparedStatement对象池</p>
+<p>尽管本章中讨论的大部分都假设了三层环境，但连接池在两层环境中也是相关的。 在两层环境中，JDBC驱动程序实现了DataSource和ConnectionPoolDataSource接口。 此实现允许打开和关闭多个连接的应用程序从连接池中受益</p>
+<h2>ConnectionPoolDataSource and PooledConnection</h2>
+<p>通常，JDBC驱动程序实现ConnectionPoolDataSource接口，应用程序服务器使用它来获取PooledConnection对象。 代码示例11-1显示了getPooledConnection方法的两个版本的签名</p>
+<blockquote>
+<p>public interface ConnectionPoolDataSource {<br />
+PooledConnection getPooledConnection() throws<br />
+SQLException;<br />
+PooledConnection getPooledConnection(String user,<br />
+String password) throws SQLException;<br />
+...<br />
+}</p>
+</blockquote>
+<p>PooledConnection对象表示与数据源的物理连接。 PooledConnection的JDBC驱动程序的实现封装了维护该连接的所有细节</p>
+<p>应用服务器在DataSource接口的实现中缓存并重用PooledConnection对象。 当客户端调用DataSource.getConnection方法时，应用程序服务器使用物理PooledConnection对象来获取逻辑Connection对象。 代码示例11-2显示了PooledConnection接口定义。</p>
+<blockquote>
+<p>public interface PooledConnection {<br />
+Connection getConnection() throws SQLException;<br />
+void close() throws SQLException;<br />
+void addConnectionEventListener(<br />
+ConnectionEventListener listener);<br />
+void addStatementEventListener(<br />
+StatementEventListener listener);<br />
+void removeConnectionEventListener(<br />
+ConnectionEventListener listener);<br />
+void removeStatementEventListener(<br />
+StatementEventListener listener);<br />
+}</p>
+</blockquote>
+<p>当应用程序使用连接完成时，它将使用Connection.close方法来关闭逻辑连接。 这将关闭逻辑连接，但不会关闭物理连接。 而是将物理连接返回到池，以便可以重新使用</p>
+<p>备注：当使用Connection pooling时调用Connection.closed时，由Connection.setClientInfo设置的任何属性都将被清除。</p>
+<h2>Connection Events</h2>
+<p>回想一下，当应用程序调用Connection.close方法时，底层物理连接（PooledConnection对象）可用于重用。 JavaBeans风格的事件用于通知连接池管理器（应用程序服务器）可以回收PooledConnection对象</p>
+<p>为了通知PooledConnection对象上的事件，连接池管理器必须实现ConnectionEventListener接口，然后由该PooledConnection对象注册为侦听器 ，ConnectionEventListener接口定义了以下两种方法，它们对应于PooledConnection对象可能发生的两种事件：</p>
+<ul>
+<li>connectionClosed ：当与此PooledConnection对象关联的逻辑连接对象关闭时触发，即称为方法Connection.close的应用程序</li>
+<li>connectionErrorOccurred ：当致命错误（如服务器崩溃）导致连接丢失时触发</li>
+</ul>
+<p>连接池管理器使用PooledConnection.addConnectionEventListener方法将自身注册为PooledConnection对象的侦听器。 通常，在将Connection对象返回给应用程序之前，连接池管理器将自身注册为ConnectionEventListener。</p>
+<p>当相应的事件发生时，驱动程序调用ConnectionEventListener方法connectionClosed和connectionErrorOccurred。 两个方法都将ConnectionEvent对象作为参数，可用于确定哪个PooledConnection对象已关闭或出现错误。 当JDBC应用程序关闭其逻辑连接时，JDBC驱动程序通过调用监听器的connectClosed方法的实现来通知连接池管理器（监听器）。 此时，连接池管理器可以将PooledConnection对象返回到池中以供重用</p>
+<p>发生错误时，JDBC驱动程序通过调用其connectionErrorOccurred方法通知侦听器，然后将SQLException对象抛出该应用程序，以通知它相同的错误。 在发生致命错误的情况下，坏池池连接对象不会返回到池中。 而是连接池管理器调用PooledConnection对象上的PooledConnection.close方法来关闭物理连接</p>
+<h2>三层环境中的连接池</h2>
+<p>以下步骤序列概述了当JDBC客户端从实现连接池的DataSource对象请求连接时会发生什么：</p>
+<ul>
+<li>这客户端呼叫 DataSource.getConnection.</li>
+<li>提供DataSource实现的应用程序服务器在其连接池中查找是否有合适的PooledConnection对象 - 物理数据库连接可用。确定给定PooledConnection对象的适用性可能包括匹配客户端的用户认证信息或应用程序类型以及使用其他实现特定标准。 与管理连接池相关联的查找方法和其他方法是特定于应用程序服务器的</li>
+<li>如果没有适当的PooledConnection对象可用，应用程序服务器将调用ConnectionPoolDataSource.getPooledConnection方法来获取新的物理连接。 实现ConnectionPoolDataSource的JDBC驱动程序创建一个新的PooledConnection对象并将其返回给应用程序服务器。</li>
+<li>无论PooledConnection是从池中检索还是新创建，应用程序服务器都会进行一些内部簿记来指示物理连接正在使用中</li>
+<li>应用程序服务器调用方法PooledConnection.getConnection以获取逻辑连接对象。 这个逻辑的Connection对象实际上是一个物理PooledConnection对象的“句柄”，当连接池生效时，DataSource.getConnection方法返回的是这个句柄</li>
+<li>应用程序服务器通过调用PooledConnection.addConnectionEventListener方法将自身注册为ConnectionEventListener。 这样做是为了在PooledConnection对象可用于重用时通知应用程序服务器</li>
+<li>逻辑Connection对象返回给JDBC客户端，JDBC客户端使用与基本DataSource情况相同的Connection API。 请注意，底层PooledConnection对象不能重用，直到客户端调用方法Connection.close。</li>
+<li>连接池也可以在没有应用服务器的两层环境中实现。 在这种情况下，JDBC驱动程序提供对客户端可见的DataSource的实现以及底层的ConnectionPoolDataSource实现</li>
+</ul>
+<h2>DataSource实现和连接池</h2>
+<p>除了提高性能和可扩展性之外，JDBC应用程序不应该在访问实现连接池的DataSource对象之间看不到任何差异。 但是，在应用程序服务器和驱动程序级别的实现中存在一些重要的区别</p>
+<p>基本的DataSource实现，即不实现连接池的实现通常由JDBC驱动程序供应商提供。 在基本的DataSource实现中，以下是真实的</p>
+<ul>
+<li>DataSource.getConnection方法创建一个新的Connection对象，它表示一个物理连接，并封装了所有的工作来设置和管理该连接。</li>
+<li>Connection.close方法关闭物理连接并释放相关资源</li>
+</ul>
+<p>在包含连接池的DataSource实现中，幕后有很多事情发生。 在这种实现中，以下是正确的</p>
+<ul>
+<li>DataSource实现包括一个实现特定的连接池模块，用于管理PooledConnection对象的缓存。<br />
+DataSource对象通常由应用程序服务器实现，作为ConnectionPoolDataSource和PooledConnection接口的驱动程序实现之上的层</li>
+<li>DataSource.getConnection方法调用PooledConnection.getConnection以获取底层物理连接的逻辑句柄。 仅当连接池中没有可用的连接时，才会产生设置新物理连接的开销。 当需要新的物理连接时，连接池管理器将调用ConnectionPoolDataSource方法getPooledConnection来创建一个。 管理物理连接的工作被委派给PooledConnection对象</li>
+<li>Connection.close方法关闭逻辑句柄，但是保持物理连接。 通知连接池管理器现在可以重用基础PooledConnection对象。 如果应用程序尝试重用逻辑句柄，则Connection实现将抛出一个SQLException<br />
+单个物理PooledConnection对象可能会在其生命周期内生成许多逻辑连接对象。 对于给定的PooledConnection对象，只有最近生成的逻辑连接对象才有效。 当调用关联的PooledConnection.getConnection方法时，任何先前存在的Connection对象都将自动关闭。 在这种情况下，不会通知侦听器（连接池管理器）</li>
+<li>连接池管理器通过调用PooledConnection.close方法来关闭物理连接。 通常仅在某些情况下才会调用此方法：当应用程序服务器正在进行有序关闭时，当重新初始化连接缓存时，或者当应用程序服务器收到指示连接上发生不可恢复的错误的事件时</li>
+</ul>
+<h2>部署</h2>
+<p>部署实现连接池的DataSource对象需要将客户端可见的DataSource对象和底层的ConnectionPoolDataSource对象注册到基于JNDI的命名服务</p>
+<blockquote>
+<p>com.acme.appserver.PooledDataSource ds =<br />
+new com.acme.appserver.PooledDataSource();<br />
+ds.setDescription(“Datasource with connection pooling”);<br />
+// Reference the previously registered ConnectionPoolDataSource<br />
+ds.setDataSourceName(“jdbc/pool/bookserver_pool”);<br />
+// Register the DataSource implementation with JNDI, using the logical // name “jdbc/bookserver”.<br />
+Context ctx = new InitialContext();<br />
+ctx.bind(“jdbc/bookserver”, ds);</p>
+</blockquote>
+<h2>通过池连接重用语句</h2>
+<p>DBC规范提供对语句池的支持。 此功能允许应用程序以与重用连接大致相同的方式重用PreparedStatement对象，可通过池化连接获得</p>
+<p>图11-2提供了一个PreparedStatement池如何与PooledConnection对象关联的逻辑视图。 与PooledConnection对象本身一样，PreparedStatement对象可以通过多个逻辑连接以透明的方式重用</p>
+<p><img src="//upload-images.jianshu.io/upload_images/1619194-d9a9df0997491203.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/782/format/webp" /></p>
+<p>11-2</p>
+<p>在图11-2中，连接池和语句池由应用服务器实现。 但是，该功能也可以由驱动程序或底层数据源来实现。 这种对语句池的讨论是为了允许任何这些实现。</p>
+<h3>使用 池语句</h3>
+<p>如果池化连接重用语句，则重用必须对应用程序完全透明。 换句话说，从应用程序的角度来看<br />
+使用参与语句池的PreparedStatement对象与使用不一致的PreparedStatement对象完全相同。 声明保持开放，完全在封面下重复使用，因此应用代码没有变化。 如果一个应用程序关闭PreparedStatement对象，它仍然必须调用Connection.prepareStatement才能再次使用它。 语句池唯一可见的效果是性能的提高</p>
+<p>一个应用程序可以通过调用DatabaseMetaData方法supportsStatementPooling来确定数据源是否支持语句池。 如果返回值为true，则应用程序可以选择使用PreparedStatement对象，知道它们可能被汇总</p>
+<p>在许多情况下，重用语句是一个重要的优化。 对于复杂的准备语句尤其如此。 但是，还应该指出的是，大量的公开声明可能会对资源的使用产生不利影响</p>
+<h3>关闭 池语句</h3>
+<p>一个应用程序关闭一个pooled语句完全一样，它关闭一个非pooled语句。 无论是否合并，已关闭的语句不再可供应用程序使用，并且尝试重用它将导致抛出异常<br />
+以下方法可以关闭pooled语句：</p>
+<ul>
+<li>Statement.close ：被调用通过一个应用; 如果语句正在池中，请关闭应用程序使用的逻辑语句，但不关闭正在池中的物理语句</li>
+<li>Connection.close ：被调用通过一个应用，<br />
+无连接池：关闭物理连接和由该连接创建的所有语句。 这是必要的，因为垃圾收集机制无法检测何时可以释放外部管理的资源<br />
+有连接池:关闭逻辑连接及其返回的逻辑语句，但会打开底层Pooled Connection对象和任何关联的pooled语句</li>
+<li>PooledConnection.close:由连接池管理器调用以关闭由PooledConnection对象提取的物理连接和关联的物理语句</li>
+</ul>
+<p>应用程序不能直接关闭正在合并的物理语句; 而是由连接池管理器完成。 PooledConnection.close方法关闭连接，并在给定的连接上打开所有的语句，释放与这些语句关联的资源</p>
+<p>应用程序也不直接控制如何汇总语句。 一个语句池与PooledConnection对象相关联，它的行为由生成它的ConnectionPoolDataSource对象的属性决定。 第11.8节“ConnectionPoolDataSource属性”讨论了这些属性</p>
+<h2>声明事件</h2>
+<p>如果连接池管理器支持PreparedStatement对象的Statement pooling，则必须实现StatementEventListener接口，然后由该PooledConnection对象注册为侦听器。 StatementEventListener接口定义了以下两种方法，它们对应于PreparedStatement对象可能发生的两种事件</p>
+<ul>
+<li>statementClosed :当与此PooledConnection对象关联的逻辑PreparedStatement对象关闭时触发，即应用程序称为方法PreparedStatement.close</li>
+<li>statementErrorOccurred : 当JDBC驱动程序确定PreparedStatement对象不再有效时触发</li>
+</ul>
+<p>连接池管理器使用PooledConnection.addStatementEventListener方法将自己注册为PreparedStatement对象的侦听器。 通常，连接池管理器将自己注册为StatementEventListener，然后将PreparedStatement对象返回给应用程序</p>
+<p>当相应的事件发生时，驱动程序调用StatementEventListener方法statementClosed和statementErrorOccurred。 两个方法都将一个statementEvent对象作为参数，可用于确定哪个PreparedStatement对象已关闭或出现错误。 当JDBC应用程序关闭其逻辑准备语句时，JDBC驱动程序通过调用监听器对方法statementClosed的实现来通知连接池管理器（监听器）。 此时，连接池管理器可以将PreparedStatement对象返回到池中以供重用。</p>
+<p>当发生使PreparedStatement对象无效的错误时，JDBC驱动程序通过调用其statementErrorOccurred方法通知侦听器，然后将SQLException对象抛出该应用程序以通知其相同的错误</p>
+<h2>ConnectionPoolDataSource 属性</h2>
+<table>
+<thead>
+<tr>
+<th>属性</th>
+<th>类型</th>
+<th>描绘</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>maxStatements</td>
+<td>int</td>
+<td>池应保持打开的语句总数。 0（零）表示缓存语句被禁用</td>
+</tr>
+<tr>
+<td>initialPoolSize</td>
+<td>int</td>
+<td>池创建时应包含的物理连接数</td>
+</tr>
+<tr>
+<td>minPoolSize</td>
+<td>int</td>
+<td>池应该始终保持可用的物理连接数。 0（零）表示应该根据需要创建连接</td>
+</tr>
+<tr>
+<td>maxPoolSize</td>
+<td>int</td>
+<td>池应包含的最大物理连接数。 0（零）表示无最大大小。</td>
+</tr>
+<tr>
+<td>maxIdleTime</td>
+<td>int</td>
+<td>在连接关闭之前，物理连接在池中应保持未使用的秒数。 0（零）表示无限制。</td>
+</tr>
+<tr>
+<td>propertyCycle</td>
+<td>int</td>
+<td>在执行由上述连接池属性的值定义的当前策略之前，池应等待的时间间隔（秒）</td>
+</tr>
+</tbody>
+</table>
+<p>连接池配置属性遵循JavaBeans规范中为JavaBeans组件指定的约定。 连接池供应商可以选择使用实现特定的属性来扩充该集合。 如果是这样，额外的属性必须被赋予不与标准属性名称冲突的名称。</p>
+<p>像DataSource实现一样，ConnectionPoolDataSource实现必须为其支持的每个属性提供“getter”和“setter”方法。 通常在部署ConnectionPoolDataSource对象时初始化这些属性。 代码示例11-5说明了供应商实现ConnectionPoolDataSource接口中的设置属性</p>
+<p> </p>

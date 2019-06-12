@@ -1,0 +1,173 @@
+<h1><a href="https://blog.csdn.net/x_i_y_u_e/article/details/52223406">Java AIO总结与示例</a></h1>
+<p>AIO是异步IO的缩写，虽然NIO在网络操作中，提供了非阻塞的方法，<strong>但是NIO的IO行为还是同步的</strong>。对于NIO来说，我们的业务线程是在IO操作准备好时，得到通知，接着就由这个线程自行进行IO操作，IO操作本身是同步的。</p>
+<p>但是对AIO来说，则更加进了一步，它不是在IO准备好时再通知线程，而是在IO操作已经完成后，再给线程发出通知。因此AIO是不会阻塞的，此时我们的业务逻辑将变成一个回调函数，等待IO操作完成后，由系统自动触发。</p>
+<p>下面的程序是通过AIO来实现一个简单的EchoServer以及对应的客户端。</p>
+<p>在AIO socket编程中，服务端通道是AsynchronousServerSocketChannel，这个类提供了一个open()静态工厂，一个bind()方法用于绑定服务端IP地址（还有端口号），另外还提供了accept()用于接收用户连接请求。在客户端使用的通道是AsynchronousSocketChannel,这个通道处理提供open静态工厂方法外，还提供了read和write方法。</p>
+<p>在AIO编程中，发出一个事件（accept read write等）之后要指定事件处理类（回调函数），AIO中的事件处理类是CompletionHandler<V,A>，这个接口定义了如下两个方法，分别在异步操作成功和失败时被回调。</p>
+<p>   <strong>void </strong>completed(V result, A attachment);</p>
+<p>   <strong>void </strong>failed(Throwable exc, A attachment);</p>
+<p>说了这么多，感觉很像Ajax中的回调方法，只不过换成了类。直接看代码吧：</p>
+<h2>服务端：</h2>
+<ol start="1">
+<li>import java.io.IOException;  </li>
+<li>import java.net.InetSocketAddress;  </li>
+<li>import java.nio.ByteBuffer;  </li>
+<li>import java.nio.channels.AsynchronousServerSocketChannel;  </li>
+<li>import java.nio.channels.AsynchronousSocketChannel;  </li>
+<li>import java.nio.channels.CompletionHandler;  </li>
+<li>import java.util.concurrent.ExecutionException;  </li>
+<li>import java.util.concurrent.Future;  </li>
+<li>import java.util.concurrent.TimeUnit;  </li>
+<li>import java.util.concurrent.TimeoutException;  </li>
+<li>  </li>
+<li>public class AIOEchoServer {  </li>
+<li>  </li>
+<li>    public final static int PORT = 8001;  </li>
+<li>    public final static String IP = "127.0.0.1";  </li>
+<li>  </li>
+<li>      </li>
+<li>    private AsynchronousServerSocketChannel server = null;  </li>
+<li>      </li>
+<li>    public AIOEchoServer(){  </li>
+<li>        try {  </li>
+<li>            //同样是利用工厂方法产生一个通道，异步通道 AsynchronousServerSocketChannel  </li>
+<li>            server = AsynchronousServerSocketChannel.open().bind(new InetSocketAddress(IP,PORT));  </li>
+<li>        } catch (IOException e) {  </li>
+<li>            e.printStackTrace();  </li>
+<li>        }  </li>
+<li>    }  </li>
+<li>      </li>
+<li>    //使用这个通道(server)来进行客户端的接收和处理  </li>
+<li>    public void start(){  </li>
+<li>        System.out.println("Server listen on "+PORT);  </li>
+<li>          </li>
+<li>        //注册事件和事件完成后的处理器，这个CompletionHandler就是事件完成后的处理器  </li>
+<li>        server.accept(null,new CompletionHandler<AsynchronousSocketChannel,Object>(){  </li>
+<li>  </li>
+<li>            final ByteBuffer buffer = ByteBuffer.allocate(1024);  </li>
+<li>              </li>
+<li>            @Override  </li>
+<li>            public void completed(AsynchronousSocketChannel result,Object attachment) {  </li>
+<li>                  </li>
+<li>                System.out.println(Thread.currentThread().getName());  </li>
+<li>                Future<Integer> writeResult = null;  </li>
+<li>                  </li>
+<li>                try{  </li>
+<li>                    buffer.clear();  </li>
+<li>                    result.read(buffer).get(100,TimeUnit.SECONDS);  </li>
+<li>                      </li>
+<li>                    System.out.println("In server: "+ new String(buffer.array()));  </li>
+<li>                      </li>
+<li>                    //将数据写回客户端  </li>
+<li>                    buffer.flip();  </li>
+<li>                    writeResult = result.write(buffer);  </li>
+<li>                }catch(InterruptedException | ExecutionException | TimeoutException e){  </li>
+<li>                    e.printStackTrace();  </li>
+<li>                }finally{  </li>
+<li>                    server.accept(null,this);  </li>
+<li>                    try {  </li>
+<li>                        writeResult.get();  </li>
+<li>                        result.close();  </li>
+<li>                    } catch (InterruptedException | ExecutionException e) {  </li>
+<li>                        e.printStackTrace();  </li>
+<li>                    } catch (IOException e) {  </li>
+<li>                        e.printStackTrace();  </li>
+<li>                    }  </li>
+<li>                }  </li>
+<li>                  </li>
+<li>            }  </li>
+<li>  </li>
+<li>            @Override  </li>
+<li>            public void failed(Throwable exc, Object attachment) {  </li>
+<li>                System.out.println("failed:"+exc);  </li>
+<li>            }  </li>
+<li>              </li>
+<li>        });  </li>
+<li>    }  </li>
+<li>      </li>
+<li>    public static void main(String[] args) {  </li>
+<li>        new AIOEchoServer().start();  </li>
+<li>        while(true){  </li>
+<li>            try {  </li>
+<li>                Thread.sleep(1000);  </li>
+<li>            } catch (InterruptedException e) {  </li>
+<li>                e.printStackTrace();  </li>
+<li>            }  </li>
+<li>        }  </li>
+<li>    }  </li>
+<li>  </li>
+<li>}  </li>
+</ol>
+<p><br />
+客户端：</p>
+<ol start="1">
+<li>import java.io.IOException;  </li>
+<li>import java.net.InetSocketAddress;  </li>
+<li>import java.nio.ByteBuffer;  </li>
+<li>import java.nio.channels.AsynchronousSocketChannel;  </li>
+<li>import java.nio.channels.CompletionHandler;  </li>
+<li>  </li>
+<li>public class AIOClient {  </li>
+<li>  </li>
+<li>    public static void main(String[] args) throws IOException {  </li>
+<li>          </li>
+<li>        final AsynchronousSocketChannel client = AsynchronousSocketChannel.open();  </li>
+<li>          </li>
+<li>        InetSocketAddress serverAddress = new InetSocketAddress("127.0.0.1",8001);  </li>
+<li>          </li>
+<li>        CompletionHandler<Void, ? super Object> handler = new CompletionHandler<Void,Object>(){  </li>
+<li>  </li>
+<li>            @Override  </li>
+<li>            public void completed(Void result, Object attachment) {  </li>
+<li>                client.write(ByteBuffer.wrap("Hello".getBytes()),null,   </li>
+<li>                        new CompletionHandler<Integer,Object>(){  </li>
+<li>  </li>
+<li>                            @Override  </li>
+<li>                            public void completed(Integer result,  </li>
+<li>                                    Object attachment) {  </li>
+<li>                                final ByteBuffer buffer = ByteBuffer.allocate(1024);  </li>
+<li>                                client.read(buffer,buffer,new CompletionHandler<Integer,ByteBuffer>(){  </li>
+<li>  </li>
+<li>                                    @Override  </li>
+<li>                                    public void completed(Integer result,  </li>
+<li>                                            ByteBuffer attachment) {  </li>
+<li>                                        buffer.flip();  </li>
+<li>                                        System.out.println(new String(buffer.array()));  </li>
+<li>                                        try {  </li>
+<li>                                            client.close();  </li>
+<li>                                        } catch (IOException e) {  </li>
+<li>                                            e.printStackTrace();  </li>
+<li>                                        }  </li>
+<li>                                    }  </li>
+<li>  </li>
+<li>                                    @Override  </li>
+<li>                                    public void failed(Throwable exc,  </li>
+<li>                                            ByteBuffer attachment) {  </li>
+<li>                                    }  </li>
+<li>                                      </li>
+<li>                                });  </li>
+<li>                            }  </li>
+<li>  </li>
+<li>                            @Override  </li>
+<li>                            public void failed(Throwable exc, Object attachment) {  </li>
+<li>                            }  </li>
+<li>                      </li>
+<li>                });  </li>
+<li>            }  </li>
+<li>  </li>
+<li>            @Override  </li>
+<li>            public void failed(Throwable exc, Object attachment) {  </li>
+<li>            }  </li>
+<li>              </li>
+<li>        };  </li>
+<li>          </li>
+<li>        client.connect(serverAddress, null, handler);  </li>
+<li>        try {  </li>
+<li>            Thread.sleep(1000);  </li>
+<li>        } catch (InterruptedException e) {  </li>
+<li>            e.printStackTrace();  </li>
+<li>        }  </li>
+<li>    }  </li>
+<li>  </li>
+<li>}  </li>
+</ol>

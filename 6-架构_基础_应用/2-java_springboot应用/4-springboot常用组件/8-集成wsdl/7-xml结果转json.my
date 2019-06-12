@@ -1,0 +1,134 @@
+<h1>java将XML文档转换成json格式数据</h1>
+
+<h2>功能</h2>
+
+<blockquote>
+<p>将xml文档转换成json格式数据</p>
+</blockquote>
+
+<hr />
+<h2>说明</h2>
+
+<blockquote>
+<p>依赖包： <br />
+1. jdom-2.0.2.jar : xml解析工具包; <br />
+2. fastjson-1.1.36.jar : 阿里巴巴研发的高性能json工具包</p>
+</blockquote>
+
+<hr />
+<h2>程序源代码</h2>
+
+<pre>
+<code>package com.xxx.open.pay.util;
+
+
+import com.alibaba.fastjson.JSONObject;
+import org.jdom2.Element;
+import org.jdom2.JDOMException;
+import org.jdom2.input.SAXBuilder;
+
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.LinkedList;
+import java.util.List;
+
+/**
+* Created by 1250052380@qq.com on 2015/5/19.
+*/
+public class XmlUtil {
+public static JSONObject xml2JSON(byte[] xml) throws JDOMException, IOException {
+JSONObject json = new JSONObject();
+InputStream is = new ByteArrayInputStream(xml);
+SAXBuilder sb = new SAXBuilder();
+org.jdom2.Document doc = sb.build(is);
+Element root = doc.getRootElement();
+json.put(root.getName(), iterateElement(root));
+return json;
+}
+
+private static JSONObject iterateElement(Element element) {
+List node = element.getChildren();
+Element et = null;
+JSONObject obj = new JSONObject();
+List list = null;
+for (int i = 0; i < node.size(); i++) {
+list = new LinkedList();
+et = (Element) node.get(i);
+if (et.getTextTrim().equals("")) {
+if (et.getChildren().size() == 0)
+continue;
+if (obj.containsKey(et.getName())) {
+list = (List) obj.get(et.getName());
+}
+list.add(iterateElement(et));
+obj.put(et.getName(), list);
+} else {
+if (obj.containsKey(et.getName())) {
+list = (List) obj.get(et.getName());
+}
+list.add(et.getTextTrim());
+obj.put(et.getName(), list);
+}
+}
+return obj;
+}
+
+public static void main(String[] args) throws JDOMException, IOException {
+String xml="<?xml version=\"1.0\" encoding=\"utf-8\" ?><MoBaoAccount MessageType=\"UserMobilePay\" PlatformID=\"b2ctest\"><OrderNo>M20150521084825</OrderNo><TradeAmt>5000.00</TradeAmt><Commission>0.5</Commission><UserID>zhuxiaolong</UserID><MerchID>zhuxiaolong1</MerchID><tradeType>0</tradeType><CustParam>123</CustParam> <NotifyUrl>http://mobaopay.com/callback.do</NotifyUrl><TradeSummary>订单</TradeSummary></MoBaoAccount>";
+JSONObject json=xml2JSON(xml.getBytes());
+System.out.println(json.toJSONString());
+}
+}
+</code></pre>
+
+<hr />
+<h2>执行结果</h2>
+
+<ul>
+<li>XML原文：</li>
+</ul>
+
+<pre>
+<code><?xml version="1.0" encoding="utf-8" ?</code></pre>
+
+<p> </p>
+
+<p><code>> <MoBaoAccount MessageType="UserMobilePay" PlatformID="b2ctest"> <OrderNo>M20150521084825</OrderNo> <TradeAmt>5000.00</TradeAmt> <Commission>0.5</Commission> <UserID>xiaolong</UserID> <MerchID>xiaolong1</MerchID> <tradeType>0</tradeType> <CustParam>123</CustParam> <NotifyUrl>http://mobaopay.com/callback.do</NotifyUrl> <TradeSummary>订单</TradeSummary> </MoBaoAccount></code></p>
+
+<ul>
+<li>转换后的json格式数据</li>
+</ul>
+
+<pre>
+<code>{
+"MoBaoAccount": {
+"Commission": [
+"0.5"
+],
+"CustParam": [
+"123"
+],
+"MerchID": [
+"zhuxiaolong1"
+],
+"NotifyUrl": [
+"http://mobaopay.com/callback.do"
+],
+"OrderNo": [
+"M20150521084825"
+],
+"TradeAmt": [
+"5000.00"
+],
+"TradeSummary": [
+"订单"
+],
+"UserID": [
+"zhuxiaolong"
+],
+"tradeType": [
+"0"
+]
+}
+}</code></pre>

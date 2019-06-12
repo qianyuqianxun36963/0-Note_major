@@ -1,0 +1,181 @@
+<h1>activemq安装</h1>
+
+<p>自从activemq5.9.0开始，activemq的集群实现方式取消了传统的Pure Master Slave方式，增加了基于zookeeper+leveldb的实现方式，其他两种方式：目录共享和数据库共享依然存在。 </p>
+
+<p><strong>1、Master-Slave部署方式</strong> </p>
+
+<p>1)、Shared Filesystem Master-Slave方式 <br />
+2)、Shared Database Master-Slave方式 <br />
+3)、Replicated LevelDB Store方式 </p>
+
+<p>第一种方案同样支持N个AMQ实例组网，但由于他是基于kahadb存储策略，亦可以部署在分布式文件系统上，应用灵活、高效且安全。 <br />
+第二种方案与shared filesystem方式类似，只是共享的存储介质由文件系统改成了数据库而已，支持N个AMQ实例组网，但他的性能会受限于数据库；  <br />
+第三种方案是ActiveMQ5.9以后才新增的特性，使用ZooKeeper协调选择一个node作为master。被选择的master broker node开启并接受客户端连接。 <br />
+其他node转入slave模式，连接master并同步他们的存储状态。slave不接受客户端连接。所有的存储操作都将被复制到连接至Master的slaves。 <br />
+如果master死了，得到了最新更新的slave被允许成为master。fialed node能够重新加入到网络中并连接master进入slave mode。所有需要同步的disk的消息操作都将等待存储状态被复制到其他法定节点的操作完成才能完成。所以，如果你配置了replicas=3，那么法定大小是(3/2)+1=2. Master将会存储并更新然后等待 (2-1)=1个slave存储和更新完成，才汇报success。至于为什么是2-1，熟悉Zookeeper的应该知道，有一个node要作为观擦者存在。 <br />
+单一个新的master被选中，你需要至少保障一个法定node在线以能够找到拥有最新状态的node。这个node将会成为新的master。因此，推荐运行至少3个replica nodes，以防止一个node失败了，服务中断。 </p>
+
+<p><strong>Shared Filesystem Master-Slave方式</strong> <br />
+shared filesystem Master-Slave部署方式主要是通过共享存储目录来实现master和slave的热备，所有的ActiveMQ应用都在不断地获取共享目录的控制权，哪个应用抢到了控制权，它就成为master。 <br />
+<br />
+多个共享存储目录的应用，谁先启动，谁就可以最早取得共享目录的控制权成为master，其他的应用就只能作为slave。 </p>
+
+<h2>一、下载activeMQ解压并复制3份</h2>
+
+<p><img alt="" src="http://images2015.cnblogs.com/blog/997896/201706/997896-20170614111714087-1226334698.png" style="width:700px" /></p>
+
+<h2>二、修改配置文件conf下面 activemq.xml</h2>
+
+<p>如下 ，3份文件broker都修改为一致  其中dataDirectory 是 数据存储共享目录地址</p>
+
+<p><img alt="" src="http://images2015.cnblogs.com/blog/997896/201706/997896-20170614111825884-1573825922.png" style="width:700px" />修改 kahaDB目录地址为数据存储共享目录地址</p>
+
+<p><img alt="" src="http://images2015.cnblogs.com/blog/997896/201706/997896-20170614111956025-158254273.png" style="width:700px" />修改openwire  的tcp 连接地址端口分别为 61616 61626 61636 </p>
+
+<p><img alt="" src="http://images2015.cnblogs.com/blog/997896/201706/997896-20170614112050853-1713021275.png" style="width:700px" />二 、修改conf 下面的 jetty.xml文件，修改管理界面端口 8161 8162 8163 方便测试查看启动的那一个activemq服务</p>
+
+<p> <img alt="" src="http://images2015.cnblogs.com/blog/997896/201706/997896-20170614112327228-339158880.png" style="width:700px" /></p>
+
+<h2>三、启动  成功了一个后面的将阻塞等待获取锁 </h2>
+
+<p><img alt="" src="http://images2015.cnblogs.com/blog/997896/201706/997896-20170614112536134-944075208.png" style="width:700px" /></p>
+
+<h2>四、测试</h2>
+
+<h3>receiver.java</h3>
+
+<p>package com.activemq.demo;</p>
+
+<p>import javax.jms.Connection;<br />
+import javax.jms.ConnectionFactory;<br />
+import javax.jms.Destination;<br />
+import javax.jms.MessageConsumer;<br />
+import javax.jms.Session;<br />
+import javax.jms.TextMessage;<br />
+import org.apache.activemq.ActiveMQConnection;<br />
+import org.apache.activemq.ActiveMQConnectionFactory;</p>
+
+<p><br />
+public class Receiver {<br />
+    public static void main(String[] args) {<br />
+        // ConnectionFactory ：连接工厂，JMS 用它创建连接<br />
+        ConnectionFactory connectionFactory;<br />
+        // Connection ：JMS 客户端到JMS Provider 的连接<br />
+        Connection connection = null;<br />
+        // Session： 一个发送或接收消息的线程<br />
+        Session session;<br />
+        // Destination ：消息的目的地;消息发送给谁.<br />
+        Destination destination;<br />
+        // 消费者，消息接收者<br />
+        MessageConsumer consumer;<br />
+        connectionFactory = new ActiveMQConnectionFactory(<br />
+                "failover:(tcp://localhost:61616,tcp://localhost:61626,tcp://localhost:61636)");<br />
+        try {<br />
+            // 构造从工厂得到连接对象<br />
+            connection = connectionFactory.createConnection();<br />
+            // 启动<br />
+            connection.start();<br />
+            // 获取操作连接<br />
+            session = connection.createSession(Boolean.FALSE,<br />
+                    Session.AUTO_ACKNOWLEDGE);<br />
+            // 获取session注意参数值xingbo.xu-queue是一个服务器的queue，须在在ActiveMq的console配置<br />
+            destination = session.createQueue("FirstQueue");<br />
+            consumer = session.createConsumer(destination);<br />
+            while (true) {<br />
+                //设置接收者接收消息的时间，为了便于测试，这里谁定为100s<br />
+                TextMessage message = (TextMessage) consumer.receive(100000);<br />
+                if (null != message) {<br />
+                    System.out.println("收到消息" + message.getText());<br />
+                } else {<br />
+                    break;<br />
+                }<br />
+            }<br />
+        } catch (Exception e) {<br />
+            e.printStackTrace();<br />
+        } finally {<br />
+            try {<br />
+                if (null != connection)<br />
+                    connection.close();<br />
+            } catch (Throwable ignore) {<br />
+            }<br />
+        }<br />
+    }<br />
+}</p>
+
+<h3>Sender.java</h3>
+
+<p>package com.activemq.demo;</p>
+
+<p>import javax.jms.Connection;<br />
+import javax.jms.ConnectionFactory;<br />
+import javax.jms.DeliveryMode;<br />
+import javax.jms.Destination;<br />
+import javax.jms.MessageProducer;<br />
+import javax.jms.Session;<br />
+import javax.jms.TextMessage;<br />
+import org.apache.activemq.ActiveMQConnection;<br />
+import org.apache.activemq.ActiveMQConnectionFactory;</p>
+
+<p>public class Sender {</p>
+
+<p>    private static final int SEND_NUMBER = 5;</p>
+
+<p>    public static void main(String[] args) {<br />
+        // ConnectionFactory ：连接工厂，JMS 用它创建连接<br />
+        ConnectionFactory connectionFactory;<br />
+        // Connection ：JMS 客户端到JMS Provider 的连接<br />
+        Connection connection = null;<br />
+        // Session： 一个发送或接收消息的线程<br />
+        Session session;<br />
+        // Destination ：消息的目的地;消息发送给谁.<br />
+        Destination destination;<br />
+        // MessageProducer：消息发送者<br />
+        MessageProducer producer;<br />
+        // TextMessage message;<br />
+        // 构造ConnectionFactory实例对象，此处采用ActiveMq的实现jar<br />
+        connectionFactory = new ActiveMQConnectionFactory(<br />
+                "failover:(tcp://localhost:61616,tcp://localhost:61626,tcp://localhost:61636)");<br />
+        try {<br />
+            // 构造从工厂得到连接对象<br />
+            connection = connectionFactory.createConnection();<br />
+            // 启动<br />
+            connection.start();<br />
+            // 获取操作连接<br />
+            session = connection.createSession(Boolean.TRUE,<br />
+                    Session.AUTO_ACKNOWLEDGE);<br />
+            // 获取session注意参数值xingbo.xu-queue是一个服务器的queue，须在在ActiveMq的console配置<br />
+            destination = session.createQueue("FirstQueue");<br />
+            // 得到消息生成者【发送者】<br />
+            producer = session.createProducer(destination);<br />
+            // 设置不持久化，此处学习，实际根据项目决定 ---- 集群此处必须持久化<br />
+         //   producer.setDeliveryMode(DeliveryMode.NON_PERSISTENT);<br />
+            // 构造消息，此处写死，项目就是参数，或者方法获取<br />
+            sendMessage(session, producer);<br />
+            session.commit();<br />
+        } catch (Exception e) {<br />
+            e.printStackTrace();<br />
+        } finally {<br />
+            try {<br />
+                if (null != connection)<br />
+                    connection.close();<br />
+            } catch (Throwable ignore) {<br />
+            }<br />
+        }<br />
+    }</p>
+
+<p><br />
+    public static void sendMessage(Session session, MessageProducer producer)<br />
+            throws Exception {<br />
+        for (int i = 1; i <= SEND_NUMBER; i++) {<br />
+            TextMessage message = session<br />
+                   .createTextMessage("ActiveMq 发送的消息" + i);<br />
+            // 发送消息到目的地方<br />
+            System.out.println("发送消息：" + "ActiveMq 发送的消息" + i);<br />
+            producer.send(message);<br />
+        }<br />
+    }<br />
+}</p>
+
+<p> </p>
+
+<p> </p>

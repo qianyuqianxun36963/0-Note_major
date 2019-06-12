@@ -1,0 +1,189 @@
+<h1>Springboot集成Swagger2.5.0</h1>
+
+<h2>1、问题描述</h2>
+
+<p>　　随着互联网技术的发展，现在的网站架构基本都由原来的后端渲染，变成了：前端渲染、先后端分离的形态，而且前端技术和后端技术在各自的道路上越走越远。 前端和后端的唯一联系，变成了API接口；API文档变成了前后端开发人员联系的纽带，变得越来越重要，swagger就是一款让你更好的书写API文档的框架，而且swagger可以完全模拟http请求，入参出参和实际情况差别几乎为零。</p>
+
+<p>　　没有API文档工具之前，大家都是手写API文档的（维护起来相当困难），在什么地方书写的都有，有在confluence上写的，有在对应的项目目录下readme.md上写的，每个公司都有每个公司的玩法，无所谓好坏。但是能称之为“框架”的，估计也只有swagger了</p>
+
+<h2>2、操作步骤</h2>
+
+<h3>2.1配置pom.xml</h3>
+
+<p><parent><br />
+       <groupId>org.springframework.boot</groupId><br />
+       <artifactId>spring-boot-starter-parent</artifactId><br />
+       <version>1.4.0.RELEASE</version><br />
+   </parent><br />
+ <br />
+  <properties><br />
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding><br />
+  </properties><br />
+ <br />
+  <dependencies><br />
+    <!-- junit --><br />
+    <dependency><br />
+      <groupId>junit</groupId><br />
+      <artifactId>junit</artifactId><br />
+      <scope>test</scope><br />
+    </dependency><br />
+    <!-- spring boot --><br />
+    <dependency><br />
+          <groupId>org.springframework.boot</groupId><br />
+          <artifactId>spring-boot-starter-web</artifactId><br />
+    </dependency><br />
+<strong>    <!-- swagger --><br />
+    <dependency><br />
+        <groupId>io.springfox</groupId><br />
+        <artifactId>springfox-swagger2</artifactId><br />
+        <version>2.5.0</version><br />
+    </dependency><br />
+    <!-- swagger-ui --><br />
+    <dependency><br />
+        <groupId>io.springfox</groupId><br />
+        <artifactId>springfox-swagger-ui</artifactId><br />
+        <version>2.5.0</version><br />
+    </dependency></strong><br />
+  </dependencies></p>
+
+<h3>2.2启动类</h3>
+
+<p>package com.mao.swagger;<br />
+ <br />
+import org.springframework.boot.SpringApplication;<br />
+import org.springframework.boot.autoconfigure.EnableAutoConfiguration;<br />
+import org.springframework.boot.autoconfigure.SpringBootApplication;<br />
+ <br />
+/**<br />
+ * Hello world!<br />
+ *<br />
+ */<br />
+<strong>@EnableAutoConfiguration</strong><br />
+@SpringBootApplication(<strong>scanBasePackages = "com.mao"</strong>)<br />
+public class DemoApp {<br />
+ <br />
+    public static void main(String[] args) throws Exception {<br />
+        SpringApplication.run(DemoApp.class, args);<br />
+    }<br />
+     <br />
+}</p>
+
+<h3>2.3配置config</h3>
+
+<p>package com.mao.swagger.config;<br />
+ <br />
+import org.springframework.context.annotation.Bean;<br />
+import org.springframework.context.annotation.Configuration;<br />
+ <br />
+import io.swagger.annotations.ApiOperation;<br />
+import springfox.documentation.builders.RequestHandlerSelectors;<br />
+import springfox.documentation.spi.DocumentationType;<br />
+import springfox.documentation.spring.web.plugins.Docket;<br />
+import springfox.documentation.swagger2.annotations.EnableSwagger2;<br />
+ <br />
+@Configuration<br />
+@EnableSwagger2<br />
+public class SwaggerConfig {<br />
+     <br />
+    @Bean<br />
+    public Docket swaggerSpringMvcPlugin() {<br />
+        return new Docket(DocumentationType.SWAGGER_2).select().apis(RequestHandlerSelectors.withMethodAnnotation(ApiOperation.class)).build();<br />
+    }<br />
+     <br />
+}</p>
+
+<h3>2.4配置controller</h3>
+
+<p>package com.mao.swagger.controller;<br />
+ <br />
+import org.springframework.http.HttpStatus;<br />
+import org.springframework.http.MediaType;<br />
+import org.springframework.web.bind.annotation.RequestBody;<br />
+import org.springframework.web.bind.annotation.RequestMapping;<br />
+import org.springframework.web.bind.annotation.RequestMethod;<br />
+import org.springframework.web.bind.annotation.RequestParam;<br />
+import org.springframework.web.bind.annotation.RestController;<br />
+ <br />
+import com.mao.swagger.beans.ResObject;<br />
+import com.mao.swagger.beans.User;<br />
+ <br />
+import io.swagger.annotations.Api;<br />
+import io.swagger.annotations.ApiImplicitParam;<br />
+import io.swagger.annotations.ApiImplicitParams;<br />
+import io.swagger.annotations.ApiOperation;<br />
+ <br />
+/**<br />
+ * Hello world!<br />
+ *<br />
+ */<br />
+@Api(description = "用户接口")<br />
+@RestController<br />
+@RequestMapping("/demoController")<br />
+public class DemoController {<br />
+ <br />
+    @ApiOperation(value = "新增用户" ,  notes="新增注册")<br />
+    @RequestMapping(value="/createUser",method=RequestMethod.POST,consumes= MediaType.APPLICATION_JSON_VALUE)<br />
+    public ResObject createUser(@RequestBody User user){<br />
+        System.out.println("createUser:::"+user.toString());<br />
+        return new ResObject(HttpStatus.OK.value(), "新增成功.");<br />
+    }<br />
+ <br />
+    @ApiOperation(value = "修改用户" ,  notes="修改用户")<br />
+    @RequestMapping(value="/updateUser",method=RequestMethod.POST,consumes= MediaType.APPLICATION_JSON_VALUE)<br />
+    public ResObject updateUser(@RequestBody User user){<br />
+        System.out.println("updateUser:::"+user.toString());<br />
+        return new ResObject(HttpStatus.OK.value(), "修改成功.");<br />
+    }<br />
+ <br />
+    @ApiOperation(value = "删除用户" ,  notes="删除用户")<br />
+    @ApiImplicitParams({<br />
+        @ApiImplicitParam(name = "userId", value = "用户标识", required = true, paramType = "query", dataType = "String")<br />
+    })<br />
+    @RequestMapping(value="/deleteUser",method=RequestMethod.DELETE)<br />
+    public ResObject deleteUser(@RequestParam("userId") String userId){<br />
+        System.out.println("deleteUser:::"+userId);<br />
+        return new ResObject(HttpStatus.OK.value(), "删除成功.");<br />
+    }<br />
+ <br />
+    @ApiOperation(value = "查询用户" ,  notes="查询用户")<br />
+    @ApiImplicitParams({<br />
+        @ApiImplicitParam(name = "userId", value = "用户标识", required = true, paramType = "query", dataType = "String")<br />
+    })<br />
+    @RequestMapping(value="/queryUser",method=RequestMethod.GET)<br />
+    public ResObject queryUser(@RequestParam("userId") String userId){<br />
+        System.out.println("queryUser:::"+userId);<br />
+        User user = new User(userId, "张三", "******", "mao2080@sina.com");<br />
+        return new ResObject(HttpStatus.OK.value(), user);<br />
+    }<br />
+ <br />
+}</p>
+
+<h2>3、效果展示</h2>
+
+<p>按照上面的启动之后访问：http://localhost:8080/swagger-ui.html  发现找不到接口</p>
+
+<p><img alt="" src="https://images2018.cnblogs.com/blog/976001/201805/976001-20180504173914889-1344741432.png" style="height:535px; width:800px" />后面排查是因为没有添加扫描包</p>
+
+<p><img alt="" src="https://images2018.cnblogs.com/blog/976001/201805/976001-20180504173932085-1690259466.png" style="height:490px; width:800px" />重启之后再刷新即可</p>
+
+<p><img alt="" src="https://images2018.cnblogs.com/blog/976001/201805/976001-20180504173953288-1857734459.png" style="height:535px; width:800px" />点击demo-controller可以看到详细接口</p>
+
+<p><img alt="" src="https://images2018.cnblogs.com/blog/976001/201805/976001-20180504174024899-421792977.png" style="height:535px; width:800px" />点击具体接口可以看到具体参数</p>
+
+<p><img alt="" src="https://images2018.cnblogs.com/blog/976001/201805/976001-20180504174147684-1814195803.png" style="height:535px; width:800px" />点击try it out! 可以测试接口。</p>
+
+<p>后台打印日志</p>
+
+<h2>4、附件下载</h2>
+
+<p><a href="https://files.cnblogs.com/files/mao2080/swagger-demo.zip" target="_blank">swagger-demo.zip</a></p>
+
+<h2>5、参考网站</h2>
+
+<p><a href="https://blog.csdn.net/i6448038/article/details/77622977" target="_blank">https://blog.csdn.net/i6448038/article/details/77622977</a></p>
+
+<p><a href="https://blog.csdn.net/blackmambaprogrammer/article/details/72354007" target="_blank">https://blog.csdn.net/blackmambaprogrammer/article/details/72354007</a></p>
+
+<h2>6、推广阅读</h2>
+
+<p><a href="http://www.cnblogs.com/mao2080/p/9021714.html" target="_blank">Sagger常用参数用法</a></p>

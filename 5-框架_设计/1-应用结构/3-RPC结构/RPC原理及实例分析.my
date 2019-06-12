@@ -1,0 +1,1058 @@
+<h1>RPC原理及RPC实例分析</h1>
+
+<p>在学校期间大家都写过不少程序，比如写个hello world服务类，然后本地调用下，如下所示。这些程序的特点是服务消费方和服务提供方是本地调用关系。</p>
+
+<p><code>public class Test {<br />
+     public static void main(String[] args) {<br />
+         HelloWorldService helloWorldService = new HelloWorldServiceImpl();<br />
+         helloWorldService.sayHello("test");<br />
+     }<br />
+}</code></p>
+
+<p><br />
+这时就会遇到两个问题：而一旦踏入公司尤其是大型互联网公司就会发现，公司的系统都由成千上万大大小小的服务组成，各服务部署在不同的机器上，由不同的团队负责。</p>
+
+<ol>
+<li>要搭建一个新服务，免不了需要依赖他人的服务，而现在他人的服务都在远端，怎么调用？</li>
+<li>其它团队要使用我们的新服务，我们的服务该怎么发布以便他人调用？下文将对这两个问题展开探讨。</li>
+</ol>
+
+<h2>1.  如何调用他人的远程服务？</h2>
+
+<p>由于各服务部署在不同机器，服务间的调用免不了网络通信过程，服务消费方每调用一个服务都要写一坨网络通信相关的代码，不仅复杂而且极易出错。</p>
+
+<p>如果有一种方式能让我们像调用本地服务一样调用远程服务，而让调用者对网络通信这些细节透明，那么将大大提高生产力，比如服务消费方在执行helloWorldService.sayHello(“test”)时，实质上调用的是远端的服务。这种方式其实就是RPC（Remote Procedure Call Protocol），在各大互联网公司中被广泛使用，如阿里巴巴的hsf、dubbo（开源）、Facebook的thrift（开源）、Google grpc（开源）、Twitter的finagle（开源）等。</p>
+
+<p>要让网络通信细节对使用者透明，我们需要对通信细节进行封装，我们先看下一个RPC调用的流程涉及到哪些通信细节：</p>
+
+<ol>
+<li>服务消费方（client）调用以本地调用方式调用服务；</li>
+<li>client stub接收到调用后负责将方法、参数等组装成能够进行网络传输的消息体；</li>
+<li>client stub找到服务地址，并将消息发送到服务端；</li>
+<li>server stub收到消息后进行解码；</li>
+<li>server stub根据解码结果调用本地的服务；</li>
+<li>本地服务执行并将结果返回给server stub；</li>
+<li>server stub将返回结果打包成消息并发送至消费方；</li>
+<li>client stub接收到消息，并进行解码；</li>
+<li>服务消费方得到最终结果。</li>
+</ol>
+
+<p>RPC的目标就是要2~8这些步骤都封装起来，让用户对这些细节透明。</p>
+
+<h3>1.1 怎么做到透明化远程服务调用？</h3>
+
+<p>怎么封装通信细节才能让用户像以本地调用方式调用远程服务呢？对java来说就是使用代理！java代理有两种方式：</p>
+
+<ol>
+<li>jdk 动态代理</li>
+<li>字节码生成</li>
+</ol>
+
+<p>尽管字节码生成方式实现的代理更为强大和高效，但代码维护不易，大部分公司实现RPC框架时还是选择动态代理方式。</p>
+
+<p>下面简单介绍下动态代理怎么实现我们的需求。我们需要实现RPCProxyClient代理类，代理类的invoke方法中封装了与远端服务通信的细节，消费方首先从RPCProxyClient获得服务提供方的接口，当执行helloWorldService.sayHello(“test”)方法时就会调用invoke方法。</p>
+
+<p>public class RPCProxyClient implements java.lang.reflect.InvocationHandler{<br />
+    private Object obj;</p>
+
+<p>    public RPCProxyClient(Object obj){<br />
+        this.obj=obj;<br />
+    }</p>
+
+<p>    /**<br />
+     * 得到被代理对象;<br />
+     */<br />
+    public static Object getProxy(Object obj){<br />
+        return java.lang.reflect.Proxy.newProxyInstance(obj.getClass().getClassLoader(),<br />
+                obj.getClass().getInterfaces(), new RPCProxyClient(obj));<br />
+    }</p>
+
+<p>    /**<br />
+     * 调用此方法执行<br />
+     */<br />
+    public Object invoke(Object proxy, Method method, Object[] args)<br />
+            throws Throwable {<br />
+        //结果参数;<br />
+        Object result = new Object();<br />
+        // ...执行通信相关逻辑<br />
+        // ...<br />
+        return result;<br />
+    }<br />
+}</p>
+
+<p><br />
+1.2  怎么对消息进行编码和解码？</p>
+
+<p><code>public</code> <code>class</code> <code>Test {</code></p>
+
+<p><code>     </code><code>public</code> <code>static</code> <code>void</code> <code>main(String[] args) {</code></p>
+
+<p><code>         </code><code>HelloWorldService helloWorldService = (HelloWorldService)RPCProxyClient.getProxy(HelloWorldService.</code><code>class</code><code>);</code></p>
+
+<p><code>         </code><code>helloWorldService.sayHello(</code><code>"test"</code><code>);</code></p>
+
+<p><code>     </code><code>}</code></p>
+
+<p><code> </code><code>}</code></p>
+
+<h4>1.2.1 确定消息数据结构</h4>
+
+<p>上节讲了invoke里需要封装通信细节（通信细节再后面几章详细探讨），而通信的第一步就是要确定客户端和服务端相互通信的消息结构。客户端的请求消息结构一般需要包括以下内容：</p>
+
+<p>1）接口名称</p>
+
+<p>在我们的例子里接口名是“HelloWorldService”，如果不传，服务端就不知道调用哪个接口了；</p>
+
+<p>2）方法名</p>
+
+<p>一个接口内可能有很多方法，如果不传方法名服务端也就不知道调用哪个方法；</p>
+
+<p>3）参数类型&参数值</p>
+
+<p>参数类型有很多，比如有bool、int、long、double、string、map、list，甚至如struct（class）；以及相应的参数值；</p>
+
+<p>4）超时时间</p>
+
+<p>5）requestID，标识唯一请求id，在下面一节会详细描述requestID的用处。</p>
+
+<p>同理服务端返回的消息结构一般包括以下内容。</p>
+
+<p>1）返回值</p>
+
+<p>2）状态code</p>
+
+<p>3）requestID</p>
+
+<h4>1.2.2 序列化</h4>
+
+<p>一旦确定了消息的数据结构后，下一步就是要考虑序列化与反序列化了。</p>
+
+<p>什么是序列化？序列化就是将数据结构或对象转换成二进制串的过程，也就是编码的过程。</p>
+
+<p>什么是反序列化？将在序列化过程中所生成的二进制串转换成数据结构或者对象的过程。</p>
+
+<p>为什么需要序列化？转换为二进制串后才好进行网络传输嘛！</p>
+
+<p>为什么需要反序列化？将二进制转换为对象才好进行后续处理！</p>
+
+<p>现如今序列化的方案越来越多，每种序列化方案都有优点和缺点，它们在设计之初有自己独特的应用场景，那到底选择哪种呢？从RPC的角度上看，主要看三点：</p>
+
+<ol>
+<li>通用性，比如是否能支持Map等复杂的数据结构；</li>
+<li>性能，包括时间复杂度和空间复杂度，由于RPC框架将会被公司几乎所有服务使用，如果序列化上能节约一点时间，对整个公司的收益都将非常可观，同理如果序列化上能节约一点内存，网络带宽也能省下不少；</li>
+<li>可扩展性，对互联网公司而言，业务变化飞快，如果序列化协议具有良好的可扩展性，支持自动增加新的业务字段，而不影响老的服务，这将大大提供系统的灵活度。</li>
+</ol>
+
+<p>目前互联网公司广泛使用Protobuf、Thrift、Avro等成熟的序列化解决方案来搭建RPC框架，这些都是久经考验的解决方案。</p>
+
+<h3>1.3  通信</h3>
+
+<p>消息数据结构被序列化为二进制串后，下一步就要进行网络通信了。目前有两种常用IO通信模型：1）BIO；2）NIO。一般RPC框架需要支持这两种IO模型。</p>
+
+<p>如何实现RPC的IO通信框架呢？</p>
+
+<ol>
+<li>使用java nio方式自研，这种方式较为复杂，而且很有可能出现隐藏bug，但也见过一些互联网公司使用这种方式；</li>
+<li>基于mina，mina在早几年比较火热，不过这些年版本更新缓慢；</li>
+<li>基于netty，现在很多RPC框架都直接基于netty这一IO通信框架，省力又省心，比如阿里巴巴的HSF、dubbo，Twitter的finagle等。</li>
+</ol>
+
+<h3>1.4  <strong>消息里为什么要有requestID？</strong></h3>
+
+<p>如果使用netty的话，一般会用channel.writeAndFlush()方法来发送消息二进制串，这个方法调用后对于整个远程调用(从发出请求到接收到结果)来说是一个异步的，即对于当前线程来说，将请求发送出来后，线程就可以往后执行了，至于服务端的结果，是服务端处理完成后，再以消息的形式发送给客户端的。于是这里出现以下两个问题：</p>
+
+<ol>
+<li>怎么让当前线程“暂停”，等结果回来后，再向后执行？</li>
+<li>如果有多个线程同时进行远程方法调用，这时建立在client server之间的socket连接上会有很多双方发送的消息传递，前后顺序也可能是随机的，server处理完结果后，将结果消息发送给client，client收到很多消息，怎么知道哪个消息结果是原先哪个线程调用的？</li>
+</ol>
+
+<p>如下图所示，线程A和线程B同时向client socket发送请求requestA和requestB，socket先后将requestB和requestA发送至server，而server可能将responseA先返回，尽管requestA请求到达时间更晚。我们需要一种机制保证responseA丢给ThreadA，responseB丢给ThreadB。</p>
+
+<p><img alt="" src="http://static.oschina.net/uploads/space/2016/0714/104316_FAgB_2243330.png" style="height:165px; width:700px" />怎么解决呢？</p>
+
+<ol>
+<li>client线程每次通过socket调用一次远程接口前，生成一个唯一的ID，即requestID（requestID必需保证在一个Socket连接里面是唯一的），一般常常使用AtomicLong从0开始累计数字生成唯一ID；</li>
+<li>将处理结果的回调对象callback，存放到全局ConcurrentHashMap里面put(requestID, callback)；</li>
+<li>当线程调用channel.writeAndFlush()发送消息后，紧接着执行callback的get()方法试图获取远程返回的结果。在get()内部，则使用synchronized获取回调对象callback的锁，再先检测是否已经获取到结果，如果没有，然后调用callback的wait()方法，释放callback上的锁，让当前线程处于等待状态。</li>
+<li>服务端接收到请求并处理后，将response结果（此结果中包含了前面的requestID）发送给客户端，客户端socket连接上专门监听消息的线程收到消息，分析结果，取到requestID，再从前面的ConcurrentHashMap里面get(requestID)，从而找到callback对象，再用synchronized获取callback上的锁，将方法调用结果设置到callback对象里，再调用callback.notifyAll()唤醒前面处于等待状态的线程。</li>
+</ol>
+
+<p>public Object get() {<br />
+    synchronized (this) { // 旋锁<br />
+        while (!isDone) { // 是否有结果了<br />
+            wait(); //没结果是释放锁，让当前线程处于等待状态<br />
+        }<br />
+    }<br />
+}</p>
+
+<p>private void setDone(Response res) {<br />
+    this.res = res;<br />
+    isDone = true;<br />
+    synchronized (this) { //获取锁，因为前面wait()已经释放了callback的锁了<br />
+        notifyAll(); // 唤醒处于等待的线程<br />
+    }<br />
+}</p>
+
+<h2>2 如何发布自己的服务？</h2>
+
+<p>如何让别人使用我们的服务呢？有同学说很简单嘛，告诉使用者服务的IP以及端口就可以了啊。确实是这样，这里问题的关键在于是自动告知还是人肉告知。</p>
+
+<p>人肉告知的方式：如果你发现你的服务一台机器不够，要再添加一台，这个时候就要告诉调用者我现在有两个ip了，你们要轮询调用来实现负载均衡；调用者咬咬牙改了，结果某天一台机器挂了，调用者发现服务有一半不可用，他又只能手动修改代码来删除挂掉那台机器的ip。现实生产环境当然不会使用人肉方式。</p>
+
+<p>有没有一种方法能实现自动告知，即机器的增添、剔除对调用方透明，调用者不再需要写死服务提供方地址？当然可以，现如今zookeeper被广泛用于实现服务自动注册与发现功能！</p>
+
+<p>简单来讲，zookeeper可以充当一个<code>服务注册表</code>（Service Registry），让多个<code>服务提供者</code>形成一个集群，让<code>服务消费者</code>通过服务注册表获取具体的服务访问地址（ip+端口）去访问具体的服务提供者。如下图所示：</p>
+
+<p><a href="http://www.importnew.com/22003.html/105148_gsi2_2243330" rel="attachment wp-att-22277"><img alt="" src="http://incdn1.b0.upaiyun.com/2016/10/19e845109c113fda7e03d02eb3a83f1e.png" title="105148_gSi2_2243330" /></a></p>
+
+<p>具体来说，zookeeper就是个分布式文件系统，每当一个服务提供者部署后都要将自己的服务注册到zookeeper的某一路径上: /{service}/{version}/{ip:port}, 比如我们的HelloWorldService部署到两台机器，那么zookeeper上就会创建两条目录：分别为/HelloWorldService/1.0.0/100.19.20.01:16888  /HelloWorldService/1.0.0/100.19.20.02:16888。</p>
+
+<p>zookeeper提供了“心跳检测”功能，它会定时向各个服务提供者发送一个请求（实际上建立的是一个 Socket 长连接），如果长期没有响应，服务中心就认为该服务提供者已经“挂了”，并将其剔除，比如100.19.20.02这台机器如果宕机了，那么zookeeper上的路径就会只剩/HelloWorldService/1.0.0/100.19.20.01:16888。</p>
+
+<p>服务消费者会去监听相应路径（/HelloWorldService/1.0.0），一旦路径上的数据有任务变化（增加或减少），zookeeper都会通知服务消费方服务提供者地址列表已经发生改变，从而进行更新。</p>
+
+<p>更为重要的是zookeeper与生俱来的容错容灾能力（比如leader选举），可以确保服务注册表的高可用性。</p>
+
+<h2>3.Hadoop中<strong>RPC</strong>实例分析</h2>
+
+<p>ipc.RPC类中有一些内部类，为了大家对RPC类有个初步的印象，就先罗列几个我们感兴趣的分析一下吧：</p>
+
+<p><strong>Invocation</strong> ：用于封装方法名和参数，作为数据传输层。<br />
+<strong>ClientCache</strong> ：用于存储client对象，用socket factory作为hash key,存储结构为hashMap <SocketFactory, Client>。<br />
+<strong>Invoker</strong> ：是动态代理中的调用实现类，继承了InvocationHandler.<br />
+<strong>Server</strong> ：是ipc.Server的实现类。</p>
+
+<p>public Object invoke(Object proxy, Method method, Object[] args)</p>
+
+<p>  throws Throwable {<br />
+  •••<br />
+  ObjectWritable value = (ObjectWritable)<br />
+    client.call(new Invocation(method, args), remoteId);<br />
+  •••<br />
+  return value.get();<br />
+}</p>
+
+<p>如果你发现这个invoke()方法实现的有些奇怪的话，那你就对了。一般我们看到的<a href="http://my.oschina.net/hosee/blog/656945" rel="nofollow" target="_blank">动态代理</a>的invoke()方法中总会有 method.invoke(ac, arg);  这句代码。而上面代码中却没有，这是为什么呢？其实使用 method.invoke(ac, arg); 是在本地JVM中调用；而在hadoop中，是将数据发送给服务端，服务端将处理的结果再返回给客户端，所以这里的invoke()方法必然需要进行网络通信。而网络通信就是下面的这段代码实现的：</p>
+
+<p><code>ObjectWritable value = (ObjectWritable)</code></p>
+
+<p><code>client.call(</code><code>new</code> <code>Invocation(method, args), remoteId);</code></p>
+
+<p>客户端和服务端的连接是怎样建立的？Invocation类在这里封装了方法名和参数。其实这里网络通信只是调用了Client类的call()方法。那我们接下来分析一下ipc.Client源码吧。和第一章一样，同样是3个问题</p>
+
+<ol>
+<li>客户端是怎样给服务端发送数据的？</li>
+<li>客户端是怎样获取服务端的返回数据的？</li>
+</ol>
+
+<h3>3.1 客户端和服务端的连接是怎样建立的？</h3>
+
+<p><code>public</code> <code>Writable call(Writable param, ConnectionId remoteId)  </code></p>
+
+<p><code>                       </code><code>throws</code> <code>InterruptedException, IOException {</code></p>
+
+<p><code>    </code><code>Call call = </code><code>new</code> <code>Call(param);       </code><code>//将传入的数据封装成call对象</code></p>
+
+<p><code>    </code><code>Connection connection = getConnection(remoteId, call);   </code><code>//获得一个连接</code></p>
+
+<p><code>    </code><code>connection.sendParam(call);     </code><code>// 向服务端发送call对象</code></p>
+
+<p><code>    </code><code>boolean</code> <code>interrupted = </code><code>false</code><code>;</code></p>
+
+<p><code>    </code><code>synchronized</code> <code>(call) {</code></p>
+
+<p><code>      </code><code>while</code> <code>(!call.done) {</code></p>
+
+<p><code>        </code><code>try</code> <code>{</code></p>
+
+<p><code>          </code><code>call.wait(); </code><code>// 等待结果的返回，在Call类的callComplete()方法里有notify()方法用于唤醒线程</code></p>
+
+<p><code>        </code><code>} </code><code>catch</code> <code>(InterruptedException ie) {</code></p>
+
+<p><code>          </code><code>// 因中断异常而终止，设置标志interrupted为true</code></p>
+
+<p><code>          </code><code>interrupted = </code><code>true</code><code>;</code></p>
+
+<p><code>        </code><code>}</code></p>
+
+<p><code>      </code><code>}</code></p>
+
+<p><code>      </code><code>if</code> <code>(interrupted) {</code></p>
+
+<p><code>        </code><code>Thread.currentThread().interrupt();</code></p>
+
+<p><code>      </code><code>}</code></p>
+
+<p> </p>
+
+<p><code>      </code><code>if</code> <code>(call.error != </code><code>null</code><code>) {</code></p>
+
+<p><code>        </code><code>if</code> <code>(call.error </code><code>instanceof</code> <code>RemoteException) {</code></p>
+
+<p><code>          </code><code>call.error.fillInStackTrace();</code></p>
+
+<p><code>          </code><code>throw</code> <code>call.error;</code></p>
+
+<p><code>        </code><code>} </code><code>else</code> <code>{ </code><code>// 本地异常</code></p>
+
+<p><code>          </code><code>throw</code> <code>wrapException(remoteId.getAddress(), call.error);</code></p>
+
+<p><code>        </code><code>}</code></p>
+
+<p><code>      </code><code>} </code><code>else</code> <code>{</code></p>
+
+<p><code>        </code><code>return</code> <code>call.value; </code><code>//返回结果数据</code></p>
+
+<p><code>      </code><code>}</code></p>
+
+<p><code>    </code><code>}</code></p>
+
+<p><code>  </code><code>}</code></p>
+
+<p>具体代码的作用我已做了注释，所以这里不再赘述。但到目前为止，你依然不知道RPC机制底层的网络连接是怎么建立的。分析代码后，我们会发现和网络通信有关的代码只会是下面的两句了：</p>
+
+<p><code>Connection connection = getConnection(remoteId, call);   </code><code>//获得一个连接</code></p>
+
+<p><code> </code><code>connection.sendParam(call);      </code><code>// 向服务端发送call对象</code></p>
+
+<p>先看看是怎么获得一个到服务端的连接吧，下面贴出ipc.Client类中的getConnection()方法。</p>
+
+<p><code>private</code> <code>Connection getConnection(ConnectionId remoteId,</code></p>
+
+<p><code>                                   </code><code>Call call)</code></p>
+
+<p><code>                                   </code><code>throws</code> <code>IOException, InterruptedException {</code></p>
+
+<p><code>    </code><code>if</code> <code>(!running.get()) {</code></p>
+
+<p><code>      </code><code>// 如果client关闭了</code></p>
+
+<p><code>      </code><code>throw</code> <code>new</code> <code>IOException(</code><code>"The client is stopped"</code><code>);</code></p>
+
+<p><code>    </code><code>}</code></p>
+
+<p><code>    </code><code>Connection connection;</code></p>
+
+<p><code>//如果connections连接池中有对应的连接对象，就不需重新创建了；如果没有就需重新创建一个连接对象。</code></p>
+
+<p><code>//但请注意，该//连接对象只是存储了remoteId的信息，其实还并没有和服务端建立连接。</code></p>
+
+<p><code>    </code><code>do</code> <code>{</code></p>
+
+<p><code>      </code><code>synchronized</code> <code>(connections) {</code></p>
+
+<p><code>        </code><code>connection = connections.get(remoteId);</code></p>
+
+<p><code>        </code><code>if</code> <code>(connection == </code><code>null</code><code>) {</code></p>
+
+<p><code>          </code><code>connection = </code><code>new</code> <code>Connection(remoteId);</code></p>
+
+<p><code>          </code><code>connections.put(remoteId, connection);</code></p>
+
+<p><code>        </code><code>}</code></p>
+
+<p><code>      </code><code>}</code></p>
+
+<p><code>    </code><code>} </code><code>while</code> <code>(!connection.addCall(call)); </code><code>//将call对象放入对应连接中的calls池，就不贴出源码了</code></p>
+
+<p><code>   </code><code>//这句代码才是真正的完成了和服务端建立连接哦~</code></p>
+
+<p><code>    </code><code>connection.setupIOstreams();</code></p>
+
+<p><code>    </code><code>return</code> <code>connection;</code></p>
+
+<p><code>  </code><code>}</code></p>
+
+<p>下面贴出Client.Connection类中的setupIOstreams()方法：</p>
+
+<p><code>private</code> <code>synchronized</code> <code>void</code> <code>setupIOstreams() </code><code>throws</code> <code>InterruptedException {</code></p>
+
+<p><code>  </code><code>•••</code></p>
+
+<p><code>     </code><code>try</code> <code>{</code></p>
+
+<p><code>      </code><code>•••</code></p>
+
+<p><code>       </code><code>while</code> <code>(</code><code>true</code><code>) {</code></p>
+
+<p><code>         </code><code>setupConnection();  </code><code>//建立连接</code></p>
+
+<p><code>         </code><code>InputStream inStream = NetUtils.getInputStream(socket);     </code><code>//获得输入流</code></p>
+
+<p><code>         </code><code>OutputStream outStream = NetUtils.getOutputStream(socket);  </code><code>//获得输出流</code></p>
+
+<p><code>         </code><code>writeRpcHeader(outStream);</code></p>
+
+<p><code>         </code><code>•••</code></p>
+
+<p><code>         </code><code>this</code><code>.in = </code><code>new</code> <code>DataInputStream(</code><code>new</code> <code>BufferedInputStream</code></p>
+
+<p><code>             </code><code>(</code><code>new</code> <code>PingInputStream(inStream)));   </code><code>//将输入流装饰成DataInputStream</code></p>
+
+<p><code>         </code><code>this</code><code>.out = </code><code>new</code> <code>DataOutputStream</code></p>
+
+<p><code>         </code><code>(</code><code>new</code> <code>BufferedOutputStream(outStream));   </code><code>//将输出流装饰成DataOutputStream</code></p>
+
+<p><code>         </code><code>writeHeader();</code></p>
+
+<p><code>         </code><code>// 跟新活动时间</code></p>
+
+<p><code>         </code><code>touch();</code></p>
+
+<p><code>         </code><code>//当连接建立时，启动接受线程等待服务端传回数据，注意：Connection继承了Tread</code></p>
+
+<p><code>         </code><code>start();</code></p>
+
+<p><code>         </code><code>return</code><code>;</code></p>
+
+<p><code>       </code><code>}</code></p>
+
+<p><code>     </code><code>} </code><code>catch</code> <code>(IOException e) {</code></p>
+
+<p><code>       </code><code>markClosed(e);</code></p>
+
+<p><code>       </code><code>close();</code></p>
+
+<p><code>     </code><code>}</code></p>
+
+<p><code>   </code><code>}</code></p>
+
+<p>再有一步我们就知道客户端的连接是怎么建立的啦，下面贴出Client.Connection类中的setupConnection()方法：</p>
+
+<p><code>private</code> <code>synchronized</code> <code>void</code> <code>setupConnection() </code><code>throws</code> <code>IOException {</code></p>
+
+<p><code>     </code><code>short</code> <code>ioFailures = </code><code>0</code><code>;</code></p>
+
+<p><code>     </code><code>short</code> <code>timeoutFailures = </code><code>0</code><code>;</code></p>
+
+<p><code>     </code><code>while</code> <code>(</code><code>true</code><code>) {</code></p>
+
+<p><code>       </code><code>try</code> <code>{</code></p>
+
+<p><code>         </code><code>this</code><code>.socket = socketFactory.createSocket(); </code><code>//终于看到创建socket的方法了</code></p>
+
+<p><code>         </code><code>this</code><code>.socket.setTcpNoDelay(tcpNoDelay);</code></p>
+
+<p><code>        </code><code>•••</code></p>
+
+<p><code>         </code><code>// 设置连接超时为20s</code></p>
+
+<p><code>         </code><code>NetUtils.connect(</code><code>this</code><code>.socket, remoteId.getAddress(), </code><code>20000</code><code>);</code></p>
+
+<p><code>         </code><code>this</code><code>.socket.setSoTimeout(pingInterval);</code></p>
+
+<p><code>         </code><code>return</code><code>;</code></p>
+
+<p><code>       </code><code>} </code><code>catch</code> <code>(SocketTimeoutException toe) {</code></p>
+
+<p><code>         </code><code>/* 设置最多连接重试为45次。</code></p>
+
+<p><code>          </code><code>* 总共有20s*45 = 15 分钟的重试时间。</code></p>
+
+<p><code>          </code><code>*/</code></p>
+
+<p><code>         </code><code>handleConnectionFailure(timeoutFailures++, </code><code>45</code><code>, toe);</code></p>
+
+<p><code>       </code><code>} </code><code>catch</code> <code>(IOException ie) {</code></p>
+
+<p><code>         </code><code>handleConnectionFailure(ioFailures++, maxRetries, ie);</code></p>
+
+<p><code>       </code><code>}</code></p>
+
+<p><code>     </code><code>}</code></p>
+
+<p><code>   </code><code>}</code></p>
+
+<p>3.2 客户端是怎样给服务端发送数据的？终于，我们知道了客户端的连接是怎样建立的了，其实就是创建一个普通的socket进行通信。</p>
+
+<p>下面贴出Client.Connection类的sendParam()方法吧：</p>
+
+<p><code>public</code> <code>void</code> <code>sendParam(Call call) {</code></p>
+
+<p><code>      </code><code>if</code> <code>(shouldCloseConnection.get()) {</code></p>
+
+<p><code>        </code><code>return</code><code>;</code></p>
+
+<p><code>      </code><code>}</code></p>
+
+<p><code>      </code><code>DataOutputBuffer d=</code><code>null</code><code>;</code></p>
+
+<p><code>      </code><code>try</code> <code>{</code></p>
+
+<p><code>        </code><code>synchronized</code> <code>(</code><code>this</code><code>.out) {</code></p>
+
+<p><code>          </code><code>if</code> <code>(LOG.isDebugEnabled())</code></p>
+
+<p><code>            </code><code>LOG.debug(getName() + </code><code>" sending #"</code> <code>+ call.id);</code></p>
+
+<p><code>          </code><code>//创建一个缓冲区</code></p>
+
+<p><code>          </code><code>d = </code><code>new</code> <code>DataOutputBuffer();</code></p>
+
+<p><code>          </code><code>d.writeInt(call.id);</code></p>
+
+<p><code>          </code><code>call.param.write(d);</code></p>
+
+<p><code>          </code><code>byte</code><code>[] data = d.getData();</code></p>
+
+<p><code>          </code><code>int</code> <code>dataLength = d.getLength();</code></p>
+
+<p><code>          </code><code>out.writeInt(dataLength);        </code><code>//首先写出数据的长度</code></p>
+
+<p><code>          </code><code>out.write(data, </code><code>0</code><code>, dataLength); </code><code>//向服务端写数据</code></p>
+
+<p><code>          </code><code>out.flush();</code></p>
+
+<p><code>        </code><code>}</code></p>
+
+<p><code>      </code><code>} </code><code>catch</code><code>(IOException e) {</code></p>
+
+<p><code>        </code><code>markClosed(e);</code></p>
+
+<p><code>      </code><code>} </code><code>finally</code> <code>{</code></p>
+
+<p><code>        </code><code>IOUtils.closeStream(d);</code></p>
+
+<p><code>      </code><code>}</code></p>
+
+<p><code>    </code><code>}</code></p>
+
+<h3><span style="font-size:13px">下面贴出Client.Connection类和Client.Call类中的相关方法：</span>3.3 客户端是怎样获取服务端的返回数据的？</h3>
+
+<p><code>方法一：  </code></p>
+
+<p><code>  </code><code>public</code> <code>void</code> <code>run() {</code></p>
+
+<p><code>      </code><code>•••</code></p>
+
+<p><code>      </code><code>while</code> <code>(waitForWork()) {</code></p>
+
+<p><code>        </code><code>receiveResponse();  </code><code>//具体的处理方法</code></p>
+
+<p><code>      </code><code>}</code></p>
+
+<p><code>      </code><code>close();</code></p>
+
+<p><code>     </code><code>•••</code></p>
+
+<p><code>}</code></p>
+
+<p> </p>
+
+<p><code>方法二：</code></p>
+
+<p><code>private</code> <code>void</code> <code>receiveResponse() {</code></p>
+
+<p><code>      </code><code>if</code> <code>(shouldCloseConnection.get()) {</code></p>
+
+<p><code>        </code><code>return</code><code>;</code></p>
+
+<p><code>      </code><code>}</code></p>
+
+<p><code>      </code><code>touch();</code></p>
+
+<p><code>      </code><code>try</code> <code>{</code></p>
+
+<p><code>        </code><code>int</code> <code>id = in.readInt();                    </code><code>// 阻塞读取id</code></p>
+
+<p><code>        </code><code>if</code> <code>(LOG.isDebugEnabled())</code></p>
+
+<p><code>          </code><code>LOG.debug(getName() + </code><code>" got value #"</code> <code>+ id);</code></p>
+
+<p><code>          </code><code>Call call = calls.get(id);    </code><code>//在calls池中找到发送时的那个对象</code></p>
+
+<p><code>        </code><code>int</code> <code>state = in.readInt();     </code><code>// 阻塞读取call对象的状态</code></p>
+
+<p><code>        </code><code>if</code> <code>(state == Status.SUCCESS.state) {</code></p>
+
+<p><code>          </code><code>Writable value = ReflectionUtils.newInstance(valueClass, conf);</code></p>
+
+<p><code>          </code><code>value.readFields(in);           </code><code>// 读取数据</code></p>
+
+<p><code>        </code><code>//将读取到的值赋给call对象，同时唤醒Client等待线程，贴出setValue()代码方法三</code></p>
+
+<p><code>          </code><code>call.setValue(value);              </code></p>
+
+<p><code>          </code><code>calls.remove(id);               </code><code>//删除已处理的call    </code></p>
+
+<p><code>        </code><code>} </code><code>else</code> <code>if</code> <code>(state == Status.ERROR.state) {</code></p>
+
+<p><code>        </code><code>•••</code></p>
+
+<p><code>        </code><code>} </code><code>else</code> <code>if</code> <code>(state == Status.FATAL.state) {</code></p>
+
+<p><code>        </code><code>•••</code></p>
+
+<p><code>        </code><code>}</code></p>
+
+<p><code>      </code><code>} </code><code>catch</code> <code>(IOException e) {</code></p>
+
+<p><code>        </code><code>markClosed(e);</code></p>
+
+<p><code>      </code><code>}</code></p>
+
+<p><code>}</code></p>
+
+<p> </p>
+
+<p><code>方法三：</code></p>
+
+<p><code>public</code> <code>synchronized</code> <code>void</code> <code>setValue(Writable value) {</code></p>
+
+<p><code>      </code><code>this</code><code>.value = value;</code></p>
+
+<p><code>      </code><code>callComplete();   </code><code>//具体实现</code></p>
+
+<p><code>}</code></p>
+
+<p><code>protected</code> <code>synchronized</code> <code>void</code> <code>callComplete() {</code></p>
+
+<p><code>      </code><code>this</code><code>.done = </code><code>true</code><code>;</code></p>
+
+<p><code>      </code><code>notify();         </code><code>// 唤醒client等待线程</code></p>
+
+<p><code>    </code><code>}</code></p>
+
+<p>3.4 ipc.Server源码分析完成的功能主要是：启动一个处理线程，读取从服务端传来的call对象，将call对象读取完毕后，唤醒client处理线程。就这么简单，客户端就获取了服务端返回的数据了哦~。客户端的源码分析就到这里了哦，下面我们来分析Server端的源码吧。</p>
+
+<p>为了让大家对ipc.Server有个初步的了解，我们先分析一下它的几个内部类吧：</p>
+
+<p><strong>Call</strong> ：用于存储客户端发来的请求<br />
+<strong>Listener</strong> ： 监听类，用于监听客户端发来的请求，同时Listener内部还有一个静态类，Listener.Reader，当监听器监听到用户请求，便让Reader读取用户请求。<br />
+<strong>Responder</strong> ：响应RPC请求类，请求处理完毕，由Responder发送给请求客户端。<br />
+<strong>Connection</strong> ：连接类，真正的客户端请求读取逻辑在这个类中。<br />
+<strong>Handler</strong> ：请求处理类，会循环阻塞读取callQueue中的call对象，并对其进行操作。</p>
+
+<p><code>private</code> <code>void</code> <code>initialize(Configuration conf) </code><code>throws</code> <code>IOException {</code></p>
+
+<p><code>   </code><code>•••</code></p>
+
+<p><code>    </code><code>// 创建 rpc server</code></p>
+
+<p><code>    </code><code>InetSocketAddress dnSocketAddr = getServiceRpcServerAddress(conf);</code></p>
+
+<p><code>    </code><code>if</code> <code>(dnSocketAddr != </code><code>null</code><code>) {</code></p>
+
+<p><code>      </code><code>int</code> <code>serviceHandlerCount =</code></p>
+
+<p><code>        </code><code>conf.getInt(DFSConfigKeys.DFS_NAMENODE_SERVICE_HANDLER_COUNT_KEY,</code></p>
+
+<p><code>                    </code><code>DFSConfigKeys.DFS_NAMENODE_SERVICE_HANDLER_COUNT_DEFAULT);</code></p>
+
+<p><code>      </code><code>//获得serviceRpcServer</code></p>
+
+<p><code>      </code><code>this</code><code>.serviceRpcServer = RPC.getServer(</code><code>this</code><code>, dnSocketAddr.getHostName(), </code></p>
+
+<p><code>          </code><code>dnSocketAddr.getPort(), serviceHandlerCount,</code></p>
+
+<p><code>          </code><code>false</code><code>, conf, namesystem.getDelegationTokenSecretManager());</code></p>
+
+<p><code>      </code><code>this</code><code>.serviceRPCAddress = </code><code>this</code><code>.serviceRpcServer.getListenerAddress();</code></p>
+
+<p><code>      </code><code>setRpcServiceServerAddress(conf);</code></p>
+
+<p><code>}</code></p>
+
+<p><code>//获得server</code></p>
+
+<p><code>    </code><code>this</code><code>.server = RPC.getServer(</code><code>this</code><code>, socAddr.getHostName(),</code></p>
+
+<p><code>        </code><code>socAddr.getPort(), handlerCount, </code><code>false</code><code>, conf, namesystem</code></p>
+
+<p><code>        </code><code>.getDelegationTokenSecretManager());</code></p>
+
+<p> </p>
+
+<p><code>   </code><code>•••</code></p>
+
+<p><code>    </code><code>this</code><code>.server.start();  </code><code>//启动 RPC server   Clients只允许连接该server</code></p>
+
+<p><code>    </code><code>if</code> <code>(serviceRpcServer != </code><code>null</code><code>) {</code></p>
+
+<p><code>      </code><code>serviceRpcServer.start();  </code><code>//启动 RPC serviceRpcServer 为HDFS服务的server</code></p>
+
+<p><code>    </code><code>}</code></p>
+
+<p><code>    </code><code>startTrashEmptier(conf);</code></p>
+
+<p><code>  </code><code>}</code></p>
+
+<p>查看Namenode初始化源码得知：RPC的server对象是通过ipc.RPC类的getServer()方法获得的。下面咱们去看看ipc.RPC类中的getServer()源码吧：</p>
+
+<p><code>public</code> <code>static</code> <code>Server getServer(</code><code>final</code> <code>Object instance, </code><code>final</code> <code>String bindAddress, </code><code>final</code> <code>int</code> <code>port,</code></p>
+
+<p><code>                                 </code><code>final</code> <code>int</code> <code>numHandlers,</code></p>
+
+<p><code>                                 </code><code>final</code> <code>boolean</code> <code>verbose, Configuration conf,</code></p>
+
+<p><code>                                 </code><code>SecretManager<? </code><code>extends</code> <code>TokenIdentifier> secretManager) </code></p>
+
+<p><code>    </code><code>throws</code> <code>IOException {</code></p>
+
+<p><code>    </code><code>return</code> <code>new</code> <code>Server(instance, conf, bindAddress, port, numHandlers, verbose, secretManager);</code></p>
+
+<p><code>  </code><code>}</code></p>
+
+<p>初始化Server后，Server端就运行起来了，看看ipc.Server的start()源码吧：这时我们发现getServer()是一个创建Server对象的工厂方法，但创建的却是RPC.Server类的对象。哈哈，现在你明白了我前面说的“RPC.Server是ipc.Server的实现类”了吧。不过RPC.Server的构造函数还是调用了ipc.Server类的构造函数的，因篇幅所限，就不贴出相关源码了。</p>
+
+<p><code>/** 启动服务 */</code></p>
+
+<p><code> </code><code>public</code> <code>synchronized</code> <code>void</code> <code>start() {</code></p>
+
+<p><code>   </code><code>responder.start();  </code><code>//启动responder</code></p>
+
+<p><code>   </code><code>listener.start();   </code><code>//启动listener</code></p>
+
+<p><code>   </code><code>handlers = </code><code>new</code> <code>Handler[handlerCount];</code></p>
+
+<p> </p>
+
+<p><code>   </code><code>for</code> <code>(</code><code>int</code> <code>i = </code><code>0</code><code>; i < handlerCount; i++) {</code></p>
+
+<p><code>     </code><code>handlers[i] = </code><code>new</code> <code>Handler(i);</code></p>
+
+<p><code>     </code><code>handlers[i].start();   </code><code>//逐个启动Handler</code></p>
+
+<p><code>   </code><code>}</code></p>
+
+<p><code> </code><code>}</code></p>
+
+<p><code>public</code> <code>Listener() </code><code>throws</code> <code>IOException {</code>分析过ipc.Client源码后，我们知道Client端的底层通信直接采用了阻塞式IO编程，当时我们曾做出猜测：Server端是不是也采用了阻塞式IO。现在我们仔细地分析一下吧，如果Server端也采用阻塞式IO，当连接进来的Client端很多时，势必会影响Server端的性能。hadoop的实现者们考虑到了这点，所以他们采用了java  NIO来实现Server端，那Server端采用java NIO是怎么建立连接的呢？分析源码得知，Server端采用Listener监听客户端的连接，下面先分析一下Listener的构造函数吧：</p>
+
+<p><code>     </code><code>address = </code><code>new</code> <code>InetSocketAddress(bindAddress, port);</code></p>
+
+<p><code>     </code><code>// 创建ServerSocketChannel,并设置成非阻塞式</code></p>
+
+<p><code>     </code><code>acceptChannel = ServerSocketChannel.open();</code></p>
+
+<p><code>     </code><code>acceptChannel.configureBlocking(</code><code>false</code><code>);</code></p>
+
+<p> </p>
+
+<p><code>     </code><code>// 将server socket绑定到本地端口</code></p>
+
+<p><code>     </code><code>bind(acceptChannel.socket(), address, backlogLength);</code></p>
+
+<p><code>     </code><code>port = acceptChannel.socket().getLocalPort(); </code></p>
+
+<p><code>     </code><code>// 获得一个selector</code></p>
+
+<p><code>     </code><code>selector= Selector.open();</code></p>
+
+<p><code>     </code><code>readers = </code><code>new</code> <code>Reader[readThreads];</code></p>
+
+<p><code>     </code><code>readPool = Executors.newFixedThreadPool(readThreads);</code></p>
+
+<p><code>     </code><code>//启动多个reader线程，为了防止请求多时服务端响应延时的问题</code></p>
+
+<p><code>     </code><code>for</code> <code>(</code><code>int</code> <code>i = </code><code>0</code><code>; i < readThreads; i++) {       </code></p>
+
+<p><code>       </code><code>Selector readSelector = Selector.open();</code></p>
+
+<p><code>       </code><code>Reader reader = </code><code>new</code> <code>Reader(readSelector);</code></p>
+
+<p><code>       </code><code>readers[i] = reader;</code></p>
+
+<p><code>       </code><code>readPool.execute(reader);</code></p>
+
+<p><code>     </code><code>}</code></p>
+
+<p><code>     </code><code>// 注册连接事件</code></p>
+
+<p><code>     </code><code>acceptChannel.register(selector, SelectionKey.OP_ACCEPT);</code></p>
+
+<p><code>     </code><code>this</code><code>.setName(</code><code>"IPC Server listener on "</code> <code>+ port);</code></p>
+
+<p><code>     </code><code>this</code><code>.setDaemon(</code><code>true</code><code>);</code></p>
+
+<p><code>   </code><code>}</code></p>
+
+<p>在启动Listener线程时，服务端会一直等待客户端的连接，下面贴出Server.Listener类的run()方法：</p>
+
+<p><code>public</code> <code>void</code> <code>run() {</code></p>
+
+<p><code>    </code><code>•••</code></p>
+
+<p><code>     </code><code>while</code> <code>(running) {</code></p>
+
+<p><code>       </code><code>SelectionKey key = </code><code>null</code><code>;</code></p>
+
+<p><code>       </code><code>try</code> <code>{</code></p>
+
+<p><code>         </code><code>selector.select();</code></p>
+
+<p><code>         </code><code>Iterator<SelectionKey> iter = selector.selectedKeys().iterator();</code></p>
+
+<p><code>         </code><code>while</code> <code>(iter.hasNext()) {</code></p>
+
+<p><code>           </code><code>key = iter.next();</code></p>
+
+<p><code>           </code><code>iter.remove();</code></p>
+
+<p><code>           </code><code>try</code> <code>{</code></p>
+
+<p><code>             </code><code>if</code> <code>(key.isValid()) {</code></p>
+
+<p><code>               </code><code>if</code> <code>(key.isAcceptable())</code></p>
+
+<p><code>                 </code><code>doAccept(key);     </code><code>//具体的连接方法</code></p>
+
+<p><code>             </code><code>}</code></p>
+
+<p><code>           </code><code>} </code><code>catch</code> <code>(IOException e) {</code></p>
+
+<p><code>           </code><code>}</code></p>
+
+<p><code>           </code><code>key = </code><code>null</code><code>;</code></p>
+
+<p><code>         </code><code>}</code></p>
+
+<p><code>       </code><code>} </code><code>catch</code> <code>(OutOfMemoryError e) {</code></p>
+
+<p><code>      </code><code>•••         </code></p>
+
+<p><code>   </code><code>}</code></p>
+
+<p>下面贴出Server.Listener类中doAccept()方法中的关键源码吧：</p>
+
+<p><code>void</code> <code>doAccept(SelectionKey key) </code><code>throws</code> <code>IOException,  OutOfMemoryError {</code></p>
+
+<p><code>      </code><code>Connection c = </code><code>null</code><code>;</code></p>
+
+<p><code>      </code><code>ServerSocketChannel server = (ServerSocketChannel) key.channel();</code></p>
+
+<p><code>      </code><code>SocketChannel channel;</code></p>
+
+<p><code>      </code><code>while</code> <code>((channel = server.accept()) != </code><code>null</code><code>) { </code><code>//建立连接</code></p>
+
+<p><code>        </code><code>channel.configureBlocking(</code><code>false</code><code>);</code></p>
+
+<p><code>        </code><code>channel.socket().setTcpNoDelay(tcpNoDelay);</code></p>
+
+<p><code>        </code><code>Reader reader = getReader();  </code><code>//从readers池中获得一个reader</code></p>
+
+<p><code>        </code><code>try</code> <code>{</code></p>
+
+<p><code>          </code><code>reader.startAdd(); </code><code>// 激活readSelector，设置adding为true</code></p>
+
+<p><code>          </code><code>SelectionKey readKey = reader.registerChannel(channel);</code><code>//将读事件设置成兴趣事件</code></p>
+
+<p><code>          </code><code>c = </code><code>new</code> <code>Connection(readKey, channel, System.currentTimeMillis());</code><code>//创建一个连接对象</code></p>
+
+<p><code>          </code><code>readKey.attach(c);   </code><code>//将connection对象注入readKey</code></p>
+
+<p><code>          </code><code>synchronized</code> <code>(connectionList) {</code></p>
+
+<p><code>            </code><code>connectionList.add(numConnections, c);</code></p>
+
+<p><code>            </code><code>numConnections++;</code></p>
+
+<p><code>          </code><code>}</code></p>
+
+<p><code>        </code><code>••• </code></p>
+
+<p><code>        </code><code>} </code><code>finally</code> <code>{</code></p>
+
+<p><code>//设置adding为false，采用notify()唤醒一个reader,其实代码十三中启动的每个reader都使</code></p>
+
+<p><code>//用了wait()方法等待。因篇幅有限，就不贴出源码了。</code></p>
+
+<p><code>          </code><code>reader.finishAdd();</code></p>
+
+<p><code>        </code><code>}</code></p>
+
+<p><code>      </code><code>}</code></p>
+
+<p><code>    </code><code>}</code></p>
+
+<p>当reader被唤醒，reader接着执行doRead()方法。</p>
+
+<p>下面贴出Server.Listener.Reader类中的doRead()方法和Server.Connection类中的readAndProcess()方法源码：</p>
+
+<p><code>方法一：   </code></p>
+
+<p><code> </code><code>void</code> <code>doRead(SelectionKey key) </code><code>throws</code> <code>InterruptedException {</code></p>
+
+<p><code>      </code><code>int</code> <code>count = </code><code>0</code><code>;</code></p>
+
+<p><code>      </code><code>Connection c = (Connection)key.attachment();  </code><code>//获得connection对象</code></p>
+
+<p><code>      </code><code>if</code> <code>(c == </code><code>null</code><code>) {</code></p>
+
+<p><code>        </code><code>return</code><code>;  </code></p>
+
+<p><code>      </code><code>}</code></p>
+
+<p><code>      </code><code>c.setLastContact(System.currentTimeMillis());</code></p>
+
+<p><code>      </code><code>try</code> <code>{</code></p>
+
+<p><code>        </code><code>count = c.readAndProcess();    </code><code>// 接受并处理请求  </code></p>
+
+<p><code>      </code><code>} </code><code>catch</code> <code>(InterruptedException ieo) {</code></p>
+
+<p><code>       </code><code>•••</code></p>
+
+<p><code>      </code><code>}</code></p>
+
+<p><code>     </code><code>•••    </code></p>
+
+<p><code>}</code></p>
+
+<p> </p>
+
+<p><code>方法二：</code></p>
+
+<p><code>public</code> <code>int</code> <code>readAndProcess() </code><code>throws</code> <code>IOException, InterruptedException {</code></p>
+
+<p><code>      </code><code>while</code> <code>(</code><code>true</code><code>) {</code></p>
+
+<p><code>        </code><code>•••</code></p>
+
+<p><code>        </code><code>if</code> <code>(!rpcHeaderRead) {</code></p>
+
+<p><code>          </code><code>if</code> <code>(rpcHeaderBuffer == </code><code>null</code><code>) {</code></p>
+
+<p><code>            </code><code>rpcHeaderBuffer = ByteBuffer.allocate(</code><code>2</code><code>);</code></p>
+
+<p><code>          </code><code>}</code></p>
+
+<p><code>         </code><code>//读取请求头</code></p>
+
+<p><code>          </code><code>count = channelRead(channel, rpcHeaderBuffer);</code></p>
+
+<p><code>          </code><code>if</code> <code>(count < </code><code>0</code> <code>|| rpcHeaderBuffer.remaining() > </code><code>0</code><code>) {</code></p>
+
+<p><code>            </code><code>return</code> <code>count;</code></p>
+
+<p><code>          </code><code>}</code></p>
+
+<p><code>        </code><code>// 读取请求版本号  </code></p>
+
+<p><code>          </code><code>int</code> <code>version = rpcHeaderBuffer.get(</code><code>0</code><code>);</code></p>
+
+<p><code>          </code><code>byte</code><code>[] method = </code><code>new</code> <code>byte</code><code>[] {rpcHeaderBuffer.get(</code><code>1</code><code>)};</code></p>
+
+<p><code>        </code><code>•••  </code></p>
+
+<p> </p>
+
+<p><code>          </code><code>data = ByteBuffer.allocate(dataLength);</code></p>
+
+<p><code>        </code><code>}</code></p>
+
+<p><code>        </code><code>// 读取请求  </code></p>
+
+<p><code>        </code><code>count = channelRead(channel, data);</code></p>
+
+<p> </p>
+
+<p><code>        </code><code>if</code> <code>(data.remaining() == </code><code>0</code><code>) {</code></p>
+
+<p><code>         </code><code>•••</code></p>
+
+<p><code>          </code><code>if</code> <code>(useSasl) {</code></p>
+
+<p><code>         </code><code>•••</code></p>
+
+<p><code>          </code><code>} </code><code>else</code> <code>{</code></p>
+
+<p><code>            </code><code>processOneRpc(data.array());</code><code>//处理请求</code></p>
+
+<p><code>          </code><code>}</code></p>
+
+<p><code>        </code><code>•••</code></p>
+
+<p><code>          </code><code>}</code></p>
+
+<p><code>        </code><code>} </code></p>
+
+<p><code>        </code><code>return</code> <code>count;</code></p>
+
+<p><code>      </code><code>}</code></p>
+
+<p><code>    </code><code>}</code></p>
+
+<p>下面贴出Server.Connection类中的processOneRpc()方法和processData()方法的源码。</p>
+
+<p><code>方法一：   </code></p>
+
+<p><code> </code><code>private</code> <code>void</code> <code>processOneRpc(</code><code>byte</code><code>[] buf) </code><code>throws</code> <code>IOException,</code></p>
+
+<p><code>        </code><code>InterruptedException {</code></p>
+
+<p><code>      </code><code>if</code> <code>(headerRead) {</code></p>
+
+<p><code>        </code><code>processData(buf);</code></p>
+
+<p><code>      </code><code>} </code><code>else</code> <code>{</code></p>
+
+<p><code>        </code><code>processHeader(buf);</code></p>
+
+<p><code>        </code><code>headerRead = </code><code>true</code><code>;</code></p>
+
+<p><code>        </code><code>if</code> <code>(!authorizeConnection()) {</code></p>
+
+<p><code>          </code><code>throw</code> <code>new</code> <code>AccessControlException(</code><code>"Connection from "</code> <code>+ </code><code>this</code></p>
+
+<p><code>              </code><code>+ </code><code>" for protocol "</code> <code>+ header.getProtocol()</code></p>
+
+<p><code>              </code><code>+ </code><code>" is unauthorized for user "</code> <code>+ user);</code></p>
+
+<p><code>        </code><code>}</code></p>
+
+<p><code>      </code><code>}</code></p>
+
+<p><code>}</code></p>
+
+<p><code>方法二：</code></p>
+
+<p><code>    </code><code>private</code> <code>void</code> <code>processData(</code><code>byte</code><code>[] buf) </code><code>throws</code>  <code>IOException, InterruptedException {</code></p>
+
+<p><code>      </code><code>DataInputStream dis =</code></p>
+
+<p><code>        </code><code>new</code> <code>DataInputStream(</code><code>new</code> <code>ByteArrayInputStream(buf));</code></p>
+
+<p><code>      </code><code>int</code> <code>id = dis.readInt();      </code><code>// 尝试读取id</code></p>
+
+<p><code>      </code><code>Writable param = ReflectionUtils.newInstance(paramClass, conf);</code><code>//读取参数</code></p>
+
+<p><code>      </code><code>param.readFields(dis);        </code></p>
+
+<p> </p>
+
+<p><code>      </code><code>Call call = </code><code>new</code> <code>Call(id, param, </code><code>this</code><code>);  </code><code>//封装成call</code></p>
+
+<p><code>      </code><code>callQueue.put(call);   </code><code>// 将call存入callQueue</code></p>
+
+<p><code>      </code><code>incRpcCount();  </code><code>// 增加rpc请求的计数</code></p>
+
+<p><code>    </code><code>}</code></p>
+
+<h2>4. RPC与web service</h2>
+
+<p>web service接口就是RPC中的stub组件，规定了server能够提供的服务（web service），这在server和client上是一致的，但是也是跨语言跨平台的。同时，由于web service规范中的WSDL文件的存在，现在各平台的web service框架，都可以基于WSDL文件，自动生成web service接口 。</p>
+
+<p>其实两者差不多，只是传输的协议不同。</p>
+
+<p> </p>
+
+<p> </p>
+
+<p> </p>
+
+<p> </p>
+
+<p> </p>
+
+<p> </p>
+
+<p> </p>
+
+<p> </p>
+
+<p> </p>
+
+<p> </p>
+
+<p> </p>

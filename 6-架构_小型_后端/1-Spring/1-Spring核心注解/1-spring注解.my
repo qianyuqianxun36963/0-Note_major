@@ -1,0 +1,396 @@
+<h1>Spring注解原理的详细剖析与实现</h1>
+
+<h2>一、注解的基本概念和原理及其简单实用</h2>
+
+<p>注解（Annotation） 提供了一种安全的类似注释的机制，为我们在代码中添加信息提供了一种形式化得方法，使我们可以在稍后某个时刻方便的使用这些数据（通过解析注解来使用这些 数据），用来将任何的信息或者元数据与程序元素（类、方法、成员变量等）进行关联。其实就是更加直观更加明了的说明，这些说明信息与程序业务逻辑没有关 系，并且是供指定的工具或框架使用的。Annotation像一种修饰符一样，应用于包、类型、构造方法、方法、成员变量、参数及本地变量的申明语句中。</p>
+
+<p>Annotation其实是一种接口。通过java的反射机制相关的API来访问Annotation信息。相关类（框架或工具中的类）根据这些信息来决定如何使用该程序元素或改变它们的行为。Java语言解释器在工作时会忽略这些Annotation，因此在JVM中这些Annotation是“不起作用”的，只能通过配套的工具才能对这些Annotation类型的信息进行访问和处理。</p>
+
+<p>Annotation和interface的异同：</p>
+
+<p>1、 annotition的类型使用关键字@interface而不是interface。它继承了java.lang.annotition.Annotition接口，并非申明了一个interface。</p>
+
+<p>2、 Annotation类型、方法定义是独特的、受限制的。Annotation类型的方法必须申明为无参数、无异常抛出的。这些方法定义了Annotation的成员：方法名称为了成员名，而方法返回值称为了成员的类型。而方法返回值必须为primitive类型、Class类型、枚举类型、Annotation类型或者由前面类型之一作为元素的一位数组。方法的后面可以使用default和一个默认数值来申明成员的默认值，null不能作为成员的默认值，这与我们在非Annotation类型中定义方法有很大不同。Annotation类型和他的方法不能使用Annotation类型的参数，成员不能是generic。只有返回值类型是Class的方法可以在Annotation类型中使用generic，因为此方法能够用类转换将各种类型转换为Class。</p>
+
+<p>3、 Annotation类型又与接口有着近似之处。它们可以定义常量、静态成员类型（比如枚举类型定义）。Annotation类型也可以如接口一般被实现或者继承。</p>
+
+<p>*<strong>元注解</strong><strong>@Target,@Retention,@Documented,@Inherited </strong><br />
+* <br />
+* @Target 表示该注解用于什么地方，可能的 ElemenetType 参数包括： <br />
+* ElemenetType.CONSTRUCTOR 构造器声明 <br />
+* ElemenetType.FIELD 域声明（包括 enum 实例） <br />
+* ElemenetType.LOCAL_VARIABLE 局部变量声明 <br />
+* ElemenetType.METHOD 方法声明 <br />
+* ElemenetType.PACKAGE 包声明 <br />
+* ElemenetType.PARAMETER 参数声明 <br />
+* ElemenetType.TYPE 类，接口（包括注解类型）或enum声明 <br />
+* <br />
+* @Retention 表示在什么级别保存该注解信息。可选的 RetentionPolicy 参数包括： <br />
+* RetentionPolicy.SOURCE 注解将被编译器丢弃 <br />
+* RetentionPolicy.CLASS 注解在class文件中可用，但会被VM丢弃 <br />
+* RetentionPolicy.RUNTIME VM将在运行期也保留注释，因此可以通过反射机制读取注解的信息。 <br />
+* <br />
+* @Documented 将此注解包含在 javadoc 中 <br />
+* <br />
+* @Inherited 允许子类继承父类中的注解</p>
+
+<p> </p>
+
+<p>使用：</p>
+
+<p>@Target(ElementType.METHOD)</p>
+
+<p>@Retention(RetentionPolicy.RUNTIME)</p>
+
+<p>@Documented</p>
+
+<p>@Inherited</p>
+
+<p> </p>
+
+<p>举例：</p>
+
+<pre>
+package com.wxy.annotation;
+
+import java.lang.annotation.Documented;
+import java.lang.annotation.ElementType; 
+import java.lang.annotation.Inherited;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
+/** 
+* 定义注解Test
+* 注解中含有两个元素 id 和 description
+* description元素有默认值"no description" 
+* @create-time 2011-8-12 下午02:22:28 
+* @revision $Id
+*/
+
+//该注解用于方法声明
+@Target(ElementType.METHOD)
+//VM将在运行期也保留注释，因此可以通过反射机制读取注解的信息
+@Retention(RetentionPolicy.RUNTIME)
+//将此注解包含在javadoc中
+@Documented
+//允许子类继承父类中的注解
+@Inherited
+public @interface Test { 
+public int id();
+public String description() default "no description";
+}</pre>
+
+<p> </p>
+
+<pre>
+package com.wxy.annotation;
+import java.lang.reflect.Method;
+/**
+* 使用注解和解析注解
+* 
+* @creator xiaoyu.wang 
+* @create-time 2011-8-12 下午03:49:17 
+* @revision $Id
+*/
+public class Test_1{
+/**
+* 被注释的三个方法
+*/
+@Test(id = 1, description = "hello method1")
+public void method1() {
+}
+@Test(id = 2)
+public void method2() {
+}
+@Test(id = 3, description = "last method3")
+/**
+* 解析注释，将Test_1类所有被注解方法的信息打印出来
+* @param args
+*/
+public static void main(String[] args) {
+Method[] methods = Test_1.class.getDeclaredMethods();
+for (Method method : methods) {
+//判断方法中是否有指定注解类型的注解
+boolean hasAnnotation = method.isAnnotationPresent(Test.class);
+if (hasAnnotation) {
+//根据注解类型返回方法的指定类型注解
+Test annotation = method.getAnnotation(Test.class);
+System.out.println("Test(method=" + method.getName() + ",id=" + annotation.id()
++ ",description=" + annotation.description() + ")");
+}
+}
+}
+}
+</pre>
+
+<p> </p>
+
+<h2>二、spring中注解@Resource的使用</h2>
+
+<p>1、修改bean.xml，引入命名空间（保证项目能引用到common-annotations.jar）</p>
+
+<pre>
+?xml version="1.0" encoding="UTF-8"?> 
+<beans xmlns=http://www.springframework.org/schema/beans
+xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+xmlns:context=http://www.springframework.org/schema/context
+xsi:schemaLocation="http://www.springframework.org/schema/beans
+http://www.springframework.org/schema/beans/spring-beans-2.5.xsd 
+http://www.springframework.org/schema/context 
+http://www.springframework.org/schema/context/spring-context-2.5.xsd">
+<context:annotation-config />
+<bean id="peopleDao" class="com.wxy.dao.impl.PeopleDaoBean"></bean>
+<bean id="peopleService" class="com.wxy.service.impl.PeopleServiceBean" 
+</bean>
+</beans> 
+</pre>
+
+<p>2、在PeopleServiceBean中使用@Resource注解</p>
+
+<pre>
+public class PeopleServiceBean implements PeopleService {
+@Resource
+private PeopleDao peopleDao;
+private String name = "wxy";
+private Integer id = 1;
+…
+}
+</pre>
+
+<p>3、 测试</p>
+
+<pre>
+public class Test {
+public static void main(String[] args) {
+//IOC容器实例化
+ClassPathXmlApplicationContext ac = new ClassPathXmlApplicationContext("beans.xml");
+PeopleService peopleService = (PeopleService) ac.getBean("peopleService");
+peopleService.save();
+}
+}
+</pre>
+
+<p>4、 结果</p>
+
+<p>--> the method is called save()! name=wxy,id=1<br />
+this is the method PeopleDaoBean.add()!</p>
+
+<p> </p>
+
+<p>也可以在setter方法上使用@Resource：</p>
+
+<pre>
+public class PeopleServiceBean implements PeopleService {
+private PeopleDao peopleDao;
+private String name = "wxy";
+private Integer id = 1;
+/** 
+* @return the peopleDao
+*/
+public PeopleDao getPeopleDao() {
+return peopleDao;
+}
+
+/**
+* @param peopleDao the peopleDao to set
+*/
+@Resource
+public void setPeopleDao(PeopleDao peopleDao) {
+this.peopleDao = peopleDao;
+}
+…..
+}
+</pre>
+
+<p>结果一样。</p>
+
+<p> </p>
+
+<h2>三、@Resource注解的实现原理（只用于配置，不用于干活）</h2>
+
+<p>1、新建Annotation类型文件</p>
+
+<p> </p>
+
+<pre>
+package com.wxy.annotation;
+
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
+
+@Retention(RetentionPolicy.RUNTIME)
+@Target( { ElementType.FIELD, ElementType.METHOD })
+public @interface WxyResource {
+String name() default "";
+}
+</pre>
+
+<p> </p>
+
+<p>2、使用自定义的注解@WxyResource</p>
+
+<pre>
+public class PeopleServiceBean implements PeopleService {
+private PeopleDao peopleDao;
+private String name = "wxy";
+private Integer id = 1;
+/** 
+* @param peopleDao the peopleDao to set
+*/
+@WxyResource
+public void setPeopleDao(PeopleDao peopleDao) {
+this.peopleDao = peopleDao;
+}
+…
+}
+</pre>
+
+<p>3、事实上上一步没有实现，这一步开始实现注入原理，在自定义spring容器中添加注解功能</p>
+
+<pre>
+public class WxyClassPathXMLApplicationContext {
+
+//存放BeanDefinition的列表，在beans.xml中定义的bean可能不止一个
+private final List<BeanDefinition> beanDefines = new ArrayList<BeanDefinition>();
+//将类名作为索引，将创建的Bean对象存入到Map中
+private final Map<String, Object> sigletons = new HashMap<String, Object>();
+public WxyClassPathXMLApplicationContext(String fileName) {
+//读取xml配置文件
+this.readXML(fileName);
+//实例化bean
+this.instanceBeans();
+//处理注解方式
+this.annotationInject();
+//注入对象
+this.injectObject();
+}
+/** 
+* 使用注解方式注入对象方法实现
+* @throws IntrospectionException 
+*/
+private void annotationInject() {
+//循环所有bean对象
+for (String beanName : sigletons.keySet()) {
+//获取bean对象
+Object bean = sigletons.get(beanName);
+//如果bean不为空,取得bean的属性
+if (bean != null) {
+try {
+//按属性注入
+PropertyDescriptor[] ps = Introspector.getBeanInfo(bean.getClass())
+.getPropertyDescriptors();
+for (PropertyDescriptor properdesc : ps) {
+//获取属性的setter方法
+Method setter = properdesc.getWriteMethod();
+//判断注解是否存在
+if (setter != null && setter.isAnnotationPresent(WxyResource.class)) {
+//取得注解
+WxyResource resource = setter.getAnnotation(WxyResource.class);
+Object value = null;
+//如果按名字找到
+if (resource.name() != null && !"".equals(resource.name())) {
+//取得容器中的bean对象
+value = sigletons.get(resource.name());
+
+} else {//没有按名字找到，按类型寻找
+//取得容器中的bean对象
+value = sigletons.get(resource.name());
+if (value == null) {
+for (String key : sigletons.keySet()) {
+if (properdesc.getPropertyType().isAssignableFrom(
+sigletons.get(key).getClass())) {
+value = sigletons.get(key);
+break;
+}
+}
+}
+}
+//把引用对象注入到属性
+setter.setAccessible(true); 
+setter.invoke(bean, value);
+}
+}
+//按字段注入
+Field[] fields = bean.getClass().getDeclaredFields();
+for (Field field : fields) {
+//如果注解存在
+if (field.isAnnotationPresent(WxyResource.class)) {
+//取得注解
+WxyResource resource = field.getAnnotation(WxyResource.class);
+Object value = null;
+//如果按名字找到
+if (resource.name() != null && !"".equals(resource.name())) {
+//取得容器中的bean对象
+value = sigletons.get(resource.name());
+} else {//没有按名字找到，按类型寻找
+//取得容器中的bean对象
+value = sigletons.get(field.getName());
+if (value == null) {
+for (String key : sigletons.keySet()) {
+if (field.getType().isAssignableFrom(
+sigletons.get(key).getClass())) {
+value = sigletons.get(key);
+break;
+}
+}
+}
+}
+//允许访问private 
+field.setAccessible(true);
+field.set(bean, value);
+}
+}
+} catch (IntrospectionException e) {
+// TODO Auto-generated catch block
+e.printStackTrace();
+} catch (IllegalArgumentException e) {
+// TODO Auto-generated catch block
+e.printStackTrace();
+} catch (IllegalAccessException e) {
+// TODO Auto-generated catch block
+e.printStackTrace();
+} catch (InvocationTargetException e) {
+// TODO Auto-generated catch block
+e.printStackTrace();
+}
+}
+}
+}
+/** 
+*为bean对象的属性注入值
+*/
+　　private void injectObject() {
+　　　　….
+　　}
+　　….
+}
+</pre>
+
+<p>4、 使用自定义容器测试</p>
+
+<pre>
+public class MyTest { 
+/**
+* @param args
+*/
+public static void main(String[] args) {
+//MyIOC容器实例化
+WxyClassPathXMLApplicationContext ac = new WxyClassPathXMLApplicationContext("beans.xml");
+PeopleService peopleService = (PeopleService) ac.getBean("peopleService");
+peopleService.save();
+}
+}
+</pre>
+
+<p>5、 测试结果</p>
+
+<p>--> the method is called save()! name=wxy,id=1<br />
+this is the method PeopleDaoBean.add()!</p>
+
+<p> </p>
+
+<p>注解本身不做任何事情，只是像xml文件一样起到配置作用。注解代表的是某种业务意义，注解背后处理器的工作原理如上源码实现：首先解析所有属性，判断属性上是否存在指定注解，如果存在则根据搜索规则取得bean，然后利用反射原理注入。如果标注在字段上面，也可以通过字段的反射技术取得注解，根据搜索规则取得bean，然后利用反射技术注入。</p>
+
+<p> </p>

@@ -1,0 +1,292 @@
+<h1>FastJson、Jackson、Gson、Json的效率简单对比</h1>
+
+<p>今天上班优化代码的时候，发现从Redis中取出List>格式的json字符串，通过net.sf.json将其转成List的时候，如果List.size()在1000左右时，消耗处理时间为1000ms，效率非常低；然后搜了下java解析json常用api，发现alibaba的fastJson处理效率还是不错的，当size在1000左右时，也就不足100ms。<br />
+然后。。。。回家就简单对比了下几个json处理方式：FastJson、Jackson、Gson、org.Json;</p>
+
+<h2>首先maven引入依赖：</h2>
+
+<p><code>    <dependency><br />
+            <groupid>org.json</groupid><br />
+            json</artifactid><br />
+            <version>20170516</version><br />
+        </dependency><br />
+        <dependency><br />
+            <groupid>com.google.code.gson</groupid><br />
+            gson</artifactid><br />
+            <version>2.8.1</version><br />
+        </dependency><br />
+        <dependency><br />
+            <groupid>com.alibaba</groupid><br />
+            fastjson</artifactid><br />
+            <version>1.2.35</version><br />
+        </dependency><br />
+        <dependency><br />
+            <groupid>com.fasterxml.jackson.core</groupid><br />
+            jackson-databind</artifactid><br />
+            <version>2.9.0.pr4</version><br />
+        </dependency></code><br />
+编写相应的类，测试jsonStr–list，list–jsonStr的处理时间</p>
+
+<h2>org.json</h2>
+
+<p><code>package com.love.yu.maven.learn.json;<br />
+ <br />
+import java.util.List;<br />
+import org.json.JSONArray;<br />
+ <br />
+public class TestJson {<br />
+    public void testJsonStr2List(String str) {<br />
+        long a = System.currentTimeMillis();<br />
+        JSONArray jsonArray = new JSONArray(str);<br />
+        List<object> list = jsonArray.toList();<br />
+        long b = System.currentTimeMillis();<br />
+        System.out.println("JsonStr2List:size=" + list.size() + ",time=" + (b - a));<br />
+    }<br />
+ <br />
+    public String testJsonList2Str(List<string> list) {<br />
+        long a = System.currentTimeMillis();<br />
+        JSONArray array = new JSONArray(list);<br />
+        String str = array.toString();<br />
+        long b = System.currentTimeMillis();<br />
+        System.out.println("JsonList2Str:length=" + str.length() + ",time=" + (b - a));<br />
+        return str;<br />
+    }<br />
+}</p>
+
+<h2>fastJson</h2>
+
+<p>package com.love.yu.maven.learn.json;<br />
+ <br />
+import java.util.List;<br />
+import com.alibaba.fastjson.JSONArray;<br />
+ <br />
+public class TestFastJson {<br />
+    public void testFastJsonStr2List(String str) {<br />
+        long a = System.currentTimeMillis();<br />
+        JSONArray jsonArray = JSONArray.parseArray(str);<br />
+        List<string> list = jsonArray.toJavaList(String.class);<br />
+        long b = System.currentTimeMillis();<br />
+        System.out.println("FastJsonStr2List:size=" + list.size() + ",time=" + (b - a));<br />
+    }<br />
+ <br />
+    public String testFastJsonList2Str(List<string> list) {<br />
+        long a = System.currentTimeMillis();<br />
+        String str = JSONArray.toJSONString(list);<br />
+        long b = System.currentTimeMillis();<br />
+        System.out.println("FastJsonList2Str:length=" + str.length() + ",time=" + (b - a));<br />
+        return str;<br />
+    }<br />
+}</p>
+
+<h2>jackson</h2>
+
+<p>package com.love.yu.maven.learn.json;<br />
+ <br />
+import java.io.IOException;<br />
+import java.util.List;<br />
+ <br />
+import com.fasterxml.jackson.core.JsonParseException;<br />
+import com.fasterxml.jackson.core.JsonProcessingException;<br />
+import com.fasterxml.jackson.databind.JsonMappingException;<br />
+import com.fasterxml.jackson.databind.ObjectMapper;<br />
+ <br />
+public class TestJackson {<br />
+    public void testJacksonStr2List(String str) throws JsonParseException, JsonMappingException, IOException {<br />
+        long a = System.currentTimeMillis();<br />
+        ObjectMapper objectMapper = new ObjectMapper();<br />
+        List<string> list = objectMapper.readValue(str, List.class);<br />
+        long b = System.currentTimeMillis();<br />
+        System.out.println("JacksonStr2List:size=" + list.size() + ",time=" + (b - a));<br />
+    }<br />
+ <br />
+    public String testJacksonList2Str(List<string> list) throws JsonProcessingException {<br />
+        long a = System.currentTimeMillis();<br />
+        ObjectMapper objectMapper = new ObjectMapper();<br />
+        String str = objectMapper.writeValueAsString(list);<br />
+        long b = System.currentTimeMillis();<br />
+        System.out.println("JacksonList2Str:length=" + str.length() + ",time=" + (b - a));<br />
+        return str;<br />
+    }<br />
+}</p>
+
+<h2>gson</h2>
+
+<p>package com.love.yu.maven.learn.json;<br />
+ <br />
+import java.util.List;<br />
+ <br />
+import com.google.gson.Gson;<br />
+ <br />
+public class TestGson {<br />
+    public void testGsonStr2List(String str) {<br />
+        long a = System.currentTimeMillis();<br />
+        Gson gson = new Gson();<br />
+        List<string> list = gson.fromJson(str, List.class);<br />
+        long b = System.currentTimeMillis();<br />
+        System.out.println("GsonStr2List:size=" + list.size() + ",time=" + (b - a));<br />
+    }<br />
+ <br />
+    public String testGsonList2Str(List<string> list) {<br />
+        long a = System.currentTimeMillis();<br />
+        Gson gson = new Gson();<br />
+        String str = gson.toJson(list);<br />
+        long b = System.currentTimeMillis();<br />
+        System.out.println("GsonList2Str:length=" + str.length() + ",time=" + (b - a));<br />
+        return str;<br />
+    }<br />
+}</p>
+
+<h2>最后编写测试类（Main代替）</h2>
+
+<p>package com.love.yu.maven.learn.json;<br />
+ <br />
+import java.io.IOException;<br />
+import java.util.ArrayList;<br />
+import java.util.List;<br />
+ <br />
+import com.fasterxml.jackson.core.JsonParseException;<br />
+import com.fasterxml.jackson.databind.JsonMappingException;<br />
+import com.love.yu.maven.learn.enums.CityEnum;<br />
+import com.love.yu.maven.learn.util.Enums;<br />
+ <br />
+public class CompareJson {<br />
+    public static void main(String[] args) throws JsonParseException, JsonMappingException, IOException {<br />
+        List<string> list = new ArrayList<string>();<br />
+        for (int i = 0; i < 5000000; i++) {<br />
+            String name = Enums.random(CityEnum.class).name();<br />
+            list.add(name + "-" + i);<br />
+        }<br />
+ <br />
+        TestJson testJson = new TestJson();<br />
+        for (int i = 0; i < 10; i++) {<br />
+            String str = testJson.testJsonList2Str(list);<br />
+            testJson.testJsonStr2List(str);<br />
+        }<br />
+ <br />
+        System.out.println("------------");<br />
+        TestFastJson fastJson = new TestFastJson();<br />
+        for (int i = 0; i < 10; i++) {<br />
+            String str = fastJson.testFastJsonList2Str(list);<br />
+            fastJson.testFastJsonStr2List(str);<br />
+        }<br />
+ <br />
+        System.out.println("------------");<br />
+        TestJackson testJackson = new TestJackson();<br />
+        for (int i = 0; i < 10; i++) {<br />
+            String str = testJackson.testJacksonList2Str(list);<br />
+            testJackson.testJacksonStr2List(str);<br />
+        }<br />
+        System.out.println("------------");<br />
+        TestGson testGson = new TestGson();<br />
+        for (int i = 0; i < 10; i++) {<br />
+            String str = testGson.testGsonList2Str(list);<br />
+            testGson.testGsonStr2List(str);<br />
+        }<br />
+    }<br />
+}</p>
+
+<h2>以size=5000000的list测试转换效率，结果如下</h2>
+
+<h3>Str2List</h3>
+
+<p>------------<br />
+JsonStr2List:size=5000000,time=4272<br />
+JsonStr2List:size=5000000,time=3270<br />
+JsonStr2List:size=5000000,time=4024<br />
+JsonStr2List:size=5000000,time=3918<br />
+JsonStr2List:size=5000000,time=3977<br />
+JsonStr2List:size=5000000,time=3928<br />
+JsonStr2List:size=5000000,time=4019<br />
+JsonStr2List:size=5000000,time=4001<br />
+JsonStr2List:size=5000000,time=3913<br />
+JsonStr2List:size=5000000,time=4152<br />
+------------<br />
+FastJsonStr2List:size=5000000,time=747<br />
+FastJsonStr2List:size=5000000,time=646<br />
+FastJsonStr2List:size=5000000,time=673<br />
+FastJsonStr2List:size=5000000,time=652<br />
+FastJsonStr2List:size=5000000,time=639<br />
+FastJsonStr2List:size=5000000,time=639<br />
+FastJsonStr2List:size=5000000,time=632<br />
+FastJsonStr2List:size=5000000,time=639<br />
+FastJsonStr2List:size=5000000,time=630<br />
+FastJsonStr2List:size=5000000,time=624<br />
+------------<br />
+JacksonStr2List:size=5000000,time=671<br />
+JacksonStr2List:size=5000000,time=1763<br />
+JacksonStr2List:size=5000000,time=1843<br />
+JacksonStr2List:size=5000000,time=1643<br />
+JacksonStr2List:size=5000000,time=1727<br />
+JacksonStr2List:size=5000000,time=1755<br />
+JacksonStr2List:size=5000000,time=1584<br />
+JacksonStr2List:size=5000000,time=1704<br />
+JacksonStr2List:size=5000000,time=1817<br />
+JacksonStr2List:size=5000000,time=1626<br />
+------------<br />
+GsonStr2List:size=5000000,time=708<br />
+GsonStr2List:size=5000000,time=2133<br />
+GsonStr2List:size=5000000,time=688<br />
+GsonStr2List:size=5000000,time=1721<br />
+GsonStr2List:size=5000000,time=648<br />
+GsonStr2List:size=5000000,time=2679<br />
+GsonStr2List:size=5000000,time=679<br />
+GsonStr2List:size=5000000,time=1706<br />
+GsonStr2List:size=5000000,time=647<br />
+GsonStr2List:size=5000000,time=2604</p>
+
+<h3>List2Str</h3>
+
+<p>------------<br />
+JsonList2Str:length=93890636,time=2060<br />
+JsonList2Str:length=93890636,time=2646<br />
+JsonList2Str:length=93890636,time=2512<br />
+JsonList2Str:length=93890636,time=2366<br />
+JsonList2Str:length=93890636,time=2386<br />
+JsonList2Str:length=93890636,time=2323<br />
+JsonList2Str:length=93890636,time=2352<br />
+JsonList2Str:length=93890636,time=2355<br />
+JsonList2Str:length=93890636,time=2342<br />
+JsonList2Str:length=93890636,time=2401<br />
+------------<br />
+FastJsonList2Str:length=93890636,time=2269<br />
+FastJsonList2Str:length=93890636,time=2150<br />
+FastJsonList2Str:length=93890636,time=2032<br />
+FastJsonList2Str:length=93890636,time=2020<br />
+FastJsonList2Str:length=93890636,time=2149<br />
+FastJsonList2Str:length=93890636,time=2015<br />
+FastJsonList2Str:length=93890636,time=2050<br />
+FastJsonList2Str:length=93890636,time=1998<br />
+FastJsonList2Str:length=93890636,time=2175<br />
+FastJsonList2Str:length=93890636,time=2011<br />
+------------<br />
+JacksonList2Str:length=93890636,time=1989<br />
+JacksonList2Str:length=93890636,time=666<br />
+JacksonList2Str:length=93890636,time=615<br />
+JacksonList2Str:length=93890636,time=412<br />
+JacksonList2Str:length=93890636,time=651<br />
+JacksonList2Str:length=93890636,time=625<br />
+JacksonList2Str:length=93890636,time=594<br />
+JacksonList2Str:length=93890636,time=647<br />
+JacksonList2Str:length=93890636,time=651<br />
+JacksonList2Str:length=93890636,time=606<br />
+------------<br />
+GsonList2Str:length=93890636,time=2244<br />
+GsonList2Str:length=93890636,time=2031<br />
+GsonList2Str:length=93890636,time=2091<br />
+GsonList2Str:length=93890636,time=2078<br />
+GsonList2Str:length=93890636,time=2150<br />
+GsonList2Str:length=93890636,time=2211<br />
+GsonList2Str:length=93890636,time=1974<br />
+GsonList2Str:length=93890636,time=2079<br />
+GsonList2Str:length=93890636,time=2124<br />
+GsonList2Str:length=93890636,time=2103</p>
+
+<h2>发现：</h2>
+
+<p>str—>list：fastJson在处理数据时速度最快，Gson处理速度也不错，但是并不稳定，Json是最慢的；</p>
+
+<p>list—>str：jackson在处理数据时速度最快，其他三者速度相差不是很大</p>
+
+<p>疑惑：</p>
+
+<p>gson在处理Str—>List的时候，处理时间交替出现快-慢-快-慢的情况。</p>

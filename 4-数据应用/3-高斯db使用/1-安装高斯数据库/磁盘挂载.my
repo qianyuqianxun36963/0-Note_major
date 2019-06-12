@@ -1,0 +1,193 @@
+<h1><a href="https://www.cnblogs.com/hellojesson/p/4582908.html" rel="nofollow">inux_LVM_磁盘扩容</a></h1>
+
+<p>场景描述：</p>
+
+<p>    安装操作系统的时候，做了LVM，应用软件基本装在了“/”目录下，服务器运行一段时间后，该目录下的存储空间使用紧张，现利用LVM对其进行磁盘空间扩容。</p>
+
+<p>注：安装系统的时候需要做逻辑卷管理，保证系统要有VG，扩展或者添加完硬盘后需要重启服务器，添加的硬盘才能被发现。</p>
+
+<p>另：这里需要搞清楚，是扩展了原有分区还是增加了新的硬盘；</p>
+
+<p>例如：如果是在原有分区SDA上扩展了10G，则命令行fdisk -l 不会看到新的分区；</p>
+
+<p>           如果是新添加的硬盘，fdisk -l 可以看到 sdb sdc 等新的未分配的分区。</p>
+
+<p>结果演示：扩展sda，磁盘分区sda使用情况打印输出：（可以看到空间变成了32.2G增大了10G）</p>
+
+<p><img src="http://wiki.inhuawei.com/download/attachments/37007818/image2019-5-27_14-22-27.png?version=1&modificationDate=1558938157000&api=v2" style="height:250px" />为服务器增加新硬盘，这里我们加了两块，开机识别出来是sdb和sdc；</p>
+
+<p>(1) 我们可以看到有3块硬盘，第一块硬盘已经分区并使用，第二块和第三块硬盘没有使用，现在我们要在第二块硬盘sdb上新建LVM分区</p>
+
+<p><img src="http://wiki.inhuawei.com/download/attachments/37007818/image2019-5-27_14-22-44.png?version=1&modificationDate=1558938174000&api=v2" style="height:250px" /></p>
+
+<p>使用fdisk /dev/sdb进行分区，按n创建一个新的分区，按P创建主分区，按1，创建第一块分区，选择开始磁道，按照默认模式开始，使用整个硬盘空间。创建好后按w生效退出。（注意：即使是另一种情况，扩展sda，也需要对sda重新分区，Partition number (1-4)时输入对应的数值。）</p>
+
+<p><img src="http://wiki.inhuawei.com/download/attachments/37007818/image2019-5-27_14-23-15.png?version=1&modificationDate=1558938207000&api=v2" style="height:250px" /></p>
+
+<p> </p>
+
+<p> </p>
+
+<p>将新的分区，格式化；</p>
+
+<p>#mkfs -t ext3 /dev/sdb1   （如果找不到刚才的分区sdb1,需要重新启动系统；默认的“done”不用手动敲，等待一会儿会自动出现。）</p>
+
+<p><img src="http://wiki.inhuawei.com/download/attachments/37007818/image2019-5-27_14-23-38.png?version=1&modificationDate=1558938230000&api=v2" style="height:250px" /></p>
+
+<p>(2) 把分区改为LVM格式</p>
+
+<p>修改分区格式，使新建的分区支持LVM格式。进入fdisk后，按t修改分区格式，类型改为8e（之前默认的是83）。按w保存生效。</p>
+
+<p><img src="http://wiki.inhuawei.com/download/attachments/37007818/image2019-5-27_14-24-23.png?version=1&modificationDate=1558938278000&api=v2" style="height:250px" /></p>
+
+<p>执行partprobe ,不用重启机器，使分区表生效。</p>
+
+<p>fdisk -l 查看刚加的分区，格式已经变成LVM 的8e。</p>
+
+<p> </p>
+
+<p>-----------------------------------------------------------------------------------------------------------------------------------------------------</p>
+
+<p> </p>
+
+<p>3 查看VG</p>
+
+<p>#vgdisplay</p>
+
+<p><img src="http://wiki.inhuawei.com/download/attachments/37007818/image2019-5-27_14-24-48.png?version=1&modificationDate=1558938303000&api=v2" style="height:250px" /></p>
+
+<p>VolGroup00是装操作系统的时候，建的；</p>
+
+<p>注: 如果需要单独的VG，可以新建；（我们这次没有新建）</p>
+
+<p>创建命令如下：</p>
+
+<p>#vgcreate VolGroup01 /dev/sdc1</p>
+
+<p>4 查看 PV</p>
+
+<p>使用如下命令创建：pvcreate /dev/sdb1</p>
+
+<p><img src="http://wiki.inhuawei.com/download/attachments/37007818/image2019-5-27_14-25-10.png?version=1&modificationDate=1558938328000&api=v2" style="height:107px" /></p>
+
+<p>查看已经存在的PV，其中/dev/sda2是我们安装操作系统的时候创建的；</p>
+
+<p>#pvdisplay</p>
+
+<p><img src="http://wiki.inhuawei.com/download/attachments/37007818/image2019-5-27_14-25-31.png?version=1&modificationDate=1558938349000&api=v2" style="height:250px" /></p>
+
+<p>5 查看创建 LV</p>
+
+<p>通过查看的命令，可以看到LV：/dev/VolGroup00/LogVol00 就是我们要进行扩展的目录对应的LV</p>
+
+<p><img src="http://wiki.inhuawei.com/download/attachments/37007818/image2019-5-27_14-25-51.png?version=1&modificationDate=1558938369000&api=v2" style="height:250px" /></p>
+
+<p>6. LVM 扩容</p>
+
+<p>扩容VG</p>
+
+<p>#vgextend VolGroup00 /dev/sdb1</p>
+
+<p><img src="http://wiki.inhuawei.com/download/attachments/37007818/image2019-5-27_14-26-15.png?version=1&modificationDate=1558938395000&api=v2" style="height:105px" /></p>
+
+<p>查看扩展后的 VG  增加了10G</p>
+
+<p><img src="http://wiki.inhuawei.com/download/attachments/37007818/image2019-5-27_14-26-36.png?version=1&modificationDate=1558938417000&api=v2" style="height:250px" /></p>
+
+<p>查看当前磁盘空间使用，可以看到当前“/“目录对应的空间大小为14G，所以接下来，LV扩容的话</p>
+
+<p>参数后边需要加数值：24G，表示扩容到24G。</p>
+
+<p><img src="http://wiki.inhuawei.com/download/attachments/37007818/image2019-5-27_14-26-56.png?version=1&modificationDate=1558938439000&api=v2" style="height:202px" /></p>
+
+<p>扩展 LV</p>
+
+<p>#lvextend -L 24G /dev/VolGroup00/LogVol00</p>
+
+<p><img src="http://wiki.inhuawei.com/download/attachments/37007818/image2019-5-27_14-27-34.png?version=1&modificationDate=1558938476000&api=v2" style="height:101px" /></p>
+
+<p>注意：</p>
+
+<p>如果出现下面提示，则说明最大扩展的空间不足，可以将值调小一点，改成23.8G，即比24G小一点（这里根据自身实际要扩展的大小进行调整）。</p>
+
+<p>[root@localhost ~]# lvextend -L 24G /dev/VolGroup00/LogVol00</p>
+
+<p>  Extending logical volume LogVol00 to 26.00 GB</p>
+
+<p>  Insufficient free space: 321 extents needed, but only 320 available</p>
+
+<p>查看扩展后LV大小：</p>
+
+<p>[root@localhost ~]# lvdisplay</p>
+
+<p>我们接着查看，当前的磁盘使用情况，发现没有变化；</p>
+
+<p><img src="http://wiki.inhuawei.com/download/attachments/37007818/image2019-5-27_14-28-11.png?version=1&modificationDate=1558938516000&api=v2" style="height:227px" /></p>
+
+<p>不要急，执行重设大小；</p>
+
+<p>#resize2fs /dev/VolGroup00/LogVol00</p>
+
+<p><img src="http://wiki.inhuawei.com/download/attachments/37007818/image2019-5-27_14-28-38.png?version=1&modificationDate=1558938543000&api=v2" style="height:188px" /></p>
+
+<p>OK ,到这里我们的扩容就完成了。</p>
+
+<p><img src="http://wiki.inhuawei.com/download/attachments/37007818/image2019-5-27_14-28-59.png?version=1&modificationDate=1558938567000&api=v2" style="height:224px" /></p>
+
+<p> </p>
+
+<p>链接: <a href="https://www.cnblogs.com/hellojesson/p/4582908.html" rel="nofollow">https://www.cnblogs.com/hellojesson/p/4582908.html</a></p>
+
+<p>---------------------------------------------------------------</p>
+
+<p> </p>
+
+<p>创建逻辑分区, 挂载等;</p>
+
+<p> </p>
+
+<p>1. 创建pv<br />
+pvcreate /dev/xvdg1<br />
+或者vgcreate VolGroup01 /dev/xvdg1 <br />
+显示pv<br />
+pvdisplay</p>
+
+<p>2. 创建vg<br />
+vgcreate VolGroup01 /dev/xvdg1<br />
+显示vg<br />
+vgdisplay</p>
+
+<p>扩充使用: vgextend VolGroup /dev/xvdg1</p>
+
+<p>3. 新建lv:<br />
+lvcreate -L 1023.99609375G -n lv_dev_xvdg1 VolGroup01</p>
+
+<p>删除逻辑卷:<br />
+lvremove /dev/VolGroup01/lv_dev_xvdg1</p>
+
+<p>Volume group "VolGroup01" has insufficient free space (262143 extents): 25600000 required.</p>
+
+<p>使用G单位来分配<br />
+#lvcreate -L 10G -n lv_oracle VolGroup<br />
+使用块单位来分配<br />
+#lvcreate -l 2559 -n lv_oracle VolGroup</p>
+
+<p>G和块转换关系:<br />
+XXX 100000 G <br />
+------- = -------<br />
+262143 25600000</p>
+
+<p>4. 挂载: <br />
+mount /dev/mapper/VolGroup-lv_oracle /oracle</p>
+
+<p><br />
+5. 其他<br />
+查看lv:<br />
+lvdisplay<br />
+格式化lv<br />
+mkfs -t ext3 /dev/VolGroup01/lv_dev_xvdg1<br />
+将lv挂载:<br />
+mount /dev/VolGroup01/lv_dev_xvdg1 /home/gaussdba<br />
+mount /dev/VolGroup01/lv_dev_xvdg1 /gaussdbData<br />
+卸除挂载: <br />
+umount /home/gaussdba</p>

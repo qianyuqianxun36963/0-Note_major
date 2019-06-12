@@ -1,0 +1,203 @@
+<h1>流式接口</h1>
+
+<p><strong>流式接口</strong>（fluent interface）是<a href="https://zh.wikipedia.org/wiki/%E8%BD%AF%E4%BB%B6%E5%B7%A5%E7%A8%8B" title="软件工程">软件工程</a>中<a href="https://zh.wikipedia.org/wiki/%E9%9D%A2%E5%90%91%E5%AF%B9%E8%B1%A1%E8%AE%BE%E8%AE%A1" title="面向对象设计">面向对象</a>API的一种实现方式，以提供更为可读的源代码。最早由<a href="https://zh.wikipedia.org/w/index.php?title=Eric_Evans&action=edit&redlink=1">Eric Evans</a>与<a href="https://zh.wikipedia.org/wiki/Martin_Fowler" title="Martin Fowler">Martin Fowler</a>于2005年提出。</p>
+
+<p>通常采取<a href="https://zh.wikipedia.org/w/index.php?title=%E6%96%B9%E6%B3%95%E7%80%91%E5%B8%83%E8%B0%83%E7%94%A8&action=edit&redlink=1">方法瀑布调用</a> (具体说是<a href="https://zh.wikipedia.org/w/index.php?title=%E6%96%B9%E6%B3%95%E9%93%BE%E5%BC%8F%E8%B0%83%E7%94%A8&action=edit&redlink=1">方法链式调用</a>)来转发一系列对象方法调用的上下文 <sup><a href="https://zh.wikipedia.org/wiki/%E6%B5%81%E5%BC%8F%E6%8E%A5%E5%8F%A3#cite_note-1">[1]</a></sup>。这个上下文（context）通常是指：</p>
+
+<ul>
+<li>通过被调方法的返回值定义</li>
+<li>自引用，新的上下文等于老的上下文。</li>
+<li>返回一个空的上下文来终止。</li>
+</ul>
+
+<p><a href="https://zh.wikipedia.org/wiki/C%2B%2B" title="C++">C++</a>的<a href="https://zh.wikipedia.org/wiki/Iostream" title="Iostream">iostream</a>流式调用就是一个典型的例子。Smalltalk在1970年代就实现了<a href="https://zh.wikipedia.org/w/index.php?title=%E6%96%B9%E6%B3%95%E7%80%91%E5%B8%83%E8%B0%83%E7%94%A8&action=edit&redlink=1">方法瀑布调用</a>。</p>
+
+<h2>例子</h2>
+
+<h3>JavaScript</h3>
+
+<p>用于数据库查询的<a href="https://zh.wikipedia.org/wiki/JQuery" title="JQuery">jQuery</a>，例如https://github.com/Medium/dynamite :</p>
+
+<pre>
+// getting an item from a table
+client.getItem('user-table')
+.setHashKey('userId', 'userA')
+.setRangeKey('column', '@')
+.execute()
+.then(function(data) {
+// data.result: the resulting object
+})
+</pre>
+
+<p>JavaScript使用原形继承与`this`.</p>
+
+<pre>
+// example from http://schier.co/post/method-chaining-in-javascript
+// define the class
+var Kitten = function() {
+this.name = 'Garfield';
+this.color = 'brown';
+this.gender = 'male';
+};
+
+Kitten.prototype.setName = function(name) {
+this.name = name;
+return this;
+};
+
+Kitten.prototype.setColor = function(color) {
+this.color = color;
+return this;
+};
+
+Kitten.prototype.setGender = function(gender) {
+this.gender = gender;
+return this;
+};
+
+Kitten.prototype.save = function() {
+console.log(
+'saving ' + this.name + ', the ' +
+this.color + ' ' + this.gender + ' kitten...'
+);
+
+// save to database here...
+
+return this;
+};
+
+// use it
+new Kitten()
+.setName('Bob')
+.setColor('black')
+.setGender('male')
+.save();
+</pre>
+
+<h3>Java</h3>
+
+<p><a href="https://zh.wikipedia.org/wiki/JOOQ" title="JOOQ">jOOQ</a>库模拟了SQL</p>
+
+<pre>
+Author author = AUTHOR.as("author");
+create.selectFrom(author)
+.where(exists(selectOne()
+.from(BOOK)
+.where(BOOK.STATUS.eq(BOOK_STATUS.SOLD_OUT))
+.and(BOOK.AUTHOR_ID.eq(author.ID))));
+</pre>
+
+<h3>C++</h3>
+
+<p>下述代码对比了传统的风格与流式接口的实现风格：</p>
+
+<pre>
+// Basic definition
+class GlutApp {
+private:
+int w_, h_, x_, y_, argc_, display_mode_;
+char **argv_;
+char *title_;
+public:
+GlutApp(int argc, char** argv) {
+argc_ = argc;
+argv_ = argv;
+}
+void setDisplayMode(int mode) {
+display_mode_ = mode;
+}
+int getDisplayMode() {
+return display_mode_;
+}
+void setWindowSize(int w, int h) {
+w_ = w;
+h_ = h;
+}
+void setWindowPosition(int x, int y) {
+x_ = x;
+y_ = y;
+}
+void setTitle(const char *title) {
+title_ = title;
+}
+void create(){;}
+};
+// Basic usage
+int main(int argc, char **argv) {
+GlutApp app(argc, argv);
+app.setDisplayMode(GLUT_DOUBLE|GLUT_RGBA|GLUT_ALPHA|GLUT_DEPTH); // Set framebuffer params
+app.setWindowSize(500, 500); // Set window params
+app.setWindowPosition(200, 200);
+app.setTitle("My OpenGL/GLUT App");
+app.create();
+}
+
+// Fluent wrapper
+class FluentGlutApp : private GlutApp {
+public:
+FluentGlutApp(int argc, char **argv) : GlutApp(argc, argv) {} // Inherit parent constructor
+FluentGlutApp &withDoubleBuffer() {
+setDisplayMode(getDisplayMode() | GLUT_DOUBLE);
+return *this;
+}
+FluentGlutApp &withRGBA() {
+setDisplayMode(getDisplayMode() | GLUT_RGBA);
+return *this;
+}
+FluentGlutApp &withAlpha() {
+setDisplayMode(getDisplayMode() | GLUT_ALPHA);
+return *this;
+}
+FluentGlutApp &withDepth() {
+setDisplayMode(getDisplayMode() | GLUT_DEPTH);
+return *this;
+}
+FluentGlutApp &across(int w, int h) {
+setWindowSize(w, h);
+return *this;
+}
+FluentGlutApp &at(int x, int y) {
+setWindowPosition(x, y);
+return *this;
+}
+FluentGlutApp &named(const char *title) {
+setTitle(title);
+return *this;
+}
+// It doesn't make sense to chain after create(), so don't return *this
+void create() {
+GlutApp::create();
+}
+};
+// Fluent usage
+int main(int argc, char **argv) {
+FluentGlutApp(argc, argv)
+.withDoubleBuffer().withRGBA().withAlpha().withDepth()
+.at(200, 200).across(500, 500)
+.named("My OpenGL/GLUT App")
+.create();
+}
+
+</pre>
+
+<h3>Python</h3>
+
+<p>Python通过在实例方法中返回`self`：</p>
+
+<pre>
+class Poem(object):
+def __init__(self, content):
+self.content = content
+
+def indent(self, spaces):
+self.content = " " * spaces + self.content
+return self
+
+def suffix(self, content):
+self.content = self.content + " - " + content
+return self
+</pre>
+
+<pre>
+>>> Poem("Road Not Travelled").indent(4).suffix("Robert Frost").content
+' Road Not Travelled - Robert Frost'</pre>

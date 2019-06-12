@@ -1,0 +1,138 @@
+<h1>Struts2的工作原理</h1>
+<p> </p>
+<p>                       <img alt="" src="http://pic002.cnblogs.com/images/2011/324906/2011082712263217.png" /></p>
+<p>上图来源于Struts2官方站点，是Struts 2 的整体结构。</p>
+<p>一个请求在Struts2框架中的处理大概分为以下几个步骤(可查看源码：<a href="https://github.com/apache/struts" target="_blank">https://github.com/apache/struts</a>):<br />
+<strong>1 客户端初始化一个指向Servlet容器（例如Tomcat）的请求</strong><br />
+<strong>2 这个请求经过一系列的过滤器（Filter）（这些过滤器中有一个叫做ActionContextCleanUp的可选过滤器，这个过滤器对于Struts2和其他框架的集成很有帮助，例如：SiteMesh Plugin） </strong><br />
+<strong>3 接着FilterDispatcher（现已过时）被调用，FilterDispatcher询问ActionMapper来决定这个请是否需要调用某个Action </strong><br />
+<strong>4 如果ActionMapper决定需要调用某个Action，FilterDispatcher把请求的处理交给ActionProxy </strong><br />
+<strong>5 ActionProxy通过Configuration Manager询问框架的配置文件，找到需要调用的Action类 </strong><br />
+<strong>6 ActionProxy创建一个ActionInvocation的实例。</strong><br />
+<strong>7 ActionInvocation实例使用命名模式来调用，在调用Action的过程前后，涉及到相关拦截器（Intercepter）的调用。 </strong><br />
+<strong>8 一旦Action执行完毕，ActionInvocation负责根据struts.xml中的配置找到对应的返回结果。返回结果通常是（但不总是，也可 能是另外的一个Action链）一个需要被表示的JSP或者FreeMarker的模版。在表示的过程中可以使用Struts2 框架中继承的标签。在这个过程中需要涉及到ActionMapper</strong></p>
+<p> </p>
+<p> 一个请求在Struts2框架中的处理大概分为以下几个步骤 </p>
+<p>    1、客户端初始化一个指向Servlet容器（例如Tomcat）的请求</p>
+<p>    2、这个请求经过一系列的过滤器（Filter）（这些过滤器中有一个叫做ActionContextCleanUp的可选过滤器，这个过滤器对于Struts2和其他框架的集成很有帮助，例如：SiteMesh Plugin） </p>
+<p>    3、接着FilterDispatcher被调用，FilterDispatcher询问ActionMapper来决定这个请是否需要调用某个Action </p>
+<p>       <strong>FilterDispatcher是控制器的核心</strong>，就是mvc中c控制层的核心。下面粗略的分析下我理解的FilterDispatcher工作流程和原理：FilterDispatcher进行初始化并启用核心doFilter</p>
+<ol start="1">
+<li>public void doFilter(ServletRequest req, ServletResponse res, FilterChain chain) throws IOException, ServletException ...{  </li>
+<li>        HttpServletRequest request = (HttpServletRequest) req;  </li>
+<li>        HttpServletResponse response = (HttpServletResponse) res;  </li>
+<li>        ServletContext servletContext = filterConfig.getServletContext();  </li>
+<li>        // 在这里处理了HttpServletRequest和HttpServletResponse。  </li>
+<li>        DispatcherUtils du = DispatcherUtils.getInstance();  </li>
+<li>        du.prepare(request, response);//正如这个方法名字一样进行locale、encoding以及特殊request parameters设置  </li>
+<li>        try ...{  </li>
+<li>            request = du.wrapRequest(request, servletContext);//对request进行包装  </li>
+<li>        } catch (IOException e) ...{  </li>
+<li>            String message = "Could not wrap servlet request with MultipartRequestWrapper!";  </li>
+<li>            LOG.error(message, e);  </li>
+<li>            throw new ServletException(message, e);  </li>
+<li>        }  </li>
+<li>                ActionMapperIF mapper = ActionMapperFactory.getMapper();//得到action的mapper  </li>
+<li>        ActionMapping mapping = mapper.getMapping(request);// 得到action 的 mapping  </li>
+<li>        if (mapping == null) ...{  </li>
+<li>            // there is no action in this request, should we look for a static resource?  </li>
+<li>            String resourcePath = RequestUtils.getServletPath(request);  </li>
+<li>            if ("".equals(resourcePath) && null != request.getPathInfo()) ...{  </li>
+<li>                resourcePath = request.getPathInfo();  </li>
+<li>            }  </li>
+<li>            if ("true".equals(Configuration.get(WebWorkConstants.WEBWORK_SERVE_STATIC_CONTENT))   </li>
+<li>                    && resourcePath.startsWith("/webwork")) ...{  </li>
+<li>                String name = resourcePath.substring("/webwork".length());  </li>
+<li>                findStaticResource(name, response);  </li>
+<li>            } else ...{  </li>
+<li>                // this is a normal request, let it pass through  </li>
+<li>                chain.doFilter(request, response);  </li>
+<li>            }  </li>
+<li>            // WW did its job here  </li>
+<li>            return;  </li>
+<li>        }  </li>
+<li>        Object o = null;  </li>
+<li>        try ...{  </li>
+<li>            //setupContainer(request);  </li>
+<li>            o = beforeActionInvocation(request, servletContext);  </li>
+<li>//整个框架最最核心的方法，下面分析  </li>
+<li>            du.serviceAction(request, response, servletContext, mapping);  </li>
+<li>        } finally ...{  </li>
+<li>            afterActionInvocation(request, servletContext, o);  </li>
+<li>            ActionContext.setContext(null);  </li>
+<li>        }  </li>
+<li>    }  </li>
+<li>du.serviceAction(request, response, servletContext, mapping);  </li>
+<li>//这个方法询问ActionMapper是否需要调用某个Action来处理这个（request）请求，如果ActionMapper决定需要调用某个Action，FilterDispatcher把请求的处理交给ActionProxy  </li>
+<li>   </li>
+<li>public void serviceAction(HttpServletRequest request, HttpServletResponse response, String namespace, String actionName, Map requestMap, Map parameterMap, Map sessionMap, Map applicationMap) ...{   </li>
+<li>        HashMap extraContext = createContextMap(requestMap, parameterMap, sessionMap, applicationMap, request, response, getServletConfig());  //实例化Map请求 ，询问ActionMapper是否需要调用某个Action来处理这个（request）请求  </li>
+<li>        extraContext.put(SERVLET_DISPATCHER, this);   </li>
+<li>        OgnlValueStack stack = (OgnlValueStack) request.getAttribute(ServletActionContext.WEBWORK_VALUESTACK_KEY);   </li>
+<li>        if (stack != null) ...{   </li>
+<li>            extraContext.put(ActionContext.VALUE_STACK,new OgnlValueStack(stack));   </li>
+<li>        }   </li>
+<li>        try ...{   </li>
+<li>            ActionProxy proxy = ActionProxyFactory.getFactory().createActionProxy(namespace, actionName, extraContext);   </li>
+<li>//这里actionName是通过两道getActionName解析出来的, FilterDispatcher把请求的处理交给ActionProxy，下面是ServletDispatcher的 TODO:   </li>
+<li>            request.setAttribute(ServletActionContext.WEBWORK_VALUESTACK_KEY, proxy.getInvocation().getStack());   </li>
+<li>            proxy.execute();   </li>
+<li>         //通过代理模式执行ActionProxy  </li>
+<li>            if (stack != null)...{   </li>
+<li>                request.setAttribute(ServletActionContext.WEBWORK_VALUESTACK_KEY,stack);   </li>
+<li>            }   </li>
+<li>        } catch (ConfigurationException e) ...{   </li>
+<li>            log.error("Could not find action", e);   </li>
+<li>            sendError(request, response, HttpServletResponse.SC_NOT_FOUND, e);   </li>
+<li>        } catch (Exception e) ...{   </li>
+<li>            log.error("Could not execute action", e);   </li>
+<li>            sendError(request, response, HttpServletResponse.SC_INTERNAL_SERVER_ERROR, e);   </li>
+<li>        }   </li>
+<li>} </li>
+</ol>
+<p>    4、如果ActionMapper决定需要调用某个Action，FilterDispatcher把请求的处理交给ActionProxy </p>
+<p>    5、ActionProxy通过ConfigurationManager询问框架的配置文件，找到需要调用的Action类 ,这里，我们一般是从struts.xml配置中读取。</p>
+<p>    6、ActionProxy创建一个ActionInvocation的实例。</p>
+<p>    7、ActionInvocation实例使用命名模式来调用，在调用Action的过程前后，涉及到相关拦截器（Intercepter）的调用。</p>
+<p>    下面我们来看看ActionInvocation是如何工作的：</p>
+<p>    ActionInvocation是Xworks 中Action 调度的核心。而对Interceptor 的调度，也正是由ActionInvocation负责。ActionInvocation 是一个接口，而DefaultActionInvocation 则是Webwork 对ActionInvocation的默认实现。</p>
+<p>    Interceptor的调度流程大致如下：</p>
+<p>    1.ActionInvocation初始化时，根据配置，加载Action相关的所有Interceptor。</p>
+<p>    2. 通过ActionInvocation.invoke方法调用Action实现时，执行Interceptor。</p>
+<p>    Interceptor将很多功能从我们的Action中独立出来，大量减少了我们Action的代码，独立出来的行为具有很好的重用性。XWork、WebWork的许多功能都是有Interceptor实现，可以在配置文件中组装Action用到的Interceptor，它会按照你指定的顺序，在Action执行前后运行。</p>
+<p>    这里，我们简单的介绍一下Interceptor</p>
+<p>    在struts2中自带了很多拦截器，在struts2-core-2.1.6.jar这个包下的struts-default.xml中我们可以发现：</p>
+<ol start="1">
+<li><interceptors>  </li>
+<li>           <interceptor name="alias"class="com.opensymphony.xwork2.interceptor.AliasInterceptor"/>  </li>
+<li>           <interceptor name="autowiring"class="com.opensymphony.xwork2.spring.interceptor.ActionAutowiringInterceptor"/>  </li>
+<li>           <interceptor name="chain"class="com.opensymphony.xwork2.interceptor.ChainingInterceptor"/>  </li>
+<li>           <interceptor name="conversionError"class="org.apache.struts2.interceptor.StrutsConversionErrorInterceptor"/>  </li>
+<li>           <interceptor name="clearSession"class="org.apache.struts2.interceptor.ClearSessionInterceptor"/>  </li>
+<li>           <interceptor name="createSession"class="org.apache.struts2.interceptor.CreateSessionInterceptor"/>  </li>
+<li>           <interceptor name="debugging"class="org.apache.struts2.interceptor.debugging.DebuggingInterceptor"/>  </li>
+<li>           <interceptor name="externalRef"class="com.opensymphony.xwork2.interceptor.ExternalReferencesInterceptor"/>  </li>
+<li>           <interceptor name="execAndWait"class="org.apache.struts2.interceptor.ExecuteAndWaitInterceptor"/>  </li>
+<li>           <interceptor name="exception"class="com.opensymphony.xwork2.interceptor.ExceptionMappingInterceptor"/>  </li>
+<li>           <interceptor name="fileUpload"class="org.apache.struts2.interceptor.FileUploadInterceptor"/>  </li>
+<li>           <interceptor name="i18n"class="com.opensymphony.xwork2.interceptor.I18nInterceptor"/>  </li>
+<li>           <interceptor name="logger"class="com.opensymphony.xwork2.interceptor.LoggingInterceptor"/>  </li>
+<li>           <interceptor name="modelDriven"class="com.opensymphony.xwork2.interceptor.ModelDrivenInterceptor"/>  </li>
+<li>           <interceptor name="scopedModelDriven"class="com.opensymphony.xwork2.interceptor.ScopedModelDrivenInterceptor"/>  </li>
+<li>           <interceptor name="params"class="com.opensymphony.xwork2.interceptor.ParametersInterceptor"/>  </li>
+<li>           <interceptor name="actionMappingParams"class="org.apache.struts2.interceptor.ActionMappingParametersInteceptor"/>  </li>
+<li>           <interceptor name="prepare"class="com.opensymphony.xwork2.interceptor.PrepareInterceptor"/>  </li>
+<li>           <interceptor name="staticParams"class="com.opensymphony.xwork2.interceptor.StaticParametersInterceptor"/>  </li>
+<li>           <interceptor name="scope"class="org.apache.struts2.interceptor.ScopeInterceptor"/>  </li>
+<li>           <interceptor name="servletConfig"class="org.apache.struts2.interceptor.ServletConfigInterceptor"/>  </li>
+<li>           <interceptor name="sessionAutowiring"class="org.apache.struts2.spring.interceptor.SessionContextAutowiringInterceptor"/>  </li>
+<li>           <interceptor name="timer"class="com.opensymphony.xwork2.interceptor.TimerInterceptor"/>  </li>
+<li>           <interceptor name="token"class="org.apache.struts2.interceptor.TokenInterceptor"/>  </li>
+<li>           <interceptor name="tokenSession"class="org.apache.struts2.interceptor.TokenSessionStoreInterceptor"/>  </li>
+<li>           <interceptor name="validation"class="org.apache.struts2.interceptor.validation.AnnotationValidationInterceptor"/>  </li>
+<li>           <interceptor name="workflow"class="com.opensymphony.xwork2.interceptor.DefaultWorkflowInterceptor"/>  </li>
+<li>           <interceptor name="store"class="org.apache.struts2.interceptor.MessageStoreInterceptor"/>  </li>
+<li>           <interceptor name="checkbox"class="org.apache.struts2.interceptor.CheckboxInterceptor"/>  </li>
+<li>           <interceptor name="profiling"class="org.apache.struts2.interceptor.ProfilingActivationInterceptor"/>  </li>
+<li>           <interceptor name="roles"class="org.apache.struts2.interceptor.RolesInterceptor"/>  </li>
+<li>         &

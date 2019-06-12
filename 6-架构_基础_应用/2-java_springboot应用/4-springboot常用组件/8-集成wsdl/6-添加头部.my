@@ -1,0 +1,175 @@
+<h1>CXF客户端添加header权限认证</h1>
+
+<p>cxf作为web service客户端，有以下几种方式，分别说明在方式下怎样添加header权限认证</p>
+
+<p>假设服务端已经设置了权限认证，并且头部信息为</p>
+
+<p><soapenv:Header><br />
+   <auth>  <br />
+     <name>admin</name>  <br />
+     <password>123456</password>  <br />
+   </auth><br />
+</soapenv:Header></p>
+
+<h2>方式一</h2>
+
+<p>1. 先添加客户端的拦截器，跟方式一中的相同</p>
+
+<p>2. 使用cxf提供的代码生成工具 wsdl2java 生成代码，wsdl2java的使用方式，请谷歌</p>
+
+<p>wsdl2java -p com -d ../src -client -encoding utf-8  http://localhost:8080/admin/cxfService?wsdl</p>
+
+<p>3.编写客户端</p>
+
+<p>public static void main(String args[]) {<br />
+<strong>        HelloWorldImplService ss = new HelloWorldImplService();//自动生成的类<br />
+        HelloWorld port = ss.getHelloWorldImplPort();//自动生成的类<br />
+        Client client= ClientProxy.getClient(port);<br />
+        client.getOutInterceptors().add(new ClientAuthInterceptor());<br />
+        System.out.println(port.sayHello("hello,world"));</strong><br />
+    }</p>
+
+<h2>方式二</h2>
+
+<p>1. 先添加统一的拦截器</p>
+
+<p>public class ClientAuthInterceptor extends AbstractPhaseInterceptor<SoapMessage> {<br />
+ <br />
+    private static final String NAME = "admin";<br />
+ <br />
+    private static final String PASSWORD = "123456";<br />
+ <br />
+    public ClientAuthInterceptor() {<br />
+        //准备发送阶段<br />
+        super(Phase.PREPARE_SEND);<br />
+    }<br />
+ <br />
+    @Override<br />
+    public void handleMessage(SoapMessage message) throws Fault {<br />
+        List<Header> headers = message.getHeaders();<br />
+ <br />
+        Document doc = DOMUtils.createDocument();<br />
+ <br />
+        Element auth = doc.createElement("auth");<br />
+       <br />
+        Element name = doc.createElement("name");<br />
+        name.setTextContent(NAME);<br />
+ <br />
+        Element password = doc.createElement("password");<br />
+        password.setTextContent(PASSWORD);<br />
+ <br />
+        auth.appendChild(name);<br />
+        auth.appendChild(password);<br />
+ <br />
+        headers.add(new Header(new QName(""), auth));<br />
+    }<br />
+}</p>
+
+<p><br />
+2. 编写客户端</p>
+
+<p>public static void main(String args[]) {<br />
+    JaxWsDynamicClientFactory clientFactory = JaxWsDynamicClientFactory.newInstance();<br />
+    Client client = clientFactory.createClient("http://localhost:8080/admin/cxfService?wsdl");<br />
+    try {<br />
+        client.getOutInterceptors().add(new ClientAuthInterceptor());<br />
+        Object[] result = client.invoke("sayHello", "KEVIN");<br />
+        System.out.println(result[0]);<br />
+    } catch (Exception e) {<br />
+        e.printStackTrace();<br />
+    }<br />
+}</p>
+
+<h1>CXF 添加soap 头部信息</h1>
+
+<p>CXF版本为3.1.3，访问.net接口，需要在头部添加用户名和密码。</p>
+
+<p>  <soap:Header><br />
+    <AuthorizationSoapHeader xmlns="http://tempuri.org/"><br />
+      <UserName>string</UserName><br />
+      <Password>string</Password><br />
+    </AuthorizationSoapHeader><br />
+  </soap:Header></p>
+
+<h2>1:首先使用wsdl2java.bat生成相应的代码</h2>
+
+<h2>2:新增拦截器。</h2>
+
+<p>import java.util.List;<br />
+import javax.xml.namespace.QName;<br />
+ <br />
+import org.apache.cxf.binding.soap.SoapHeader;<br />
+import org.apache.cxf.binding.soap.SoapMessage;<br />
+import org.apache.cxf.binding.soap.interceptor.AbstractSoapInterceptor;<br />
+import org.apache.cxf.headers.Header;<br />
+import org.apache.cxf.helpers.DOMUtils;<br />
+import org.apache.cxf.interceptor.Fault;<br />
+import org.apache.cxf.phase.Phase;<br />
+import org.w3c.dom.Document;<br />
+import org.w3c.dom.Element;<br />
+ <br />
+/**<br />
+ * Created by liruilin on 2015/10/20.<br />
+ */<br />
+public class AddSoapHeader extends AbstractSoapInterceptor {<br />
+ <br />
+    public AddSoapHeader() {<br />
+        super(Phase.WRITE);<br />
+    }<br />
+ <br />
+ <br />
+    /**<br />
+     * 处理soap信息<br />
+     * @param message soap信息<br />
+     * <P>作成者：cyf<br />
+     */<br />
+    public void handleMessage(SoapMessage message) throws Fault {<br />
+        // SoapHeader部分待添加的节点<br />
+        QName qName = new QName("AuthorizationSoapHeader");<br />
+ <br />
+        Document doc = DOMUtils.createDocument();<br />
+        // 验证用户名<br />
+        Element id = doc.createElement("UserName");<br />
+        id.setTextContent("0001");<br />
+        // 验证密码<br />
+        Element pwd = doc.createElement("Password");<br />
+        pwd.setTextContent("123");<br />
+ <br />
+        Element root = doc.createElementNS("http://tempuri.org/","AuthorizationSoapHeader");<br />
+        root.appendChild(id);<br />
+        root.appendChild(pwd);<br />
+        // 创建SoapHeader内容<br />
+        SoapHeader header = new SoapHeader(qName, root);<br />
+        // 添加SoapHeader内容<br />
+        List<Header> headers = message.getHeaders();<br />
+        headers.add(header);<br />
+    }<br />
+ <br />
+}</p>
+
+<h2>3:测试。TKService 和TKServiceSoap是用WSDL2JAVA.bat 生成的。</h2>
+
+<p>package com.miaoyou.demo2;<br />
+ <br />
+import com.miaoyou.demo1.TKService;<br />
+import com.miaoyou.demo1.TKServiceSoap;<br />
+import org.apache.cxf.endpoint.Client;<br />
+import org.apache.cxf.frontend.ClientProxy;<br />
+ <br />
+/**<br />
+ * Created by liruilin on 2015/10/21.<br />
+ */<br />
+public class Test3 {<br />
+ <br />
+    public static void main(String[] args) {<br />
+        System.out.println("Invoking BoatLineQuery...");<br />
+        String dmcode="gzkl";<br />
+        TKService ss = new TKService();<br />
+        TKServiceSoap serviceSoap=ss.getTKServiceSoap();<br />
+        Client client= ClientProxy.getClient(serviceSoap);<br />
+        client.getOutInterceptors().add(new AddSoapHeader());<br />
+        String _boatLock__return = serviceSoap.boatLineQuery(dmcode,"");<br />
+        System.out.println(_boatLock__return);<br />
+ <br />
+    }<br />
+}</p>

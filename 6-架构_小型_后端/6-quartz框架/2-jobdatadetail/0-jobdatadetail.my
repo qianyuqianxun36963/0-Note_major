@@ -1,0 +1,50 @@
+<h1>Jobs、JobDetail、JobDataMap</h1>
+<h2>Jobs与JobDetails</h2>
+<p>正如第一篇文章看到的那样，实现一个Job是非常简单的，只需要完成execute()方法就行了。 <br />
+那么Jobs与JobDetails有什么关系呢？简而言之，Job是对任务的一个具体实现；谁执行了这个任务呢？这就需要JobDetail来实现，所以JobDetail就是Job的一个具体实例；如9点上语文课是一个具体任务，而刘老师在9点上语文课就是这个任务的一个具体实例。 <br />
+Scheduler执行Job时，在调用execute()方法前会先实例化Job；一旦执行结束，该实例就会被丢弃，然后被垃圾回收。 <br />
+需要注意的是Job必须有一个无参的构造器；另外在Job类中定义数据属性是没有意义的，因为这些属性值并不会在执行期间保存。</p>
+<h2>JobDataMap</h2>
+<p>上面说到Job中无法定义属性来传递数据，那么如果我们需要传递数据该怎么做？就是使用JobDataMap，它是JobDetail的一个属性。JobDataMap是Map接口的一个实现，并且它有一些便利的方法来储存和检索基本类型数据。 <br />
+修改之前的测试类如下：</p>
+<p>JobDetail jobDetail = JobBuilder.newJob(HelloJob.class)<br />
+                .withIdentity("helloJob", "group1")<br />
+                .usingJobData("name", "孙悟空")<br />
+                .build();<br />
+添加一个值为孙悟空的name属性。然后在HelloJob中，我们就可以获取到该属性：</p>
+<p>@Override<br />
+    public void execute(JobExecutionContext context) throws JobExecutionException {<br />
+        JobDataMap jobDataMap = context.getJobDetail().getJobDataMap();<br />
+        String name = jobDataMap.getString("name");<br />
+        System.out.println("hello "+name+", "+ DateFormatUtils.format(new Date(), "yyyy-MM-dd HH:mm:ss"));<br />
+    }<br />
+然后运行测试类： </p>
+<p><br />
+如果在Job类中定义与JobDataMap中键值一致的set和get方法，那么Quartz会自动将这些属性注入。如：</p>
+<p>public class HelloJob implements Job{</p>
+<p>    private String name;</p>
+<p>    @Override<br />
+    public void execute(JobExecutionContext context) throws JobExecutionException {<br />
+        //JobDataMap jobDataMap = context.getJobDetail().getJobDataMap();<br />
+        //String name = jobDataMap.getString("name");<br />
+        System.out.println("hello "+name+", "+ DateFormatUtils.format(new Date(), "yyyy-MM-dd HH:mm:ss"));<br />
+    }</p>
+<p>    public String getName() {<br />
+        return name;<br />
+    }</p>
+<p>    public void setName(String name) {<br />
+        this.name = name;<br />
+    }</p>
+<p>}<br />
+另外Trigger中也可以设置JobDataMap属性，这是为了在多个Trigger中使用相同的Job。JobExecutionContext 将会合并JobDetail与Trigger的JobDataMap，如果其中属性名相同，后者将覆盖前者。可以使用JobExecutionContext.getMergedJobDataMap()方法来获取合并后的JobDataMap。</p>
+<h2>Job的状态与并发</h2>
+<p>@DisallowConcurrentExecution，如果使用该注解，那么同一时间将只有一个Job实例被执行。如，ReportJob有个实例为ReportForJoe，那么同一时间只有一个ReportForJoe被执行。而ReportForMike等都可以执行。 <br />
+@PersistJobDataAfterExecution，如果使用该注解，在Job被执行结束后，将会更新JobDataMap，这样下次Job执行后就会使用新的值而不是初始值。 <br />
+如果使用@PersistJobDataAfterExecution注解，推荐也使用@DisallowConcurrentExecution注解，这是为了避免并发问题导致数据紊乱。</p>
+<h2>其它属性</h2>
+<p>Durability，持久性；如果Job是非持久性的，一旦没有Trigger与其相关联，它就会从Scheduler中被删除。也就是说Job的生命周期和其Trigger是关联的。<br />
+RequestsRecovery，如果为true，那么在Scheduler异常中止或者系统异常关闭后，当Scheduler重启后，Job会被重新执行。<br />
+JobExecutionException<br />
+execute()方法只允许抛出JobExecutionException异常<br />
+<br />
+ </p>

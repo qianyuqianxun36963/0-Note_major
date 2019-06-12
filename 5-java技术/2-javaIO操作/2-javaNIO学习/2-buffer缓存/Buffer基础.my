@@ -1,0 +1,225 @@
+<h1>Java NIO笔记(二)：NIO Buffer(缓冲区)之基础</h1>
+<p>2014年06月11日 23:58:36</p>
+<p>阅读数：11332</p>
+<p>        缓冲区(Buffer)就是在内存中预留指定字节数的存储空间用来对输入/输出(I/O)的数据作临时存储，这部分预留的内存空间就叫做缓冲区；在Java NIO中，缓冲区的作用也是用来临时存储数据，可以理解为是I/O操作中数据的中转站。缓冲区直接为通道(Channel)服务，写入数据到通道或从通道读取数据，这样的操利用缓冲区数据来传递就可以达到对数据高效处理的目的。在NIO中主要有八种缓冲区类(其中MappedByteBuffer是专门用于内存映射的一种ByteBuffer)：</p>
+<p><img alt="" src="https://img-blog.csdn.net/20140610223236484?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQvYWJjX2tleQ==/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70/gravity/SouthEast" /></p>
+<p>缓冲区是包在一个对象内的基础数据的数组，Buffer类相比一般简单数组而言其优点是将数据的内容和相关信息放在一个对象里面，这个对象提供了处理缓冲区数据的丰富的API。</p>
+<p>所有缓冲区都有4个属性：capacity、limit、position、mark，并遵循：capacity>=limit>=position>=mark>=0，下表格是对着4个属性的解释：</p>
+<p> </p>
+<table align="left" border="1" cellpadding="1" cellspacing="1" style="width:527px">
+<tbody>
+<tr>
+<td>属性</td>
+<td>描述</td>
+</tr>
+<tr>
+<td>Capacity</td>
+<td>容量，即可以容纳的最大数据量；在缓冲区创建时被设定并且不能改变</td>
+</tr>
+<tr>
+<td>Limit</td>
+<td>上界，缓冲区中当前数据量</td>
+</tr>
+<tr>
+<td>Position</td>
+<td>位置，下一个要被读或写的元素的索引</td>
+</tr>
+<tr>
+<td>Mark</td>
+<td>标记，调用mark()来设置mark=position，再调用reset()可以让position恢复到标记的位置即position=mark</td>
+</tr>
+</tbody>
+</table>
+<p> </p>
+<p> </p>
+<p> </p>
+<p> </p>
+<p> </p>
+<p> </p>
+<p><strong>一、创建缓冲区</strong></p>
+<p>        所有的缓冲区类都不能直接使用new关键字实例化，它们都是抽象类，但是它们都有一个用于创建相应实例的静态工厂方法，以ByteBuffer类为例子：</p>
+<p> </p>
+<p><strong>[java]</strong> <a href="https://blog.csdn.net/abc_key/article/details/29909375#" onclick="dp.sh.Toolbar.Command('ViewSource',this);return false;" title="view plain">view plain</a> <a href="https://blog.csdn.net/abc_key/article/details/29909375#" onclick="dp.sh.Toolbar.Command('CopyToClipboard',this);return false;" title="copy">copy</a></p>
+<ol start="1">
+<li>//创建一个容量为10的byte缓冲区  </li>
+<li>ByteBuffer buff = ByteBuffer.allocate(10);  </li>
+</ol>
+<p><br />
+上面代码将会从堆空间中分配一个容量大小为10的byte数组作为缓冲区的byte数据存储器。对于其他缓冲区类上面方式也适用，如创建容量为10的CharBuffer：</p>
+<p> </p>
+<p> </p>
+<p><strong>[java]</strong> <a href="https://blog.csdn.net/abc_key/article/details/29909375#" onclick="dp.sh.Toolbar.Command('ViewSource',this);return false;" title="view plain">view plain</a> <a href="https://blog.csdn.net/abc_key/article/details/29909375#" onclick="dp.sh.Toolbar.Command('CopyToClipboard',this);return false;" title="copy">copy</a></p>
+<ol start="1">
+<li>//创建一个容量为10的char缓冲区  </li>
+<li>CharBuffer buff = CharBuffer.allocate(10);  </li>
+</ol>
+<p><br />
+        如果想用一个指定大小的数组作为缓冲区的数据的存储器，可以使用wrap()方法：</p>
+<p> </p>
+<p> </p>
+<p><strong>[java]</strong> <a href="https://blog.csdn.net/abc_key/article/details/29909375#" onclick="dp.sh.Toolbar.Command('ViewSource',this);return false;" title="view plain">view plain</a> <a href="https://blog.csdn.net/abc_key/article/details/29909375#" onclick="dp.sh.Toolbar.Command('CopyToClipboard',this);return false;" title="copy">copy</a></p>
+<ol start="1">
+<li>//使用一个指定数组作为缓冲区的存储器  </li>
+<li>byte[] bytes = new byte[10];  </li>
+<li>ByteBuffer buff = ByteBuffer.wrap(bytes);  </li>
+</ol>
+<p>上面代码中缓冲区的数据会存放在bytes数组中，bytes数组或buff缓冲区任何一方中数据的改动都会影响另一方。还可以创建指定初始位置(position)和上界(limit)的缓冲区：</p>
+<p> </p>
+<p> </p>
+<p><strong>[java]</strong> <a href="https://blog.csdn.net/abc_key/article/details/29909375#" onclick="dp.sh.Toolbar.Command('ViewSource',this);return false;" title="view plain">view plain</a> <a href="https://blog.csdn.net/abc_key/article/details/29909375#" onclick="dp.sh.Toolbar.Command('CopyToClipboard',this);return false;" title="copy">copy</a></p>
+<ol start="1">
+<li>//使用一个指定数组作为缓冲区的存储器  </li>
+<li>//并创建一个position=3,limit=8,capacity=10的缓冲区  </li>
+<li>byte[] bytes = new byte[10];  </li>
+<li>ByteBuffer buff = ByteBuffer.wrap(bytes, 3, 8);  </li>
+</ol>
+<p>下图是新创建的一个容量为10的字节缓冲区的内存图：</p>
+<p><img alt="" src="https://img-blog.csdn.net/20140611223019437?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQvYWJjX2tleQ==/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70/gravity/SouthEast" /></p>
+<p><strong>二、操作缓冲区</strong></p>
+<p><strong>1、存取(Buffer.get() & Buffer.put())</strong></p>
+<p>        使用get()从缓冲区中取数据，使用put()向缓冲区中存数据。</p>
+<p> </p>
+<p><strong>[java]</strong> <a href="https://blog.csdn.net/abc_key/article/details/29909375#" onclick="dp.sh.Toolbar.Command('ViewSource',this);return false;" title="view plain">view plain</a> <a href="https://blog.csdn.net/abc_key/article/details/29909375#" onclick="dp.sh.Toolbar.Command('CopyToClipboard',this);return false;" title="copy">copy</a></p>
+<ol start="1">
+<li>// 创建一个容量为10的byte数据缓冲区  </li>
+<li>ByteBuffer buff = ByteBuffer.allocate(10);  </li>
+<li>// 存入4次数据  </li>
+<li>buff.put((byte) 'A');  </li>
+<li>buff.put((byte) 'B');  </li>
+<li>buff.put((byte) 'C');  </li>
+<li>buff.put((byte) 'D');  </li>
+<li>// 翻转缓冲区  </li>
+<li>buff.flip();  </li>
+<li>// 读取2次数据  </li>
+<li>System.out.println((char)buff.get());  </li>
+<li>System.out.println((char)buff.get());  </li>
+</ol>
+<p> </p>
+<p>        上面有提过缓冲区四个属性值一定遵循capacity>=limit>=position>=mark>=0，put()时，若position超过limit则会抛出BufferOverflowException；get()时，若position超过limit则会抛出BufferUnderflowException。</p>
+<p>        buff.flip()是将缓冲区翻转，翻转将在下面来说。</p>
+<p>调用put()或get()时，每调用一次position的值会加1，指示下次存或取开始的位置；</p>
+<p>上面代码put()四次后的缓冲区内存示意图：</p>
+<p><img alt="" src="https://img-blog.csdn.net/20140611223142031?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQvYWJjX2tleQ==/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70/gravity/SouthEast" /></p>
+<p>上面代码执行buff.flip()将缓冲区翻转后的内存示意图：</p>
+<p><img alt="" src="https://img-blog.csdn.net/20140611224150484?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQvYWJjX2tleQ==/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70/gravity/SouthEast" /></p>
+<p>上面代码执两次get()后的缓冲区内存示意图：</p>
+<p><img alt="" src="https://img-blog.csdn.net/20140611223543203?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQvYWJjX2tleQ==/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70/gravity/SouthEast" /></p>
+<p>        再向Buffer中读写数据时有2个方法也非常有用：</p>
+<p>Buffer.remaining()：返回从当前位置到上界的数据元素数量；</p>
+<p>Buffer.hasRemaining()：告诉我们从当前位置到上界是否有数据元素；</p>
+<p><strong>2、翻转(Buffer.flip())</strong></p>
+<p>        翻转就是将一个处于存数据状态的缓冲区变为一个处于准备取数据的状态，使用flip()方式实现翻转。Buffer.flip()的源码如下：</p>
+<p> </p>
+<p><strong>[java]</strong> <a href="https://blog.csdn.net/abc_key/article/details/29909375#" onclick="dp.sh.Toolbar.Command('ViewSource',this);return false;" title="view plain">view plain</a> <a href="https://blog.csdn.net/abc_key/article/details/29909375#" onclick="dp.sh.Toolbar.Command('CopyToClipboard',this);return false;" title="copy">copy</a></p>
+<ol start="1">
+<li>public final Buffer flip() {  </li>
+<li>    limit = position;  </li>
+<li>    position = 0;  </li>
+<li>    mark = -1;  </li>
+<li>    return this;  </li>
+<li>}  </li>
+</ol>
+<p>相信看到了实现的源码应该就会清楚flip()的作用了。rewind()方法与flip()很相似，区别在于rewind()不会影响limit，而flip()会重设limit属性值，Buffer.rewind()的源码如下：</p>
+<p> </p>
+<p> </p>
+<p><strong>[java]</strong> <a href="https://blog.csdn.net/abc_key/article/details/29909375#" onclick="dp.sh.Toolbar.Command('ViewSource',this);return false;" title="view plain">view plain</a> <a href="https://blog.csdn.net/abc_key/article/details/29909375#" onclick="dp.sh.Toolbar.Command('CopyToClipboard',this);return false;" title="copy">copy</a></p>
+<ol start="1">
+<li>public final Buffer rewind() {  </li>
+<li>    position = 0;  </li>
+<li>    mark = -1;  </li>
+<li>    return this;  </li>
+<li>}  </li>
+</ol>
+<p><br />
+<strong>3、压缩(Buffer.compact())</strong></p>
+<p> </p>
+<p>        压缩就是将已读取了的数据丢弃，保留未读取的数据并将保留的数据重新填充到缓冲区的顶部，然后继续向缓冲区写入数据。</p>
+<p> </p>
+<p><strong>[java]</strong> <a href="https://blog.csdn.net/abc_key/article/details/29909375#" onclick="dp.sh.Toolbar.Command('ViewSource',this);return false;" title="view plain">view plain</a> <a href="https://blog.csdn.net/abc_key/article/details/29909375#" onclick="dp.sh.Toolbar.Command('CopyToClipboard',this);return false;" title="copy">copy</a></p>
+<ol start="1">
+<li>// 创建一个容量为10的byte数据缓冲区  </li>
+<li>ByteBuffer buff = ByteBuffer.allocate(10);  </li>
+<li>// 填充缓冲区  </li>
+<li>buff.put((byte)'A');  </li>
+<li>buff.put((byte)'B');  </li>
+<li>buff.put((byte)'C');  </li>
+<li>buff.put((byte)'D');  </li>
+<li>System.out.println("first put : " + new String(buff.array()));  </li>
+<li>//翻转  </li>
+<li>buff.flip();  </li>
+<li>//释放  </li>
+<li>System.out.println((char)buff.get());  </li>
+<li>System.out.println((char)buff.get());  </li>
+<li>//压缩  </li>
+<li>buff.compact();  </li>
+<li>System.out.println("compact after get : " + new String(buff.array()));  </li>
+<li>//继续填充  </li>
+<li>buff.put((byte)'E');  </li>
+<li>buff.put((byte)'F');  </li>
+<li>//输出所有  </li>
+<li>System.out.println("put after compact : " + new String(buff.array()));  </li>
+</ol>
+<p><br />
+以上代码打印结果：</p>
+<p> </p>
+<p>first put : ABCD</p>
+<p>A</p>
+<p>B</p>
+<p>compact after get : CDCD</p>
+<p>put after compact : CDEF</p>
+<p>控制台中输出内容中有正方形的乱码，是正常。因为字节缓冲区中没有赋值的内存块默认值是0，而Unicode编码中没有0编码，所以乱码。</p>
+<p><strong>4、标记(Buffer.mark())</strong></p>
+<p>        标记就是记住当前位置(使用mark()方法标记)，之后可以将位置恢复到标记处(使用reset()方法恢复)，mark()和reset()源码如下：</p>
+<p> </p>
+<p><strong>[java]</strong> <a href="https://blog.csdn.net/abc_key/article/details/29909375#" onclick="dp.sh.Toolbar.Command('ViewSource',this);return false;" title="view plain">view plain</a> <a href="https://blog.csdn.net/abc_key/article/details/29909375#" onclick="dp.sh.Toolbar.Command('CopyToClipboard',this);return false;" title="copy">copy</a></p>
+<ol start="1">
+<li>public final Buffer mark() {  </li>
+<li>    mark = position;  </li>
+<li>    return this;  </li>
+<li>}  </li>
+<li>  </li>
+<li>public final Buffer reset() {  </li>
+<li>    int m = mark;  </li>
+<li>    if (m < 0)  </li>
+<li>        throw new InvalidMarkException();  </li>
+<li>    position = m;  </li>
+<li>    return this;  </li>
+<li>}  </li>
+</ol>
+<p><strong>5、比较两个缓冲区是否相等</strong></p>
+<p> </p>
+<p>        比较两个缓冲区是否相等有2种方法：equals(Object ob) 和compareTo(ByteBuffer that)，这两个方法都是在Buffer的子类中实现的。</p>
+<p>        equals比较的两个缓冲区中的每个值，所以允许不同的Buffer对象进行比较；compareTo有类型限制，ByteBuffer只能和ByteBuffer进行比较；比较两个缓冲区实际上是比较两个缓冲区中每个缓冲区position到limit之间(不包括limit)的缓冲值。如下图：</p>
+<p><img alt="" src="https://img-blog.csdn.net/20140611232314265?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQvYWJjX2tleQ==/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70/gravity/SouthEast" /></p>
+<p><img alt="" src="https://img-blog.csdn.net/20140611232502468?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQvYWJjX2tleQ==/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70/gravity/SouthEast" /></p>
+<p><strong>6、批量移动缓冲区的数据</strong></p>
+<p>        缓冲区的目的就是高效传输数据，高效传输数据就应杜绝一个一个的传输，所以Buffer API提供了相应的方法来进行批量移动。下面是个例子：</p>
+<p> </p>
+<p><strong>[java]</strong> <a href="https://blog.csdn.net/abc_key/article/details/29909375#" onclick="dp.sh.Toolbar.Command('ViewSource',this);return false;" title="view plain">view plain</a> <a href="https://blog.csdn.net/abc_key/article/details/29909375#" onclick="dp.sh.Toolbar.Command('CopyToClipboard',this);return false;" title="copy">copy</a></p>
+<ol start="1">
+<li>byte[] bytes = "hello world!".getBytes();  </li>
+<li>// 创建一个容量等bytes容量的byte数据缓冲区  </li>
+<li>ByteBuffer buff = ByteBuffer.allocate(bytes.length);  </li>
+<li>//将byte数据写入缓冲区，下面代码和buff.put(bytes)效果一致  </li>
+<li>buff.put(bytes, 0, bytes.length);  </li>
+<li>//翻转缓冲区  </li>
+<li>buff.flip();  </li>
+<li>//轮询判断是否有数据，有则将缓冲区的数据批量读到array中  </li>
+<li>byte[] array =  new byte[bytes.length];  </li>
+<li>while(buff.hasRemaining()){  </li>
+<li>    buff.get(array, 0, buff.remaining());  </li>
+<li>}  </li>
+<li>//输出冲缓冲区读出来的数据  </li>
+<li>System.out.println(new String(array));  </li>
+</ol>
+<p>以上面代码为例，</p>
+<p> </p>
+<p>写数据到缓冲区时，若bytes.length > buff.capacity()则会抛出java.nio.BufferOverflowException；</p>
+<p>从缓冲区中读数据时，若array.length < buff.limit()则会抛出java.lang.IndexOutOfBoundsException。</p>
+<p><strong>7、复制缓冲区</strong></p>
+<p>        复制一个与源缓冲区共享数据的缓冲区，各自管理自己的属性</p>
+<ul>
+<li>asReadOnlyBuffer()：复制一个只读缓冲区</li>
+<li>duplicate()：复制一个可读可写的缓冲区</li>
+<li>slice()：复制一个从源缓冲position到limit的新缓冲区</li>
+</ul>

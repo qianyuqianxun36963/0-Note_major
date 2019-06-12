@@ -1,0 +1,374 @@
+<h1>vue+mockjs 模拟数据，实现前后端分离开发</h1>
+
+<h2>mockjs简介</h2>
+
+<p>在项目中尝试了mockjs，mock数据，实现前后端分离开发。</p>
+
+<p>关于mockjs，官网描述的是</p>
+
+<p>1.前后端分离</p>
+
+<p>2.不需要修改既有代码，就可以拦截 Ajax 请求，返回模拟的响应数据。</p>
+
+<p>3.数据类型丰富</p>
+
+<p>4.通过随机数据，模拟各种场景。</p>
+
+<p>等等优点。</p>
+
+<p>总结起来就是在后端接口没有开发完成之前，前端可以用已有的接口文档，在真实的请求上拦截ajax，并根据mockjs的mock数据的规则，模拟真实接口返回的数据，并将随机的模拟数据返回参与相应的数据交互处理，这样真正实现了前后台的分离开发。</p>
+
+<p>与以往的自己模拟的假数据不同，mockjs可以带给我们的是：在后台接口未开发完成之前模拟数据，并返回，完成前台的交互；在后台数据完成之后，你所做的只是去掉mockjs：停止拦截真实的ajax，仅此而已。</p>
+
+<h2>项目案例</h2>
+
+<p>下面一步步的来实现vue-cli创建项目并添加一条新闻类的数据模拟接口：</p>
+
+<h3>1.安装vue-cli全局脚手架</h3>
+
+<p>npm install --global vue-cli</p>
+
+<h3>2.创建vue项目</h3>
+
+<p>cd mockjsvue init webpack mockjs</p>
+
+<p>npm install axios --save</p>
+
+<h3>3.安装mockjs</h3>
+
+<p>npm install mockjs --save-dev</p>
+
+<h3>4.项目目录</h3>
+
+<p><img alt="" src="https://images2017.cnblogs.com/blog/1013797/201708/1013797-20170807221707424-507569416.png" />axios/api    用来封装axios</p>
+
+<p>Hello.vue     页面首页</p>
+
+<p>NeswCell.vue   新闻组件</p>
+
+<p>router/index.js   路由</p>
+
+<p>main.js      入口js</p>
+
+<p>mock.js     mockjs文件</p>
+
+<p>在来看下完成后的效果</p>
+
+<h3><img alt="" src="https://images2017.cnblogs.com/blog/1013797/201708/1013797-20170807222211955-469247956.png" />5.在入口js（main.js）里引入mockjs</h3>
+
+<p>// The Vue build version to load with the `import` command<br />
+// (runtime-only or standalone) has been set in webpack.base.conf with an alias.<br />
+import Vue from 'vue'<br />
+import App from './App'<br />
+import router from './router'</p>
+
+<p>Vue.config.productionTip = false</p>
+
+<p>// 引入mockjs<br />
+require('./mock.js')</p>
+
+<p>/* eslint-disable no-new */<br />
+new Vue({<br />
+    el: '#app',<br />
+    router,<br />
+    template: '<App/>',<br />
+    components: {<br />
+        App<br />
+    }<br />
+})</p>
+
+<p>Vue.filter('getYMD', function(input) {<br />
+    return input.split(' ')[0];<br />
+})</p>
+
+<p>这里我添加了额一个常用的时间整理过滤器 getYMD</p>
+
+<h3>6. 添加一个mock规则（mock.js）</h3>
+
+<p>// 引入mockjs<br />
+const Mock = require('mockjs');<br />
+// 获取 mock.Random 对象<br />
+const Random = Mock.Random;<br />
+// mock一组数据<br />
+const produceNewsData = function() {<br />
+    let articles = [];<br />
+    for (let i = 0; i < 100; i++) {<br />
+        let newArticleObject = {<br />
+            title: Random.csentence(5, 30), //  Random.csentence( min, max )<br />
+            thumbnail_pic_s: Random.dataImage('300x250', 'mock的图片'), // Random.dataImage( size, text ) 生成一段随机的 Base64 图片编码<br />
+            author_name: Random.cname(), // Random.cname() 随机生成一个常见的中文姓名<br />
+            date: Random.date() + ' ' + Random.time() // Random.date()指示生成的日期字符串的格式,默认为yyyy-MM-dd；Random.time() 返回一个随机的时间字符串<br />
+        }<br />
+        articles.push(newArticleObject)<br />
+    }</p>
+
+<p>    return {<br />
+        articles: articles<br />
+    }<br />
+}</p>
+
+<p>// Mock.mock( url, post/get , 返回的数据)；<br />
+Mock.mock('/news/index', 'post', produceNewsData);</p>
+
+<h3>7.在Hello.vue 中请求文档接口，并接收mock数据</h3>
+
+<p><template><br />
+  <div class="index"><br />
+    <div v-for="(item, key) in newsListShow"><br />
+      <news-cell<br />
+      :newsDate="item"<br />
+      :key="key"<br />
+      ></news-cell><br />
+    </div><br />
+  </div><br />
+</template></p>
+
+<p><script><br />
+import api from './../axios/api.js'<br />
+import NewsCell from './NewsCell.vue'</p>
+
+<p>export default {<br />
+  name: 'index',<br />
+  data () {<br />
+    return {<br />
+      newsListShow: [],<br />
+    }<br />
+  },</p>
+
+<p>  components: {<br />
+    NewsCell<br />
+  },</p>
+
+<p>  created() {<br />
+    this.setNewsApi();<br />
+  },</p>
+
+<p>  methods:{<br />
+    setNewsApi: function() {<br />
+      api.JH_news('/news/index', 'type=top&key=123456')<br />
+      .then(res => {<br />
+        console.log(res);<br />
+        this.newsListShow = res.articles;<br />
+      });<br />
+    },<br />
+  }<br />
+}</p>
+
+<p></script></p>
+
+<p><!-- Add "scoped" attribute to limit CSS to this component only --><br />
+<style scoped><br />
+.topNav{<br />
+  width: 100%;<br />
+  background: #ED4040;<br />
+  position: fixed;<br />
+  top:0rem;<br />
+  left: 0;<br />
+  z-index: 10;<br />
+}</p>
+
+<p>.simpleNav{<br />
+  width: 100%;<br />
+  line-height: 1rem;<br />
+  overflow: hidden;<br />
+  overflow-x: auto;<br />
+  text-align: center;<br />
+  font-size: 0;<br />
+  font-family: '微软雅黑';<br />
+  white-space: nowrap;<br />
+}</p>
+
+<p>.simpleNav::-webkit-scrollbar{height:0px}<br />
+.simpleNavBar{<br />
+  display: inline-block;<br />
+  width: 1.2rem;<br />
+  color:#fff;<br />
+  font-size:0.3rem;<br />
+}</p>
+
+<p>.navActive{<br />
+  color: #000;<br />
+  border-bottom: 0.05rem solid #000;<br />
+}</p>
+
+<p>.placeholder{<br />
+  width:100%;<br />
+  height: 1rem;<br />
+}</p>
+
+<p></style></p>
+
+<p>注意：api.JH_news是我封装的axios函数 </p>
+
+<p>axios/api.js如下</p>
+
+<p>import axios from 'axios'<br />
+import vue from 'vue'</p>
+
+<p>axios.defaults.headers.post['Content-Type'] = 'application/x-www-form-urlencoded'</p>
+
+<p>// 请求拦截器<br />
+axios.interceptors.request.use(function(config) {<br />
+    return config;<br />
+  }, function(error) {<br />
+    return Promise.reject(error);<br />
+  })<br />
+  // 响应拦截器<br />
+axios.interceptors.response.use(function(response) {<br />
+  return response;<br />
+}, function(error) {<br />
+  return Promise.reject(error);<br />
+})</p>
+
+<p>// 封装axios的post请求<br />
+export function fetch(url, params) {<br />
+  return new Promise((resolve, reject) => {<br />
+    axios.post(url, params)<br />
+      .then(response => {<br />
+        resolve(response.data);<br />
+      })<br />
+      .catch((error) => {<br />
+        reject(error);<br />
+      })<br />
+  })<br />
+}</p>
+
+<p>export default {<br />
+  JH_news(url, params) {<br />
+    return fetch(url, params);<br />
+  }<br />
+}</p>
+
+<h3>8.在NewsCell.vue展示数据</h3>
+
+<p><template><br />
+  <section class="financial-list"><br />
+    <section class="collect" @click="jumpPage"><br />
+      <aside><br />
+        <h2>{{newsDate.title}}</h2><br />
+        <section class="Cleft clearfix"><br />
+          <img class="fl" src="./../assets/icon/eyes.png" style="width:0.24rem;height:0.2rem;"><br />
+          <span class="fl">{{newsDate.author_name}}</span><br />
+        </section><br />
+        <section class="Cright"><br />
+          <img src="./../assets/icon/clock.png" style="width:0.2rem;height:0.2rem;"><br />
+          <span>{{newsDate.date | getYMD}}</span><br />
+        </section><br />
+        <div style="clear: both"></div><br />
+      </aside><br />
+      <aside><br />
+        <img :src="newsDate.thumbnail_pic_s" style="border-radius: 0.2rem;"><br />
+      </aside><br />
+      <div style="clear: both"></div><br />
+    </section><br />
+  </section><br />
+</template></p>
+
+<p><script><br />
+export default {<br />
+  name: 'NewsCell',<br />
+  props: {<br />
+    newsDate: Object<br />
+  },<br />
+  data () {<br />
+    return {<br />
+    }<br />
+  },<br />
+  computed: {<br />
+  },<br />
+  methods: {<br />
+    jumpPage: function () {<br />
+      window.location.href = this.newsDate.url<br />
+    }<br />
+  }<br />
+}</p>
+
+<p></script></p>
+
+<p><style scoped><br />
+.financial-list {<br />
+  width: 100%;<br />
+  height: 100%;<br />
+  background-color: white;<br />
+  padding: 0.28rem 0;<br />
+  border-bottom: 1px solid #ccc;<br />
+}</p>
+
+<p>.financial-list .collect {<br />
+  width: 92%;<br />
+  margin: 0 auto;<br />
+}</p>
+
+<p>.financial-list .collect aside:nth-of-type(1) {<br />
+  width: 63%;<br />
+  float: left;<br />
+}</p>
+
+<p>.financial-list .collect aside:nth-of-type(2) {<br />
+  width: 32%;<br />
+  height: 2rem;<br />
+  float: left;<br />
+  margin-left: 0.3rem;<br />
+}</p>
+
+<p>.financial-list .collect h2 {<br />
+  width: 100%;<br />
+  height: 0.96rem;<br />
+  font-size: 0.32rem;<br />
+  color: #333333;<br />
+  line-height: 0.48rem;<br />
+  text-overflow: ellipsis;<br />
+  -o-text-overflow: ellipsis;<br />
+  overflow: hidden;<br />
+}</p>
+
+<p>.financial-list .collect aside:nth-of-type(2) img {<br />
+  width: 100%;<br />
+  height: 100%;<br />
+}</p>
+
+<p>.financial-list .collect aside .Cleft {<br />
+  width: 45%;<br />
+  float: left;<br />
+  margin-top: 0.66rem;<br />
+}</p>
+
+<p>.financial-list .collect aside .Cleft span{<br />
+  display: block;<br />
+  width: 1.4rem;<br />
+  margin-left: 0.05rem;<br />
+  white-space: nowrap;<br />
+  text-overflow: ellipsis;<br />
+  -o-text-overflow: ellipsis;<br />
+  overflow: hidden;<br />
+}</p>
+
+<p>.financial-list .collect aside .Cright {<br />
+  width: 55%;<br />
+  float: right;<br />
+  margin-top: 0.66rem;<br />
+}</p>
+
+<p>.financial-list .collect aside .Cright span{<br />
+  display: inline-block;<br />
+  margin: 0.04rem 0 0 0.05rem;<br />
+}</p>
+
+<p>.financial-list .collect aside span {<br />
+  font-size: 0.2rem;<br />
+  color: #999999;<br />
+}</p>
+
+<p>.financial-list .collect aside .Cleft img,</p>
+
+<p>.financial-list .collect aside .Cright img {<br />
+  width: 0.18rem;<br />
+  height: 0.24rem;<br />
+  margin-top: 0.09rem;<br />
+}</p>
+
+<p></style></p>
+
+<h3>9.所有代码可以查看我的github</h3>
+
+<p>https://github.com/Jasonwang911/vue_mockjs　　完成</p>

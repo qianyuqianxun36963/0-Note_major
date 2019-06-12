@@ -1,0 +1,108 @@
+<h1 style="margin-left:0cm">实际使用的mongodb备份</h1>
+
+<h2>Linux上备份</h2>
+
+<p style="margin-left:0cm"><span style="font-size:10.5pt">a</span><span style="font-size:10.5pt"><span style="font-family:宋体">，备份脚本所在目录</span></span><span style="font-size:10.5pt">/database/backup/scripts/mongo_bak.sh</span></p>
+
+<p style="margin-left:0cm"><span style="font-size:10.5pt">b</span><span style="font-size:10.5pt"><span style="font-family:宋体">，备份数据文件所在目录为</span></span><span style="font-size:10.5pt">/database/backup/mongobk</span></p>
+
+<p style="margin-left:0cm"><span style="font-size:10.5pt">c</span><span style="font-size:10.5pt"><span style="font-family:宋体">，备份策略：每天凌晨</span></span><span style="font-size:10.5pt">2</span><span style="font-size:10.5pt"><span style="font-family:宋体">：</span></span><span style="font-size:10.5pt">30</span><span style="font-size:10.5pt"><span style="font-family:宋体">全备，备份目录形如：</span></span></p>
+
+<p style="margin-left:0cm"><span style="font-size:10.5pt">20180306-1150</span></p>
+
+<p style="margin-left:0cm"><span style="font-size:10.5pt">20180306-1154</span></p>
+
+<p style="margin-left:0cm"><span style="font-size:10.5pt">d</span><span style="font-size:10.5pt"><span style="font-family:宋体">，备份脚本内容：</span></span></p>
+
+<p>#!/bin/sh<br />
+BAKDIR=/database/backup/mongobk<br />
+DA=$(date '+%Y%m%d-%H%M')<br />
+BAKFILE=${BAKDIR}/${DA}</p>
+
+<p>[ ! -d ${BAKFILE} ] &&mkdir ${BAKFILE}<br />
+/bin/mongodump -h 127.0.0.1 -o ${BAKFILE}</p>
+
+<h2 style="margin-left:0cm">windows上备份</h2>
+
+<p style="margin-left:0cm">1，编制备份处理的批处理文件，并保存为以. bat 形式结尾文件（如 mongo_backup.bat）</p>
+
+<p style="margin-left:0cm">bat脚本如下：</p>
+
+<p>@echo off<br />
+set "Ymd=%date:~,4%%date:~5,2%%date:~8,2%%time:~0,2%%time:~3,2%"<br />
+mongodump -h localhost -o d:/NAPortal/code/mongo_backup/na_%Ymd%<br />
+@echo o</p>
+
+<p>2，打开管理工具 中的 “任务计划程序”</p>
+
+<p>注：打开方法，点击开始按钮，然后搜索程序："Task Scheduler"，或 "任务计划程序"。</p>
+
+<p>在任务计划页面，右侧，Task Scheduler Library 里面有功能点，Create Task。通过这里添加任务即可。</p>
+
+<p>选择想要执行的程序按照模板点击“下一步”进行相关操作，在“每日”设置相关的定时工作的时间</p>
+
+<p>最后点击“完成”即可</p>
+
+<h2>windows上恢复</h2>
+
+<p>最简单的全量恢复：进入备份文件夹(如mongo_backup)同级目录，直接运行:  <strong>mongorestore mongo_backup </strong>即可！</p>
+
+<p>当在实际应用中，由于机器故障或人工手抖误删了数据库的话，这个时候就需要将备份的数据进行恢复了，恢复数据的命令格式如下：</p>
+
+<p>>mongorestore -h dbhost -d dbname -directoryperdb dbdirectory<br />
+-h：MongoDB所在服务器地址<br />
+-d：需要恢复的数据库实例，例如：kaiye，当然这个名称也可以和备份时候的不一样，比如kaiye<br />
+-directoryperdb：备份数据所在位置，例如：C:\mongodump\kaiye，记住备份的数据所在目录需要时备份目录+"\"+需要恢复的数据库名称</p>
+
+<h2>附件</h2>
+
+<h3>mongodump 语法</h3>
+
+<p>mongodump命令脚本语法如下：</p>
+
+<pre>
+>mongodump -h dbhost -d dbname -o dbdirectory</pre>
+
+<ul>
+<li><strong>-h：</strong>
+
+<p>MongDB所在服务器地址，例如：127.0.0.1，当然也可以指定端口号：127.0.0.1:27017</p>
+</li>
+<li><strong>-d：</strong>
+<p>需要备份的数据库实例，例如：test</p>
+</li>
+<li><strong>-o：</strong>
+<p>备份的数据存放位置，例如：c:\data\dump，当然该目录需要提前建立，在备份完成后，系统自动在dump目录下建立一个test目录，这个目录里面存放该数据库实例的备份数据。</p>
+</li>
+</ul>
+
+<h3>mongorestore 语法</h3>
+
+<p>mongorestore命令脚本语法如下：</p>
+
+<pre>
+>mongorestore -h <hostname><:port> -d dbname <path>
+</pre>
+
+<ul>
+<li><strong>--host <:port>, -h <:port>：</strong>
+
+<p>MongoDB所在服务器地址，默认为： localhost:27017</p>
+</li>
+<li><strong>--db , -d ：</strong>
+<p>需要恢复的数据库实例，例如：test，当然这个名称也可以和备份时候的不一样，比如test2</p>
+</li>
+<li><strong>--drop：</strong>
+<p>恢复的时候，先删除当前数据，然后恢复备份的数据。就是说，恢复后，备份后添加修改的数据都会被删除，慎用哦！</p>
+</li>
+<li><strong><path>：</strong>
+<p>mongorestore 最后的一个参数，设置备份数据所在位置，例如：c:\data\dump\test。</p>
+
+<p>你不能同时指定 <path> 和 --dir 选项，--dir也可以设置备份目录。</p>
+</li>
+<li><strong>--dir：</strong>
+<p>指定备份的目录</p>
+
+<p>你不能同时指定 <path> 和 --dir 选项。</p>
+</li>
+</ul>

@@ -1,0 +1,286 @@
+<h1>部署OpenShift集群</h1>
+
+<h2>0、准备机器</h2>
+
+<p>机器：</p>
+
+<table border="8">
+<tbody>
+<tr>
+<th>主机名</th>
+<th>IP</th>
+<th>用途</th>
+<th>备注</th>
+</tr>
+<tr>
+<td>oc-master1</td>
+<td>10.171.75.58</td>
+<td rowspan="3">
+<p>控制平面</p>
+
+<p>etcd也部署在这三个节点上</p>
+
+<p>使用VIP对外暴露服务</p>
+</td>
+<td> </td>
+</tr>
+<tr>
+<td>oc-master2</td>
+<td>10.171.75.219</td>
+<td> </td>
+</tr>
+<tr>
+<td>oc-master3</td>
+<td>10.171.75.250</td>
+<td> </td>
+</tr>
+<tr>
+<td colspan="1">oc-glusterfs1</td>
+<td colspan="1">10.171.76.248</td>
+<td rowspan="3">
+<p>Glusterfs集群</p>
+</td>
+<td colspan="1"> </td>
+</tr>
+<tr>
+<td colspan="1">oc-glusterfs2</td>
+<td colspan="1">10.171.77.85</td>
+<td colspan="1"> </td>
+</tr>
+<tr>
+<td colspan="1">oc-glusterfs3</td>
+<td colspan="1">10.171.70.108</td>
+<td colspan="1"> </td>
+</tr>
+<tr>
+<td colspan="1">oc-node1</td>
+<td colspan="1">10.171.67.39</td>
+<td rowspan="2">计算节点</td>
+<td colspan="1"> </td>
+</tr>
+<tr>
+<td colspan="1">oc-node2</td>
+<td colspan="1">10.171.69.137</td>
+<td colspan="1"> </td>
+</tr>
+</tbody>
+</table>
+
+<h2>1、部署Glusterfs集群</h2>
+
+<p>参考01-部署Glusterfs集群</p>
+
+<h2>2、配置Ansible</h2>
+
+<p>编辑Ansible Inventory，默认为/etc/ansible/hosts，注意配置ansible_ssh_pass，按需修改其他参数：</p>
+
+<p>[OSEv3:vars]<br />
+ansible_ssh_pass=xxxxxx<br />
+openshift_master_identity_providers=[{'name': 'htpasswd_auth','login': 'true', 'challenge': 'true','kind': 'HTPasswdPasswordIdentityProvider','filename': '/etc/origin/master/htpasswd'}]<br />
+osm_cluster_network_cidr=10.128.0.0/14<br />
+openshift_portal_net=192.168.255.0/24<br />
+openshift_master_default_subdomain=openshift.test.huawei.com<br />
+openshift_deployment_type=origin<br />
+openshift_clock_enabled=true<br />
+openshift_disable_check=disk_availability,memory_availability<br />
+ansible_service_broker_install=false<br />
+openshift_master_cluster_hostname=10.171.75.58<br />
+openshift_master_cluster_public_hostname=10.171.75.58<br />
+openshift_hosted_registry_cert_expire_days=1825<br />
+openshift_ca_cert_expire_days=1825<br />
+openshift_node_cert_expire_days=1825<br />
+openshift_master_cert_expire_days=1825<br />
+etcd_ca_default_days=1825<br />
+openshift_set_node_ip=true<br />
+openshift_storage_glusterfs_is_native=false<br />
+openshift_storage_glusterfs_storageclass=true<br />
+openshift_storage_glusterfs_heketi_is_native=true<br />
+openshift_storage_glusterfs_heketi_executor=ssh<br />
+openshift_storage_glusterfs_heketi_ssh_port=22<br />
+openshift_storage_glusterfs_heketi_ssh_user=root<br />
+openshift_storage_glusterfs_heketi_ssh_sudo=false<br />
+openshift_storage_glusterfs_heketi_ssh_keyfile="/root/.ssh/id_rsa"<br />
+openshift_hosted_registry_routehost=registry.openshift.test.huawei.com<br />
+[OSEv3:children]<br />
+masters<br />
+etcd<br />
+glusterfs<br />
+nodes</p>
+
+<p>[masters]<br />
+10.171.75.58  openshift_ip=10.171.75.58  openshift_public_ip=10.171.75.58  openshift_hostname=10.171.75.58<br />
+10.171.75.219 openshift_ip=10.171.75.219 openshift_public_ip=10.171.75.219 openshift_hostname=10.171.75.219<br />
+10.171.75.250 openshift_ip=10.171.75.250 openshift_public_ip=10.171.75.250 openshift_hostname=10.171.75.250</p>
+
+<p>[etcd]<br />
+10.171.75.58  openshift_ip=10.171.75.58  openshift_public_ip=10.171.75.58  openshift_hostname=10.171.75.58<br />
+10.171.75.219 openshift_ip=10.171.75.219 openshift_public_ip=10.171.75.219 openshift_hostname=10.171.75.219<br />
+10.171.75.250 openshift_ip=10.171.75.250 openshift_public_ip=10.171.75.250 openshift_hostname=10.171.75.250</p>
+
+<p># hostname should be access in all nodes<br />
+[glusterfs]<br />
+glusterfs-node1 ansible_ssh_host=10.171.76.248 glusterfs_ip=10.171.76.248 glusterfs_public_ip=10.171.76.248 glusterfs_devices='["/dev/xvde"]'<br />
+glusterfs-node2 ansible_ssh_host=10.171.77.85  glusterfs_ip=10.171.77.85  glusterfs_public_ip=10.171.77.85  glusterfs_devices='["/dev/xvde"]'<br />
+glusterfs-node3 ansible_ssh_host=10.171.70.108 glusterfs_ip=10.171.70.108 glusterfs_public_ip=10.171.70.108 glusterfs_devices='["/dev/xvde"]'</p>
+
+<p>[nodes]<br />
+10.171.75.58  openshift_ip=10.171.75.58  openshift_public_ip=10.171.75.58  openshift_hostname=10.171.75.58  openshift_node_labels="{'region': 'infra', 'zone': 'default'}" openshift_schedulable=true<br />
+10.171.75.219 openshift_ip=10.171.75.219 openshift_public_ip=10.171.75.219 openshift_hostname=10.171.75.219 openshift_node_labels="{'region': 'infra', 'zone': 'default'}" openshift_schedulable=true<br />
+10.171.75.250 openshift_ip=10.171.75.250 openshift_public_ip=10.171.75.250 openshift_hostname=10.171.75.250 openshift_node_labels="{'region': 'infra', 'zone': 'default'}" openshift_schedulable=true<br />
+10.171.67.39  openshift_ip=10.171.67.39  openshift_public_ip=10.171.67.39  openshift_hostname=10.171.67.39  openshift_node_labels="{'region': 'app', 'zone': 'default', 'node-role.kubernetes.io/compute': 'true'}"<br />
+10.171.69.137 openshift_ip=10.171.69.137 openshift_public_ip=10.171.69.137 openshift_hostname=10.171.69.137 openshift_node_labels="{'region': 'app', 'zone': 'default', 'node-role.kubernetes.io/compute': 'true'}"</p>
+
+<h2>3、初始化机器</h2>
+
+<p>从isource上克隆common-ansible到本地并执行。注意替换命令中的用户名和密码：</p>
+
+<p>git clone http://isource-nj.huawei.com/w00438280/common-ansible.git<br />
+cd common-ansible<br />
+ansible-playbook openshift.yml -e "proxy_username=a00123456 proxy_password=xxxxxx"</p>
+
+<h2>4、准备工作</h2>
+
+<p>1、OpenShift要求Docker使用xfs的overlay或overlay2存储引擎，否则docker_storage检查不通过。</p>
+
+<p>计算云中可以将数据盘格式化为xfs，挂载到/data目录，然后将docker的工作目录移到/data/docker。</p>
+
+<p>2、docker默认开启了selinux特性，部分容器需要关掉它，将/etc/sysconfig/docker中的OPTION里的selinux-enabled参数置为false。</p>
+
+<p>sed -i 's/selinux-enabled\ /selinux-enabled=false\ /' /etc/sysconfig/docker<br />
+systemctl restart docker</p>
+
+<p>3、OpenShift中使用Heketi管理Glusterfs集群，推荐使用ssh方式，所以在Ansible所在机器上通过ssh-keygen生成一对公私钥，并使用ssh-copy-id将公钥拷贝到Gluster集群的所有节点上。<br />
+ssh-keygen<br />
+# 一路Enter，使用默认配置，默认的路径是~/.ssh/目录下，私钥为id_rsa，公钥为id_rsa.pub</p>
+
+<p>ssh-copy-id 10.171.76.248</p>
+
+<p># 根据提示输入对方机器的密码，下同</p>
+
+<p>ssh-copy-id 10.171.77.85<br />
+ssh-copy-id 10.171.70.108</p>
+
+<p>4、heketi的topo中使用的是主机名，因此要让所有节点能够ping通所有glusterfs节点的主机名。在/etc/hosts中或者dnsmasq中配置。以使用dnsmasq为例，在/etc/dnsmasq.d/address.conf中添加：</p>
+
+<p>address=/szv1000352039/10.171.70.108<br />
+address=/szv1000352038/10.171.77.85<br />
+address=/szv1000352037/10.171.76.248</p>
+
+<p>修改完之后记得重启dnsmasq服务：</p>
+
+<p>systemctl restart dnsmasq</p>
+
+<p>5、下载OpenShift的Ansible剧本，并执行prerequisites检查：</p>
+
+<p>ansible-playbook playbooks/prerequisites.yml</p>
+
+<p>根据不通过的提示进行相应的调整。</p>
+
+<p>6、执行pre-install检查：</p>
+
+<p>ansible-playbook playbooks/openshift-checks/pre-install.yml</p>
+
+<p>根据不通过的提示进行相应的调整。<br />
+注意inventory中通过参数禁用了disk_availability和memory_availability的检查。默认要求内存不少于16G，/var目录空间不少于40G。<br />
+第一次通常会提示镜像不存在，需要手动pull一下镜像：<br />
+ansible nodes -m shell -a "docker pull cockpit/kubernetes:latest;\<br />
+ docker pull openshift/origin-deployer:v3.9.0;\<br />
+ docker pull openshift/origin-docker-registry:v3.9.0;\<br />
+ docker pull openshift/origin-haproxy-router:v3.9.0;\<br />
+ docker pull openshift/origin-pod:v3.9.0"</p>
+
+<p>7、如果想用内网镜像源，则修改文件roles/openshift_repos/templates/CentOS-OpenShift-Origin.repo.j2。</p>
+
+<h2>5、执行部署</h2>
+
+<p>1、部署集群：</p>
+
+<p>ansible-playbook playbooks/deploy_cluster.yml</p>
+
+<p>根据错误提示进行相应的设置调整。然后重新执行上面的命令继续部署集群。</p>
+
+<p>部署过程包括一下几步，在哪一步出错了，可以从这一步重新执行，然后接着执行后面的脚本：</p>
+
+<p>Playbook Name<br />
+File Location<br />
+Initialization</p>
+
+<p>Health Check    openshift-ansible/playbooks/openshift-checks/pre-install.yml<br />
+etcd Install    openshift-ansible/playbooks/openshift-etcd/config.yml<br />
+Master Install    openshift-ansible/playbooks/openshift-master/config.yml<br />
+Master Additional Install    openshift-ansible/playbooks/openshift-master/additional_config.yml<br />
+Node Install    openshift-ansible/playbooks/openshift-node/config.yml<br />
+GlusterFS Install    openshift-ansible/playbooks/openshift-glusterfs/config.yml<br />
+Hosted Install    openshift-ansible/playbooks/openshift-hosted/config.yml<br />
+Web Console Install    openshift-ansible/playbooks/openshift-web-console/config.yml<br />
+Service Catalog Install    openshift-ansible/playbooks/openshift-service-catalog/config.yml</p>
+
+<p>2、如果在部署glusterfs插件过程中出错了，需要删除deploymentconfigs/deploy-heketi-storage才能重新部署，在master节点上执行该命令：</p>
+
+<p>oc delete dc deploy-heketi-storage -n glusterfs</p>
+
+<p>另外，如果是deploy-heketi-storage-1-deploy容器启不起来，查看下容器的日志，可能是“/usr/bin/openshift-deploy: error while loading shared libraries: libpthread.so.0: cannot open shared object file: Permission denied ”这个错误，这是安装脚本将/etc/sysconfig/docker的selinux打开了，需要再次关掉它并重启docker，然后再运行deploy_cluster.yml：</p>
+
+<p>sed -i 's/selinux-enabled\ /selinux-enabled=false\ /' /etc/sysconfig/docker<br />
+systemctl restart docker</p>
+
+<p>3、glusterfs插件安装完成后需要一些额外的配置。</p>
+
+<p>（1）node节点使用route暴露出来的域名来访问heketi，因此需要在所有节点上配置域名解析，以使用dnsmasq为例，在/etc/dnsmasq.d/address.conf中添加：</p>
+
+<p>address=/heketi-storage-glusterfs.openshift.test.huawei.com/10.171.75.58</p>
+
+<p>修改完之后记得重启dnsmasq服务：</p>
+
+<p>systemctl restart dnsmasq</p>
+
+<p>（2）将glusterfs设置为默认的storageclass，在master节点上执行该命令：</p>
+
+<p>oc patch storageclass glusterfs-storage -p '{"metadata": {"annotations": {"storageclass.kubernetes.io/is-default-class": "true"}}}'</p>
+
+<p>4、集群部署完成之后需要创建超级管理员用户。上面配置了集群使用htpasswd_auth的认证方式，因此在所有master节点上使用htpasswd创建用户，然后给用户赋予超级管理员权限（只在一个master节点上执行就行了）：</p>
+
+<p>htpasswd -b /etc/origin/master/htpasswd admin admin@123<br />
+oc login -u system:admin<br />
+oc adm policy add-cluster-role-to-user cluster-admin admin</p>
+
+<h2>6、检查集群是否可用</h2>
+
+<p>1、在master节点上执行oc get nodes查看集群节点状态。<br />
+2、访问master节点的8443端口，https://10.171.75.58:8443/console，访问控制台页面。使用上面创建的超级管理员用户登录。</p>
+
+<h2>7、将registry的数据卷迁移到glusterfs上</h2>
+
+<p>OpenShift推荐的方式是单独为registry搭建一个glusterfs集群，出于集群规模和资源限制的考虑，就使用当前的glusterfs集群就行了。<br />
+首先创建一个动态pvc，保存为文件registry-volume.yaml：</p>
+
+<p>apiVersion: v1<br />
+kind: PersistentVolumeClaim<br />
+metadata:<br />
+ name: registry<br />
+spec:<br />
+ accessModes:<br />
+  - ReadWriteMany<br />
+ resources:<br />
+   requests:<br />
+        storage: 50Gi<br />
+ storageClassName: glusterfs-storage</p>
+
+<p>使用oc命令创建：</p>
+
+<p>oc create -f registry-volume.yaml</p>
+
+<p>为已部署的registry更换volume：</p>
+
+<p>oc volume deploymentconfigs/docker-registry --add --name=registry-storage -t pvc --claim-name=registry --overwrite</p>
+
+<h2>8、登录Registry</h2>
+
+<p>Registry默认使用系统用户的token登录，因此在有oc客户端的节点上登录的方式如下：</p>
+
+<p>docker login -u $(oc whoami) -p $(oc whoami -t) docker-registry.default.svc:5000</p>
+
+<p>实际上-u指定的用户名没有用到，实际起作用的是-p指定的token。<br />
+在其他机器上要登录的话可以从管理员处获得token。</p>
+
+<p>如果docker配置了网络代理，那么需要将docker-registry.default.svc加入到NO_PROXY变量中。</p>

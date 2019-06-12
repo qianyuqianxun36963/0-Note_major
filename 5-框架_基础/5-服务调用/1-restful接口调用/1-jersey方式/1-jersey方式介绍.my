@@ -1,0 +1,393 @@
+<h1>Jersey 开发RESTful（十三） Jersey客户端API入门</h1>
+
+<p>【原创文章，转载请注明原文章地址，谢谢！】</p>
+
+<blockquote>
+<p>本小节简单介绍Jersey提供的客户端API（Client API）。Jersey的客户端API能够让我们非常方便的创建出REST的Web服务客户端，不管是客户端应用，还是用于测试的代码，都是非常容易和舒服的。比较原生的使用HTTPUrlConnection或者Apache HttpClient，都更加的方便和强大。本小节的大部分示例代码来源于Jersey的文档（<a href="https://link.jianshu.com/?t=https%3A%2F%2Fjersey.github.io%2Fdocumentation%2Flatest%2Fclient.html" rel="nofollow" target="_blank">https://jersey.github.io/documentation/latest/client.html</a>）。</p>
+</blockquote>
+
+<h2>依赖</h2>
+
+<p>首先我们要了解到，在JAX-RS中，提供了一系列的标准的Client API，而Jersey为了更好的实现和扩展这套API，提供了一种扩展机制，即实现了org.glassfish.jersey.client.spi.Connector接口，就可以提供不同具体实现的Client API实现。比如默认使用JDK的Http(s)URLConnection，也可以使用HttpClient的实现，还可以使用Jetty的实现，grizzly的实现等等。所以，在引入依赖的时候需要注意这点：</p>
+
+<pre>
+<code><dependency>
+<groupId>org.glassfish.jersey.core</groupId>
+<artifactId>jersey-client</artifactId>
+<version>2.26</version>
+</dependency>
+</code></pre>
+
+<p>默认的实现，使用JDK的实现；可以选择对应其他的实现方式：</p>
+
+<pre>
+<code><dependency>
+<groupId>org.glassfish.jersey.connectors</groupId>
+<artifactId>jersey-grizzly-connector</artifactId>
+<version>2.26</version>
+</dependency>
+
+<dependency>
+<groupId>org.glassfish.jersey.connectors</groupId>
+<artifactId>jersey-apache-connector</artifactId>
+<version>2.26</version>
+</dependency>
+
+<dependency>
+<groupId>org.glassfish.jersey.connectors</groupId>
+<artifactId>jersey-jetty-connector</artifactId>
+<version>2.26</version>
+</dependency>
+</code></pre>
+
+<p>比如选择使用grizzly就引入对应的jersey-grizzly-connector，选择使用apache的Httpclient，引入jersey-apache-connector即可。一般情况下，比如针对普通测试，使用默认的JDK实现即可。</p>
+
+<h2>Client API快速入门</h2>
+
+<p>既然是一种非常方便的代码，我们直接使用一段DEMO来看看Client API的基本使用方式，有一个直观的了解：</p>
+
+<pre>
+<code>Client client = ClientBuilder.newClient();
+WebTarget target = client.target("http://localhost:9998").path("resource");
+
+Form form = new Form();
+form.param("x", "foo");
+form.param("y", "bar");
+
+MyJAXBBean bean =
+target.request(MediaType.APPLICATION_JSON_TYPE)
+.post(Entity.entity(form,MediaType.APPLICATION_FORM_URLENCODED_TYPE),
+MyJAXBBean.class);
+</code></pre>
+
+<p>非常直观的理解：<br />
+1，首先使用ClientBuilder的工厂方法newClient创建一个Client对象，可以理解为一个浏览器（客户端）；<br />
+2，使用client对象的target方法，创建一个WebTarget，这里注意链式调用，首先使用target方法，接着再使用path方法，即WebTarget对象对应的实际资源地址为<a href="https://link.jianshu.com/?t=http%3A%2F%2Flocalhost%3A9998%2Fresource" rel="nofollow" target="_blank">http://localhost:9998/resource</a>；<br />
+3，创建一个Form对象，代表（或者说模拟一个表单），并为表单创建了两个值域：x,y，对应的值为foo和bar；<br />
+4，使用WebTarget对象的request方法创建一个请求，注意请求的期望响应类型为application/json；然后接着使用链式方法post，发起一个POST请求，并且在请求的过程中，传入一个实体（Entity），而这个实体就是我们上面构造的Form表单对象，并且采用的是x-www-form-urlencoded编码格式，post方法的第二个参数，就是接受的响应类型，我们需要把json响应直接转成MyJAXBBean对象。</p>
+
+<p>通过这个例子，我们可以很简单的看到使用Jesey的ClientAPI创建相对复杂的请求的例子。不过，在这个例子中，其实隐藏了很多细节的代码和对象，方法，下面来更进一步的了解。</p>
+
+<h2>Client API简介</h2>
+
+<p>在上一节中我们通过一个直观的代码对Jersey的Client API有了一个了解，我相信其中的链式代码方式，应该有比较深刻的影响。我已经说到，其实在这段代码之下，隐藏了很多API细节，下面就来通过拆分代码，看看这些细节。</p>
+
+<h4>创建Client</h4>
+
+<p>一般开始一个客户端代码，都是从创建一个Client对象开始。通常情况下，都是使用ClientBuilder的newClient方法来创建一个Client：</p>
+
+<pre>
+<code>Client client = ClientBuilder.newClient();
+</code></pre>
+
+<p>当我们稍微深入一点newClient方法，其实我们可以看到具体的实现其实是这样的：</p>
+
+<pre>
+<code>public static Client newClient() {
+return newBuilder().build();
+}
+</code></pre>
+
+<p>可以看到，其实我们的Client对象是通过newBuilder()方法首先创建一个ClientBuilder实例，在通过这个实例的build方法创建的Client对象。换句话说，其实ClientBuilder内部提供了更为复杂的build模式，我们完全可以通过ClientBuilder.newBuilder()方法先创建一个ClientBuilder对象，并且对这个对象进行一系列的配置，再调用build方法来创建Client对象。<br />
+其次，我们可以发现，ClientBuilder类其实实现了javax.ws.rs.client.Configurable接口，这个接口我们在介绍ResourceConfig的时候介绍过，那么通过这个接口，我们可以为一个ClientBuilder配置更多的内容，比如配置参数，比如配置Provider（比如上面那个案例中，JSON->MyJAXBBean对象，就使用了之前介绍的Entity Provider），这也是为什么我们要在介绍拦截器和过滤器之前介绍Client API的原因，就是Client API也是能够使用各种Provider，Filter，Interceptor；<br />
+另外，ClientBuilder还提供了基于一个javax.ws.rs.client.Configurable的构造方法：</p>
+
+<pre>
+<code>public abstract ClientBuilder withConfig(Configuration config);
+public static Client newClient(final Configuration configuration) {
+return newBuilder().withConfig(configuration).build();
+}
+</code></pre>
+
+<p>更进一步，ClientBuilder本身就是实现了Configuration接口，这就意味着，我们可以使用一个ClientBuilder来配置另外一个ClientBuilder（实际开发中，我们更多使用的是ClientConfig对象，后面介绍），即我们可以完成ClientBuilder配置的复用。这有什么用？我们继续看，在ClientBuilder中还提供了HTTPS相关方法：</p>
+
+<pre>
+<code>public abstract ClientBuilder sslContext(final SSLContext sslContext);
+public abstract ClientBuilder keyStore(final KeyStore keyStore, final char[] password);
+public abstract ClientBuilder trustStore(final KeyStore trustStore);
+</code></pre>
+
+<p>那么，针对一个SSL应用，我们就可以首先创建一个基本的SSL全局配置的ClientBuilder对象，然后再每次具体请求的时候，使用这个全局配置对象来构建新的ClientBuilder对象，然后再设置具体的特殊配置。这个技巧后面还会详细介绍。</p>
+
+<h4>使用ClientConfig</h4>
+
+<p>上一节说道，我们可以使用一个Configuration对象来创建一个Client对象，在实际的开发中，承担这个配置对象角色的更常见的是使用org.glassfish.jersey.client.ClientConfig；下面来看一个代码片段：</p>
+
+<pre>
+<code>ClientConfig clientConfig = new ClientConfig();
+clientConfig.register(MyClientResponseFilter.class);
+clientConfig.register(new AnotherClientFilter());
+Client client = ClientBuilder.newClient(clientConfig);
+</code></pre>
+
+<p>在这段代码中，我们可以明显的看到，首先创建了一个ClientConfig对象，然后使用该对象的register方法，注册了两个过滤器（下一篇文章介绍），然后再使用这个clientConfig对象，创建了一个Client对象。那么这个Client对象，就拥有了两个Filter的功能。</p>
+
+<p>之所以能够通过ClientConfig对象注册Filter，根本原因还是在于ClientConfig类也实现了Configuration接口：</p>
+
+<pre>
+<code>public class ClientConfig implements Configurable<ClientConfig>, ExtendedConfig 
+</code></pre>
+
+<p>在ClientConfig类中，还提供了一些其他的构造方法：</p>
+
+<pre>
+<code>public ClientConfig(final Class<?>... providerClasses) 
+public ClientConfig(final Object... providers)
+</code></pre>
+
+<p>比如上面的代码就可以重写为：</p>
+
+<pre>
+<code>Client client = ClientBuilder.newClient(
+new ClientConfig(MyClientResponseFilter.class,AnotherClientFilter.class));
+</code></pre>
+
+<h4>ClientConfig的复制</h4>
+
+<p>先来看一段代码：</p>
+
+<pre>
+<code>ClientConfig c1 = new ClientConfig();
+c1.register(MyClientResponseFilter.class);
+c1.register(new AnotherClientFilter());
+Client client = ClientBuilder.newClient(c1);
+client.register(ThirdClientFilter.class);
+Configuration c2 = client.getConfiguration();
+</code></pre>
+
+<p>为了看的更加清楚，我把代码拆分为单行代码，可以看到：<br />
+1，创建一个ClientConfig对象c1；<br />
+2，为c1注册了两个过滤器；<br />
+3，使用c1创建了一个Client对象client；<br />
+4，注意这句代码，我们在client对象上，再次注册了一个ThirdClientFilter，之所以能这样做，不用多说，Client对象肯定也实现了Configuration接口；<br />
+5，然后调用client.getConfiguration()方法获取到了一个新的配置对象c2；</p>
+
+<p>代码本身没有什么难度，但是这段代码揭示了Jersey一个很重要的概念，就是ClientConfig的复制。在这段代码中，我们先创建了一个ClientConfig对象c1，然后通过c1创建了Client对象，然后在这个Client对象上面额外添加了一个过滤器，然后再通过Client对象得到一个新的配置对象c2；那么这时候，c1，Client，c2这三个对象的过滤器情况是怎么样的呢？<br />
+1，c1的过滤器仍然只有MyClientResponseFilter和AnotherClientFilter；<br />
+2，Client对象上有MyClientResponseFilter，AnotherClientFilter和ThirdClientFilter这三个过滤器；<br />
+3，c2的过滤器有MyClientResponseFilter，AnotherClientFilter和ThirdClientFilter这三个过滤器；</p>
+
+<p>换句话说，client对象的过滤器增加，并没有影响到原始的c1。这个概念对于我们上文已经提到过的统一基础配置的概念非常重要，来看这段代码：</p>
+
+<pre>
+<code>ClientConfig baseConfig = new ClientConfig()
+.register(MyClientResponseFilter.class)
+.register(new AnotherClientFilter());
+Client client1 = ClientBuilder.newClient(baseConfig)
+.register(SomeOtherFilter.class);
+//do something use client1；
+Client client2 = ClientBuilder.newClient(baseConfig)
+.register(CustomerFilter.class);
+//do something use client2；
+</code></pre>
+
+<p>在这段代码中，充分利用了ClientConfig的拷贝原理，创建了一个基础的baseConfig对象，然后使用这个baseConfig创建了client1和client2，并且client1和client2各自有自己的Filter，但是他们各自注册的filter都不会影响原始的baseConfig对象，所以后面我们可以接着使用baseConfig对象去创建新的Client；</p>
+
+<h4>定位一个资源</h4>
+
+<p>创建好Client对象之后，就可以使用target方法来定位一个资源。</p>
+
+<pre>
+<code>WebTarget webTarget = client.target("http://example.com/rest");
+</code></pre>
+
+<p>得到一个WebTarget对象。我们简单来认识一下WebTarget对象。该类代表一个资源URI：</p>
+
+<pre>
+<code>public interface WebTarget extends Configurable<WebTarget> 
+</code></pre>
+
+<p>并且可以看到，该类实际继承了Configurable接口，所以我们还可以再某一个单独的URI上面配置Filter等。<br />
+其次，该对象提供了以下几个常用的方法：</p>
+
+<pre>
+<code>//创建一个子资源URI
+public WebTarget path(String path);
+//为当前URI设置矩阵参数（参考参数绑定一文）
+public WebTarget matrixParam(String name, Object... values);
+//为当前URI设置查询参数（参考参数绑定一文）
+public WebTarget queryParam(String name, Object... values);
+//发起一个请求，获取请求执行器
+public Invocation.Builder request();
+</code></pre>
+
+<p>要注意一点的是，一般我们会使用target方法来定位WEB API的根资源，而再通过path方法来创建具体每次请求的子资源，比如：</p>
+
+<pre>
+<code>WebTarget webTarget = client.target("http://www.wolfcode.com/api");
+webTarget.register(FilterForExampleCom.class);
+WebTarget resourceWebTarget = webTarget.path("resource");
+WebTarget helloworldWebTarget = resourceWebTarget.path("helloworld");
+WebTarget helloworldWebTargetWithQueryParam =
+helloworldWebTarget.queryParam("greeting", "HiWorld!");
+</code></pre>
+
+<p>1，先针对应用的根路径创建一个webTarget，并设置了一个过滤器，那么这个过滤器会被由webTarget创建出来的所有的子资源所使用；<br />
+2，使用webTarget创建了第一个子资源resourceWebTarget，实际资源URI为：<a href="https://link.jianshu.com/?t=http%3A%2F%2Fwww.wolfcode.com%2Fapi%2Fresource" rel="nofollow" target="_blank">http://www.wolfcode.com/api/resource</a>;<br />
+3，继续使用webTarget创建了子资源helloworldWebTarget，实际资源URI为：<a href="https://link.jianshu.com/?t=http%3A%2F%2Fwww.wolfcode.com%2Fapi%2Fhelloworld" rel="nofollow" target="_blank">http://www.wolfcode.com/api/helloworld</a>;<br />
+4，然后再使用helloworldWebTarget，添加请求参数greeting，值为hiworld，那么实际的请求URI为：<a href="https://link.jianshu.com/?t=http%3A%2F%2Fwww.wolfcode.com%2Fapi%2Fhelloworld%3Fgreeting%3Dhiworld" rel="nofollow" target="_blank">http://www.wolfcode.com/api/helloworld?greeting=hiworld</a></p>
+
+<h4>执行一个HTTP请求</h4>
+
+<p>当获取一个资源URI之后，就可以通过WebTarget对象的request方法创建一个Invocation.Builder类，这个类代表一个HTTP请求执行器：</p>
+
+<pre>
+<code>Invocation.Builder invocationBuilder =
+helloworldWebTargetWithQueryParam.request(MediaType.TEXT_PLAIN_TYPE);
+invocationBuilder.header("some-header", "true");
+</code></pre>
+
+<p>可以看到，我们使用request方法，传入了一个MediaType，这个MediaType就相当于请求的Accept请求头；我们还可以通过Invocation.Builder对象的header方法，为本次请求添加请求头；下面先来看看WebTarget的request方法重载：</p>
+
+<pre>
+<code>public Invocation.Builder request();
+public Invocation.Builder request(String... acceptedResponseTypes);
+public Invocation.Builder request(MediaType... acceptedResponseTypes);
+</code></pre>
+
+<p>非常直观，第一种方法创建一个默认的Invocation.Builder，第二，三种方式可以直接配置请求的Accept类型；</p>
+
+<p>下面再来看看Invocation.Builder类的常见方法：</p>
+
+<pre>
+<code> //创建一个指定请求方法的请求
+public Invocation build(String method);
+//创建一个指定请求方法的请求，并添加请求实体内容
+public Invocation build(String method, Entity<?> entity);
+//创建一个GET请求
+public Invocation buildGet();
+//创建一个DELETE请求
+public Invocation buildDelete();
+//创建一个POST请求，并添加POST请求实体内容；
+public Invocation buildPost(Entity<?> entity);
+//创建一个PUT请求，并添加请求实体内容；
+public Invocation buildPut(Entity<?> entity);
+//设置接受请求MIME格式；
+public Builder accept(MediaType... mediaTypes);
+//设置接受的编码格式；
+public Builder acceptEncoding(String... encodings);
+//添加Cookie内容；
+public Builder cookie(String name, String value);
+//添加请求头信息；
+public Builder header(String name, Object value);
+</code></pre>
+
+<p>我相信这些方法的使用都是非常直观的。而可以看到在Invocation.Builder接口中的buildXXX方法，都是返回一个Invocation对象，那么Invocation中又有哪些方法呢？</p>
+
+<pre>
+<code>//执行请求；得到一个响应对象
+public Response invoke();
+//执行请求；将响应转成一个指定类型对象；
+public <T> T invoke(Class<T> responseType);
+//异步执行请求（关于异步请求，SSE，WebSocket会单开专题）；
+public Future<Response> submit();
+</code></pre>
+
+<p>所以，我们一个请求可以这样执行：</p>
+
+<pre>
+<code>Invocation.Builder invocationBuilder helloworldWebTargetWithQueryParam
+.request(MediaType.TEXT_PLAIN_TYPE)
+.header("some-header", "true");
+String responseText=invocationBuilder.buildGet().invoke(String.class);
+</code></pre>
+
+<p>而，又因为，Invocation.Builder接口还实现了SyncInvoker接口：</p>
+
+<pre>
+<code>public static interface Builder extends SyncInvoker 
+</code></pre>
+
+<p>所以，我们还可以看到类似这样的代码：</p>
+
+<pre>
+<code>Response response = invocationBuilder.get();
+</code></pre>
+
+<p>而类似get的方法，就是来自于SyncInvoker接口：</p>
+
+<pre>
+<code>Response get();
+<T> T get(Class<T> responseType);
+Response put(Entity<?> entity);
+<T> T put(Entity<?> entity, Class<T> responseType);
+Response post(Entity<?> entity);
+<T> T post(Entity<?> entity, Class<T> responseType);
+Response delete();
+<T> T delete(Class<T> responseType);
+Response head();
+Response options();
+Response trace();
+<T> T method(String name, Class<T> responseType);
+</code></pre>
+
+<p>我从SyncInvoker接口中摘录了几条方法，我相信这些方法的签名已经非常明确的说明了方法的概念，比如<T> T put(Entity<?> entity, Class<T> responseType);那非常明显，就是对当前Invocation.Builder调用PUT方法请求，并传入请求实体(entity)，要求的响应转化成responseType类型。</p>
+
+<p>下面来看一个综合一点的代码：</p>
+
+<pre>
+<code>//创建一个配置对象
+ClientConfig clientConfig = new ClientConfig();
+//注册过滤器
+clientConfig.register(MyClientResponseFilter.class);
+clientConfig.register(new AnotherClientFilter());
+//创建一个Client对象
+Client client = ClientBuilder.newClient(clientConfig);
+//为这个Client对象再注册一个过滤器
+client.register(ThirdClientFilter.class);
+//创建根资源路径URI
+WebTarget webTarget = client.target("http://wolfcode.cn/api");
+//为根资源路径添加一个过滤器；
+webTarget.register(FilterForExampleCom.class);
+//创建一个子资源URI
+WebTarget helloworldWebTarget = resourceWebTarget.path("helloworld");
+//添加查询参数；
+WebTarget helloworldWebTargetWithQueryParam =
+helloworldWebTarget.queryParam("greeting", "Hi World!");
+//获取执行器
+Invocation.Builder invocationBuilder =
+helloworldWebTargetWithQueryParam.request(MediaType.TEXT_PLAIN_TYPE);
+//添加头信息
+invocationBuilder.header("some-header", "true");
+//对当前URI执行GET方法请求；获得响应对象
+Response response = invocationBuilder.get();
+//从响应对象中获取需要的内容
+System.out.println(response.getStatus());
+System.out.println(response.readEntity(String.class));
+</code></pre>
+
+<p>这就是一个标准的请求代码流程。但这段代码是完全拆分的代码，目的是为了让大家看清楚参与整个请求流程的每一个对象的作用；下面是这段代码的使用链式代码样式，我们做个对比：</p>
+
+<pre>
+<code>Client client = ClientBuilder.newClient(new ClientConfig()
+.register(MyClientResponseFilter.class)
+.register(new AnotherClientFilter()));
+
+String entity = client.target("http://wolfcode.cn/api")
+.register(FilterForExampleCom.class)
+.path("helloworld")
+.queryParam("greeting", "Hi World!")
+.request(MediaType.TEXT_PLAIN_TYPE)
+.header("some-header", "true")
+.get(String.class);
+</code></pre>
+
+<p>可以看到简化之后的代码的可读性是非常强的。</p>
+
+<h4>连接的关闭</h4>
+
+<p>在Jersey中，当返回的Response中的Entity被读取之后，连接自动关闭。如下代码所示：</p>
+
+<pre>
+<code>final WebTarget target = ... some web target
+Response response = target.path("resource").request().get();
+//到这里，连接仍然开启，因为还没有读取response；
+System.out.println("string response: " + response.readEntity(String.class));
+//到这里，连接已经关闭，因为上面一句代码已经读取了response中的entity；
+</code></pre>
+
+<p>需要注意的一点，如果返回的response中有输入流（比如之前介绍的下载）；那么在读取inputstream的过程中，连接保持开启。这种情况下，就需要在读取完毕inputstream之后，手动关闭输入流即可。</p>
+
+<h2>小结</h2>
+
+<p>在本节中，我们简单的看到了Jersey客户端API的一个基本的结构和使用方法，当然这仅仅只是一个很基础的说明，能完成常见的80%以上的测试代码情况，具体的更多的API大家可以参考文档。关于Entity，过滤器，拦截器的处理，我们在后面的章节中介绍。</p>

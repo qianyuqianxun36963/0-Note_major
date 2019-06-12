@@ -1,0 +1,173 @@
+<h1>TCP三次握手四次挥手详解</h1>
+
+<h2>第一部分 过程介绍</h2>
+
+<p>相对于SOCKET开发者,TCP创建过程和链接折除过程是由TCP/IP协议栈自动创建的.因此开发者并不需要控制这个过程.但是对于理解TCP底层运作机制,相当有帮助.</p>
+
+<p>而且对于有网络协议工程师之类笔试,几乎是必考的内容.企业对这个问题热情之高,出乎我的意料：-）。有时上午面试前强调这个问题，并重复讲一次，下午几乎每一个人都被问到这个问题。</p>
+
+<p>因此在这里详细解释一下这两个过程。</p>
+
+<h3><strong>TCP三次握手</strong></h3>
+
+<p>所谓三次握手(Three-way Handshake)，是指建立一个TCP连接时，需要客户端和服务器总共发送3个包。</p>
+
+<p>三次握手的目的是连接服务器指定端口，建立TCP连接,并同步连接双方的序列号和确认号并交换 TCP 窗口大小信息.在socket编程中，客户端执行connect()时。将触发三次握手。<br />
+<a href="http://www.centos.bz/wp-content/uploads/2012/08/100327002629.png" rel="1&nbsp;of&nbsp;6"><img alt="" src="http://www.centos.bz/wp-content/uploads/2012/08/100327002629.png" style="height:537px; width:714px" title="100327002629" /></a><br />
+第一次握手:<br />
+客户端发送一个TCP的SYN标志位置1的包指明客户打算连接的服务器的端口，以及初始序号X,保存在包头的序列号(Sequence Number)字段里。<br />
+<a href="http://www.centos.bz/wp-content/uploads/2012/08/100327002911.png" rel="2&nbsp;of&nbsp;6"><img alt="" src="http://www.centos.bz/wp-content/uploads/2012/08/100327002911.png" style="height:239px; width:548px" title="100327002911" /></a><br />
+第二次握手:<br />
+服务器发回确认包(ACK)应答。即SYN标志位和ACK标志位均为1同时，将确认序号(Acknowledgement Number)设置为客户的I S N加1以.即X+1。<br />
+<a href="http://www.centos.bz/wp-content/uploads/2012/08/100327003054.png" rel="3&nbsp;of&nbsp;6"><img alt="" src="http://www.centos.bz/wp-content/uploads/2012/08/100327003054.png" style="height:233px; width:541px" title="100327003054" /></a></p>
+
+<p>第三次握手.<br />
+客户端再次发送确认包(ACK) SYN标志位为0,ACK标志位为1.并且把服务器发来ACK的序号字段+1,放在确定字段中发送给对方.并且在数据段放写ISN的+1<br />
+<a href="http://www.centos.bz/wp-content/uploads/2012/08/100327003214.png" rel="4&nbsp;of&nbsp;6"><img alt="" src="http://www.centos.bz/wp-content/uploads/2012/08/100327003214.png" style="height:237px; width:541px" title="100327003214" /></a><br />
+<strong>SYN攻击</strong><br />
+在三次握手过程中，服务器发送SYN-ACK之后，收到客户端的ACK之前的TCP连接称为半连接(half-open connect).此时服务器处于Syn_RECV状态.当收到ACK后，服务器转入ESTABLISHED状态.<br />
+Syn攻击就是 攻击客户端 在短时间内伪造大量不存在的IP地址，向服务器不断地发送syn包，服务器回复确认包，并等待客户的确认，由于源地址是不存在的，服务器需要不断的重发直 至超时，这些伪造的SYN包将长时间占用未连接队列，正常的SYN请求被丢弃，目标系统运行缓慢，严重者引起网络堵塞甚至系统瘫痪。<br />
+Syn攻击是一个典型的<a href="https://www.centos.bz/tag/ddos/" title="DDOS">DDOS</a>攻击。检测SYN攻击非常的方便，当你在服务器上看到大量的半连接状态时，特别是源IP地址是随机的，基本上可以断定这是一次SYN攻击.在<a href="http://www.centos.bz/" title="Linux">Linux</a>下可以如下命令检测是否被Syn攻击<br />
+netstat -n -p TCP | grep SYN_RECV<br />
+一般较新的TCP/IP协议栈都对这一过程进行修正来防范Syn攻击，修改tcp协议实现。主要方法有SynAttackProtect保护机制、SYN cookies技术、增加最大半连接和缩短超时时间等.<br />
+但是不能完全防范syn攻击。</p>
+
+<h3><strong>TCP 四次挥手</strong></h3>
+
+<p>TCP的连接的拆除需要发送四个包，因此称为四次挥手(four-way handshake)。客户端或服务器均可主动发起挥手动作，在socket编程中，任何一方执行close()操作即可产生挥手操作。</p>
+
+<p><a href="http://www.centos.bz/wp-content/uploads/2012/08/100327022731.jpg" rel="5&nbsp;of&nbsp;6"><img alt="" src="http://www.centos.bz/wp-content/uploads/2012/08/100327022731.jpg" style="height:532px; width:717px" title="100327022731" /></a></p>
+
+<p>参见wireshark抓包，实测的抓包结果并没有严格按挥手时序。我估计是时间间隔太短造成。<br />
+<a href="http://www.centos.bz/wp-content/uploads/2012/08/100327023334.png" rel="6&nbsp;of&nbsp;6"><img alt="" src="http://www.centos.bz/wp-content/uploads/2012/08/100327023334.png" style="height:448px; width:799px" title="100327023334" /></a>注意上面的字段标号地段和发送接收的内容序号，可能有个有错，记不住哪个了，后头要细看看</p>
+
+<h2>第二部分：补充tcp连接过程</h2>
+
+<p>在TCP/IP协议中，TCP协议提供可靠的连接服务，采用三次握手建立一个连接，如图1所示。</p>
+
+<p> (1) 第一次握手：建立连接时，客户端A发送SYN包(SYN=j)到服务器B，并进入SYN_SEND状态，等待服务器B确认。</p>
+
+<p> (2) 第二次握手：服务器B收到SYN包，必须确认客户A的SYN(ACK=j+1)，同时自己也发送一个SYN包(SYN=k)，即SYN+ACK包，此时服务器B进入SYN_RECV状态。</p>
+
+<p> (3) 第三次握手：客户端A收到服务器B的SYN＋ACK包，向服务器B发送确认包ACK(ACK=k+1)，此包发送完毕，客户端A和服务器B进入ESTABLISHED状态，完成三次握手。</p>
+
+<p>完成三次握手，客户端与服务器开始传送数据。</p>
+
+<p>由于TCP连接是全双工的，因此每个方向都必须单独进行关闭。这个原则是当一方完成它的数据发送任务后就能发送一个FIN来终止这个方向的连接。收到一个 FIN只意味着这一方向上没有数据流动，一个TCP连接在收到一个FIN后仍能发送数据。首先进行关闭的一方将执行主动关闭，而另一方执行被动关闭。</p>
+
+<p>（1）客户端A发送一个FIN，用来关闭客户A到服务器B的数据传送(报文段4)。</p>
+
+<p>（2）服务器B收到这个FIN，它发回一个ACK，确认序号为收到的序号加1(报文段5)。和SYN一样，一个FIN将占用一个序号。</p>
+
+<p>（3）服务器B关闭与客户端A的连接，发送一个FIN给客户端A(报文段6)。</p>
+
+<p>（4）客户端A发回ACK报文确认，并将确认序号设置为收到序号加1(报文段7)。</p>
+
+<p>TCP采用四次挥手关闭连接如图2所示。</p>
+
+<p><strong>1．为什么建立连接协议是三次握手，而关闭连接却是四次握手呢？</strong></p>
+
+<p>这是因为服务端的LISTEN状态下的SOCKET当收到SYN报文的连接请求后，它可以把ACK和SYN(ACK起应答作用，而SYN起同步作用)放在一个报文里来发送。但关闭连接时，当收到对方的FIN报文通知时，<strong>它仅仅表示对方没有数据发送给你了；但未必你所有的数据都全部发送给对方了，所以你可能未必会马上会关闭SOCKET</strong>,也即你可能还需要发送一些数据给对方之后，再发送FIN报文给对方来表示你同意现在可以关闭连接了，所以它这里的ACK报文和FIN报文多数情况下都是分开发送的。</p>
+
+<p><strong>2．为什么TIME_WAIT状态还需要等2MSL后才能返回到CLOSED状态？</strong></p>
+
+<p><strong>这个问题可以参考《unix 网络编程》（第三版，2.7 TIME_WAIT状态）。</strong></p>
+
+<p><strong>TIME_WAIT状态由两个存在的理由。</strong></p>
+
+<p><strong><strong>（1）可靠的实现TCP全双工链接的终止。</strong></strong></p>
+
+<p>这是因为虽然双方都同意关闭连接了，而且握手的4个报文也都协调和发送完毕，按理可以直接回到CLOSED状态（就好比从SYN_SEND状态到ESTABLISH状态那样）；但是因为我们必须要假想网络是不可靠的，你无法保证你最后发送的ACK报文会一定被对方收到，因此对方处于LAST_ACK状态下的SOCKET可能会因为超时未收到ACK报文，而重发FIN报文，所以这个TIME_WAIT状态的作用就是用来重发可能丢失的ACK报文。</p>
+
+<p> （2）允许老的重复的分节在网络中消逝。</p>
+
+<p>假 设在12.106.32.254的1500端口和206.168.1.112.219的21端口之间有一个TCP连接。我们关闭这个链接，过一段时间后在 相同的IP地址和端口建立另一个连接。后一个链接成为前一个的化身。因为它们的IP地址和端口号都相同。TCP必须防止来自某一个连接的老的重复分组在连 接已经终止后再现，从而被误解成属于同一链接的某一个某一个新的化身。为做到这一点，TCP将不给处于TIME_WAIT状态的链接发起新的化身。既然 TIME_WAIT状态的持续时间是MSL的2倍，这就足以让某个方向上的分组最多存活msl秒即被丢弃，另一个方向上的应答最多存活msl秒也被丢弃。 通过实施这个规则，我们就能保证每成功建立一个TCP连接时。来自该链接先前化身的重复分组都已经在网络中消逝了。</p>
+
+<p><strong>3. 为什么不能用两次握手进行连接？</strong></p>
+
+<p>我们知道，3次握手完成两个重要的功能，既要双方做好发送数据的准备工作(双方都知道彼此已准备好)，也要允许双方就初始序列号进行协商，这个序列号在握手过程中被发送和确认。<br />
+    现在把三次握手改成仅需要两次握手，死锁是可能发生的。作为例子，考虑计算机S和C之间的通信，假定C给S发送一个连接请求分组，S收到了这个分组，并发 送了确认应答分组。按照两次握手的协定，S认为连接已经成功地建立了，可以开始发送数据分组。可是，C在S的应答分组在传输中被丢失的情况下，将不知道S 是否已准备好，不知道S建立什么样的序列号，C甚至怀疑S是否收到自己的连接请求分组。在这种情况下，C认为连接还未建立成功，将忽略S发来的任何数据分 组，只等待连接确认应答分组。而S在发出的分组超时后，重复发送同样的分组。这样就形成了死锁。</p>
+
+<p><strong>补充：</strong></p>
+
+<p>a. 默认情况下(不改变socket选项)，当你调用close( or closesocket，以下说close不再重复)时，如果发送缓冲中还有数据，TCP会继续把数据发送完。</p>
+
+<p>b. 发送了FIN只是表示这端不能继续发送数据(应用层不能再调用send发送)，但是还可以接收数据。</p>
+
+<p>c. 应用层如何知道对端关闭？通常，在最简单的阻塞模型中，当你调用recv时，如果返回0，则表示对端关闭。在这个时候通常的做法就是也调用close，那么TCP层就发送FIN，继续完成四次握手。如果你不调用close，那么对端就会处于FIN_WAIT_2状态，而本端则会处于CLOSE_WAIT状态。这个可以写代码试试。</p>
+
+<p>d. 在很多时候，TCP连接的断开都会由TCP层自动进行，例如你CTRL+C终止你的程序，TCP连接依然会正常关闭，你可以写代码试试。</p>
+
+<p><strong>插曲：</strong></p>
+
+<p>   特别的TIME_WAIT状态：</p>
+
+<p>   从以上TCP连接关闭的状态转换图可以看出，主动关闭的一方在发送完对对方FIN报文的确认(ACK)报文后，会进入TIME_WAIT状态。TIME_WAIT状态也称为2MSL状态。</p>
+
+<p>   什么是2MSL？MSL即Maximum Segment Lifetime，也就是报文最大生存时间，引用《TCP/IP详解》中的话：“它(MSL)是任何报文段被丢弃前在网络内的最长时间。”那么，2MSL也就是这个时间的2倍。其实我觉得没必要把这个MSL的确切含义搞明白，你所需要明白的是，当TCP连接完成四个报文段的交换时，主动关闭的一方将继续等待一定时间(2-4分钟)，即使两端的应用程序结束。你可以写代码试试，然后用setstat查看下。</p>
+
+<p>   为什么需要2MSL？根据《TCP/IP详解》和《The TCP/IP Guide》中的说法，有两个原因：</p>
+
+<p>   其一，保证发送的ACK会成功发送到对方，如何保证？我觉得可能是通过超时计时器发送。这个就很难用代码演示了。</p>
+
+<p>   其二，报文可能会被混淆，意思是说，其他时候的连接可能会被当作本次的连接。直接引用《The TCP/IP Guide》的说法：The second is to provide a “buffering period” between the end of this connection and any subsequent ones. If not for this period, it is possible that packets from different connections could be mixed, creating confusion.</p>
+
+<p>   TIME_WAIT状态所带来的影响：</p>
+
+<p>   当某个连接的一端处于TIME_WAIT状态时，该连接将不能再被使用。事实上，对于我们比较有现实意义的是，这个端口将不能再被使用。某个端口处于TIME_WAIT状态(其实应该是这个连接)时，这意味着这个TCP连接并没有断开(完全断开)，那么，如果你bind这个端口，就会失败。对于服务器而言，如果服务器突然crash掉了，那么它将无法再2MSL内重新启动，因为bind会失败。解决这个问题的一个方法就是设置socket的SO_REUSEADDR选项。这个选项意味着你可以重用一个地址。</p>
+
+<p>   对于TIME_WAIT的插曲：</p>
+
+<p>   当建立一个TCP连接时，服务器端会继续用原有端口监听，同时用这个端口与客户端通信。而客户端默认情况下会使用一个随机端口与服务器端的监听端口通信。有时候，为了服务器端的安全性，我们需要对客户端进行验证，即限定某个IP某个特定端口的客户端。客户端可以使用bind来使用特定的端口。对于服务器端，当设置了SO_REUSEADDR选项时，它可以在2MSL内启动并listen成功。但是对于客户端，当使</p>
+
+<p>用bind并设置SO_REUSEADDR时，如果在2MSL内启动，虽然bind会成功，但是在windows平台上connect会失败。而在linux上则不存在这个问题。(我的实验平台：winxp, ubuntu7.10)</p>
+
+<p>    要解决windows平台的这个问题，可以设置SO_LINGER选项。SO_LINGER选项决定调用close时TCP的行为。SO_LINGER涉及到linger结构体，如果设置结构体中l_onoff为非0，l_linger为0，那么调用close时TCP连接会立刻断开，TCP不会将发送缓冲中未发送的数据发送，而是立即发送一个RST报文给对方，这个时候TCP连接就不会进入TIME_WAIT状态。如你所见，这样做虽然解决了问题，但是并不安全。通过以上方式设置SO_LINGER状态，等同于设置SO_DONTLINGER状态。</p>
+
+<p>    断开连接时的意外：</p>
+
+<p>    这个算不上断开连接时的意外，当TCP连接发生一些物理上的意外情况时，例如网线断开，linux上的TCP实现会依然认为该连接有效，而windows则会在一定时间后返回错误信息。这似乎可以通过设置SO_KEEPALIVE选项来解决，不过不知道这个选项是否对于所有平台都有效。</p>
+
+<h2><strong>第三部分：常见面试题</strong></h2>
+
+<ul>
+<li>TCP协议和UDP协议的区别是什么
+<ul>
+<li>TCP协议是有连接的，有连接的意思是开始传输实际数据之前TCP的客户端和服务器端必须通过三次握手建立连接，会话结束之后也要结束连接。而UDP是无连接的</li>
+<li>TCP协议保证数据按序发送，按序到达，提供超时重传来保证可靠性，但是UDP不保证按序到达，甚至不保证到达，只是努力交付，即便是按序发送的序列，也不保证按序送到。</li>
+<li>TCP协议所需资源多，TCP首部需20个字节（不算可选项），UDP首部字段只需8个字节。</li>
+<li>TCP有流量控制和拥塞控制，UDP没有，网络拥堵不会影响发送端的发送速率</li>
+<li>TCP是一对一的连接，而UDP则可以支持一对一，多对多，一对多的通信。</li>
+<li>TCP面向的是字节流的服务，UDP面向的是报文的服务。</li>
+<li><a href="http://www.cnblogs.com/newwy/archive/2013/08/02/3232503.html">TCP介绍</a>和UDP介绍</li>
+</ul>
+</li>
+<li>为什么连接的时候是三次握手，关闭的时候却是四次握手？</li>
+</ul>
+
+<p>答：因为当Server端收到Client端的SYN连接请求报文后，可以直接发送SYN+ACK报文。其中ACK报文是用来应答的，SYN报文是用来同步的。但是关闭连接时，当Server端收到FIN报文时，很可能并不会立即关闭SOCKET，所以只能先回复一个ACK报文，告诉Client端，"你发的FIN报文我收到了"。只有等到我Server端所有的报文都发送完了，我才能发送FIN报文，因此不能一起发送。故需要四步握手。</p>
+
+<ul>
+<li>为什么TIME_WAIT状态需要经过2MSL(最大报文段生存时间)才能返回到CLOSE状态？
+<ul>
+<li>答：虽然按道理，四个报文都发送完毕，我们可以直接进入CLOSE状态了，但是我们必须假象网络是不可靠的，有可以最后一个ACK丢失。所以TIME_WAIT状态就是用来重发可能丢失的ACK报文。在Client发送出最后的ACK回复，但该ACK可能丢失。Server如果没有收到ACK，将不断重复发送FIN片段。所以Client不能立即关闭，它必须确认Server接收到了该ACK。Client会在发送出ACK之后进入到TIME_WAIT状态。Client会设置一个计时器，等待2MSL的时间。如果在该时间内再次收到FIN，那么Client会重发ACK并再次等待2MSL。所谓的2MSL是两倍的MSL(Maximum Segment Lifetime)。MSL指一个片段在网络中最大的存活时间，2MSL就是一个发送和一个回复所需的最大时间。如果直到2MSL，Client都没有再次收到FIN，那么Client推断ACK已经被成功接收，则结束TCP连接。</li>
+</ul>
+</li>
+</ul>
+
+<ul>
+<li>为什么不能用两次握手进行连接？
+<ul>
+<li>答：3次握手完成两个重要的功能，既要双方做好发送数据的准备工作(双方都知道彼此已准备好)，也要允许双方就初始序列号进行协商，这个序列号在握手过程中被发送和确认。        现在把三次握手改成仅需要两次握手，死锁是可能发生的。作为例子，考虑计算机S和C之间的通信，假定C给S发送一个连接请求分组，S收到了这个分组，并发 送了确认应答分组。按照两次握手的协定，S认为连接已经成功地建立了，可以开始发送数据分组。可是，C在S的应答分组在传输中被丢失的情况下，将不知道S 是否已准备好，不知道S建立什么样的序列号，C甚至怀疑S是否收到自己的连接请求分组。在这种情况下，C认为连接还未建立成功，将忽略S发来的任何数据分 组，只等待连接确认应答分组。而S在发出的分组超时后，重复发送同样的分组。这样就形成了死锁。</li>
+</ul>
+</li>
+</ul>
+
+<ul>
+<li>如果已经建立了连接，但是客户端突然出现故障了怎么办？
+<ul>
+<li>TCP还设有一个保活计时器，显然，客户端如果出现故障，服务器不能一直等下去，白白浪费资源。服务器每收到一次客户端的请求后都会重新复位这个计时器，时间通常是设置为2小时，若两小时还没有收到客户端的任何数据，服务器就会发送一个探测报文段，以后每隔75分钟发送一次。若一连发送10个探测报文仍然没反应，服务器就认为客户端出了故障，接着就关闭连接。<br />
+ </li>
+</ul>
+</li>
+</ul>

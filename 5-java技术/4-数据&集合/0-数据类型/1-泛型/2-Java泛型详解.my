@@ -1,0 +1,241 @@
+<h1>Java泛型详解</h1>
+<h2>1. 概述</h2>
+<p>在引入范型之前，Java类型分为原始类型、复杂类型，其中复杂类型分为数组和类。引入范型后，一个复杂类型<br />
+就可以在细分成更多的类型。<br />
+例如原先的类型List，现在在细分成List<Object>, List<String>等更多的类型。<br />
+注意，现在List<Object>, List<String>是两种不同的类型，<br />
+他们之间没有继承关系，即使String继承了Object。下面的代码是非法的<br />
+    List<String> ls = new ArrayList<String>();<br />
+    List<Object> lo = ls;<br />
+这样设计的原因在于，根据lo的声明，编译器允许你向lo中添加任意对象（例如Integer），但是此对象是<br />
+List<String>，破坏了数据类型的完整性。<br />
+在引入范型之前，要在类中的方法支持多个数据类型，就需要对方法进行重载，在引入范型后，可以解决此问题<br />
+（多态），更进一步可以定义多个参数以及返回值之间的关系。<br />
+例如<br />
+public void write(Integer i, Integer[] ia);<br />
+public void write(Double  d, Double[] da);<br />
+的范型版本为<br />
+public <T> void write(T t, T[] ta);</p>
+<h2>2. 定义&使用</h2>
+<p> 类型参数的命名风格为：<br />
+ 推荐你用简练的名字作为形式类型参数的名字(如果可能，单个字符)。最好避免小写字母，这使它和其他的普通<br />
+ 的形式参数很容易被区分开来。<br />
+ 使用T代表类型，无论何时都没有比这更具体的类型来区分它。这经常见于泛型方法。如果有多个类型参数，我们<br />
+ 可能使用字母表中T的临近的字母，比如S。<br />
+ 如果一个泛型函数在一个泛型类里面出现，最好避免在方法的类型参数和类的类型参数中使用同样的名字来避免混<br />
+ 淆。对内部类也是同样。<br />
+ <br />
+ 2.1 定义带类型参数的类<br />
+ 在定义带类型参数的类时，在紧跟类命之后的<>内,指定一个或多个类型参数的名字，同时也可以对类型参数的取<br /> 
+
+
+ 值范围进行限定，多个类型参数之间用,号分隔。<br />
+ 定义完类型参数后，可以在定义位置之后的类的几乎任意地方（静态块，静态属性，静态方法除外）使用类型参数，<br />
+ 就像使用普通的类型一样。<br />
+ 注意，父类定义的类型参数不能被子类继承。<br />
+ public class TestClassDefine<T, S extends T> {<br />
+     ....  <br />
+ }<br />
+ <br />
+ 2.2 定义待类型参数方法<br />
+ 在定义带类型参数的方法时，在紧跟可见范围修饰（例如public）之后的<>内,指定一个或多个类型参数的名字，<br />
+ 同时也可以对类型参数的取值范围进行限定，多个类型参数之间用,号分隔。<br />
+ 定义完类型参数后，可以在定义位置之后的方法的任意地方使用类型参数，就像使用普通的类型一样。<br />
+ 例如：<br />
+ public <T, S extends T> T testGenericMethodDefine(T t, S s){<br />
+     ...<br />
+ }<br />
+ 注意：定义带类型参数的方法，骑主要目的是为了表达多个参数以及返回值之间的关系。例如本例子中T和S的继<br />
+ 承关系， 返回值的类型和第一个类型参数的值相同。<br />
+ 如果仅仅是想实现多态，请优先使用通配符解决。通配符的内容见下面章节。<br />
+ public <T> void testGenericMethodDefine2(List<T> s){<br />
+     ...<br />
+ }<br />
+ 应改为<br />
+ public void testGenericMethodDefine2(List<？> s){<br />
+     ...<br />
+ }</p>
+
+<h2>3. 类型参数赋值</h2>
+
+<p> 当对类或方法的类型参数进行赋值时，要求对所有的类型参数进行赋值。否则，将得到一个编译错误。<br />
+ <br />
+ 3.1 对带类型参数的类进行类型参数赋值<br />
+ 对带类型参数的类进行类型参数赋值有两种方式<br />
+ 第一声明类变量或者实例化时。例如<br />
+ List<String> list;<br />
+ list = new ArrayList<String>;<br />
+ 第二继承类或者实现接口时。例如<br />
+ public class MyList<E> extends ArrayList<E> implements List<E> {...} <br />
+ <br />
+ 3.2 对带类型参数方法进行赋值<br />
+ 当调用范型方法时，编译器自动对类型参数进行赋值，当不能成功赋值时报编译错误。例如<br />
+ public <T> T testGenericMethodDefine3(T t, List<T> list){<br />
+     ...<br />
+ }<br />
+ public <T> T testGenericMethodDefine4(List<T> list1, List<T> list2){<br />
+     ...<br />
+ }<br />
+ <br />
+ Number n = null;<br />
+ Integer i = null;<br />
+ Object o = null;<br />
+ testGenericMethodDefine(n, i);//此时T为Number, S为Integer<br />
+ testGenericMethodDefine(o, i);//T为Object, S为Integer<br />
+ <br />
+ List<Number> list1 = null;<br />
+ testGenericMethodDefine3(i, list1)//此时T为Number<br />
+ <br />
+ List<Integer> list2 = null;<br />
+ testGenericMethodDefine4(list1, list2)//编译报错<br />
+ <br />
+ 3.3 通配符<br />
+ 在上面两小节中，对是类型参数赋予具体的值，除此，还可以对类型参数赋予不确定值。例如<br />
+ List<?> unknownList;<br />
+ List<? extends Number> unknownNumberList;<br />
+ List<? super Integer> unknownBaseLineIntgerList; <br />
+ 注意： 在Java集合框架中，对于参数值是未知类型的容器类，只能读取其中元素，不能像其中添加元素，<br />
+ 因为，其类型是未知，所以编译器无法识别添加元素的类型和容器的类型是否兼容，唯一的例外是NULL</p>
+
+<p> List<String> listString;<br />
+ List<?> unknownList2 = listString;<br />
+ unknownList = unknownList2;<br />
+ listString = unknownList;//编译错误</p>
+
+<h2>4. 数组范型</h2>
+
+<p> 可以使用带范型参数值的类声明数组，却不可有创建数组<br />
+ List<Integer>[] iListArray;<br />
+ new ArrayList<Integer>[10];//编译时错误<br />
+ </p>
+
+<h2>5. 实现原理</h2>
+
+<p>5.1. Java范型时编译时技术，在运行时不包含范型信息，仅仅Class的实例中包含了类型参数的定义信息。<br />
+泛型是通过java编译器的称为擦除(erasure)的前端处理来实现的。你可以（基本上就是）把它认为是一个从源<br />
+码到源码的转换，它把泛型版本转换成非泛型版本。<br />
+基本上，擦除去掉了所有的泛型类型信息。所有在尖括号之间的类型信息都被扔掉了，因此，比如说一个<br />
+List<String>类型被转换为List。所有对类型变量的引用被替换成类型变量的上限(通常是Object)。而且，<br />
+无论何时结果代码类型不正确，会插入一个到合适类型的转换。<br />
+       <T> T badCast(T t, Object o) {<br />
+         return (T) o; // unchecked warning<br />
+       }<br />
+类型参数在运行时并不存在。这意味着它们不会添加任何的时间或者空间上的负担，这很好。不幸的是，这也意味<br />
+着你不能依靠他们进行类型转换。</p>
+
+<p>5.2.一个泛型类被其所有调用共享<br />
+下面的代码打印的结果是什么？<br />
+       List<String> l1 = new ArrayList<String>();<br />
+       List<Integer> l2 = new ArrayList<Integer>();<br />
+       System.out.println(l1.getClass() == l2.getClass());<br />
+或许你会说false，但是你想错了。它打印出true。因为一个泛型类的所有实例在运行时具有相同的运行时类(class)，<br />
+而不管他们的实际类型参数。<br />
+事实上，泛型之所以叫泛型，就是因为它对所有其可能的类型参数，有同样的行为；同样的类可以被当作许多不同<br />
+的类型。作为一个结果，类的静态变量和方法也在所有的实例间共享。这就是为什么在静态方法或静态初始化代码<br />
+中或者在静态变量的声明和初始化时使用类型参数（类型参数是属于具体实例的）是不合法的原因。</p>
+
+<p>5.3. 转型和instanceof<br />
+泛型类被所有其实例(instances)共享的另一个暗示是检查一个实例是不是一个特定类型的泛型类是没有意义的。<br />
+       Collection cs = new ArrayList<String>();<br />
+       if (cs instanceof Collection<String>) { ...} // 非法<br />
+类似的，如下的类型转换<br />
+Collection<String> cstr = (Collection<String>) cs;<br />
+得到一个unchecked warning，因为运行时环境不会为你作这样的检查。</p>
+
+<h2>6. Class的范型处理</h2>
+
+<p>Java 5之后，Class变成范型化了。<br />
+JDK1.5中一个变化是类 java.lang.Class是泛型化的。这是把泛型扩展到容器类之外的一个很有意思的例子。<br />
+现在，Class有一个类型参数T, 你很可能会问，T 代表什么？它代表Class对象代表的类型。比如说，<br />
+String.class类型代表 Class<String>，Serializable.class代表 Class<Serializable>。<br />
+这可以被用来提高你的反射代码的类型安全。<br />
+特别的，因为 Class的 newInstance() 方法现在返回一个T, 你可以在使用反射创建对象时得到更精确的类型。<br />
+比如说，假定你要写一个工具方法来进行一个数据库查询，给定一个SQL语句，并返回一个数据库中符合查询条件<br />
+的对象集合(collection)。<br />
+一个方法是显式的传递一个工厂对象，像下面的代码：<br />
+interface Factory<T> {<br />
+      public T[] make();<br />
+}<br />
+public <T> Collection<T> select(Factory<T> factory, String statement) { <br />
+       Collection<T> result = new ArrayList<T>();<br />
+       /* run sql query using jdbc */<br />
+       for ( int i=0; i<10; i++ ) { /* iterate over jdbc results */<br />
+            T item = factory.make();<br />
+            /* use reflection and set all of item’s fields from sql results */<br />
+            result.add( item );<br />
+       }<br />
+       return result;<br />
+}<br />
+你可以这样调用：<br />
+select(new Factory<EmpInfo>(){ <br />
+    public EmpInfo make() { <br />
+        return new EmpInfo();<br />
+        }<br />
+       } , ”selection string”);<br />
+也可以声明一个类 EmpInfoFactory 来支持接口 Factory：<br />
+class EmpInfoFactory implements Factory<EmpInfo> { ...<br />
+    public EmpInfo make() { return new EmpInfo();}<br />
+}<br />
+然后调用：<br />
+select(getMyEmpInfoFactory(), "selection string");<br />
+这个解决方案的缺点是它需要下面的二者之一：<br />
+调用处那冗长的匿名工厂类，或为每个要使用的类型声明一个工厂类并传递其对象给调用的地方<br />
+这很不自然。<br />
+使用class类型参数值是非常自然的，它可以被反射使用。没有泛型的代码可能是：<br />
+Collection emps = sqlUtility.select(EmpInfo.class, ”select * from emps”); ...<br />
+public static Collection select(Class c, String sqlStatement) { <br />
+    Collection result = new ArrayList();<br />
+    /* run sql query using jdbc */<br />
+    for ( /* iterate over jdbc results */ ) { <br />
+        Object item = c.newInstance();<br />
+        /* use reflection and set all of item’s fields from sql results */<br />
+        result.add(item);<br />
+    }<br />
+        return result;<br />
+}<br />
+但是这不能给我们返回一个我们要的精确类型的集合。现在Class是泛型的，我们可以写：<br />
+Collection<EmpInfo> emps=sqlUtility.select(EmpInfo.class, ”select * from emps”); ...<br />
+public static <T> Collection<T> select(Class<T>c, String sqlStatement) { <br />
+    Collection<T> result = new ArrayList<T>();<br />
+    /* run sql query using jdbc */<br />
+    for ( /* iterate over jdbc results */ ) { <br />
+        T item = c.newInstance();<br />
+        /* use reflection and set all of item’s fields from sql results */<br />
+        result.add(item);<br />
+    } <br />
+    return result;<br />
+}<br />
+来通过一种类型安全的方式得到我们要的集合。<br />
+这项技术是一个非常有用的技巧，它已成为一个在处理注释(annotations)的新API中被广泛使用的习惯用法。</p>
+
+<h2>7. 新老代码兼容</h2>
+
+<p>7.1. 为了保证代码的兼容性，下面的代码编译器（javac）允许，类型安全有你自己保证<br />
+List l = new ArrayList<String>();<br />
+List<String> l = new ArrayList();</p>
+
+<p>7.2. 在将你的类库升级为范型版本时，慎用协变式返回值。<br />
+例如，将代码<br />
+public class Foo { <br />
+    public Foo create(){<br />
+        return new Foo();<br />
+    }<br />
+}</p>
+
+<p>public class Bar extends Foo { <br />
+    public Foo create(){<br />
+        return new Bar();<br />
+    } <br />
+}<br />
+采用协变式返回值风格，将Bar修改为<br />
+public class Bar extends Foo { <br />
+    public Bar create(){<br />
+        return new Bar();<br />
+    } <br />
+}<br />
+要小心你类库的客户端。</p>
+
+<p>8. 参考资料<br />
+http://java.sun.com/j2se/1.5/pdf/generics-tutorial.pdf</p>
+
+<p><object><object><object></object></object></object></p>

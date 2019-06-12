@@ -1,0 +1,132 @@
+<p>Java 本地链接高斯DB（JDBC链接gaussDB）</p>
+
+<p><a href="http://3ms.huawei.com/km/groups/388/blogs/details/5908917">http://3ms.huawei.com/km/groups/388/blogs/details/5908917</a></p>
+
+<p>解压附件： 将com.huawei.gauss.jdbc.ZenithDriver-V300R001C00B510.jar包添加到build path。</p>
+
+<p>import java.sql.Connection;<br />
+import java.sql.DriverManager;<br />
+import java.sql.ResultSet;<br />
+import java.sql.ResultSetMetaData;<br />
+import java.sql.SQLException;<br />
+import java.sql.Statement;<br />
+<br />
+import org.apache.log4j.Logger;<br />
+<br />
+import com.huawei.hutaf.testtools.loghelper.LoggerUtil;<br />
+<br />
+import actionWords.StorageDeviceMgmt.page.LoginPage;<br />
+import actionWords.StorageDeviceMgmt.util.Util;<br />
+import net.sf.json.JSONArray;<br />
+import net.sf.json.JSONException;<br />
+import net.sf.json.JSONObject;<br />
+<br />
+public class GaussDbUtil {<br />
+<br />
+private static Logger logger = Logger.getLogger(LoggerUtil.WORKERLOG);<br />
+<br />
+private static Connection conn = null;<br />
+<br />
+// 建数据库连接。<br />
+static {<br />
+String ip = Util.getIps(LoginPage.ESIGHT_URL);<br />
+String driver = "com.huawei.gauss.jdbc.ZenithDriver";<br />
+String sourceURL = "jdbc:zenith:@" + ip + ":32083";<br />
+String username = "storagemgmtdb";<br />
+String passwd = "Changeme_123";<br />
+try {<br />
+// 加载数据库驱动。<br />
+Class.forName(driver).newInstance();<br />
+// 创建数据库连接。<br />
+conn = DriverManager.getConnection(sourceURL, username, passwd);<br />
+logger.info("GaussDB Connection Successed!");<br />
+} catch (Exception e) {<br />
+e.printStackTrace();<br />
+}<br />
+}<br />
+<br />
+/**<br />
+* 查询数据<br />
+*/<br />
+public static String gaussQuery(String sql) {<br />
+Statement stmt = null;<br />
+try {<br />
+stmt = conn.createStatement();<br />
+// 执行普通SQL语句。<br />
+ResultSet rc = stmt.executeQuery(sql);<br />
+<br />
+return resultSetToJson(rc);<br />
+} catch (SQLException e) {<br />
+e.printStackTrace();<br />
+return null;<br />
+} finally {<br />
+if (stmt != null) {<br />
+try {<br />
+stmt.close();<br />
+} catch (SQLException e1) {<br />
+e1.printStackTrace();<br />
+}<br />
+}<br />
+}<br />
+}<br />
+<br />
+// /**<br />
+// * 更新数据<br />
+// * <br />
+// * @param tableName<br />
+// * @param updateFieldValueMap<br />
+// * @param whereFieldValueMap<br />
+// */<br />
+// public int gaussUpdate(String sql) {<br />
+// int rowcount = 0;<br />
+// PreparedStatement pstmt = null;<br />
+// try {<br />
+// pstmt = conn.prepareStatement(sql);<br />
+// rowcount = pstmt.executeUpdate();<br />
+// } catch (SQLException e) {<br />
+// e.printStackTrace();<br />
+// } finally {<br />
+// if (pstmt != null) {<br />
+// try {<br />
+// pstmt.close();<br />
+// } catch (SQLException e1) {<br />
+// e1.printStackTrace();<br />
+// }<br />
+// }<br />
+// }<br />
+//<br />
+// return rowcount;<br />
+// }<br />
+<br />
+/**<br />
+* ResultSet转Json<br />
+* <br />
+* @param rs<br />
+* @return<br />
+* @throws SQLException<br />
+* @throws JSONException<br />
+*/<br />
+public static String resultSetToJson(ResultSet rs) throws SQLException, JSONException {<br />
+JSONArray array = new JSONArray();<br />
+// 获取列数<br />
+ResultSetMetaData metaData = rs.getMetaData();<br />
+int columnCount = metaData.getColumnCount();<br />
+// 遍历ResultSet中的每条数据<br />
+while (rs.next()) {<br />
+JSONObject jsonObj = new JSONObject();<br />
+// 遍历每一列<br />
+for (int i = 1; i <= columnCount; i++) {<br />
+String columnName = metaData.getColumnLabel(i);<br />
+String value = rs.getString(columnName);<br />
+jsonObj.put(columnName, value);<br />
+}<br />
+array.add(jsonObj);<br />
+}<br />
+return array.toString();<br />
+}<br />
+<br />
+public static void main(String[] args) {<br />
+String sql = "SELECT * FROM STORAGEMGMTDB.T_STORAGE";<br />
+String resule = gaussQuery(sql);<br />
+System.out.println(resule);<br />
+}</p>

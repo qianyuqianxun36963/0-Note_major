@@ -1,0 +1,223 @@
+<h1>JAVA获取FTP工具</h1>
+
+<p>public class FtpClientUtil {<br />
+    FtpClient ftpClient;<br />
+    private String server;<br />
+    private int port;<br />
+    private String userName;<br />
+    private String userPassword;<br />
+    <br />
+    public FtpClientUtil(String server,int port,String userName,String userPassword)<br />
+    {<br />
+        this.server=server;<br />
+        this.port=port;<br />
+        this.userName=userName;<br />
+        this.userPassword=userPassword;<br />
+    }<br />
+    /**<br />
+     * 链接到服务器<br />
+     * @return<br />
+     */<br />
+    public boolean open()<br />
+    {<br />
+        if(ftpClient!=null&&ftpClient.serverIsOpen())<br />
+            return true;<br />
+        try<br />
+        {<br />
+            ftpClient= new FtpClient();<br />
+            ftpClient.openServer(server,port);<br />
+            ftpClient.login(userName, userPassword);<br />
+            ftpClient.binary();<br />
+            return true;<br />
+        }<br />
+        catch(Exception e)<br />
+        {<br />
+            e.printStackTrace();<br />
+            ftpClient=null;<br />
+            return false;<br />
+        }<br />
+ }<br />
+ <br />
+ public boolean cd(String dir){<br />
+    boolean f = false;<br />
+    try {<br />
+     ftpClient.cd(dir);<br />
+    } catch (IOException e) {<br />
+     Logs.error(e.toString());<br />
+     return f;<br />
+    }<br />
+    return true;<br />
+ }<br />
+ <br />
+ /**<br />
+    * 上传文件到FTP服务器<br />
+    * @param localPathAndFileName 本地文件目录和文件名<br />
+    * @param ftpFileName    上传后的文件名<br />
+    * @param ftpDirectory FTP目录如:/path1/pathb2/,如果目录不存在回自动创建目录<br />
+    * @throws Exception<br />
+    */<br />
+ public boolean upload(String localDirectoryAndFileName,String ftpFileName,String ftpDirectory)throws Exception {<br />
+    if(!open())<br />
+     return false;<br />
+    FileInputStream is=null;<br />
+    TelnetOutputStream os=null;<br />
+    try<br />
+    {<br />
+        char ch = ' ';<br />
+        if (ftpDirectory.length() > 0)<br />
+         ch = ftpDirectory.charAt(ftpDirectory.length() - 1);<br />
+        for (; ch == '/' || ch == '\\'; ch = ftpDirectory.charAt(ftpDirectory.length() - 1))<br />
+         ftpDirectory = ftpDirectory.substring(0, ftpDirectory.length() - 1);<br />
+ <br />
+        int slashIndex = ftpDirectory.indexOf(47);<br />
+        int backslashIndex = ftpDirectory.indexOf(92);<br />
+        int index = slashIndex;<br />
+        String dirall = ftpDirectory;<br />
+        if (backslashIndex != -1 && (index == -1 || index > backslashIndex))<br />
+         index = backslashIndex;<br />
+        String directory = "";<br />
+        while (index != -1) {<br />
+            if (index > 0) {<br />
+                String dir = dirall.substring(0, index);<br />
+                directory = directory + "/" + dir;<br />
+                ftpClient.sendServer("XMKD " + directory + "\r\n");<br />
+                ftpClient.readServerResponse();<br />
+            }<br />
+            dirall = dirall.substring(index + 1);<br />
+            slashIndex = dirall.indexOf(47);<br />
+            backslashIndex = dirall.indexOf(92);<br />
+            index = slashIndex;<br />
+            if (backslashIndex != -1 && (index == -1 || index > backslashIndex))<br />
+                index = backslashIndex;<br />
+        }<br />
+     ftpClient.sendServer("XMKD " + ftpDirectory + "\r\n");<br />
+     ftpClient.readServerResponse();<br />
+ <br />
+     os = ftpClient.put(ftpDirectory + "/"<br />
+         + ftpFileName);<br />
+     File file_in = new File(localDirectoryAndFileName);<br />
+     is = new FileInputStream(file_in);<br />
+     byte bytes[] = new byte[1024];<br />
+     int i;<br />
+     while ((i = is.read(bytes)) != -1)<br />
+        os.write(bytes, 0, i);<br />
+     //清理垃圾<br />
+     <br />
+        <br />
+     return true;<br />
+    }<br />
+    catch(Exception e)<br />
+    {<br />
+     e.printStackTrace();<br />
+     return false;<br />
+    }<br />
+    finally<br />
+    {<br />
+     if (is != null) <br />
+            is.close();<br />
+     if (os != null) <br />
+            os.close();<br />
+    }<br />
+ }<br />
+ /**<br />
+    * 从FTP服务器上下载文件并返回下载文件长度<br />
+    * @param ftpDirectoryAndFileName<br />
+    * @param localDirectoryAndFileName<br />
+    * @return<br />
+    * @throws Exception<br />
+    */<br />
+ public long download(String ftpDirectoryAndFileName,String localDirectoryAndFileName)throws Exception <br />
+    {<br />
+        long result = 0; <br />
+        if(!open())<br />
+         return result;<br />
+        TelnetInputStream is = null; <br />
+        FileOutputStream os = null;<br />
+        try    <br />
+        { <br />
+            is = ftpClient.get(ftpDirectoryAndFileName);                <br />
+            java.io.File outfile = new java.io.File(localDirectoryAndFileName); <br />
+            os = new FileOutputStream(outfile); <br />
+            byte[] bytes = new byte[1024]; <br />
+            int c; <br />
+            while ((c = is.read(bytes)) != -1) <br />
+            { <br />
+                os.write(bytes, 0, c); <br />
+                result = result + c; <br />
+            } <br />
+        }<br />
+        catch (Exception e)    <br />
+        { <br />
+            throw e;<br />
+        } <br />
+        finally <br />
+        { <br />
+            if (is != null) <br />
+                is.close();<br />
+            if (os != null) <br />
+                os.close();        <br />
+        }<br />
+        return result; <br />
+    } <br />
+ /**<br />
+    * 返回FTP目录下的文件列表<br />
+    * @param ftpDirectory<br />
+    * @return<br />
+    */<br />
+    public List<String> getFileNameList(String ftpDirectory) <br />
+    { <br />
+        List<String> list = new ArrayList<String>(); <br />
+        if(!open())<br />
+        return list;<br />
+        try    <br />
+        { <br />
+            DataInputStream dis = new    DataInputStream(ftpClient.nameList(ftpDirectory)); <br />
+            String filename = ""; <br />
+            while((filename=dis.readLine())!=null)     <br />
+            {<br />
+                list.add(filename);                 <br />
+            }     <br />
+        } catch (Exception e)    <br />
+        { <br />
+            e.printStackTrace(); <br />
+        } <br />
+        return list; <br />
+    }<br />
+    /**<br />
+     * 删除FTP上的文件<br />
+     * @param ftpDirAndFileName<br />
+     */<br />
+    public boolean deleteFile(String ftpDirAndFileName)<br />
+    {<br />
+        if(!open())<br />
+        return false;<br />
+        ftpClient.sendServer("DELE "+ftpDirAndFileName+"\r\n");<br />
+        return true;<br />
+    }<br />
+    /**<br />
+     * 删除FTP目录<br />
+     * @param ftpDirectory<br />
+     */<br />
+    public boolean deleteDirectory(String ftpDirectory)<br />
+    {<br />
+        if(!open())<br />
+        return false;<br />
+        ftpClient.sendServer("XRMD "+ftpDirectory+"\r\n");<br />
+        return true;<br />
+    }<br />
+    /**<br />
+     * 关闭链接<br />
+     */<br />
+    public void close()<br />
+    {<br />
+        try<br />
+        {<br />
+            if(ftpClient!=null&&ftpClient.serverIsOpen())<br />
+            ftpClient.closeServer();<br />
+        }catch(Exception e)<br />
+        {<br />
+        <br />
+        }<br />
+    }<br />
+}<br />
+ </p>

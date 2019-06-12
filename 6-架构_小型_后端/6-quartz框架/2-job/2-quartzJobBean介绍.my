@@ -1,0 +1,139 @@
+<h1>QuartzJobBean使用</h1>
+<h2>一、QuartzJobBean使用介绍</h2>
+<p>      项目开发中经常会使用到定时器的功能，比如晚间批量、定时处理账务等等，jdk也提供了Timer实现定时任务，简单介绍下Timer实现。Timer的使用大致分为两步骤：</p>
+<p>第一、编写任务类继承TimerTask，重写run方法</p>
+<p>package com.erayt.timer;<br />
+import java.util.TimerTask;<br />
+<br />
+public class MTimerTask extends TimerTask{<br />
+<br />
+    private String name;<br />
+    public MTimerTask(String nicKname){<br />
+        this.name = nicKname;<br />
+    }<br />
+    @Override<br />
+    public void run() {<br />
+        // TODO Auto-generated method stub<br />
+        System.out.println("当前名称："+name);<br />
+    }<br />
+}</p>
+<p>第二、创建Timer对象，设置任务及调度策略</p>
+<p>package com.erayt.timer;<br />
+import java.util.Timer;<br />
+<br />
+public class MyTimer extends Timer{<br />
+    public static void main(String[] args) {<br />
+        Timer timer = new Timer();//创建Timer对象<br />
+        MTimerTask task = new MTimerTask("你好");<br />
+        timer.schedule(task, 2000, 1000);//参数：设置任务，任务在启动后间隔时间触发，触发后每隔多长时间触发<br />
+    }<br />
+}<br />
+本文重点不在介绍Timer的使用，项目中Quartz集成spring的方式才是最为常用的，即QuartzJobBean的使用。关键对象分为三个：</p>
+<p>1、调度工作类：org.springframework.scheduling.quartz.JobDetailBean，该对象通过jobClass属性指定调度工作类；</p>
+<p>2、调度触发器：org.springframework.scheduling.quartz.CronTriggerBean，该对象通过jobDetail属性指定工作类，通过</p>
+<p>cronExpression属性指定调度频率；</p>
+<p>3、调度工厂类：org.springframework.scheduling.quartz.SchedulerFactoryBean，该对象通过triggers属性指定单个或多个触发器。</p>
+<p>下面为项目简单测试的实现。</p>
+<h2>二、所需jar包（版本不固定）</h2>
+<p>spring-2.5.6.jar，commons-logging-1.1.jar，quartz-all-1.6.5.jar，commons-collections-3.2.jar（无此包，启动测试会报错</p>
+<p>Caused by: java.lang.ClassNotFoundException: org.apache.commons.collections.SetUtils）。</p>
+<h2>三、创建java项目，导入jar包</h2>
+<h2>四、编写工作类（简单实现）</h2>
+<p>package com.erayt.job;<br />
+ <br />
+import org.quartz.JobExecutionContext;<br />
+import org.quartz.JobExecutionException;<br />
+import org.springframework.scheduling.quartz.QuartzJobBean;<br />
+ <br />
+public class Job1 extends QuartzJobBean {<br />
+ <br />
+    private int timeout;//间隔多长时间调度开始<br />
+     private static int i = 0;<br />
+ <br />
+    //JobDetailBean通过jobDataAsMap注入此属性值，指定当服务器启动后过多少秒钟首次调用工作类<br />
+    public void setTimeout(int timeout) {<br />
+        this.timeout = timeout;<br />
+    }<br />
+        //需要调度的任务<br />
+    protected void executeInternal(JobExecutionContext context)<br />
+            throws JobExecutionException {<br />
+        System.out.println("QuartzJobBean-调度" + ++i + "进行中...");<br />
+    }<br />
+ <br />
+}</p>
+<h2>五、配置spring文件（本文写在根目录下）</h2>
+<p><?xml version="1.0" encoding="UTF-8"?><br />
+<!DOCTYPE beans PUBLIC "-//SPRING//DTD BEAN//EN"<br />
+    "http://www.springframework.org/dtd/spring-beans.dtd"><br />
+<beans><br />
+    <!-- JobDetailBean 1、工作类配置 --><br />
+     <bean name="job1" class="org.springframework.scheduling.quartz.JobDetailBean"><br />
+         <property name="jobClass" value="com.erayt.job.Job1" /><br />
+         <property name="jobDataAsMap"><br />
+             <map><br />
+             <entry key="timeout" value="10" /><!-- Job1中的 timeout属性，10秒后启用调度--><br />
+             </map><br />
+         </property><br />
+     </bean><br />
+     <!-- CronTriggerBean 2、触发器配置--><br />
+     <bean id="cronTrigger" class="org.springframework.scheduling.quartz.CronTriggerBean"><br />
+         <property name="jobDetail" ref="job1" /><!-- 注入1步骤中的工作类 --><br />
+        <!-- 每隔一秒调度一次 --><br />
+        <property name="cronExpression" value="0/1 * * * * ?" /><br />
+     </bean><br />
+    <!-- SchedulerFactoryBean 3、配置调度工厂 --><br />
+     <bean class="org.springframework.scheduling.quartz.SchedulerFactoryBean"><br />
+         <property name="triggers"><br />
+             <list><br />
+                 <ref bean="cronTrigger" /><!-- 注入2步骤中触发器 --><br />
+             </list><br />
+         </property><br />
+     </bean><br />
+</beans></p>
+<h2>六、编写调度测试类（加载spring配置文件即可）</h2>
+<p>package com.erayt.test;<br />
+ <br />
+import org.springframework.context.ApplicationContext;<br />
+import org.springframework.context.support.ClassPathXmlApplicationContext;<br />
+ <br />
+public class ScheduleTest {<br />
+ <br />
+    public static void main(String[] args) {<br />
+        ApplicationContext context = new ClassPathXmlApplicationContext("applicationContext.xml");<br />
+    }<br />
+}</p>
+<h2>七、调度结果如下：</h2>
+<p>QuartzJobBean-调度1进行中...<br />
+QuartzJobBean-调度2进行中...<br />
+QuartzJobBean-调度3进行中...<br />
+QuartzJobBean-调度4进行中...<br />
+QuartzJobBean-调度5进行中...<br />
+QuartzJobBean-调度6进行中...</p>
+<h2>八、补充一些调度时间配置方法</h2>
+<p>具体时间设定可参考 <br />
+"0/10 * * * * ?" 每10秒触发 <br />
+"0 0 12 * * ?" 每天中午12点触发 <br />
+"0 15 10 ? * *" 每天上午10:15触发 <br />
+"0 15 10 * * ?" 每天上午10:15触发 <br />
+"0 15 10 * * ? *" 每天上午10:15触发 <br />
+"0 15 10 * * ? 2005" 2005年的每天上午10:15触发 <br />
+"0 * 14 * * ?" 在每天下午2点到下午2:59期间的每1分钟触发 <br />
+"0 0/5 14 * * ?" 在每天下午2点到下午2:55期间的每5分钟触发 <br />
+"0 0/5 14,18 * * ?" 在每天下午2点到2:55期间和下午6点到6:55期间的每5分钟触发 <br />
+"0 0-5 14 * * ?" 在每天下午2点到下午2:05期间的每1分钟触发 <br />
+"0 10,44 14 ? 3 WED" 每年三月的星期三的下午2:10和2:44触发 <br />
+"0 15 10 ? * MON-FRI" 周一至周五的上午10:15触发 <br />
+"0 15 10 15 * ?" 每月15日上午10:15触发 <br />
+"0 15 10 L * ?" 每月最后一日的上午10:15触发 <br />
+"0 15 10 ? * 6L" 每月的最后一个星期五上午10:15触发 <br />
+"0 15 10 ? * 6L 2002-2005" 2002年至2005年的每月的最后一个星期五上午10:15触发 <br />
+"0 15 10 ? * 6#3" 每月的第三个星期五上午10:15触发 <br />
+每隔5秒执行一次：*/5 * * * * ? <br />
+每隔1分钟执行一次：0 */1 * * * ? <br />
+每天23点执行一次：0 0 23 * * ? <br />
+每天凌晨1点执行一次：0 0 1 * * ? <br />
+每月1号凌晨1点执行一次：0 0 1 1 * ? <br />
+每月最后一天23点执行一次：0 0 23 L * ? <br />
+每周星期天凌晨1点实行一次：0 0 1 ? * L <br />
+在26分、29分、33分执行一次：0 26,29,33 * * * ? <br />
+每天的0点、13点、18点、21点都执行一次：0 0 0,13,18,21 * * ?</p>

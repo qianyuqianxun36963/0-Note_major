@@ -1,0 +1,98 @@
+<h1>浅谈“阻塞同步”，“BIO、NIO、AIO”</h1>
+<h2>一、阻塞？同步？</h2>
+<p>可能大家平常会经常听到这两个名词，但是没花太多心思详细了解，今天就来揭开这层面纱。</p>
+<p>一次IO操作，以read方法举例，会经历两个阶段：<br />
+（1）等待数据准备(Waitingfor the data to be ready)<br />
+<strong>是否阻塞指的就是这一个阶段。</strong></p>
+<p>（2）将数据从内核拷贝到进程中(Copying the data from the kernel to the process)<br />
+<strong>是否同步指的就是这一个阶段。</strong></p>
+<h2>二、BIO</h2>
+<p>即blocking IO，阻塞式IO，大家最为熟悉的IO流，经常用于操作网络请求，文件读写之类。按读取类型可分为两大类：字符流，字节流。详情图如下：</p>
+<p><img src="//upload-images.jianshu.io/upload_images/1935847-bedaafe55178e0df.jpg?imageMogr2/auto-orient/strip%7CimageView2/2/w/687/format/webp" /></p>
+<p>IO流详情图</p>
+<p>附上普通I/O（BIO）的读流程图示：</p>
+<p><img src="//upload-images.jianshu.io/upload_images/1935847-89bf49c3c462ddbe?imageMogr2/auto-orient/strip%7CimageView2/2/w/552/format/webp" /></p>
+<p>BIO阻塞同步图</p>
+<p>当左边的应用进程发出了“system call”命令后，kernel首先进入第一阶段“wait for data”，然后再进入第二阶段“copying the data”，最后“return OK”返回到用户进程中，即<strong>BIO在两个阶段都是阻塞block的，阻塞并同步。</strong></p>
+<h2>三、NIO</h2>
+<p>即non-blocking IO，也叫做new IO，因为是NIO是JDK 1.4的java.nio.*包中引入的新I/O库，目的是提高速度，也是对之前的BIO一个补充完善。</p>
+<p>NIO的三个重点，重中之重的是：</p>
+<h4>1. channel（通道）</h4>
+<p>连接data数据与buffer缓存区的桥梁。</p>
+<ul>
+<li>既可以从通道中读取数据，又可以写数据到通道。但流的读写通常是单向的。</li>
+<li>通道可以异步地读写。</li>
+<li>通道中的数据总是要先读到一个Buffer，或者总是要从一个Buffer中写入。</li>
+</ul>
+<h4>2. Buffer（缓冲区）</h4>
+<p>用于和NIO通道进行交互。如图所示，数据是从通道读入缓冲区，从缓冲区写入到通道中的。</p>
+<p><img src="//upload-images.jianshu.io/upload_images/1935847-39ca1624a3d389a6.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/338/format/webp" /></p>
+<p>buffer</p>
+<h4>3. Selector（选择器）</h4>
+<p>是Java NIO中能够检测一到多个NIO通道，并能够知晓通道是否为诸如读写事件做好准备的组件，如此一个单独的线程可以管理多个channel，从而管理多个连接。</p>
+<p><img src="//upload-images.jianshu.io/upload_images/1935847-dbfd46387f9facca.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/408/format/webp" /></p>
+<p>selector</p>
+<p>由于selector的原因，可以将NIO简单区分为两种：普通的NIO，和多路复用的NIO（加入了selector管理）。通过下面两张IO操作图示简单说明下两者区别：</p>
+<p><img src="//upload-images.jianshu.io/upload_images/1935847-be4d47691f85bb49?imageMogr2/auto-orient/strip%7CimageView2/2/w/603/format/webp" /></p>
+<p>NIO非阻塞同步图</p>
+<p>很明显的可以观测到NIO在IO操作的<strong>准备数据</strong>阶段时有一个轮询操作，会不停地发出“system call”到kernel轮询数据是否准备好，没准备好，应用进程可以处理其他事，准备好了之后在发出一个“system call”到kernel进行第二个阶段<strong>复制数据</strong>，这个过程是blocking的，所以<strong>NIO的特点就是在IO执行的第一阶段不会阻塞，但是在第二阶段将数据从内核拷贝到进程这个真是的IO操作还是会阻塞</strong>。</p>
+<p><img src="//upload-images.jianshu.io/upload_images/1935847-d8ff0d1eb9c7ae0f?imageMogr2/auto-orient/strip%7CimageView2/2/w/609/format/webp" /></p>
+<p>NIO多路复用图</p>
+<p>多路复用的NIO则是上述的普通NIO的补充，在并发量过大的情况下，不可能每个线程都要轮询自己的IO状态，这时就可以使用selector管理所有的IO通道channel，之用开启一个线程，便可解决成千上万的高并发问题(｡◕ˇ∀ˇ◕)｡</p>
+<h2>四、AIO</h2>
+<p>NIO 2.0引入了新的异步通道的概念，并提供了对异步文件通道和异步套接字通道的实现。（基于NIO）<br />
+Asynchronous IO，字面意思即异步的IO，完全不阻塞，那我们看看这个的read操作图示：</p>
+<p><img src="//upload-images.jianshu.io/upload_images/1935847-48defd00552ceae7?imageMogr2/auto-orient/strip%7CimageView2/2/w/572/format/webp" /></p>
+<p>NIO非阻塞异步图</p>
+<p>通过图示可以很清楚得发现，如果是AIO发起read操作之后，kernel收到请求后会立即响应应用进程application，所以应用进程完全可以做其他的事，不会造成任何的block。待kernel第一、二阶段都已经完成之后，会给应用进程发送一个signal，告诉它read操作已经完成。所以<strong>AIO的特点是在IO的两个阶段都不会发生阻塞，而是全权交给系统内核才完成，内核完成后通过信号告知应用进程即可</strong>。</p>
+<h2>五、各种I/O对比</h2>
+<table>
+<thead>
+<tr>
+<th>属性\模型</th>
+<th>阻塞BIO</th>
+<th>非阻塞NIO</th>
+<th>异步AIO</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>blocking</strong></td>
+<td>阻塞并同步</td>
+<td>非阻塞但同步</td>
+<td>非阻塞并异步</td>
+</tr>
+<tr>
+<td><strong>线程数（server:client）</strong></td>
+<td>1:1</td>
+<td>1：N</td>
+<td>0：N</td>
+</tr>
+<tr>
+<td><strong>复杂度</strong></td>
+<td>简单</td>
+<td>较复杂</td>
+<td>复杂</td>
+</tr>
+<tr>
+<td><strong>吞吐量</strong></td>
+<td>低</td>
+<td>高</td>
+<td>高</td>
+</tr>
+</tbody>
+</table>
+<p>具体使用得依据业务的实际应用场景和性能需求而定，如果客户端很少，并发量不大，那么完全可以选择BIO，不过得加入线程池管理；相反要求并发较高的话，就应该采用NIO框架了。</p>
+<h2>六、简单总结</h2>
+<h3>BIO、NIO、AIO概念认知：</h3>
+<ul>
+<li>Java BIO ： 同步并阻塞，服务器实现模式为一个连接一个线程，即客户端有连接请求时服务器端就需要启动一个线程进行处理，如果这个连接不做任何事情会造成不必要的线程开销，当然可以通过线程池机制改善。</li>
+<li>Java NIO ： 同步非阻塞，服务器实现模式为一个请求一个线程，即客户端发送的连接请求都会注册到多路复用器上，多路复用器轮询到连接有I/O请求时才启动一个线程进行处理。</li>
+<li>Java AIO(NIO.2) ： 异步非阻塞，服务器实现模式为一个有效请求一个线程，客户端的I/O请求都是由OS先完成了再通知服务器应用去启动线程进行处理。</li>
+</ul>
+<h3>BIO、NIO、AIO适用场景分析:</h3>
+<ul>
+<li>BIO方式适用于连接数目比较小且固定的架构，这种方式对服务器资源要求比较高，并发局限于应用中，JDK1.4以前的唯一选择，但程序直观简单易理解。</li>
+<li>NIO方式适用于连接数目多且连接比较短（轻操作）的架构，比如聊天服务器，并发局限于应用中，编程比较复杂，JDK1.4开始支持。</li>
+<li>AIO方式使用于连接数目多且连接比较长（重操作）的架构，比如相册服务器，充分调用OS参与并发操作，编程比较复杂，JDK7开始支持。</li>
+</ul>

@@ -1,0 +1,354 @@
+<h1>Zookeeper CLI</h1>
+
+<p>ZooKeeper 命令行界面(CLI)是用来与 ZooKeeper 集成作开发进行交互的。这是在调试和使用不同的选项时的工作有用。</p>
+
+<p>为了执行ZooKeeper的CLI操作， ZooKeeper服务器首先要启动 (“bin/zkServer.sh start”) , 然后使用 ZooKeeper 客户端 (“bin/zkCli.sh”). 当客户端启动后，可以执行以下操作 -</p>
+
+<ul>
+<li>创建znodes</li>
+<li>获取数据</li>
+<li>监视 znode 变化</li>
+<li>设置数据</li>
+<li>创建 znode 的子 znode</li>
+<li>列出一个 znode 的子 znode</li>
+<li>检查状态</li>
+<li>删除一个 znode</li>
+</ul>
+
+<p>现在，让我们一个个用一个例子地来看上面的命令。</p>
+
+<h2>创建Znodes</h2>
+
+<p>由一个给定的路径来创建znode。flag参数指定了创建的 znode 是否为短暂的，持久的，或连续的。默认情况下，所有的 znodes是持久的。</p>
+
+<ul>
+<li>
+<p>短暂 znodes（flag: e）当会话过期或当客户端断开连接将被自动删除。</p>
+</li>
+<li>
+<p>连续 znodes 保证 znode 路径是唯一的。</p>
+</li>
+<li>
+<p>ZooKeeper集成将沿着添加序列号使用10位填充到znode路径。例如，znode路径 /myapp 将被转换为 /myapp0000000001 以及下一个序列号将是 /myapp0000000002. 如果没有指定flag，那么 znode 是持久的。</p>
+</li>
+</ul>
+
+<h3>语法</h3>
+
+<pre>
+create /path /data
+</pre>
+
+<h3>示例</h3>
+
+<pre>
+create /FirstZnode “Myfirstzookeeper-app”
+</pre>
+
+<h3>输出结果</h3>
+
+<pre>
+[zk: localhost:2181(CONNECTED) 0] create /FirstZnode “Myfirstzookeeper-app”
+Created /FirstZnode
+</pre>
+
+<p>要创建一个连续znode，如下图所示添加 -s 标志。</p>
+
+<h3>语法</h3>
+
+<pre>
+create -s /path /data
+</pre>
+
+<h3>示例</h3>
+
+<pre>
+create -s /FirstZnode second-data
+</pre>
+
+<h3>输出</h3>
+
+<pre>
+[zk: localhost:2181(CONNECTED) 2] create -s /FirstZnode “second-data”
+Created /FirstZnode0000000023
+</pre>
+
+<p>要创建一个临时Znode，添加-e标志，如下图所示。</p>
+
+<h3>语法</h3>
+
+<pre>
+create -e /path /data
+</pre>
+
+<h3>示例</h3>
+
+<pre>
+create -e /SecondZnode “Ephemeral-data”
+</pre>
+
+<h3>输出</h3>
+
+<pre>
+[zk: localhost:2181(CONNECTED) 2] create -e /SecondZnode “Ephemeral-data”
+Created /SecondZnode
+</pre>
+
+<p>记住，当丢失一个客户端连接，在临时 znode 将被删除。可以通过退出 ZooKeeper CLI 尝试，然后重新打开命令行。</p>
+
+<h2>获取数据</h2>
+
+<p>它返回 znode 的相关数据和指定 znode 元数据。这里将得到信息，例如当数据最后一次修改，在那里它被修改和有关数据的信息。此外 CLI 还用于分配监视显示通知有关的数据。</p>
+
+<h3>语法</h3>
+
+<pre>
+get /path 
+</pre>
+
+<h3>示例</h3>
+
+<pre>
+get /FirstZnode
+</pre>
+
+<h3>输出</h3>
+
+<pre>
+[zk: localhost:2181(CONNECTED) 1] get /FirstZnode
+“Myfirstzookeeper-app”
+cZxid = 0x7f
+ctime = Tue Sep 29 16:15:47 IST 2015
+mZxid = 0x7f
+mtime = Tue Sep 29 16:15:47 IST 2015
+pZxid = 0x7f
+cversion = 0
+dataVersion = 0
+aclVersion = 0
+ephemeralOwner = 0x0
+dataLength = 22
+numChildren = 0
+</pre>
+
+<p>要访问顺序znode，必须输入znode的完整路径。</p>
+
+<h3>示例</h3>
+
+<pre>
+get /FirstZnode0000000023
+</pre>
+
+<h3>输出</h3>
+
+<pre>
+[zk: localhost:2181(CONNECTED) 1] get /FirstZnode0000000023
+“Second-data”
+cZxid = 0x80
+ctime = Tue Sep 29 16:25:47 IST 2015
+mZxid = 0x80
+mtime = Tue Sep 29 16:25:47 IST 2015
+pZxid = 0x80
+cversion = 0
+dataVersion = 0
+aclVersion = 0
+ephemeralOwner = 0x0
+dataLength = 13
+numChildren = 0
+</pre>
+
+<h2>监视</h2>
+
+<p>监视显示通知当指定znode或znode的子数据变化。只能在 get 命令中设置监视。</p>
+
+<h3>语法</h3>
+
+<pre>
+get /path [watch] 1
+</pre>
+
+<h3>示例</h3>
+
+<pre>
+get /FirstZnode 1
+</pre>
+
+<h3>输出</h3>
+
+<pre>
+[zk: localhost:2181(CONNECTED) 1] get /FirstZnode 1
+“Myfirstzookeeper-app”
+cZxid = 0x7f
+ctime = Tue Sep 29 16:15:47 IST 2015
+mZxid = 0x7f
+mtime = Tue Sep 29 16:15:47 IST 2015
+pZxid = 0x7f
+cversion = 0
+dataVersion = 0
+aclVersion = 0
+ephemeralOwner = 0x0
+dataLength = 22
+numChildren = 0
+</pre>
+
+<p>输出类似于正常get命令，但它会在后台等待节点改变。</p>
+
+<h2>设置数据</h2>
+
+<p>设置指定znode的数据。当你完成设置操作，就可以使用get CLI命令检查数据。</p>
+
+<h3>语法</h3>
+
+<p>set /path /data</p>
+
+<h3>示例</h3>
+
+<pre>
+set /SecondZnode Data-updated
+</pre>
+
+<h3>输出</h3>
+
+<pre>
+[zk: localhost:2181(CONNECTED) 1] get /SecondZnode “Data-updated”
+cZxid = 0x82
+ctime = Tue Sep 29 16:29:50 IST 2015
+mZxid = 0x83
+mtime = Tue Sep 29 16:29:50 IST 2015
+pZxid = 0x82
+cversion = 0
+dataVersion = 1
+aclVersion = 0
+ephemeralOwner = 0x15018b47db00000
+dataLength = 14
+numChildren = 0
+</pre>
+
+<p>如果分配监视选项在get命令（之前的命令），则输出将类似如下 -</p>
+
+<h3>输出</h3>
+
+<pre>
+[zk: localhost:2181(CONNECTED) 1] get /FirstZnode “Mysecondzookeeper-app”
+
+WATCHER: :
+
+WatchedEvent state:SyncConnected type:NodeDataChanged path:/FirstZnode
+cZxid = 0x7f
+ctime = Tue Sep 29 16:15:47 IST 2015
+mZxid = 0x84
+mtime = Tue Sep 29 17:14:47 IST 2015
+pZxid = 0x7f
+cversion = 0
+dataVersion = 1
+aclVersion = 0
+ephemeralOwner = 0x0
+dataLength = 23
+numChildren = 0
+</pre>
+
+<h2>创建子znode</h2>
+
+<p>创建子znode类似于创建新的znodes。唯一的区别在于，子 znode 的路径将包含有父路径。</p>
+
+<h3>语法</h3>
+
+<pre>
+create /parent/path/subnode/path /data
+</pre>
+
+<h3>示例</h3>
+
+<pre>
+create /FirstZnode/Child1 firstchildren
+</pre>
+
+<h3>输出</h3>
+
+<pre>
+[zk: localhost:2181(CONNECTED) 16] create /FirstZnode/Child1 “firstchildren”
+created /FirstZnode/Child1
+[zk: localhost:2181(CONNECTED) 17] create /FirstZnode/Child2 “secondchildren”
+created /FirstZnode/Child2
+</pre>
+
+<h2>列出子znode</h2>
+
+<p>该命令用于列出和显示子 znode 。</p>
+
+<h3>语法</h3>
+
+<pre>
+ls /path
+</pre>
+
+<h3>示例</h3>
+
+<pre>
+ls /MyFirstZnode
+</pre>
+
+<h3>输出</h3>
+
+<pre>
+[zk: localhost:2181(CONNECTED) 2] ls /MyFirstZnode
+[mysecondsubnode, myfirstsubnode]
+</pre>
+
+<h2>检查状态</h2>
+
+<p>状态描述了指定znode的元数据。它包含详细信息，如时间戳，版本号，访问控制列表，数据长度和子znode。</p>
+
+<h3>语法</h3>
+
+<pre>
+stat /path
+</pre>
+
+<h3>示例</h3>
+
+<pre>
+stat /FirstZnode
+</pre>
+
+<h3>输出</h3>
+
+<pre>
+[zk: localhost:2181(CONNECTED) 1] stat /FirstZnode
+cZxid = 0x7f
+ctime = Tue Sep 29 16:15:47 IST 2015
+mZxid = 0x7f
+mtime = Tue Sep 29 17:14:24 IST 2015
+pZxid = 0x7f
+cversion = 0
+dataVersion = 1
+aclVersion = 0
+ephemeralOwner = 0x0
+dataLength = 23
+numChildren = 0
+</pre>
+
+<h2>删除Znode</h2>
+
+<p>删除指定znode和递归删除所有的子znode。这只有在znode可用时发生。</p>
+
+<h3>语法</h3>
+
+<pre>
+rmr /path
+</pre>
+
+<h3>示例</h3>
+
+<pre>
+rmr /FirstZnode
+</pre>
+
+<h3>输出</h3>
+
+<pre>
+[zk: localhost:2181(CONNECTED) 10] rmr /FirstZnode
+[zk: localhost:2181(CONNECTED) 11] get /FirstZnode
+Node does not exist: /FirstZnode
+</pre>
+
+<p>删除（删除/路径）命令类似remove命令，但它仅适用于无子znode的znode。</p>

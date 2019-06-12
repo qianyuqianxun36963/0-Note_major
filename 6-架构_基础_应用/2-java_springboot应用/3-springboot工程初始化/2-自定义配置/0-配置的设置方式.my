@@ -1,0 +1,83 @@
+<h1>springboot熟悉配置</h1>
+
+<h2>掀开自动配置的神秘面纱</h2>
+
+<p>正如我们在2.3.3节里讨论的那样，Spring Boot自动配置自带了很多配置类，每一个都能运用在你的应用程序里。它们都使用了Spring 4.0的条件化配置，可以在运行时判断这个配置是该被运用，还是该被忽略。<br />
+大部分情况下，表2-1里的@ConditionalOnMissingBean注解是覆盖自动配置的关键。<br />
+Spring Boot的DataSourceAutoConfiguration中定义的JdbcTemplate Bean就是一个非常简单的例子，演示了@ConditionalOnMissingBean如何工作：</p>
+
+<p>@Bean<br />
+@ConditionalOnMissingBean(JdbcOperations.class)<br />
+public JdbcTemplate jdbcTemplate() {<br />
+return new JdbcTemplate(this.dataSource);<br />
+}<br />
+jdbcTemplate()方法上添加了@Bean注解，在需要时可以配置出一个JdbcTemplateBean。但它上面还加了@ConditionalOnMissingBean注解，要求当前不存在JdbcOperations类型（JdbcTemplate实现了该接口）的Bean时才生效。如果当前已经有一个JdbcOperationsBean了，条件即不满足，不会执行jdbcTemplate()方法。<br />
+什么情况下会存在一个JdbcOperations Bean呢？Spring Boot的设计是加载应用级配置，随后再考虑自动配置类。因此，如果你已经配置了一个JdbcTemplate Bean，那么在执行自动配置时就已经存在一个JdbcOperations类型的Bean了，于是忽略自动配置的JdbcTemplate Bean。<br />
+关于Spring Security，自动配置会考虑几个配置类。在这里讨论每个配置类的细节是不切实际的，但覆盖Spring Boot自动配置的安全配置时，最重要的一个类是SpringBootWebSecurity-Configuration。以下是其中的一个代码片段：</p>
+
+<p>@Configuration<br />
+@EnableConfigurationProperties<br />
+@ConditionalOnClass({ EnableWebSecurity.class })<br />
+@ConditionalOnMissingBean(WebSecurityConfiguration.class)<br />
+@ConditionalOnWebApplication<br />
+public class SpringBootWebSecurityConfiguration {<br />
+...<br />
+}</p>
+
+<p>如你所见，SpringBootWebSecurityConfiguration上加了好几个注解。看到@ConditionalOnClass注解后，你就应该知道Classpath里必须要有@EnableWebSecurity注解。<br />
+@ConditionalOnWebApplication 说明这必须是个Web 应用程序。@ConditionalOn-MissingBean注解才是我们的安全配置类代替SpringBootWebSecurityConfiguration的关键所在。<br />
+@ConditionalOnMissingBean注解要求当下没有WebSecurityConfiguration类型的Bean。虽然表面上我们并没有这么一个Bean，但通过在SecurityConfig上添加@EnableWebSecurity注解，我们实际上间接创建了一个WebSecurityConfiguration Bean。所以在自动配置时，这个Bean就已经存在了，@ConditionalOnMissingBean条件不成立，SpringBoot-WebSecurityConfiguration提供的配置就被跳过了。<br />
+虽然Spring Boot的自动配置和@ConditionalOnMissingBean让你能显式地覆盖那些可以自动配置的Bean，但并不是每次都要做到这种程度。让我们来看看怎么通过设置几个简单的配置属性调整自动配置组件吧。</p>
+
+<h2>通过属性文件外置配置</h2>
+
+<p>在处理应用安全时，你当然会希望完全掌控所有配置。不过，为了微调一些细节，比如改改端口号和日志级别，便放弃自动配置，这是一件让人羞愧的事。为了设置数据库URL，是配置一个属性简单，还是完整地声明一个数据源的Bean简单？答案不言自明，不是吗？<br />
+事实上，Spring Boot自动配置的Bean提供了300多个用于微调的属性。当你调整设置时，只要在环境变量、Java系统属性、JNDI（Java Naming and Directory Interface）、命令行参数或者属性文件里进行指定就好了。<br />
+要了解这些属性，让我们来看个非常简单的例子。你也许已经注意到了，在命令行里运行阅读列表应用程序时，Spring Boot有一个ascii-art Banner。如果你想禁用这个Banner，可以将spring.main.show-banner属性设置为false。有几种实现方式，其中之一就是在运行应用程序的命令行参数里指定：</p>
+
+<p>$ java -jar readinglist-0.0.1-SNAPSHOT.jar --spring.main.show-banner=false</p>
+
+<p>另一种方式是创建一个名为application.properties的文件，包含如下内容：</p>
+
+<p>spring.main.show-banner=false</p>
+
+<p>或者，如果你喜欢的话，也可以创建名为application.yml的YAML文件，内容如下：</p>
+
+<p>spring:<br />
+  main:<br />
+    show-banner: false</p>
+
+<p>还可以将属性设置为环境变量。举例来说，如果你用的是bash或者zsh，可以用export命令：</p>
+
+<p>$ export spring_main_show_banner=false</p>
+
+<p>请注意，这里用的是下划线而不是点和横杠，这是对环境变量名称的要求。</p>
+
+<h2>Spring Boot属性源</h2>
+
+<p>实际上，Spring Boot应用程序有多种设置途径。Spring Boot能从多种属性源获得属性，包括如下几处。</p>
+
+<p>(1) 命令行参数<br />
+(2) java:comp/env里的JNDI属性<br />
+(3) JVM系统属性<br />
+(4) 操作系统环境变量<br />
+(5) 随机生成的带random.*前缀的属性（在设置其他属性时，可以引用它们，比如${random.long}）<br />
+(6) 应用程序以外的application.properties或者appliaction.yml文件<br />
+(7) 打包在应用程序内的application.properties或者appliaction.yml文件<br />
+(8) 通过@PropertySource标注的属性源<br />
+(9) 默认属性</p>
+
+<p>这个列表按照优先级排序，也就是说，任何在高优先级属性源里设置的属性都会覆盖低优先级的相同属性。例如，命令行参数会覆盖其他属性源里的属性。</p>
+
+<h2>application配置文件位置</h2>
+
+<p>application.properties和application.yml文件能放在以下四个位置。</p>
+
+<p>(1) 外置，在相对于应用程序运行目录的/config子目录里。<br />
+(2) 外置，在应用程序运行的目录里。<br />
+(3) 内置，在config包内。<br />
+(4) 内置，在Classpath根目录。</p>
+
+<p>同样，这个列表按照优先级排序。也就是说，/config子目录里的application.properties会覆盖应用程序Classpath里的application.properties中的相同属性。<br />
+此外，如果你在同一优先级位置同时有application.properties和application.yml，那么application.yml里的属性会覆盖application.properties里的属性。<br />
+禁用ascii-art Banner只是使用属性的一个小例子。让我们再看几个例子，看看如何通过常用途径微调自动配置的Bean。</p>
