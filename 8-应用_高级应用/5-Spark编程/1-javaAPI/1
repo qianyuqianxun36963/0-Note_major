@@ -1,0 +1,929 @@
+<h1>【Spark Java API】Action(1)&mdash;reduce、aggregate</h1>
+
+<h1>reduce</h1>
+
+<hr />
+<h3>官方文档描述：</h3>
+
+<pre>
+<code>Reduces the elements of this RDD using the specified commutative and associative binary operator.
+</code></pre>
+
+<h3>函数原型：</h3>
+
+<pre>
+<code>def reduce(f: JFunction2[T, T, T]): T</code></pre>
+
+<p><strong>根据映射函数f，对RDD中的元素进行二元计算（满足交换律和结合律），返回计算结果。</strong></p>
+
+<h3>源码分析：</h3>
+
+<pre>
+<code>def reduce(f: (T, T) =&gt; T): T = withScope {  
+  val cleanF = sc.clean(f)  
+  val reducePartition: Iterator[T] =&gt; Option[T] = iter =&gt; {    
+    if (iter.hasNext) {      
+        Some(iter.reduceLeft(cleanF))    
+    } else {      
+        None    
+    }  
+  }  
+  var jobResult: Option[T] = None  
+  val mergeResult = (index: Int, taskResult: Option[T]) =&gt; {    
+      if (taskResult.isDefined) {      
+        jobResult = jobResult match {        
+          case Some(value) =&gt; Some(f(value, taskResult.get))        
+          case None =&gt; taskResult      
+        }    
+      }  
+   }  
+   sc.runJob(this, reducePartition, mergeResult)  
+  // Get the final result out of our Option, or throw an exception if the RDD was empty  
+  jobResult.getOrElse(throw new UnsupportedOperationException(&quot;empty collection&quot;))
+}</code></pre>
+
+<p><strong>从源码中可以看出，reduce函数相当于对RDD中的元素进行reduceLeft函数操作，reduceLeft函数是从列表的左边往右边应用reduce函数；之后，在driver端对结果进行合并处理，因此，如果分区数量过多或者自定义函数过于复杂，对driver端的负载比较重。</strong></p>
+
+<h3>实例：</h3>
+
+<pre>
+<code>JavaSparkContext javaSparkContext = new JavaSparkContext(sparkConf);
+
+List&lt;Integer&gt; data = Arrays.asList(5, 1, 1, 4, 4, 2, 2);
+
+JavaRDD&lt;Integer&gt; javaRDD = javaSparkContext.parallelize(data,3);
+
+Integer reduceRDD = javaRDD.reduce(new Function2&lt;Integer, Integer, Integer&gt;() {    
+  @Override    
+  public Integer call(Integer v1, Integer v2) throws Exception {        
+      return v1 + v2;    
+  }
+});
+System.out.println(&quot;~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~&quot; + reduceRDD);</code></pre>
+
+<h1>aggregate</h1>
+
+<hr />
+<h3>官方文档描述：</h3>
+
+<pre>
+<code>Aggregate the elements of each partition, and then the results for all the partitions, using given combine functions and a neutral &quot;zero value&quot;. This function can return a different result type, U, than the type of this RDD, T. Thus, we need one operation for merging a T into an U and one operation for merging two U&#39;s, as in scala.TraversableOnce. Both of these functions are allowed to modify and return their first argument instead of creating a new U to avoid memory allocation.
+</code></pre>
+
+<h3>函数原型：</h3>
+
+<pre>
+<code>def aggregate[U](zeroValue: U)(seqOp: JFunction2[U, T, U],  combOp: JFunction2[U, U, U]): U</code></pre>
+
+<p><strong>aggregate合并每个区分的每个元素，然后在对分区结果进行merge处理，这个函数最终返回的类型不需要和RDD中元素类型一致。</strong></p>
+
+<h3>源码分析：</h3>
+
+<pre>
+<code>def aggregate[U: ClassTag](zeroValue: U)(seqOp: (U, T) =&gt; U, combOp: (U, U) =&gt; U): U = withScope {  
+  // Clone the zero value since we will also be serializing it as part of tasks  
+  var jobResult = Utils.clone(zeroValue, sc.env.serializer.newInstance())  
+  val cleanSeqOp = sc.clean(seqOp)  
+  val cleanCombOp = sc.clean(combOp)  
+  val aggregatePartition = (it: Iterator[T]) =&gt; it.aggregate(zeroValue)(cleanSeqOp, cleanCombOp)  
+  val mergeResult = (index: Int, taskResult: U) =&gt; jobResult = combOp(jobResult, taskResult)  
+  sc.runJob(this, aggregatePartition, mergeResult)  
+  jobResult
+}</code></pre>
+
+<p><strong>从源码中可以看出，aggregate函数针对每个分区利用scala集合操作aggregate，再使用comb()将之前每个分区结果聚合。</strong></p>
+
+<h3>实例：</h3>
+
+<pre>
+<code>JavaSparkContext javaSparkContext = new JavaSparkContext(sparkConf);
+List&lt;Integer&gt; data = Arrays.asList(5, 1, 1, 4, 4, 2, 2);
+JavaRDD&lt;Integer&gt; javaRDD = javaSparkContext.parallelize(data,3);
+Integer aggregateRDD = javaRDD.aggregate(2, new Function2&lt;Integer, Integer, Integer&gt;() {    
+    @Override    
+    public Integer call(Integer v1, Integer v2) throws Exception {        
+        return v1 + v2;    
+    }
+}, new Function2&lt;Integer, Integer, Integer&gt;() {    
+    @Override    
+    public Integer call(Integer v1, Integer v2) throws Exception {          
+        return v1 + v2;    
+    }
+});
+System.out.println(&quot;~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~&quot; + aggregateRDD);</code></pre>
+
+<h1>【Spark Java API】Action(2)&mdash;fold、countByKey</h1>
+
+<h1>fold</h1>
+
+<hr />
+<h3>官方文档描述：</h3>
+
+<pre>
+<code>Aggregate the elements of each partition, and then the results for all the partitions, using a given associative and commutative function and a neutral &quot;zero value&quot;. The function op(t1, t2) is allowed to modify t1 and return it as its result value to avoid object allocation; however, it should not modify t2.
+</code></pre>
+
+<h3>函数原型：</h3>
+
+<pre>
+<code>def fold(zeroValue: T)(f: JFunction2[T, T, T]): T</code></pre>
+
+<p><strong>fold是<a href="http://www.jianshu.com/p/de88317c8b83" rel="nofollow">aggregate</a>的简化，将aggregate中的seqOp和combOp使用同一个函数op。</strong></p>
+
+<h3>源码分析：</h3>
+
+<pre>
+<code>def fold(zeroValue: T)(op: (T, T) =&gt; T): T = withScope {  
+  // Clone the zero value since we will also be serializing it as part of tasks 
+  var jobResult = Utils.clone(zeroValue, sc.env.closureSerializer.newInstance())  
+  val cleanOp = sc.clean(op)  
+  val foldPartition = (iter: Iterator[T]) =&gt; iter.fold(zeroValue)(cleanOp)  
+  val mergeResult = (index: Int, taskResult: T) =&gt; jobResult = op(jobResult, taskResult)  
+  sc.runJob(this, foldPartition, mergeResult)  
+  jobResult
+}</code></pre>
+
+<p><strong>从源码中可以看出，先是将zeroValue赋值给jobResult，然后针对每个分区利用op函数与zeroValue进行计算，再利用op函数将taskResult和jobResult合并计算，同时更新jobResult，最后，将jobResult的结果返回。</strong></p>
+
+<h3>实例：</h3>
+
+<pre>
+<code>List&lt;String&gt; data = Arrays.asList(&quot;5&quot;, &quot;1&quot;, &quot;1&quot;, &quot;3&quot;, &quot;6&quot;, &quot;2&quot;, &quot;2&quot;);
+JavaRDD&lt;String&gt; javaRDD = javaSparkContext.parallelize(data,5);
+JavaRDD&lt;String&gt; partitionRDD = javaRDD.mapPartitionsWithIndex(new Function2&lt;Integer, Iterator&lt;String&gt;, Iterator&lt;String&gt;&gt;() {    
+  @Override    
+  public Iterator&lt;String&gt; call(Integer v1, Iterator&lt;String&gt; v2) throws Exception {        
+    LinkedList&lt;String&gt; linkedList = new LinkedList&lt;String&gt;();        
+    while(v2.hasNext()){            
+      linkedList.add(v1 + &quot;=&quot; + v2.next());        
+    }        
+    return linkedList.iterator();    
+  }
+},false);
+
+System.out.println(partitionRDD.collect());
+
+String foldRDD = javaRDD.fold(&quot;0&quot;, new Function2&lt;String, String, String&gt;() {    
+    @Override    
+    public String call(String v1, String v2) throws Exception {        
+        return v1 + &quot; - &quot; + v2;    
+    }
+});
+System.out.println(&quot;~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~&quot; + foldRDD);</code></pre>
+
+<h1>countByKey</h1>
+
+<hr />
+<h3>官方文档描述：</h3>
+
+<pre>
+<code>Count the number of elements for each key, collecting the results to a local Map.Note that this method should only be used if the resulting map is expected to be small, as the whole thing is loaded into the driver&#39;s memory. To handle very large results, consider using rdd.mapValues(_ =&gt; 1L).reduceByKey(_ + _), which returns an RDD[T, Long] instead of a map.
+</code></pre>
+
+<h3>函数原型：</h3>
+
+<pre>
+<code>def countByKey(): java.util.Map[K, Long]</code></pre>
+
+<h3>源码分析：</h3>
+
+<pre>
+<code>def countByKey(): Map[K, Long] = self.withScope {  
+   self.mapValues(_ =&gt; 1L).reduceByKey(_ + _).collect().toMap
+}</code></pre>
+
+<p><strong>从源码中可以看出，先是进行map操作转化为(key,1)键值对，再进行reduce聚合操作，最后利用collect函数将数据加载到driver，并转化为map类型。</strong>&nbsp;<br />
+<strong>注意，从上述分析可以看出，countByKey操作将数据全部加载到driver端的内存，如果数据量比较大，可能出现OOM。因此，如果key数量比较多，建议进行<code>rdd.mapValues(_ =&gt; 1L).reduceByKey(_ + _)</code>，返回<code>RDD[T, Long]</code>。</strong></p>
+
+<h3>实例：</h3>
+
+<pre>
+<code>List&lt;String&gt; data = Arrays.asList(&quot;5&quot;, &quot;1&quot;, &quot;1&quot;, &quot;3&quot;, &quot;6&quot;, &quot;2&quot;, &quot;2&quot;);
+JavaRDD&lt;String&gt; javaRDD = javaSparkContext.parallelize(data,5);
+
+JavaRDD&lt;String&gt; partitionRDD = javaRDD.mapPartitionsWithIndex(new Function2&lt;Integer, Iterator&lt;String&gt;, Iterator&lt;String&gt;&gt;() {    
+  @Override      
+  public Iterator&lt;String&gt; call(Integer v1, Iterator&lt;String&gt; v2) throws Exception {        
+    LinkedList&lt;String&gt; linkedList = new LinkedList&lt;String&gt;();        
+    while(v2.hasNext()){            
+      linkedList.add(v1 + &quot;=&quot; + v2.next());        
+    }        
+    return linkedList.iterator();    
+  }
+},false);
+System.out.println(partitionRDD.collect());
+JavaPairRDD&lt;String,String&gt; javaPairRDD = javaRDD.mapToPair(new PairFunction&lt;String, String, String&gt;() {    
+   @Override    
+    public Tuple2&lt;String, String&gt; call(String s) throws Exception {        
+      return new Tuple2&lt;String, String&gt;(s,s);    
+  }
+});
+System.out.println(javaPairRDD.countByKey());</code></pre>
+
+<h1>【Spark Java API】Action(3)&mdash;foreach、foreachPartition、lookup</h1>
+
+<h1>foreach</h1>
+
+<hr />
+<h3>官方文档描述：</h3>
+
+<pre>
+<code>Applies a function f to all elements of this RDD.
+</code></pre>
+
+<h3>函数原型：</h3>
+
+<pre>
+<code>def foreach(f: VoidFunction[T])</code></pre>
+
+<p><strong>foreach用于遍历RDD,将函数f应用于每一个元素。</strong></p>
+
+<h3>源码分析：</h3>
+
+<pre>
+<code>def foreach(f: T =&gt; Unit): Unit = withScope {  
+  val cleanF = sc.clean(f)  
+  sc.runJob(this, (iter: Iterator[T]) =&gt; iter.foreach(cleanF))
+}</code></pre>
+
+<h3>实例：</h3>
+
+<pre>
+<code>List&lt;Integer&gt; data = Arrays.asList(5, 1, 1, 4, 4, 2, 2);
+JavaRDD&lt;Integer&gt; javaRDD = javaSparkContext.parallelize(data,3);
+javaRDD.foreach(new VoidFunction&lt;Integer&gt;() {    
+  @Override    
+  public void call(Integer integer) throws Exception {        
+    System.out.println(integer);    
+  }
+});</code></pre>
+
+<h1>foreachPartition</h1>
+
+<hr />
+<h3>官方文档描述：</h3>
+
+<pre>
+<code>Applies a function f to each partition of this RDD.
+</code></pre>
+
+<h3>函数原型：</h3>
+
+<pre>
+<code>def foreachPartition(f: VoidFunction[java.util.Iterator[T]])</code></pre>
+
+<p><strong>foreachPartition和foreach类似，只不过是对每一个分区使用f。</strong></p>
+
+<h3>源码分析：</h3>
+
+<pre>
+<code>def foreachPartition(f: Iterator[T] =&gt; Unit): Unit = withScope {  
+  val cleanF = sc.clean(f)  
+  sc.runJob(this, (iter: Iterator[T]) =&gt; cleanF(iter))
+}</code></pre>
+
+<h3>实例：</h3>
+
+<pre>
+<code>List&lt;Integer&gt; data = Arrays.asList(5, 1, 1, 4, 4, 2, 2);
+JavaRDD&lt;Integer&gt; javaRDD = javaSparkContext.parallelize(data,3);
+
+//获得分区ID
+JavaRDD&lt;String&gt; partitionRDD = javaRDD.mapPartitionsWithIndex(new Function2&lt;Integer, Iterator&lt;Integer&gt;, Iterator&lt;String&gt;&gt;() {    
+  @Override    
+  public Iterator&lt;String&gt; call(Integer v1, Iterator&lt;Integer&gt; v2) throws Exception {        
+      LinkedList&lt;String&gt; linkedList = new LinkedList&lt;String&gt;();        
+      while(v2.hasNext()){            
+        linkedList.add(v1 + &quot;=&quot; + v2.next());        
+      }
+     return linkedList.iterator();    
+  }
+},false);
+System.out.println(partitionRDD.collect());
+javaRDD.foreachPartition(new VoidFunction&lt;Iterator&lt;Integer&gt;&gt;() {    
+  @Override    
+   public void call(Iterator&lt;Integer&gt; integerIterator) throws Exception {        
+    System.out.println(&quot;___________begin_______________&quot;);        
+    while(integerIterator.hasNext())            
+      System.out.print(integerIterator.next() + &quot;      &quot;);        
+    System.out.println(&quot;\n___________end_________________&quot;);    
+   }
+});</code></pre>
+
+<h1>lookup</h1>
+
+<hr />
+<h3>官方文档描述：</h3>
+
+<pre>
+<code>Return the list of values in the RDD for key `key`. This operation is done efficiently if the RDD has a known partitioner by only searching the partition that the key maps to.
+</code></pre>
+
+<h3>函数原型：</h3>
+
+<pre>
+<code>def lookup(key: K): JList[V]</code></pre>
+
+<p><strong>lookup用于(K,V)类型的RDD,指定K值，返回RDD中该K对应的所有V值。</strong></p>
+
+<h3>源码分析：</h3>
+
+<pre>
+<code>def lookup(key: K): Seq[V] = self.withScope {  
+  self.partitioner match {    
+    case Some(p) =&gt;      
+      val index = p.getPartition(key)      
+      val process = (it: Iterator[(K, V)]) =&gt; {        
+        val buf = new ArrayBuffer[V]        
+        for (pair &lt;- it if pair._1 == key) {          
+          buf += pair._2        
+        }        
+        buf      
+      } : Seq[V]      
+      val res = self.context.runJob(self, process, Array(index), false)      
+      res(0)    
+    case None =&gt;      
+      self.filter(_._1 == key).map(_._2).collect()  
+  }
+}</code></pre>
+
+<p><strong>从源码中可以看出，如果partitioner不为空，计算key得到对应的partition，在从该partition中获得key对应的所有value；如果partitioner为空，则通过filter过滤掉其他不等于key的值，然后将其value输出。</strong></p>
+
+<h3>实例：</h3>
+
+<pre>
+<code>List&lt;Integer&gt; data = Arrays.asList(5, 1, 1, 4, 4, 2, 2);
+JavaRDD&lt;Integer&gt; javaRDD = javaSparkContext.parallelize(data, 3);
+JavaPairRDD&lt;Integer,Integer&gt; javaPairRDD = javaRDD.mapToPair(new PairFunction&lt;Integer, Integer, Integer&gt;() {    
+  int i = 0;    
+  @Override    
+  public Tuple2&lt;Integer, Integer&gt; call(Integer integer) throws Exception {        
+    i++;        
+    return new Tuple2&lt;Integer, Integer&gt;(integer,i + integer);    
+  }
+});
+System.out.println(javaPairRDD.collect());
+System.out.println(&quot;lookup------------&quot; + javaPairRDD.lookup(4));</code></pre>
+
+<h1>【Spark Java API】Action(4)&mdash;sortBy、takeOrdered、takeSample</h1>
+
+<h1>sortBy</h1>
+
+<hr />
+<h3>官方文档描述：</h3>
+
+<pre>
+<code>Return this RDD sorted by the given key function.
+</code></pre>
+
+<h3>函数原型：</h3>
+
+<pre>
+<code>def sortBy[S](f: JFunction[T, S], ascending: Boolean, numPartitions: Int): JavaRDD[T]</code></pre>
+
+<p><strong>sortBy根据给定的f函数将RDD中的元素进行排序。</strong></p>
+
+<h3>源码分析：</h3>
+
+<pre>
+<code>def sortBy[K](   
+   f: (T) =&gt; K,    
+  ascending: Boolean = true,    
+  numPartitions: Int = this.partitions.length)    
+  (implicit ord: Ordering[K], ctag: ClassTag[K]): RDD[T] = withScope {  
+    this.keyBy[K](f)      
+    .sortByKey(ascending, numPartitions)      
+    .values
+}
+/** 
+* Creates tuples of the elements in this RDD by applying `f`. 
+*/
+def keyBy[K](f: T =&gt; K): RDD[(K, T)] = withScope {  
+  val cleanedF = sc.clean(f)  
+  map(x =&gt; (cleanedF(x), x))
+}</code></pre>
+
+<p><strong>从源码中可以看出，sortBy函数的实现依赖于<a href="http://www.jianshu.com/p/876bc8df7b91" rel="nofollow">sortByKey</a>函数。该函数接受三个参数，第一参数是一个函数，该函数带有泛型参数T，返回类型与RDD中的元素类型一致，主要是用keyBy函数的map转化，将每个元素转化为tuples类型的元素；第二个参数是ascending，该参数是可选参数，主要用于RDD中的元素的排序方式，默认是true，是升序；第三个参数是numPartitions，该参数也是可选参数，主要使用对排序后的RDD进行分区，默认的分区个数与排序前一致是partitions.length。</strong></p>
+
+<h3>实例：</h3>
+
+<pre>
+<code>List&lt;Integer&gt; data = Arrays.asList(5, 1, 1, 4, 4, 2, 2);
+JavaRDD&lt;Integer&gt; javaRDD = javaSparkContext.parallelize(data, 3);
+final Random random = new Random(100);
+//对RDD进行转换，每个元素有两部分组成
+JavaRDD&lt;String&gt; javaRDD1 = javaRDD.map(new Function&lt;Integer, String&gt;() {    
+  @Override    
+  public String call(Integer v1) throws Exception {        
+    return v1.toString() + &quot;_&quot; + random.nextInt(100);    
+  }
+});
+System.out.println(javaRDD1.collect());
+//按RDD中每个元素的第二部分进行排序
+JavaRDD&lt;String&gt; resultRDD = javaRDD1.sortBy(new Function&lt;String, Object&gt;() {    
+  @Override    
+  public Object call(String v1) throws Exception {        
+    return v1.split(&quot;_&quot;)[1];    
+  }
+},false,3);
+System.out.println(&quot;result--------------&quot; + resultRDD.collect());</code></pre>
+
+<h1>takeOrdered</h1>
+
+<hr />
+<h3>官方文档描述：</h3>
+
+<pre>
+<code>Returns the first k (smallest) elements from this RDD using the 
+natural ordering for T while maintain the order.
+</code></pre>
+
+<h3>函数原型：</h3>
+
+<pre>
+<code>def takeOrdered(num: Int): JList[T]
+def takeOrdered(num: Int, comp: Comparator[T]): JList[T]</code></pre>
+
+<p><strong>takeOrdered函数用于从RDD中，按照默认（升序）或指定排序规则，返回前num个元素。</strong></p>
+
+<h3>源码分析：</h3>
+
+<pre>
+<code>def takeOrdered(num: Int)(implicit ord: Ordering[T]): Array[T] = withScope {  
+  if (num == 0) {    
+    Array.empty  
+  } else {    
+    val mapRDDs = mapPartitions { items =&gt;      
+    // Priority keeps the largest elements, so let&#39;s reverse the ordering.      
+    val queue = new BoundedPriorityQueue[T](num)(ord.reverse)      
+    queue ++= util.collection.Utils.takeOrdered(items, num)(ord)      
+    Iterator.single(queue)    
+  }    
+  if (mapRDDs.partitions.length == 0) {      
+    Array.empty    
+  } else {      
+    mapRDDs.reduce { (queue1, queue2) =&gt;        
+      queue1 ++= queue2        
+      queue1      
+  }.toArray.sorted(ord)    
+  }  
+ }
+}</code></pre>
+
+<p><strong>从源码分析可以看出，利用mapPartitions在每个分区里面进行分区排序，每个分区局部排序只返回num个元素，这里注意返回的mapRDDs的元素是BoundedPriorityQueue优先队列，再针对mapRDDs进行reduce函数操作，转化为数组进行全局排序。</strong></p>
+
+<h3>实例：</h3>
+
+<pre>
+<code>//注意comparator需要序列化
+public static class TakeOrderedComparator implements Serializable,Comparator&lt;Integer&gt;{    
+    @Override    
+    public int compare(Integer o1, Integer o2) {        
+      return -o1.compareTo(o2);    
+    }
+}
+List&lt;Integer&gt; data = Arrays.asList(5, 1, 0, 4, 4, 2, 2);
+JavaRDD&lt;Integer&gt; javaRDD = javaSparkContext.parallelize(data, 3);
+System.out.println(&quot;takeOrdered-----1-------------&quot; + javaRDD.takeOrdered(2));
+List&lt;Integer&gt; list = javaRDD.takeOrdered(2, new TakeOrderedComparator());
+System.out.println(&quot;takeOrdered----2--------------&quot; + list);</code></pre>
+
+<h1>takeSample</h1>
+
+<hr />
+<h3>官方文档描述：</h3>
+
+<pre>
+<code>Return a fixed-size sampled subset of this RDD in an array
+</code></pre>
+
+<h3>函数原型：</h3>
+
+<pre>
+<code>def takeSample(withReplacement: Boolean, num: Int): JList[T]
+
+def takeSample(withReplacement: Boolean, num: Int, seed: Long): JList[T] </code></pre>
+
+<p><strong>takeSample函数返回一个数组，在数据集中随机采样 num 个元素组成。</strong></p>
+
+<h3>源码分析：</h3>
+
+<pre>
+<code>def takeSample(    
+  withReplacement: Boolean,    
+  num: Int,    
+  seed: Long = Utils.random.nextLong): Array[T] = 
+{  
+    val numStDev = 10.0  
+    if (num &lt; 0) {    
+      throw new IllegalArgumentException(&quot;Negative number of elements requested&quot;)  
+    } else if (num == 0) {    
+      return new Array[T](0)  
+    }  
+    val initialCount = this.count()  
+    if (initialCount == 0) {    
+      return new Array[T](0)  
+    }
+    val maxSampleSize = Int.MaxValue - (numStDev * math.sqrt(Int.MaxValue)).toInt  
+    if (num &gt; maxSampleSize) {    
+      throw new IllegalArgumentException(&quot;Cannot support a sample size &gt; Int.MaxValue - &quot; +      s&quot;$numStDev * math.sqrt(Int.MaxValue)&quot;)  
+    }  
+    val rand = new Random(seed)    
+    if (!withReplacement &amp;&amp; num &gt;= initialCount) {    
+      return Utils.randomizeInPlace(this.collect(), rand)  
+    }  
+    val fraction = SamplingUtils.computeFractionForSampleSize(num, initialCount,    withReplacement)  
+    var samples = this.sample(withReplacement, fraction, rand.nextInt()).collect()  
+    // If the first sample didn&#39;t turn out large enough, keep trying to take samples;  
+    // this shouldn&#39;t happen often because we use a big multiplier for the initial size  
+    var numIters = 0  
+    while (samples.length &lt; num) {    
+      logWarning(s&quot;Needed to re-sample due to insufficient sample size. Repeat #$numIters&quot;)    
+      samples = this.sample(withReplacement, fraction, rand.nextInt()).collect()    
+      numIters += 1  
+  }  
+  Utils.randomizeInPlace(samples, rand).take(num)
+}</code></pre>
+
+<p><strong>从源码中可以看出，takeSample函数类似于<a href="http://www.jianshu.com/p/abe1755220b2" rel="nofollow">sample</a>函数，该函数接受三个参数，第一个参数withReplacement ，表示采样是否放回，true表示有放回的采样，false表示无放回采样；第二个参数num，表示返回的采样数据的个数，这个也是takeSample函数和sample函数的区别；第三个参数seed，表示用于指定的随机数生成器种子。另外，takeSample函数先是计算fraction，也就是采样比例，然后调用sample函数进行采样，并对采样后的数据进行collect()，最后调用take函数返回num个元素。注意，如果采样个数大于RDD的元素个数，且选择的无放回采样，则返回RDD的元素的个数。</strong></p>
+
+<h3>实例：</h3>
+
+<pre>
+<code>List&lt;Integer&gt; data = Arrays.asList(5, 1, 0, 4, 4, 2, 2);
+JavaRDD&lt;Integer&gt; javaRDD = javaSparkContext.parallelize(data, 3);
+System.out.println(&quot;takeSample-----1-------------&quot; + javaRDD.takeSample(true,2));
+System.out.println(&quot;takeSample-----2-------------&quot; + javaRDD.takeSample(true,2,100));
+//返回20个元素
+System.out.println(&quot;takeSample-----3-------------&quot; + javaRDD.takeSample(true,20,100));
+//返回7个元素
+System.out.println(&quot;takeSample-----4-------------&quot; + javaRDD.takeSample(false,20,100));</code></pre>
+
+<p>&nbsp;</p>
+
+<h1>【Spark Java API】Action(5)&mdash;treeAggregate、treeReduce</h1>
+
+<h1>treeAggregate</h1>
+
+<hr />
+<h3>官方文档描述：</h3>
+
+<pre>
+<code>Aggregates the elements of this RDD in a multi-level tree pattern.
+</code></pre>
+
+<ul>
+	<li>1</li>
+</ul>
+
+<h3>函数原型：</h3>
+
+<pre>
+<code>def treeAggregate[U](    
+    zeroValue: U,    
+    seqOp: JFunction2[U, T, U],    
+    combOp: JFunction2[U, U, U],
+    depth: Int): U 
+def treeAggregate[U](    
+    zeroValue: U,    
+    seqOp: JFunction2[U, T, U],    
+    combOp: JFunction2[U, U, U]): U </code></pre>
+
+<p><strong>可理解为更复杂的多阶<a href="http://www.jianshu.com/p/de88317c8b83" rel="nofollow">aggregate</a>。</strong></p>
+
+<h3>源码分析：</h3>
+
+<pre>
+<code>def treeAggregate[U: ClassTag](zeroValue: U)(    
+    seqOp: (U, T) =&gt; U,    
+    combOp: (U, U) =&gt; U,    
+    depth: Int = 2): U = withScope {  
+  require(depth &gt;= 1, s&quot;Depth must be greater than or equal to 1 but got $depth.&quot;)  
+  if (partitions.length == 0) {    
+    Utils.clone(zeroValue, context.env.closureSerializer.newInstance())  
+  } else {    
+    val cleanSeqOp = context.clean(seqOp)    
+    val cleanCombOp = context.clean(combOp)    
+    val aggregatePartition =      
+      (it: Iterator[T]) =&gt; it.aggregate(zeroValue)(cleanSeqOp, cleanCombOp)    
+    var partiallyAggregated = mapPartitions(it =&gt; Iterator(aggregatePartition(it)))    
+    var numPartitions = partiallyAggregated.partitions.length    
+    val scale = math.max(math.ceil(math.pow(numPartitions, 1.0 / depth)).toInt, 2)    
+    // If creating an extra level doesn&#39;t help reduce    
+    // the wall-clock time, we stop tree aggregation.          
+    // Don&#39;t trigger TreeAggregation when it doesn&#39;t save wall-clock time    
+    while (numPartitions &gt; scale + math.ceil(numPartitions.toDouble / scale)) {      
+      numPartitions /= scale      
+      val curNumPartitions = numPartitions      
+      partiallyAggregated = partiallyAggregated.mapPartitionsWithIndex {        
+        (i, iter) =&gt; iter.map((i % curNumPartitions, _))      
+      }.reduceByKey(new HashPartitioner(curNumPartitions), cleanCombOp).values    
+  }    
+  partiallyAggregated.reduce(cleanCombOp)  
+  }
+}</code></pre>
+
+<p><strong>从源码中可以看出，treeAggregate函数先是对每个分区利用scala的aggregate函数进行局部聚合的操作；同时，依据depth参数计算scale，如果当分区数量过多时，则按<code>i%curNumPartitions</code>进行key值计算，再按key进行重新分区合并计算；最后，在进行reduce聚合操作。这样可以通过调解深度来减少reduce的开销。</strong></p>
+
+<h3>实例：</h3>
+
+<pre>
+<code>List&lt;Integer&gt; data = Arrays.asList(5, 1, 1, 4, 4, 2, 2);
+JavaRDD&lt;Integer&gt; javaRDD = javaSparkContext.parallelize(data,3);
+//转化操作
+JavaRDD&lt;String&gt; javaRDD1 = javaRDD.map(new Function&lt;Integer, String&gt;() {    
+  @Override    
+  public String call(Integer v1) throws Exception {        
+    return Integer.toString(v1);    
+  }
+});
+
+String result1 = javaRDD1.treeAggregate(&quot;0&quot;, new Function2&lt;String, String, String&gt;() {    
+  @Override    
+  public String call(String v1, String v2) throws Exception {        
+    System.out.println(v1 + &quot;=seq=&quot; + v2);        
+    return v1 + &quot;=seq=&quot; + v2;    
+  }
+}, new Function2&lt;String, String, String&gt;() {    
+    @Override    
+    public String call(String v1, String v2) throws Exception {        
+      System.out.println(v1 + &quot;&lt;=comb=&gt;&quot; + v2);        
+      return v1 + &quot;&lt;=comb=&gt;&quot; + v2;    
+  }
+});
+System.out.println(result1);</code></pre>
+
+<h1>treeReduce</h1>
+
+<hr />
+<h3>官方文档描述：</h3>
+
+<pre>
+<code>Reduces the elements of this RDD in a multi-level tree pattern.
+</code></pre>
+
+<h3>函数原型：</h3>
+
+<pre>
+<code>def treeReduce(f: JFunction2[T, T, T], depth: Int): T
+def treeReduce(f: JFunction2[T, T, T]): T</code></pre>
+
+<p><strong>与treeAggregate类似，只不过是seqOp和combOp相同的treeAggregate。</strong></p>
+
+<h3>源码分析：</h3>
+
+<pre>
+<code>def treeReduce(f: (T, T) =&gt; T, depth: Int = 2): T = withScope {  
+  require(depth &gt;= 1, s&quot;Depth must be greater than or equal to 1 but got $depth.&quot;)  
+  val cleanF = context.clean(f)  
+  val reducePartition: Iterator[T] =&gt; Option[T] = iter =&gt; {    
+    if (iter.hasNext) {      
+      Some(iter.reduceLeft(cleanF))    
+    } else {      
+      None    
+    }  
+  }  
+  val partiallyReduced = mapPartitions(it =&gt; Iterator(reducePartition(it)))  
+  val op: (Option[T], Option[T]) =&gt; Option[T] = (c, x) =&gt; {    
+  if (c.isDefined &amp;&amp; x.isDefined) {      
+    Some(cleanF(c.get, x.get))    
+  } else if (c.isDefined) {      
+    c    
+  } else if (x.isDefined) {      
+    x    
+  } else {      
+    None    
+  }  
+ }  
+partiallyReduced.treeAggregate(Option.empty[T])(op, op, depth)    
+  .getOrElse(throw new UnsupportedOperationException(&quot;empty collection&quot;))}</code></pre>
+
+<p><strong>从源码中可以看出，treeReduce函数先是针对每个分区利用scala的reduceLeft函数进行计算；最后，在将局部合并的RDD进行treeAggregate计算，这里的seqOp和combOp一样，初值为空。在实际应用中，可以用treeReduce来代替<a href="http://www.jianshu.com/p/de88317c8b83" rel="nofollow">reduce</a>，主要是用于单个reduce操作开销比较大，而treeReduce可以通过调整深度来控制每次reduce的规模。</strong></p>
+
+<h3>实例：</h3>
+
+<pre>
+<code>List&lt;Integer&gt; data = Arrays.asList(5, 1, 1, 4, 4, 2, 2);
+JavaRDD&lt;Integer&gt; javaRDD = javaSparkContext.parallelize(data,5);
+JavaRDD&lt;String&gt; javaRDD1 = javaRDD.map(new Function&lt;Integer, String&gt;() {    
+    @Override    
+    public String call(Integer v1) throws Exception {        
+      return Integer.toString(v1);    
+    }
+});
+String result = javaRDD1.treeReduce(new Function2&lt;String, String, String&gt;() {    
+    @Override    
+    public String call(String v1, String v2) throws Exception {        
+      System.out.println(v1 + &quot;=&quot; + v2);        
+      return v1 + &quot;=&quot; + v2;    
+  }
+});
+System.out.println(&quot;~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~&quot; + treeReduceRDD);</code>
+</pre>
+
+<h1>【Spark Java API】Action(6)&mdash;saveAsTextFile、saveAsObjectFile</h1>
+
+<h1>saveAsTextFile</h1>
+
+<hr />
+<h3>官方文档描述：</h3>
+
+<pre>
+<code>Save&nbsp;this&nbsp;RDD&nbsp;as&nbsp;a&nbsp;text&nbsp;file,&nbsp;using&nbsp;string&nbsp;representations&nbsp;of&nbsp;elements.
+</code></pre>
+
+<h3>函数原型：</h3>
+
+<pre>
+<code>def&nbsp;saveAsTextFile(path:&nbsp;String):&nbsp;Unit
+def&nbsp;saveAsTextFile(path:&nbsp;String,&nbsp;codec:&nbsp;Class[_&nbsp;&lt;:&nbsp;CompressionCodec]):&nbsp;Unit</code></pre>
+
+<p><strong>saveAsTextFile用于将RDD以文本文件的格式存储到文件系统中。</strong></p>
+
+<h3>源码分析：</h3>
+
+<pre>
+<code>def&nbsp;saveAsTextFile(path:&nbsp;String):&nbsp;Unit&nbsp;=&nbsp;withScope&nbsp;{&nbsp; 
+  //&nbsp;https://issues.apache.org/jira/browse/SPARK-2075&nbsp; //&nbsp; 
+  //&nbsp;NullWritable&nbsp;is&nbsp;a&nbsp;`Comparable`&nbsp;in&nbsp;Hadoop&nbsp;1.+,&nbsp;so&nbsp;the&nbsp;compiler&nbsp;cannot&nbsp;find&nbsp;an&nbsp;implicit&nbsp; 
+  //&nbsp;Ordering&nbsp;for&nbsp;it&nbsp;and&nbsp;will&nbsp;use&nbsp;the&nbsp;default&nbsp;`null`.&nbsp;However,&nbsp;it&#39;s&nbsp;a&nbsp;`Comparable[NullWritable]`&nbsp; 
+  //&nbsp;in&nbsp;Hadoop&nbsp;2.+,&nbsp;so&nbsp;the&nbsp;compiler&nbsp;will&nbsp;call&nbsp;the&nbsp;implicit&nbsp;`Ordering.ordered`&nbsp;method&nbsp;to&nbsp;create&nbsp;an&nbsp; 
+  //&nbsp;Ordering&nbsp;for&nbsp;`NullWritable`.&nbsp;That&#39;s&nbsp;why&nbsp;the&nbsp;compiler&nbsp;will&nbsp;generate&nbsp;different&nbsp;anonymous&nbsp; 
+  //&nbsp;classes&nbsp;for&nbsp;`saveAsTextFile`&nbsp;in&nbsp;Hadoop&nbsp;1.+&nbsp;and&nbsp;Hadoop&nbsp;2.+.&nbsp; 
+  //&nbsp; 
+  //&nbsp;Therefore,&nbsp;here&nbsp;we&nbsp;provide&nbsp;an&nbsp;explicit&nbsp;Ordering&nbsp;`null`&nbsp;to&nbsp;make&nbsp;sure&nbsp;the&nbsp;compiler&nbsp;generate&nbsp; 
+  //&nbsp;same&nbsp;bytecodes&nbsp;for&nbsp;`saveAsTextFile`.&nbsp; 
+  val&nbsp;nullWritableClassTag&nbsp;=&nbsp;implicitly[ClassTag[NullWritable]]&nbsp; 
+  val&nbsp;textClassTag&nbsp;=&nbsp;implicitly[ClassTag[Text]]&nbsp; 
+  val&nbsp;r&nbsp;=&nbsp;this.mapPartitions&nbsp;{&nbsp;iter&nbsp;=&gt;&nbsp; &nbsp; 
+    val&nbsp;text&nbsp;=&nbsp;new&nbsp;Text()&nbsp; &nbsp; 
+    iter.map&nbsp;{&nbsp;x&nbsp;=&gt;&nbsp; &nbsp; &nbsp; 
+      text.set(x.toString)&nbsp; &nbsp; &nbsp; 
+      (NullWritable.get(),&nbsp;text)&nbsp; &nbsp; 
+    }&nbsp; 
+  }&nbsp; 
+  RDD.rddToPairRDDFunctions(r)(nullWritableClassTag,&nbsp;textClassTag,&nbsp;null)&nbsp; &nbsp; 
+    .saveAsHadoopFile[TextOutputFormat[NullWritable,&nbsp;Text]](path)
+}
+/**&nbsp;
+*&nbsp;Output&nbsp;the&nbsp;RDD&nbsp;to&nbsp;any&nbsp;Hadoop-supported&nbsp;file&nbsp;system,&nbsp;using&nbsp;a&nbsp;Hadoop&nbsp;`OutputFormat`&nbsp;class&nbsp;
+*&nbsp;supporting&nbsp;the&nbsp;key&nbsp;and&nbsp;value&nbsp;types&nbsp;K&nbsp;and&nbsp;V&nbsp;in&nbsp;this&nbsp;RDD.&nbsp;
+*/
+def&nbsp;saveAsHadoopFile(&nbsp; &nbsp; 
+      path:&nbsp;String,&nbsp; &nbsp; 
+      keyClass:&nbsp;Class[_],&nbsp; &nbsp; 
+      valueClass:&nbsp;Class[_],&nbsp; &nbsp; 
+      outputFormatClass:&nbsp;Class[_&nbsp;&lt;:&nbsp;OutputFormat[_,&nbsp;_]],&nbsp; &nbsp; 
+      conf:&nbsp;JobConf&nbsp;=&nbsp;new&nbsp;JobConf(self.context.hadoopConfiguration),&nbsp; &nbsp; 
+      codec:&nbsp;Option[Class[_&nbsp;&lt;:&nbsp;CompressionCodec]]&nbsp;=&nbsp;None):&nbsp;Unit&nbsp;=&nbsp;self.withScope&nbsp;{&nbsp; 
+  //&nbsp;Rename&nbsp;this&nbsp;as&nbsp;hadoopConf&nbsp;internally&nbsp;to&nbsp;avoid&nbsp;shadowing&nbsp;(see&nbsp;SPARK-2038).&nbsp; 
+  val&nbsp;hadoopConf&nbsp;=&nbsp;conf&nbsp; 
+  hadoopConf.setOutputKeyClass(keyClass)&nbsp; 
+  hadoopConf.setOutputValueClass(valueClass)&nbsp; 
+  //&nbsp;Doesn&#39;t&nbsp;work&nbsp;in&nbsp;Scala&nbsp;2.9&nbsp;due&nbsp;to&nbsp;what&nbsp;may&nbsp;be&nbsp;a&nbsp;generics&nbsp;bug&nbsp; 
+  //&nbsp;TODO:&nbsp;Should&nbsp;we&nbsp;uncomment&nbsp;this&nbsp;for&nbsp;Scala&nbsp;2.10?&nbsp; 
+  //&nbsp;conf.setOutputFormat(outputFormatClass)&nbsp; 
+  hadoopConf.set(&quot;mapred.output.format.class&quot;,&nbsp;outputFormatClass.getName)&nbsp; 
+  for&nbsp;(c&nbsp;&lt;-&nbsp;codec)&nbsp;{&nbsp; &nbsp; 
+    hadoopConf.setCompressMapOutput(true)&nbsp; &nbsp; 
+    hadoopConf.set(&quot;mapred.output.compress&quot;,&nbsp;&quot;true&quot;)&nbsp; &nbsp; 
+    hadoopConf.setMapOutputCompressorClass(c)&nbsp; &nbsp; 
+    hadoopConf.set(&quot;mapred.output.compression.codec&quot;,&nbsp;c.getCanonicalName)&nbsp; &nbsp; 
+    hadoopConf.set(&quot;mapred.output.compression.type&quot;,&nbsp;CompressionType.BLOCK.toString)&nbsp; 
+   }&nbsp; 
+   //&nbsp;Use&nbsp;configured&nbsp;output&nbsp;committer&nbsp;if&nbsp;already&nbsp;set&nbsp; 
+   if&nbsp;(conf.getOutputCommitter&nbsp;==&nbsp;null)&nbsp;{&nbsp; &nbsp; 
+      hadoopConf.setOutputCommitter(classOf[FileOutputCommitter])&nbsp; 
+   }&nbsp; 
+  FileOutputFormat.setOutputPath(hadoopConf,&nbsp; &nbsp;
+    SparkHadoopWriter.createPathFromString(path,&nbsp;hadoopConf))&nbsp; 
+  saveAsHadoopDataset(hadoopConf)
+}
+
+/**&nbsp;
+*&nbsp;Output&nbsp;the&nbsp;RDD&nbsp;to&nbsp;any&nbsp;Hadoop-supported&nbsp;storage&nbsp;system,&nbsp;using&nbsp;a&nbsp;Hadoop&nbsp;JobConf&nbsp;object&nbsp;for&nbsp;
+*&nbsp;that&nbsp;storage&nbsp;system.&nbsp;The&nbsp;JobConf&nbsp;should&nbsp;set&nbsp;an&nbsp;OutputFormat&nbsp;and&nbsp;any&nbsp;output&nbsp;paths&nbsp;required&nbsp;
+*&nbsp;(e.g.&nbsp;a&nbsp;table&nbsp;name&nbsp;to&nbsp;write&nbsp;to)&nbsp;in&nbsp;the&nbsp;same&nbsp;way&nbsp;as&nbsp;it&nbsp;would&nbsp;be&nbsp;configured&nbsp;for&nbsp;a&nbsp;Hadoop&nbsp;
+*&nbsp;MapReduce&nbsp;job.&nbsp;
+*/
+def&nbsp;saveAsHadoopDataset(conf:&nbsp;JobConf):&nbsp;Unit&nbsp;=&nbsp;self.withScope&nbsp;{&nbsp; 
+  //&nbsp;Rename&nbsp;this&nbsp;as&nbsp;hadoopConf&nbsp;internally&nbsp;to&nbsp;avoid&nbsp;shadowing&nbsp;(see&nbsp;SPARK-2038).&nbsp; 
+  val&nbsp;hadoopConf&nbsp;=&nbsp;conf&nbsp; 
+  val&nbsp;wrappedConf&nbsp;=&nbsp;new&nbsp;SerializableConfiguration(hadoopConf)&nbsp; 
+  val&nbsp;outputFormatInstance&nbsp;=&nbsp;hadoopConf.getOutputFormat&nbsp; 
+  val&nbsp;keyClass&nbsp;=&nbsp;hadoopConf.getOutputKeyClass&nbsp; 
+  val&nbsp;valueClass&nbsp;=&nbsp;hadoopConf.getOutputValueClass&nbsp; 
+  if&nbsp;(outputFormatInstance&nbsp;==&nbsp;null)&nbsp;{&nbsp; &nbsp; 
+    throw&nbsp;new&nbsp;SparkException(&quot;Output&nbsp;format&nbsp;class&nbsp;not&nbsp;set&quot;)&nbsp; 
+  }&nbsp; 
+  if&nbsp;(keyClass&nbsp;==&nbsp;null)&nbsp;{&nbsp; &nbsp; 
+    throw&nbsp;new&nbsp;SparkException(&quot;Output&nbsp;key&nbsp;class&nbsp;not&nbsp;set&quot;)&nbsp; 
+  }&nbsp; 
+  if&nbsp;(valueClass&nbsp;==&nbsp;null)&nbsp;{&nbsp; &nbsp; 
+    throw&nbsp;new&nbsp;SparkException(&quot;Output&nbsp;value&nbsp;class&nbsp;not&nbsp;set&quot;)&nbsp; 
+  }&nbsp; 
+  SparkHadoopUtil.get.addCredentials(hadoopConf)&nbsp; 
+  logDebug(&quot;Saving&nbsp;as&nbsp;hadoop&nbsp;file&nbsp;of&nbsp;type&nbsp;(&quot;&nbsp;+&nbsp;keyClass.getSimpleName&nbsp;+&nbsp;&quot;,&nbsp;&quot;&nbsp;+&nbsp; &nbsp; valueClass.getSimpleName&nbsp;+&nbsp;&quot;)&quot;)&nbsp; 
+  if&nbsp;(isOutputSpecValidationEnabled)&nbsp;{&nbsp; &nbsp; 
+    //&nbsp;FileOutputFormat&nbsp;ignores&nbsp;the&nbsp;filesystem&nbsp;parameter&nbsp; &nbsp; 
+    val&nbsp;ignoredFs&nbsp;=&nbsp;FileSystem.get(hadoopConf)&nbsp; &nbsp; 
+    hadoopConf.getOutputFormat.checkOutputSpecs(ignoredFs,&nbsp;hadoopConf)&nbsp; 
+  }&nbsp; 
+  val&nbsp;writer&nbsp;=&nbsp;new&nbsp;SparkHadoopWriter(hadoopConf)&nbsp; 
+  writer.preSetup()&nbsp; 
+  val&nbsp;writeToFile&nbsp;=&nbsp;(context:&nbsp;TaskContext,&nbsp;iter:&nbsp;Iterator[(K,&nbsp;V)])&nbsp;=&gt;&nbsp;{&nbsp; &nbsp; 
+    val&nbsp;config&nbsp;=&nbsp;wrappedConf.value&nbsp; &nbsp; 
+    //&nbsp;Hadoop&nbsp;wants&nbsp;a&nbsp;32-bit&nbsp;task&nbsp;attempt&nbsp;ID,&nbsp;so&nbsp;if&nbsp;ours&nbsp;is&nbsp;bigger&nbsp;than&nbsp;Int.MaxValue,&nbsp;roll&nbsp;it&nbsp; &nbsp; 
+    //&nbsp;around&nbsp;by&nbsp;taking&nbsp;a&nbsp;mod.&nbsp;We&nbsp;expect&nbsp;that&nbsp;no&nbsp;task&nbsp;will&nbsp;be&nbsp;attempted&nbsp;2&nbsp;billion&nbsp;times.&nbsp; &nbsp; 
+    val&nbsp;taskAttemptId&nbsp;=&nbsp;(context.taskAttemptId&nbsp;%&nbsp;Int.MaxValue).toInt&nbsp; &nbsp; 
+    val&nbsp;(outputMetrics,&nbsp;bytesWrittenCallback)&nbsp;=&nbsp;initHadoopOutputMetrics(context)&nbsp; &nbsp; writer.setup(context.stageId,&nbsp;context.partitionId,&nbsp;taskAttemptId)&nbsp; &nbsp; 
+    writer.open()&nbsp; &nbsp; 
+    var&nbsp;recordsWritten&nbsp;=&nbsp;0L&nbsp; &nbsp; 
+    Utils.tryWithSafeFinally&nbsp;{&nbsp; &nbsp; &nbsp; 
+      while&nbsp;(iter.hasNext)&nbsp;{&nbsp; &nbsp; &nbsp; &nbsp; 
+        val&nbsp;record&nbsp;=&nbsp;iter.next()&nbsp; &nbsp; &nbsp; &nbsp; 
+        writer.write(record._1.asInstanceOf[AnyRef],&nbsp;record._2.asInstanceOf[AnyRef])&nbsp; &nbsp; &nbsp; &nbsp; 
+        //&nbsp;Update&nbsp;bytes&nbsp;written&nbsp;metric&nbsp;every&nbsp;few&nbsp;records&nbsp; &nbsp; &nbsp; &nbsp; 
+        maybeUpdateOutputMetrics(bytesWrittenCallback,&nbsp;outputMetrics,&nbsp;recordsWritten)&nbsp; &nbsp; &nbsp; &nbsp; 
+        recordsWritten&nbsp;+=&nbsp;1&nbsp; &nbsp; &nbsp; 
+  }&nbsp; &nbsp; 
+}&nbsp;{&nbsp; &nbsp; &nbsp; 
+  writer.close()&nbsp; &nbsp; 
+}&nbsp; &nbsp; 
+  writer.commit()&nbsp; &nbsp; 
+  bytesWrittenCallback.foreach&nbsp;{&nbsp;fn&nbsp;=&gt;&nbsp;outputMetrics.setBytesWritten(fn())&nbsp;}&nbsp; &nbsp; 
+  outputMetrics.setRecordsWritten(recordsWritten)&nbsp; }&nbsp; 
+  self.context.runJob(self,&nbsp;writeToFile)&nbsp; 
+  writer.commitJob()
+}
+</code></pre>
+
+<p><strong>从源码中可以看到，saveAsTextFile函数是依赖于saveAsHadoopFile函数，由于saveAsHadoopFile函数接受PairRDD，所以在saveAsTextFile函数中利用rddToPairRDDFunctions函数转化为(NullWritable,Text)类型的RDD，然后通过saveAsHadoopFile函数实现相应的写操作。</strong></p>
+
+<h3>实例：</h3>
+
+<pre>
+<code>List&lt;Integer&gt;&nbsp;data&nbsp;=&nbsp;Arrays.asList(5,&nbsp;1,&nbsp;1,&nbsp;4,&nbsp;4,&nbsp;2,&nbsp;2);
+JavaRDD&lt;Integer&gt;&nbsp;javaRDD&nbsp;=&nbsp;javaSparkContext.parallelize(data,5);
+javaRDD.saveAsTextFile(&quot;/user/tmp&quot;);</code></pre>
+
+<h1>savaAsObjectFile</h1>
+
+<hr />
+<h3>官方文档描述：</h3>
+
+<pre>
+<code>Save&nbsp;this&nbsp;RDD&nbsp;as&nbsp;a&nbsp;SequenceFile&nbsp;of&nbsp;serialized&nbsp;objects.
+</code></pre>
+
+<h3>函数原型：</h3>
+
+<pre>
+<code>def&nbsp;saveAsObjectFile(path:&nbsp;String):&nbsp;Unit</code></pre>
+
+<p><strong>saveAsObjectFile用于将RDD中的元素序列化成对象，存储到文件中。</strong></p>
+
+<h3>源码分析：</h3>
+
+<pre>
+<code>def&nbsp;saveAsObjectFile(path:&nbsp;String):&nbsp;Unit&nbsp;=&nbsp;withScope&nbsp;{&nbsp; 
+  this.mapPartitions(iter&nbsp;=&gt;&nbsp;iter.grouped(10).map(_.toArray))&nbsp; &nbsp; 
+    .map(x&nbsp;=&gt;&nbsp;(NullWritable.get(),&nbsp;new&nbsp;BytesWritable(Utils.serialize(x))))&nbsp; &nbsp; 
+    .saveAsSequenceFile(path)
+}
+
+def&nbsp;saveAsSequenceFile(&nbsp; &nbsp; 
+    path:&nbsp;String,&nbsp; &nbsp; 
+    codec:&nbsp;Option[Class[_&nbsp;&lt;:&nbsp;CompressionCodec]]&nbsp;=&nbsp;None):&nbsp;Unit&nbsp;=&nbsp;self.withScope&nbsp;{&nbsp; 
+  def&nbsp;anyToWritable[U&nbsp;&lt;%&nbsp;Writable](u:&nbsp;U):&nbsp;Writable&nbsp;=&nbsp;u&nbsp; 
+  //&nbsp;TODO&nbsp;We&nbsp;cannot&nbsp;force&nbsp;the&nbsp;return&nbsp;type&nbsp;of&nbsp;`anyToWritable`&nbsp;be&nbsp;same&nbsp;as&nbsp;keyWritableClass&nbsp;and&nbsp; 
+  //&nbsp;valueWritableClass&nbsp;at&nbsp;the&nbsp;compile&nbsp;time.&nbsp;To&nbsp;implement&nbsp;that,&nbsp;we&nbsp;need&nbsp;to&nbsp;add&nbsp;type&nbsp;parameters&nbsp;to&nbsp; 
+  //&nbsp;SequenceFileRDDFunctions.&nbsp;however,&nbsp;SequenceFileRDDFunctions&nbsp;is&nbsp;a&nbsp;public&nbsp;class&nbsp;so&nbsp;it&nbsp;will&nbsp;be&nbsp;a&nbsp; 
+  //&nbsp;breaking&nbsp;change.&nbsp; 
+  val&nbsp;convertKey&nbsp;=&nbsp;self.keyClass&nbsp;!=&nbsp;keyWritableClass&nbsp; 
+  val&nbsp;convertValue&nbsp;=&nbsp;self.valueClass&nbsp;!=&nbsp;valueWritableClass&nbsp; 
+  logInfo(&quot;Saving&nbsp;as&nbsp;sequence&nbsp;file&nbsp;of&nbsp;type&nbsp;(&quot;&nbsp;+&nbsp;keyWritableClass.getSimpleName&nbsp;+&nbsp;&quot;,&quot;&nbsp;+&nbsp; &nbsp; valueWritableClass.getSimpleName&nbsp;+&nbsp;&quot;)&quot;&nbsp;)&nbsp; 
+  val&nbsp;format&nbsp;=&nbsp;classOf[SequenceFileOutputFormat[Writable,&nbsp;Writable]]&nbsp; 
+  val&nbsp;jobConf&nbsp;=&nbsp;new&nbsp;JobConf(self.context.hadoopConfiguration)&nbsp; 
+  if&nbsp;(!convertKey&nbsp;&amp;&amp;&nbsp;!convertValue)&nbsp;{&nbsp; &nbsp; 
+    self.saveAsHadoopFile(path,&nbsp;keyWritableClass,&nbsp;valueWritableClass,&nbsp;format,&nbsp;jobConf,&nbsp;codec)&nbsp; 
+  }&nbsp;else&nbsp;if&nbsp;(!convertKey&nbsp;&amp;&amp;&nbsp;convertValue)&nbsp;{&nbsp; &nbsp; 
+    self.map(x&nbsp;=&gt;&nbsp;(x._1,&nbsp;anyToWritable(x._2))).saveAsHadoopFile(&nbsp; &nbsp; &nbsp; 
+      path,&nbsp;keyWritableClass,&nbsp;valueWritableClass,&nbsp;format,&nbsp;jobConf,&nbsp;codec)&nbsp; 
+  }&nbsp;else&nbsp;if&nbsp;(convertKey&nbsp;&amp;&amp;&nbsp;!convertValue)&nbsp;{&nbsp; &nbsp; 
+    self.map(x&nbsp;=&gt;&nbsp;(anyToWritable(x._1),&nbsp;x._2)).saveAsHadoopFile(&nbsp; &nbsp; &nbsp; 
+      path,&nbsp;keyWritableClass,&nbsp;valueWritableClass,&nbsp;format,&nbsp;jobConf,&nbsp;codec)&nbsp; 
+  }&nbsp;else&nbsp;if&nbsp;(convertKey&nbsp;&amp;&amp;&nbsp;convertValue)&nbsp;{&nbsp; &nbsp; 
+    self.map(x&nbsp;=&gt;&nbsp;(anyToWritable(x._1),&nbsp;anyToWritable(x._2))).saveAsHadoopFile(&nbsp; &nbsp; &nbsp; 
+      path,&nbsp;keyWritableClass,&nbsp;valueWritableClass,&nbsp;format,&nbsp;jobConf,&nbsp;codec)&nbsp; 
+  }
+}</code></pre>
+
+<p><strong>从源码中可以看出，saveAsObjectFile函数是依赖于saveAsSequenceFile函数实现的，将RDD转化为类型为</strong></p>
+
+<h3>实例：</h3>
+
+<pre>
+<code>List&lt;Integer&gt;&nbsp;data&nbsp;=&nbsp;Arrays.asList(5,&nbsp;1,&nbsp;1,&nbsp;4,&nbsp;4,&nbsp;2,&nbsp;2);
+JavaRDD&lt;Integer&gt;&nbsp;javaRDD&nbsp;=&nbsp;javaSparkContext.parallelize(data,5);
+javaRDD.saveAsObjectFile(&quot;/user/tmp&quot;);</code></pre>

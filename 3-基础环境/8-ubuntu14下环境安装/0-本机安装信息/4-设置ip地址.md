@@ -60,7 +60,7 @@ serverA:201 serverB:202 serverC:203
 	netmask 255.255.255.0
 	gateway 192.168.175.2
 	dns-nameservers 192.168.1.1
-	//这个地址，通过实体机的ipconfig/all查看。
+	//这个地址，通过实体机的ipconfig /all查看,取其中的'默认网关'字段。
 	
 	IP设置好以后，需要重启，其他机器才能ping通
 

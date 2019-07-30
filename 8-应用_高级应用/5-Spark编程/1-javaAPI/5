@@ -1,0 +1,1260 @@
+<h1>【Spark Java API】Transformation(5)&mdash;cartesian、distinct</h1>
+
+<h1>cartesian</h1>
+
+<hr />
+<h3>官方文档描述：</h3>
+
+<pre>
+<code>Return the Cartesian product of this RDD and another one, that is, the RDD of all pairs of elements (a, b) where a is in `this` and b is in `other`.
+</code></pre>
+
+<h3>函数原型：</h3>
+
+<pre>
+<code>def cartesian[U](other: JavaRDDLike[U, _]): JavaPairRDD[T, U]</code></pre>
+
+<h3>源码分析：</h3>
+
+<pre>
+<code> def getPartitions: Array[Partition] = {  
+// create the cross product split  
+val array = new Array[Partition(rdd1.partitions.length * rdd2.partitions.length)  
+for (s1 &lt;- rdd1.partitions; s2 &lt;- rdd2.partitions) {    
+    val idx = s1.index * numPartitionsInRdd2 + s2.index    
+    array(idx) = new CartesianPartition(idx, rdd1, rdd2, s1.index, s2.index)  
+  }  array
+}
+
+def getDependencies: Seq[Dependency[_]] = List(  
+new NarrowDependency(rdd1) {    
+  def getParents(id: Int): Seq[Int] = List(id / numPartitionsInRdd2) 
+ },  
+new NarrowDependency(rdd2) {    
+  def getParents(id: Int): Seq[Int] = List(id % numPartitionsInRdd2)  
+    }
+)</code></pre>
+
+<p><strong>Cartesian 对两个 RDD 做笛卡尔集，生成的 CartesianRDD 中 partition 个数 =&nbsp;<code>partitionNum(RDD a) * partitionNum(RDD b)</code>。从getDependencies分析可知，这里的依赖关系与前面的不太一样，CartesianRDD中每个partition依赖两个parent RDD，而且其中每个 partition 完全依赖(NarrowDependency) RDD a 中一个 partition，同时又完全依赖(NarrowDependency) RDD b 中另一个 partition。具体如下CartesianRDD 中的 partiton i 依赖于<code>(RDD a).List(i / numPartitionsInRDDb)</code>&nbsp;和&nbsp;<code>(RDD b).List(i %numPartitionsInRDDb)</code>。</strong></p>
+
+<h3>实例：</h3>
+
+<pre>
+<code>
+List&lt;Integer&gt; data = Arrays.asList(1, 2, 4, 3, 5, 6, 7);
+JavaRDD&lt;Integer&gt; javaRDD = javaSparkContext.parallelize(data);
+
+JavaPairRDD&lt;Integer,Integer&gt; cartesianRDD = javaRDD.cartesian(javaRDD);
+System.out.println(cartesianRDD.collect());</code></pre>
+
+<h1>distinct</h1>
+
+<hr />
+<h3>官方文档描述：</h3>
+
+<pre>
+<code>Return a new RDD containing the distinct elements in this RDD.
+</code></pre>
+
+<h3>函数原型：</h3>
+
+<pre>
+<code>def distinct(): JavaRDD[T]
+
+def distinct(numPartitions: Int): JavaRDD[T]</code></pre>
+
+<p><strong>第一个函数是基于第二函数实现的，只是numPartitions默认为partitions.length，partitions为parent RDD的分区。</strong></p>
+
+<h3>源码分析：</h3>
+
+<pre>
+<code>def distinct(): RDD[T] = withScope {  distinct(partitions.length)}
+
+def distinct(numPartitions: Int)(implicit ord: Ordering[T] = null): RDD[T] = withScope {  
+  map(x =&gt; (x, null)).reduceByKey((x, y) =&gt; x, numPartitions).map(_._1)
+}</code></pre>
+
+<p><strong>distinct() 功能是 deduplicate RDD 中的所有的重复数据。由于重复数据可能分散在不同的 partition 里面，因此需要 shuffle 来进行 aggregate 后再去重。然而，shuffle 要求数据类型是</strong></p>
+
+<h3>实例：</h3>
+
+<pre>
+<code>List&lt;Integer&gt; data = Arrays.asList(1, 2, 4, 3, 5, 6, 7, 1, 2);
+JavaRDD&lt;Integer&gt; javaRDD = javaSparkContext.parallelize(data);
+
+JavaRDD&lt;Integer&gt; distinctRDD1 = javaRDD.distinct();
+System.out.println(distinctRDD1.collect());
+JavaRDD&lt;Integer&gt; distinctRDD2 = javaRDD.distinct(2);
+System.out.println(distinctRDD2.collect());</code></pre>
+
+<p>&nbsp;</p>
+
+<h1>【Spark Java API】Transformation(6)&mdash;aggregate、aggregateByKey</h1>
+
+<h1>aggregate</h1>
+
+<hr />
+<h3>官方文档描述：</h3>
+
+<pre>
+<code>Aggregate the elements of each partition, and then the results for all the partitions,using given combine functions and a neutral &quot;zero value&quot;. This function can return a different result type, U, than the type of this RDD, T. Thus, we need one operation for merging a T into an U and one operation for merging two U&#39;s, as in scala.TraversableOnce.Both of these functions are allowed to modify and return their first argument instead of creating a new U to avoid memory allocation.
+</code></pre>
+
+<h3>函数原型：</h3>
+
+<pre>
+<code>def aggregate[U](zeroValue: U)(seqOp: JFunction2[U, T, U],  combOp: JFunction2[U, U, U]): U</code></pre>
+
+<h3>源码分析：</h3>
+
+<pre>
+<code>def aggregate[U: ClassTag](zeroValue: U)(seqOp: (U, T) =&gt; U, combOp: (U, U) =&gt; U): U = withScope {  
+// Clone the zero value since we will also be serializing it as part of tasks  
+  var jobResult = Utils.clone(zeroValue, sc.env.serializer.newInstance())
+  val cleanSeqOp = sc.clean(seqOp)  
+  val cleanCombOp = sc.clean(combOp)  
+  val aggregatePartition = (it: Iterator[T]) =&gt; it.aggregate(zeroValue)(cleanSeqOp, cleanCombOp)  
+  val mergeResult = (index: Int, taskResult: U) =&gt; jobResult = combOp(jobResult, taskResult)  
+  sc.runJob(this, aggregatePartition, mergeResult)  
+  jobResult
+}</code></pre>
+
+<p><strong>aggregate函数将每个分区里面的元素进行聚合，然后用combine函数将每个分区的结果和初始值(zeroValue)进行combine操作。这个函数最终返回U的类型不需要和RDD的T中元素类型一致。 这样，我们需要一个函数将T中元素合并到U中，另一个函数将两个U进行合并。其中，参数1是初值元素；参数2是seq函数是与初值进行比较；参数3是comb函数是进行合并 。</strong>&nbsp;<br />
+<strong>注意：如果没有指定分区，aggregate是计算每个分区的，空值则用初始值替换。</strong></p>
+
+<h3>实例：</h3>
+
+<pre>
+<code>List&lt;Integer&gt; data = Arrays.asList(5, 1, 1, 4, 4, 2, 2);
+JavaRDD&lt;Integer&gt; javaRDD = javaSparkContext.parallelize(data,3);
+Integer aggregateValue = javaRDD.aggregate(3, new Function2&lt;Integer, Integer, Integer&gt;() {    
+@Override    
+public Integer call(Integer v1, Integer v2) throws Exception {        
+    System.out.println(&quot;seq~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~&quot; + v1 + &quot;,&quot; + v2);        
+    return Math.max(v1, v2);    
+  }
+}, new Function2&lt;Integer, Integer, Integer&gt;() {    
+  int i = 0;    
+  @Override      
+public Integer call(Integer v1, Integer v2) throws Exception {    
+    System.out.println(&quot;comb~~~~~~~~~i~~~~~~~~~~~~~~~~~~~&quot;+i++);        
+    System.out.println(&quot;comb~~~~~~~~~v1~~~~~~~~~~~~~~~~~~~&quot; + v1);        
+    System.out.println(&quot;comb~~~~~~~~~v2~~~~~~~~~~~~~~~~~~~&quot; + v2);        
+    return v1 + v2;   
+  }
+});
+System.out.println(&quot;~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~&quot;+aggregateValue);</code></pre>
+
+<h1>aggregateByKey</h1>
+
+<hr />
+<h3>官方文档描述：</h3>
+
+<pre>
+<code>Aggregate the values of each key, using given combine functions and a neutral &quot;zero value&quot;.This function can return a different result type, U, than the type of the values in this RDD,V.Thus, we need one operation for merging a V into a U and one operation for merging two U&#39;s,as in scala.TraversableOnce. The former operation is used for merging values within a partition, and the latter is used for merging values between partitions. To avoid memory allocation, both of these functions are allowed to modify and return their first argument instead of creating a new U.
+</code></pre>
+
+<h3>函数原型：</h3>
+
+<pre>
+<code>def aggregateByKey[U](zeroValue: U, partitioner: Partitioner, seqFunc: JFunction2[U, V, U],
+    combFunc: JFunction2[U, U, U]): JavaPairRDD[K, U]
+def aggregateByKey[U](zeroValue: U, numPartitions: Int, seqFunc: JFunction2[U, V, U],
+    combFunc: JFunction2[U, U, U]): JavaPairRDD[K, U]
+def aggregateByKey[U](zeroValue: U, seqFunc: JFunction2[U, V, U], combFunc: JFunction2[U, U, U]): JavaPairRDD[K, U]</code></pre>
+
+<h3>源码分析：</h3>
+
+<pre>
+<code>def aggregateByKey[U: ClassTag](zeroValue: U, partitioner: Partitioner)(seqOp: (U, V) =&gt; U,    
+combOp: (U, U) =&gt; U): RDD[(K, U)] = self.withScope {  
+  // Serialize the zero value to a byte array so that we can get a new clone of it on each key  
+  val zeroBuffer = SparkEnv.get.serializer.newInstance().serialize(zeroValue)  
+  val zeroArray = new Array[Byte](zeroBuffer.limit)  
+  zeroBuffer.get(zeroArray)  
+  lazy val cachedSerializer = SparkEnv.get.serializer.newInstance()  
+  val createZero = () =&gt; cachedSerializer.deserialize[U](ByteBuffer.wrap(zeroArray))  
+  // We will clean the combiner closure later in `combineByKey`  
+  val cleanedSeqOp = self.context.clean(seqOp)  
+  combineByKey[U]((v: V) =&gt; cleanedSeqOp(createZero(), v), cleanedSeqOp, combOp, partitioner)
+}</code></pre>
+
+<p><strong>aggregateByKey函数对PairRDD中相同Key的值进行聚合操作，在聚合过程中同样使用了一个中立的初始值。和aggregate函数类似，aggregateByKey返回值的类型不需要和RDD中value的类型一致。因为aggregateByKey是对相同Key中的值进行聚合操作，所以aggregateByKey函数最终返回的类型还是Pair RDD，对应的结果是Key和聚合好的值；而aggregate函数直接是返回非RDD的结果，这点需要注意。在实现过程中，定义了三个aggregateByKey函数原型，但最终调用的aggregateByKey函数都一致。其中，参数zeroValue代表做比较的初始值；参数partitioner代表分区函数；参数seq代表与初始值比较的函数；参数comb是进行合并的方法。</strong></p>
+
+<h3>实例：</h3>
+
+<pre>
+<code>//将这个测试程序拿文字做一下描述就是：在data数据集中，按key将value进行分组合并，
+//合并时在seq函数与指定的初始值进行比较，保留大的值；然后在comb中来处理合并的方式。
+List&lt;Integer&gt; data = Arrays.asList(5, 1, 1, 4, 4, 2, 2);
+int numPartitions = 4;
+JavaRDD&lt;Integer&gt; javaRDD = javaSparkContext.parallelize(data);
+final Random random = new Random(100);
+JavaPairRDD&lt;Integer,Integer&gt; javaPairRDD = javaRDD.mapToPair(new PairFunction&lt;Integer, Integer, Integer&gt;() {    
+  @Override    
+  public Tuple2&lt;Integer, Integer&gt; call(Integer integer) throws Exception {        
+    return new Tuple2&lt;Integer, Integer&gt;(integer,random.nextInt(10));    
+  }
+});
+System.out.println(&quot;~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~&quot;+javaPairRDD.collect());
+
+JavaPairRDD&lt;Integer, Integer&gt; aggregateByKeyRDD = javaPairRDD.aggregateByKey(3,numPartitions, new Function2&lt;Integer, Integer, Integer&gt;() {    
+  @Override    
+  public Integer call(Integer v1, Integer v2) throws Exception {        
+    System.out.println(&quot;seq~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~&quot; + v1 + &quot;,&quot; + v2);        
+    return Math.max(v1, v2);    
+  }
+}, new Function2&lt;Integer, Integer, Integer&gt;() {    
+  int i = 0;    
+  @Override    
+  public Integer call(Integer v1, Integer v2) throws Exception {        
+  System.out.println(&quot;comb~~~~~~~~~i~~~~~~~~~~~~~~~~~~~&quot; + i++);        
+  System.out.println(&quot;comb~~~~~~~~~v1~~~~~~~~~~~~~~~~~~~&quot; + v1);        
+  System.out.println(&quot;comb~~~~~~~~~v2~~~~~~~~~~~~~~~~~~~&quot; + v2);        
+  return v1 + v2;   
+ }
+});
+System.out.println(&quot;aggregateByKeyRDD.partitions().size()~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~&quot;+aggregateByKeyRDD.partitions().size());
+System.out.println(&quot;aggregateByKeyRDD~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~&quot;+aggregateByKeyRDD.collect());</code></pre>
+
+<h1>【Spark Java API】Transformation(7)&mdash;cogroup、join</h1>
+
+<h1>cogroup</h1>
+
+<hr />
+<h3>官方文档描述：</h3>
+
+<pre>
+<code>For each key k in `this` or `other`, return a resulting RDD that contains a tuple with the list of values for that key in `this` as well as `other`.
+</code></pre>
+
+<h3>函数原型：</h3>
+
+<pre>
+<code>def cogroup[W](other: JavaPairRDD[K, W], partitioner: Partitioner): JavaPairRDD[K, (JIterable[V], JIterable[W])]
+
+def cogroup[W1, W2](other1: JavaPairRDD[K, W1], other2: JavaPairRDD[K, W2],    partitioner: Partitioner): JavaPairRDD[K, (JIterable[V], JIterable[W1], JIterable[W2])]
+
+def cogroup[W1, W2, W3](other1: JavaPairRDD[K, W1],    other2: JavaPairRDD[K, W2],    other3: JavaPairRDD[K, W3],    partitioner: Partitioner): JavaPairRDD[K, (JIterable[V], JIterable[W1], JIterable[W2], JIterable[W3])]
+
+def cogroup[W](other: JavaPairRDD[K, W]): JavaPairRDD[K, (JIterable[V], JIterable[W])]
+
+def cogroup[W1, W2](other1: JavaPairRDD[K, W1], other2: JavaPairRDD[K, W2]): JavaPairRDD[K, (JIterable[V], JIterable[W1], JIterable[W2])]
+
+def cogroup[W1, W2, W3](other1: JavaPairRDD[K, W1],    other2: JavaPairRDD[K, W2],    other3: JavaPairRDD[K, W3]): JavaPairRDD[K, (JIterable[V], JIterable[W1], JIterable[W2], JIterable[W3])]
+
+def cogroup[W](other: JavaPairRDD[K, W], numPartitions: Int): JavaPairRDD[K, (JIterable[V], JIterable[W])]
+
+def cogroup[W1, W2](other1: JavaPairRDD[K, W1], other2: JavaPairRDD[K, W2], numPartitions: Int): JavaPairRDD[K, (JIterable[V], JIterable[W1], JIterable[W2])]
+
+def cogroup[W1, W2, W3](other1: JavaPairRDD[K, W1],    other2: JavaPairRDD[K, W2],    other3: JavaPairRDD[K, W3],    numPartitions: Int): JavaPairRDD[K, (JIterable[V], JIterable[W1], JIterable[W2], JIterable[W3])]</code></pre>
+
+<h3>源码分析：</h3>
+
+<pre>
+<code>def cogroup[W](other: RDD[(K, W)], partitioner: Partitioner)    : RDD[(K, (Iterable[V], Iterable[W]))] = self.withScope {  
+if (partitioner.isInstanceOf[HashPartitioner] &amp;&amp; keyClass.isArray) {    
+  throw new SparkException(&quot;Default partitioner cannot partition array keys.&quot;)  
+}  
+val cg = new CoGroupedRDD[K](Seq(self, other), partitioner)  
+cg.mapValues { case Array(vs, w1s) =&gt;    
+    (vs.asInstanceOf[Iterable[V]], w1s.asInstanceOf[Iterable[W]])  
+  }
+}
+
+override def getDependencies: Seq[Dependency[_]] = {  
+  rdds.map { rdd: RDD[_ &lt;: Product2[K, _]] =&gt;    
+    if (rdd.partitioner == Some(part)) {      
+      logDebug(&quot;Adding one-to-one dependency with &quot; + rdd)      
+      new OneToOneDependency(rdd)    
+    } else {      
+      logDebug(&quot;Adding shuffle dependency with &quot; + rdd)      
+      new ShuffleDependency[K, Any, CoGroupCombiner](rdd, part, serializer)    
+    }  
+  }
+}
+override def getPartitions: Array[Partition] = {  
+  val array = new Array[Partition](part.numPartitions)  
+  for (i &lt;- 0 until array.length) {    
+    // Each CoGroupPartition will have a dependency per contributing RDD    
+    array(i) = new CoGroupPartition(i, rdds.zipWithIndex.map { case (rdd, j) =&gt;      
+    // Assume each RDD contributed a single dependency, and get it        
+    dependencies(j) match {
+        case s: ShuffleDependency[_, _, _] =&gt;          
+            None        
+        case _ =&gt;          
+            Some(new NarrowCoGroupSplitDep(rdd, i, rdd.partitions(i)))      
+      }    
+    }.toArray)  
+  }  
+  array
+}</code></pre>
+
+<p><strong>cogroup() 的计算结果放在 CoGroupedRDD 中哪个 partition 是由用户设置的 partitioner 确定的（默认是 HashPartitioner）。</strong>&nbsp;<br />
+<strong>CoGroupedRDD 依赖的所有 RDD 放进数组 rdds[RDD] 中。再次，foreach i，如果 CoGroupedRDD 和 rdds(i) 对应的 RDD 是 OneToOneDependency 关系，那么&nbsp;<code>Dependecy[i] = new OneToOneDependency(rdd)</code>，否则 =&nbsp;<code>new ShuffleDependency(rdd)</code>。最后，返回与每个 parent RDD 的依赖关系数组 deps[Dependency]。</strong>&nbsp;<br />
+<strong>Dependency 类中的 getParents(partition id) 负责给出某个 partition 按照该 dependency 所依赖的 parent RDD 中的 partitions: List[Int]。</strong>&nbsp;<br />
+<strong>getPartitions() 负责给出 RDD 中有多少个 partition，以及每个 partition 如何序列化。</strong></p>
+
+<h3>实例：</h3>
+
+<pre>
+<code>List&lt;Integer&gt; data = Arrays.asList(1, 2, 4, 3, 5, 6, 7, 1, 2);
+JavaRDD&lt;Integer&gt; javaRDD = javaSparkContext.parallelize(data);
+
+JavaPairRDD&lt;Integer,Integer&gt; javaPairRDD = javaRDD.mapToPair(new PairFunction&lt;Integer, Integer, Integer&gt;() {    
+@Override    
+  public Tuple2&lt;Integer, Integer&gt; call(Integer integer) throws Exception {        
+    return new Tuple2&lt;Integer, Integer&gt;(integer,1);    
+  }
+});
+
+//与 groupByKey() 不同，cogroup() 要 aggregate 两个或两个以上的 RDD。
+JavaPairRDD&lt;Integer,Tuple2&lt;Iterable&lt;Integer&gt;,Iterable&lt;Integer&gt;&gt;&gt; cogroupRDD = javaPairRDD.cogroup(javaPairRDD);
+System.out.println(cogroupRDD.collect());
+
+JavaPairRDD&lt;Integer,Tuple2&lt;Iterable&lt;Integer&gt;,Iterable&lt;Integer&gt;&gt;&gt; cogroupRDD3 = javaPairRDD.cogroup(javaPairRDD, new Partitioner() {    
+    @Override    
+    public int numPartitions() {        
+      return 2;    
+    }    
+    @Override    
+    public int getPartition(Object key) {        
+      return (key.toString()).hashCode()%numPartitions();
+    }
+});
+System.out.println(cogroupRDD3);</code></pre>
+
+<h1>join</h1>
+
+<hr />
+<h3>官方文档描述：</h3>
+
+<pre>
+<code>Return an RDD containing all pairs of elements with matching keys in `this` and `other`. Each pair of elements will be returned as a (k, (v1, v2)) tuple, where (k, v1) is in `this` and (k, v2) is in `other`. Performs a hash join across the cluster.
+</code></pre>
+
+<h3>函数原型：</h3>
+
+<pre>
+<code>def join[W](other: JavaPairRDD[K, W]): JavaPairRDD[K, (V, W)]
+
+def join[W](other: JavaPairRDD[K, W], numPartitions: Int): JavaPairRDD[K, (V, W)]
+
+def join[W](other: JavaPairRDD[K, W], partitioner: Partitioner): JavaPairRDD[K, (V, W)]</code></pre>
+
+<h3>源码分析：</h3>
+
+<pre>
+<code>def join[W](other: RDD[(K, W)], partitioner: Partitioner): RDD[(K, (V, W))] = self.withScope {  
+  this.cogroup(other, partitioner).flatMapValues( pair =&gt;    
+    for (v &lt;- pair._1.iterator; w &lt;- pair._2.iterator) yield (v, w)  
+  )
+}</code></pre>
+
+<p><strong>从源码中可以看出，join() 将两个 RDD[(K, V)] 按照 SQL 中的 join 方式聚合在一起。与 intersection() 类似，首先进行 cogroup()， 得到</strong></p>
+
+<h3>实例：</h3>
+
+<pre>
+<code>List&lt;Integer&gt; data = Arrays.asList(1, 2, 4, 3, 5, 6, 7);
+final Random random = new Random();
+JavaRDD&lt;Integer&gt; javaRDD = javaSparkContext.parallelize(data);
+JavaPairRDD&lt;Integer,Integer&gt; javaPairRDD = javaRDD.mapToPair(new PairFunction&lt;Integer, Integer, Integer&gt;() {    
+  @Override    
+  public Tuple2&lt;Integer, Integer&gt; call(Integer integer) throws Exception {        
+    return new Tuple2&lt;Integer, Integer&gt;(integer,random.nextInt(10));    
+  }
+});
+
+JavaPairRDD&lt;Integer,Tuple2&lt;Integer,Integer&gt;&gt; joinRDD = javaPairRDD.join(javaPairRDD);
+System.out.println(joinRDD.collect());
+
+JavaPairRDD&lt;Integer,Tuple2&lt;Integer,Integer&gt;&gt; joinRDD2 = javaPairRDD.join(javaPairRDD,2);
+System.out.println(joinRDD2.collect());
+
+JavaPairRDD&lt;Integer,Tuple2&lt;Integer,Integer&gt;&gt; joinRDD3 = javaPairRDD.join(javaPairRDD, new Partitioner() {    
+  @Override    
+  public int numPartitions() {        
+    return 2;    
+  }    
+  @Override    
+  public int getPartition(Object key) {        
+    return (key.toString()).hashCode()%numPartitions();
+    }
+});
+System.out.println(joinRDD3.collect());</code></pre>
+
+<p>&nbsp;</p>
+
+<h1>【Spark Java API】Transformation(8)&mdash;fullOuterJoin、leftOuterJoin、rightOuterJoin</h1>
+
+<p>2016年08月20日 10:57:35&nbsp;<a href="https://me.csdn.net/a6210575" target="_blank">小飞_侠</a>&nbsp;阅读数 1159</p>
+
+<h1>fullOuterJoin</h1>
+
+<hr />
+<h3>官方文档描述：</h3>
+
+<pre>
+<code>Perform a full outer join of `this` and `other`. For each element (k, v) in `this`, the resulting RDD will either contain all pairs (k, (Some(v), Some(w))) for w in `other`, or the pair (k, (Some(v), None)) if no elements in `other` have key k. Similarly, for each element (k, w) in `other`, the resulting RDD will either contain all pairs (k, (Some(v), Some(w))) for v in `this`, or the pair (k, (None, Some(w))) if no elements in `this` have key k. Uses the given Partitioner to partition the output RDD.
+</code></pre>
+
+<ul>
+	<li>1</li>
+</ul>
+
+<h3>函数原型：</h3>
+
+<pre>
+<code>def fullOuterJoin[W](other: JavaPairRDD[K, W]): JavaPairRDD[K, (Optional[V], Optional[W])]
+
+def fullOuterJoin[W](other: JavaPairRDD[K, W], numPartitions: Int)
+: JavaPairRDD[K, (Optional[V], Optional[W])]
+
+def fullOuterJoin[W](other: JavaPairRDD[K, W], partitioner: Partitioner)
+: JavaPairRDD[K, (Optional[V], Optional[W])]</code></pre>
+
+<h3>源码分析：</h3>
+
+<pre>
+<code>def fullOuterJoin[W](other: RDD[(K, W)], partitioner: Partitioner)    : RDD[(K, (Option[V], Option[W]))] = self.withScope {  
+  this.cogroup(other, partitioner).flatMapValues {    
+    case (vs, Seq()) =&gt; vs.iterator.map(v =&gt; (Some(v), None))    
+    case (Seq(), ws) =&gt; ws.iterator.map(w =&gt; (None, Some(w)))    
+    case (vs, ws) =&gt; for (v &lt;- vs.iterator; w &lt;- ws.iterator) yield (Some(v), Some(w))  
+  }
+}</code></pre>
+
+<p><strong>从源码中可以看出，fullOuterJoin() 与 join() 类似，首先进行 cogroup()， 得到&nbsp;<code>&lt;K, (Iterable[V1], Iterable[V2])&gt;</code>&nbsp;类型的 MappedValuesRDD，然后对 Iterable[V1] 和 Iterable[V2] 做笛卡尔集，注意在V1，V2中添加了None，并将集合 flat() 化。</strong></p>
+
+<h3>实例：</h3>
+
+<pre>
+<code>List&lt;Integer&gt; data = Arrays.asList(1, 2, 4, 3, 5, 6, 7);
+final Random random = new Random();
+JavaRDD&lt;Integer&gt; javaRDD = javaSparkContext.parallelize(data);
+JavaPairRDD&lt;Integer,Integer&gt; javaPairRDD = javaRDD.mapToPair(new PairFunction&lt;Integer, Integer, Integer&gt;() {    
+  @Override    
+  public Tuple2&lt;Integer, Integer&gt; call(Integer integer) throws Exception {        
+    return new Tuple2&lt;Integer, Integer&gt;(integer,random.nextInt(10));    
+  }
+});
+
+//全关联
+JavaPairRDD&lt;Integer,Tuple2&lt;Optional&lt;Integer&gt;,Optional&lt;Integer&gt;&gt;&gt; fullJoinRDD = javaPairRDD.fullOuterJoin(javaPairRDD);
+System.out.println(fullJoinRDD);
+
+JavaPairRDD&lt;Integer,Tuple2&lt;Optional&lt;Integer&gt;,Optional&lt;Integer&gt;&gt;&gt; fullJoinRDD1 = javaPairRDD.fullOuterJoin(javaPairRDD,2);
+System.out.println(fullJoinRDD1);
+
+JavaPairRDD&lt;Integer,Tuple2&lt;Optional&lt;Integer&gt;,Optional&lt;Integer&gt;&gt;&gt; fullJoinRDD2 = javaPairRDD.fullOuterJoin(javaPairRDD, new Partitioner() {    
+  @Override    
+  public int numPartitions() {        return 2;    }    
+  @Override    
+  public int getPartition(Object key) {   return (key.toString()).hashCode()%numPartitions();    }
+});
+System.out.println(fullJoinRDD2);</code></pre>
+
+<h1>leftOuterJoin</h1>
+
+<hr />
+<h3>官方文档描述：</h3>
+
+<pre>
+<code>Perform a left outer join of `this` and `other`. For each element (k, v) in `this`, the resulting RDD will either contain all pairs (k, (v, Some(w))) for w in `other`, or the pair (k, (v, None)) if no elements in `other` have key k. Uses the given Partitioner to partition the output RDD.
+</code></pre>
+
+<h3>函数原型：</h3>
+
+<pre>
+<code>def leftOuterJoin[W](other: JavaPairRDD[K, W]): JavaPairRDD[K, (V, Optional[W])]
+
+def leftOuterJoin[W](other: JavaPairRDD[K, W], numPartitions: Int)
+: JavaPairRDD[K, (V, Optional[W])]
+
+def leftOuterJoin[W](other: JavaPairRDD[K, W], partitioner: Partitioner): JavaPairRDD[K, (V, Optional[W])] </code></pre>
+
+<h3>源码分析：</h3>
+
+<pre>
+<code>def leftOuterJoin[W](    other: RDD[(K, W)],    partitioner: Partitioner): RDD[(K, (V, Option[W]))] = self.withScope {  
+this.cogroup(other, partitioner).flatMapValues { pair =&gt;    
+    if (pair._2.isEmpty) {      
+      pair._1.iterator.map(v =&gt; (v, None))    
+    } else {        
+      for (v &lt;- pair._1.iterator; w &lt;- pair._2.iterator) yield (v, Some(w))    
+    }  
+  }
+}</code></pre>
+
+<p><strong>从源码中可以看出，leftOuterJoin() 与 fullOuterJoin() 类似，首先进行 cogroup()， 得到&nbsp;<code>&lt;K, (Iterable[V1], Iterable[V2])&gt;</code>类型的 MappedValuesRDD，然后对 Iterable[V1] 和 Iterable[V2] 做笛卡尔集，注意在V1中添加了None，并将集合 flat() 化。</strong></p>
+
+<h3>实例：</h3>
+
+<pre>
+<code>List&lt;Integer&gt; data = Arrays.asList(1, 2, 4, 3, 5, 6, 7);
+final Random random = new Random();
+JavaRDD&lt;Integer&gt; javaRDD = javaSparkContext.parallelize(data);
+JavaPairRDD&lt;Integer,Integer&gt; javaPairRDD = javaRDD.mapToPair(new PairFunction&lt;Integer, Integer, Integer&gt;() {    
+  @Override    
+  public Tuple2&lt;Integer, Integer&gt; call(Integer integer) throws Exception {        
+    return new Tuple2&lt;Integer, Integer&gt;(integer,random.nextInt(10));    
+  }
+});
+
+//左关联 JavaPairRDD&lt;Integer,Tuple2&lt;Integer,Optional&lt;Integer&gt;&gt;&gt; leftJoinRDD = javaPairRDD.leftOuterJoin(javaPairRDD);
+System.out.println(leftJoinRDD);
+
+JavaPairRDD&lt;Integer,Tuple2&lt;Integer,Optional&lt;Integer&gt;&gt;&gt; leftJoinRDD1 = javaPairRDD.leftOuterJoin(javaPairRDD,2);
+System.out.println(leftJoinRDD1);
+
+JavaPairRDD&lt;Integer,Tuple2&lt;Integer,Optional&lt;Integer&gt;&gt;&gt; leftJoinRDD2 = javaPairRDD.leftOuterJoin(javaPairRDD, new Partitioner() {    
+    @Override    
+    public int numPartitions() {        return 2;    }    
+    @Override    
+    public int getPartition(Object key) { return (key.toString()).hashCode()%numPartitions();    
+  }
+});
+System.out.println(leftJoinRDD2);</code></pre>
+
+<h1>rightOuterJoin</h1>
+
+<hr />
+<h3>官方文档描述：</h3>
+
+<pre>
+<code>Perform a right outer join of `this` and `other`. For each element (k, w) in `other`, the resulting RDD will either contain all pairs (k, (Some(v), w)) for v in `this`, or the pair (k, (None, w)) if no elements in `this` have key k. Uses the given Partitioner to partition the output RDD.
+</code></pre>
+
+<h3>函数原型：</h3>
+
+<pre>
+<code>def rightOuterJoin[W](other: JavaPairRDD[K, W]): JavaPairRDD[K, (Optional[V], W)]
+
+def rightOuterJoin[W](other: JavaPairRDD[K, W], numPartitions: Int)
+: JavaPairRDD[K, (Optional[V], W)]
+
+def rightOuterJoin[W](other: JavaPairRDD[K, W], partitioner: Partitioner): JavaPairRDD[K, (Optional[V], W)]</code></pre>
+
+<h3>源码分析：</h3>
+
+<pre>
+<code>def rightOuterJoin[W](other: RDD[(K, W)], partitioner: Partitioner)    : RDD[(K, (Option[V], W))] = self.withScope {  
+this.cogroup(other, partitioner).flatMapValues { pair =&gt;    
+    if (pair._1.isEmpty) {      
+      pair._2.iterator.map(w =&gt; (None, w))    
+    } else {      
+      for (v &lt;- pair._1.iterator; w &lt;- pair._2.iterator) yield (Some(v), w)    
+    }  
+  }
+}</code></pre>
+
+<p><strong>从源码中可以看出，rightOuterJoin() 与 fullOuterJoin() 类似，首先进行 cogroup()， 得到&nbsp;<code>&lt;K, (Iterable[V1], Iterable[V2])&gt;</code>&nbsp;类型的 MappedValuesRDD，然后对 Iterable[V1] 和 Iterable[V2] 做笛卡尔集，注意在V2中添加了None，并将集合 flat() 化。</strong></p>
+
+<h3>实例：</h3>
+
+<pre>
+<code>List&lt;Integer&gt; data = Arrays.asList(1, 2, 4, 3, 5, 6, 7);
+final Random random = new Random();
+JavaRDD&lt;Integer&gt; javaRDD = javaSparkContext.parallelize(data);
+JavaPairRDD&lt;Integer,Integer&gt; javaPairRDD = javaRDD.mapToPair(new PairFunction&lt;Integer, Integer, Integer&gt;() {    
+  @Override    
+  public Tuple2&lt;Integer, Integer&gt; call(Integer integer) throws Exception {        
+    return new Tuple2&lt;Integer, Integer&gt;(integer,random.nextInt(10));    
+  }
+});
+
+//右关联
+JavaPairRDD&lt;Integer,Tuple2&lt;Optional&lt;Integer&gt;,Integer&gt;&gt; rightJoinRDD = javaPairRDD.rightOuterJoin(javaPairRDD);
+System.out.println(rightJoinRDD);
+
+JavaPairRDD&lt;Integer,Tuple2&lt;Optional&lt;Integer&gt;,Integer&gt;&gt; rightJoinRDD1 = javaPairRDD.rightOuterJoin(javaPairRDD,2);
+System.out.println(rightJoinRDD1);
+
+JavaPairRDD&lt;Integer,Tuple2&lt;Optional&lt;Integer&gt;,Integer&gt;&gt; rightJoinRDD2 = javaPairRDD.rightOuterJoin(javaPairRDD, new Partitioner() {    
+  @Override    
+  public int numPartitions() {        return 2;    }    
+  @Override    
+  public int getPartition(Object key) { return (key.toString()).hashCode()%numPartitions();    }
+});
+System.out.println(rightJoinRDD2);</code>
+</pre>
+
+<p>&nbsp;</p>
+
+<h1>【Spark Java API】Transformation(9)&mdash;sortByKey、repartitionAndSortWithinPartitions</h1>
+
+<h1>sortByKey</h1>
+
+<hr />
+<h3>官方文档描述：</h3>
+
+<pre>
+<code>Sort the RDD by key, so that each partition contains a sorted range of the elements in ascending order. Calling `collect` or `save` on the resulting RDD will return or output an ordered list of records (in the `save` case, they will be written to multiple `part-X` files in the filesystem, in order of the keys).
+</code></pre>
+
+<h3>函数原型：</h3>
+
+<pre>
+<code>def sortByKey(): JavaPairRDD[K, V]
+
+def sortByKey(ascending: Boolean): JavaPairRDD[K, V]
+
+def sortByKey(ascending: Boolean, numPartitions: Int): JavaPairRDD[K, V]
+
+def sortByKey(comp: Comparator[K]): JavaPairRDD[K, V]
+
+def sortByKey(comp: Comparator[K], ascending: Boolean): JavaPairRDD[K, V]
+
+def sortByKey(comp: Comparator[K], ascending: Boolean, numPartitions: Int): JavaPairRDD[K, V]</code></pre>
+
+<h3>源码分析：</h3>
+
+<pre>
+<code>def sortByKey(ascending: Boolean = true, numPartitions: Int = self.partitions.length) : RDD[(K, V)] = self.withScope{  
+  val part = new RangePartitioner(numPartitions, self, ascending)  
+  new ShuffledRDD[K, V, V](self, part)    
+  .setKeyOrdering(if (ascending) ordering else ordering.reverse)
+}</code></pre>
+
+<p><strong>sortByKey() 将 RDD[(K, V)] 中的 records 按 key 排序，ascending = true 表示升序，false 表示降序。目前 sortByKey() 的数据依赖很简单，先使用 shuffle 将 records 聚集在一起（放到对应的 partition 里面），然后将 partition 内的所有 records 按 key 排序，最后得到的 MapPartitionsRDD 中的 records 就有序了。目前 sortByKey() 先使用 Array 来保存 partition 中所有的 records，再排序。</strong></p>
+
+<h3>实例：</h3>
+
+<pre>
+<code>List&lt;Integer&gt; data = Arrays.asList(1, 2, 4, 3, 5, 6, 7);
+JavaRDD&lt;Integer&gt; javaRDD = javaSparkContext.parallelize(data);
+final Random random = new Random(100);
+JavaPairRDD&lt;Integer,Integer&gt; javaPairRDD = javaRDD.mapToPair(new PairFunction&lt;Integer, Integer, Integer&gt;() {    
+    @Override      
+    public Tuple2&lt;Integer, Integer&gt; call(Integer integer) throws Exception {        
+      return new Tuple2&lt;Integer, Integer&gt;(integer,random.nextInt(10));    
+  }
+});
+
+JavaPairRDD&lt;Integer,Integer&gt; sortByKeyRDD = javaPairRDD.sortByKey();
+System.out.println(sortByKeyRDD.collect());</code></pre>
+
+<h1>repartitionAndSortWithinPartitions</h1>
+
+<hr />
+<h3>官方文档描述：</h3>
+
+<pre>
+<code>Repartition the RDD according to the given partitioner and, within each resulting partition,sort records by their keys.This is more efficient than calling `repartition` and then sorting within each partition because it can push the sorting down into the shuffle machinery.
+</code></pre>
+
+<h3>函数原型：</h3>
+
+<pre>
+<code>def repartitionAndSortWithinPartitions(partitioner: Partitioner): JavaPairRDD[K, V]
+
+def repartitionAndSortWithinPartitions(partitioner: Partitioner, comp: Comparator[K])  : JavaPairRDD[K, V]</code></pre>
+
+<h3>源码分析：</h3>
+
+<pre>
+<code>def repartitionAndSortWithinPartitions(partitioner: Partitioner): RDD[(K, V)] = self.withScope {  
+  new ShuffledRDD[K, V, V](self, partitioner).setKeyOrdering(ordering)
+}</code></pre>
+
+<p><strong>从源码中可以看出，该方法依据partitioner对RDD进行分区，并且在每个结果分区中按key进行排序；通过对比sortByKey发现，这种方式比先分区，然后在每个分区中进行排序效率高，这是因为它可以将排序融入到shuffle阶段。</strong></p>
+
+<h3>实例：</h3>
+
+<pre>
+<code>List&lt;Integer&gt; data = Arrays.asList(1, 2, 4, 3, 5, 6, 7);
+JavaRDD&lt;Integer&gt; javaRDD = javaSparkContext.parallelize(data);
+final Random random = new Random();JavaPairRDD&lt;Integer,Integer&gt; javaPairRDD = javaRDD.mapToPair(new PairFunction&lt;Integer, Integer, Integer&gt;() {    
+    @Override    
+    public Tuple2&lt;Integer, Integer&gt; call(Integer integer) throws Exception {        
+      return new Tuple2&lt;Integer, Integer&gt;(integer,random.nextInt(10));    
+  }
+});
+
+JavaPairRDD&lt;Integer,Integer&gt; RepartitionAndSortWithPartitionsRDD = javaPairRDD.repartitionAndSortWithinPartitions(new Partitioner() {    
+    @Override    
+    public int numPartitions() {   return 2;    }    
+    @Override    
+    public int getPartition(Object key) { return key.toString().hashCode() % numPartitions();    
+  }
+});
+System.out.println(RepartitionAndSortWithPartitionsRDD.collect());</code>
+</pre>
+
+<h1>【Spark Java API】Transformation(10)&mdash;combineByKey、groupByKey</h1>
+
+<h1>combineByKey</h1>
+
+<hr />
+<h3>官方文档描述：</h3>
+
+<pre>
+<code>Generic function to combine the elements for each key using a custom set of aggregation functions. Turns an RDD[(K, V)] into a result of type RDD[(K, C)], for a &quot;combined type&quot; C Note that V and C can be different -- for example, one might group an RDD of type (Int, Int) into an RDD of type (Int, Seq[Int]). 
+Users provide three functions:
+ - `createCombiner`, which turns a V into a C (e.g., creates a one-element list)
+ - `mergeValue`, to merge a V into a C (e.g., adds it to the end of a list)
+ - `mergeCombiners`, to combine two C&#39;s into a single one.
+In addition, users can control the partitioning of the output RDD, and whether to perform map-side aggregation (if a mapper can produce multiple items with the same key).
+</code></pre>
+
+<h3>函数原型：</h3>
+
+<pre>
+<code>def combineByKey[C](createCombiner: JFunction[V, C], mergeValue: JFunction2[C, V, C],  
+mergeCombiners: JFunction2[C, C, C]): JavaPairRDD[K, C]
+
+def combineByKey[C](createCombiner: JFunction[V, C], mergeValue: JFunction2[C, V, C], 
+mergeCombiners: JFunction2[C, C, C], numPartitions: Int): JavaPairRDD[K, C]
+
+def combineByKey[C](createCombiner: JFunction[V, C], mergeValue: JFunction2[C, V, C],    
+mergeCombiners: JFunction2[C, C, C], partitioner: Partitioner): JavaPairRDD[K, C]
+
+def combineByKey[C](createCombiner: JFunction[V, C], mergeValue: JFunction2[C, V, C], 
+mergeCombiners: JFunction2[C, C, C], partitioner: Partitioner, 
+mapSideCombine: Boolean,serializer: Serializer): JavaPairRDD[K, C]</code></pre>
+
+<p><strong>该函数是用于将RDD[k,v]转化为RDD[k,c]，其中类型v和类型c可以相同也可以不同。</strong>&nbsp;<br />
+<strong>其中的参数如下：</strong>&nbsp;<br />
+<strong>- createCombiner：该函数用于将输入参数RDD[k,v]的类型V转化为输出参数RDD[k,c]中类型C;</strong>&nbsp;<br />
+<strong>- mergeValue：合并函数，用于将输入中的类型C的值和类型V的值进行合并，得到类型C，输入参数是（C，V），输出是C；</strong>&nbsp;<br />
+<strong>- mergeCombiners：合并函数，用于将两个类型C的值合并成一个类型C，输入参数是（C，C），输出是C；</strong>&nbsp;<br />
+<strong>- numPartitions：默认HashPartitioner中partition的个数；</strong>&nbsp;<br />
+<strong>- partitioner：分区函数，默认是HashPartitionner；</strong>&nbsp;<br />
+<strong>- mapSideCombine：该函数用于判断是否需要在map进行combine操作，类似于MapReduce中的combine，默认是 true。</strong></p>
+
+<h3>源码分析：</h3>
+
+<pre>
+<code>def combineByKey[C](createCombiner: V =&gt; C, 
+mergeValue: (C, V) =&gt; C, 
+mergeCombiners: (C, C) =&gt; C, 
+partitioner: Partitioner, 
+mapSideCombine: Boolean = true, 
+serializer: Serializer = null): RDD[(K, C)] = self.withScope {  
+require(mergeCombiners != null, &quot;mergeCombiners must be defined&quot;) // required as of Spark 0.9.0  
+if (keyClass.isArray) {    
+  if (mapSideCombine) {      
+    throw new SparkException(&quot;Cannot use map-side combining with array keys.&quot;)    
+  }    
+  if (partitioner.isInstanceOf[HashPartitioner]) {          
+    throw new SparkException(&quot;Default partitioner cannot partition array keys.&quot;)    
+  }  
+}  
+val aggregator = new Aggregator[K, V, C](    
+  self.context.clean(createCombiner),    
+  self.context.clean(mergeValue),    
+  self.context.clean(mergeCombiners))  
+if (self.partitioner == Some(partitioner)) {    
+  self.mapPartitions(iter =&gt; {      
+    val context = TaskContext.get()      
+    new InterruptibleIterator(context, aggregator.combineValuesByKey(iter, context))    
+  }, preservesPartitioning = true)  
+} else {    
+  new ShuffledRDD[K, V, C](self, partitioner)      
+    .setSerializer(serializer)      
+    .setAggregator(aggregator)        
+    .setMapSideCombine(mapSideCombine)  
+  }
+}</code></pre>
+
+<p><strong>从源码中可以看出，combineByKey()的实现是一边进行aggregate，一边进行compute() 的基础操作。假设一组具有相同 K 的&nbsp;<code>&lt;K, V&gt;</code>&nbsp;records 正在一个个流向 combineByKey()，createCombiner 将第一个 record 的 value 初始化为 c （比如，c = value），然后从第二个 record 开始，来一个 record 就使用 mergeValue(c, record.value) 来更新 c，比如想要对这些 records 的所有 values 做 sum，那么使用&nbsp;<code>c = c + record.value</code>。等到 records 全部被 mergeValue()，得到结果 c。假设还有一组 records（key 与前面那组的 key 均相同）一个个到来，combineByKey() 使用前面的方法不断计算得到 c&rsquo;。现在如果要求这两组 records 总的 combineByKey() 后的结果，那么可以使用&nbsp;<code>final c = mergeCombiners(c, c&#39;)</code>&nbsp;来计算；然后依据partitioner进行不同分区合并。</strong></p>
+
+<h3>实例：</h3>
+
+<pre>
+<code>List&lt;Integer&gt; data = Arrays.asList(1, 2, 4, 3, 5, 6, 7, 1, 2);
+JavaRDD&lt;Integer&gt; javaRDD = javaSparkContext.parallelize(data);
+//转化为pairRDD
+JavaPairRDD&lt;Integer,Integer&gt; javaPairRDD = javaRDD.mapToPair(new PairFunction&lt;Integer, Integer, Integer&gt;() {    
+    @Override    
+    public Tuple2&lt;Integer, Integer&gt; call(Integer integer) throws Exception {  
+    return new Tuple2&lt;Integer, Integer&gt;(integer,1);   
+  }
+});
+
+JavaPairRDD&lt;Integer,String&gt; combineByKeyRDD = javaPairRDD.combineByKey(new Function&lt;Integer, String&gt;() {    
+    @Override    
+    public String call(Integer v1) throws Exception {  
+      return v1 + &quot; :createCombiner: &quot;;    
+  }
+  }, new Function2&lt;String, Integer, String&gt;() {    
+    @Override    
+    public String call(String v1, Integer v2) throws Exception {        
+      return v1 + &quot; :mergeValue: &quot; + v2;    
+  }
+}, new Function2&lt;String, String, String&gt;() {    
+    @Override    
+    public String call(String v1, String v2) throws Exception {        
+      return v1 + &quot; :mergeCombiners: &quot; + v2;    
+  }
+});
+System.out.println(&quot;result~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~&quot; + combineByKeyRDD.collect());</code></pre>
+
+<h1>groupByKey</h1>
+
+<hr />
+<h3>官方文档描述：</h3>
+
+<pre>
+<code>Group the values for each key in the RDD into a single sequence. Allows controlling the partitioning of the resulting key-value pair RDD by passing a Partitioner. The ordering of elements within each group is not guaranteed,and may even differ each time the resulting RDD is evaluated.Note: This operation may be very expensive. If you are grouping in order to perform an aggregation (such as a sum or average) over each key, using [[PairRDDFunctions.aggregateByKey]] or [[PairRDDFunctions.reduceByKey]] will provide much better performance.Note: As currently implemented, groupByKey must be able to hold all the key-value pairs for any key in memory. If a key has too many values, it can result in an [[OutOfMemoryError]].
+</code></pre>
+
+<ul>
+	<li>1</li>
+</ul>
+
+<h3>函数原型：</h3>
+
+<pre>
+<code>def groupByKey(partitioner: Partitioner): JavaPairRDD[K, JIterable[V]]
+
+def groupByKey(numPartitions: Int): JavaPairRDD[K, JIterable[V]]</code></pre>
+
+<ul>
+	<li>1</li>
+	<li>2</li>
+	<li>3</li>
+</ul>
+
+<h3>源码分析：</h3>
+
+<pre>
+<code>def groupByKey(partitioner: Partitioner): RDD[(K, Iterable[V])] = self.withScope {  
+  // groupByKey shouldn&#39;t use map side combine because map side combine does not  
+  // reduce the amount of data shuffled and requires all map side data be inserted  
+  // into a hash table, leading to more objects in the old gen.  
+  val createCombiner = (v: V) =&gt; CompactBuffer(v)  
+  val mergeValue = (buf: CompactBuffer[V], v: V) =&gt; buf += v  
+  val mergeCombiners = (c1: CompactBuffer[V], c2: CompactBuffer[V]) =&gt; c1 ++= c2  
+  val bufs = combineByKey[CompactBuffer[V]]( createCombiner, mergeValue, mergeCombiners, partitioner, mapSideCombine = false)  
+  bufs.asInstanceOf[RDD[(K, Iterable[V])]]
+}</code></pre>
+
+<p><strong>从源码中可以看出groupByKey()是基于combineByKey()实现的， 只是将 Key 相同的 records 聚合在一起，一个简单的 shuffle 过程就可以完成。ShuffledRDD 中的 compute() 只负责将属于每个 partition 的数据 fetch 过来，之后使用 mapPartitions() 操作进行 aggregate，生成 MapPartitionsRDD，到这里 groupByKey() 已经结束。最后为了统一返回值接口，将 value 中的 ArrayBuffer[] 数据结构抽象化成 Iterable[]。groupByKey() 没有在 map 端进行 combine（mapSideCombine = false），这样设计是因为map 端 combine 只会省掉 partition 里面重复 key 占用的空间；但是，当重复 key 特别多时，可以考虑开启 combine。</strong></p>
+
+<h3>实例：</h3>
+
+<pre>
+<code>List&lt;Integer&gt; data = Arrays.asList(1, 2, 4, 3, 5, 6, 7);
+JavaRDD&lt;Integer&gt; javaRDD = javaSparkContext.parallelize(data);
+//转为k，v格式
+JavaPairRDD&lt;Integer,Integer&gt; javaPairRDD = javaRDD.mapToPair(new PairFunction&lt;Integer, Integer, Integer&gt;() {    
+    @Override      
+    public Tuple2&lt;Integer, Integer&gt; call(Integer integer) throws Exception {        
+    return new Tuple2&lt;Integer, Integer&gt;(integer,1);    
+  }
+});
+
+JavaPairRDD&lt;Integer,Iterable&lt;Integer&gt;&gt; groupByKeyRDD = javaPairRDD.groupByKey(2);
+System.out.println(groupByKeyRDD.collect());
+
+//自定义partition
+JavaPairRDD&lt;Integer,Iterable&lt;Integer&gt;&gt; groupByKeyRDD3 = javaPairRDD.groupByKey(new Partitioner() {    
+    //partition各数    
+    @Override    
+    public int numPartitions() {        return 10;    }    
+    //partition方式    
+    @Override    
+    public int getPartition(Object o) {          
+      return (o.toString()).hashCode()%numPartitions();    
+  }
+});
+System.out.println(groupByKeyRDD3.collect());</code></pre>
+
+<p>&nbsp;</p>
+
+<h1>【Spark Java API】Transformation(11)&mdash;reduceByKey、foldByKey</h1>
+
+<h1>reduceByKey</h1>
+
+<hr />
+<h3>官方文档描述：</h3>
+
+<pre>
+<code>Merge the values for each key using an associative reduce function. This will also perform the merging locally on each mapper before sending results to a reducer, similarly to a &quot;combiner&quot; in MapReduce.
+</code></pre>
+
+<h3>函数原型：</h3>
+
+<pre>
+<code>def reduceByKey(partitioner: Partitioner, func: JFunction2[V, V, V]): JavaPairRDD[K, V]
+
+def reduceByKey(func: JFunction2[V, V, V], numPartitions: Int): JavaPairRDD[K, V]</code></pre>
+
+<p><strong>该函数利用映射函数将每个K对应的V进行运算。</strong>&nbsp;<br />
+<strong>其中参数说明如下：</strong>&nbsp;<br />
+<strong>- func：映射函数，根据需求自定义；</strong>&nbsp;<br />
+<strong>- partitioner：分区函数；</strong>&nbsp;<br />
+<strong>- numPartitions：分区数，默认的分区函数是HashPartitioner。</strong></p>
+
+<h3>源码分析：</h3>
+
+<pre>
+<code>def reduceByKey(partitioner: Partitioner, func: (V, V) =&gt; V): RDD[(K, V)] = self.withScope {  
+  combineByKey[V]((v: V) =&gt; v, func, func, partitioner)
+}</code></pre>
+
+<p><strong>从源码中可以看出，reduceByKey()是基于<a href="http://www.jianshu.com/p/03f63af51afe" rel="nofollow">combineByKey()</a>实现的，其中createCombiner只是简单的转化，而mergeValue和mergeCombiners相同，都是利用用户自定义函数。reduceyByKey() 相当于传统的 MapReduce，整个数据流也与 Hadoop 中的数据流基本一样。在combineByKey()中在 map 端开启 combine()，因此，reduceyByKey() 默认也在 map 端开启 combine()，这样在 shuffle 之前先通过 mapPartitions 操作进行 combine，得到 MapPartitionsRDD， 然后 shuffle 得到 ShuffledRDD，再进行 reduce（通过 aggregate + mapPartitions() 操作来实现）得到 MapPartitionsRDD。</strong></p>
+
+<h3>实例：</h3>
+
+<pre>
+<code>List&lt;Integer&gt; data = Arrays.asList(1, 2, 4, 3, 5, 6, 7);
+JavaRDD&lt;Integer&gt; javaRDD = javaSparkContext.parallelize(data);
+
+//转化为K，V格式
+JavaPairRDD&lt;Integer,Integer&gt; javaPairRDD = javaRDD.mapToPair(new PairFunction&lt;Integer, Integer, Integer&gt;() {    
+    @Override    
+    public Tuple2&lt;Integer, Integer&gt; call(Integer integer) throws Exception {        
+      return new Tuple2&lt;Integer, Integer&gt;(integer,1);    
+  }
+});
+JavaPairRDD&lt;Integer,Integer&gt; reduceByKeyRDD = javaPairRDD.reduceByKey(new Function2&lt;Integer, Integer, Integer&gt;() {    
+    @Override      
+    public Integer call(Integer v1, Integer v2) throws Exception {        
+      return v1 + v2;    
+  }
+});
+System.out.println(reduceByKeyRDD.collect());
+
+//指定numPartitions
+JavaPairRDD&lt;Integer,Integer&gt; reduceByKeyRDD2 = javaPairRDD.reduceByKey(new Function2&lt;Integer, Integer, Integer&gt;() {    
+    @Override    
+    public Integer call(Integer v1, Integer v2) throws Exception {        
+      return v1 + v2;    
+  }
+},2);
+System.out.println(reduceByKeyRDD2.collect());
+
+//自定义partition
+JavaPairRDD&lt;Integer,Integer&gt; reduceByKeyRDD4 = javaPairRDD.reduceByKey(new Partitioner() {    
+      @Override    
+      public int numPartitions() {    return 2;    }    
+      @Override    
+      public int getPartition(Object o) {        
+        return (o.toString()).hashCode()%numPartitions();    
+  }
+}, new Function2&lt;Integer, Integer, Integer&gt;() {    
+    @Override      
+    public Integer call(Integer v1, Integer v2) throws Exception {        
+      return v1 + v2;    
+  }
+});
+System.out.println(reduceByKeyRDD4.collect());</code></pre>
+
+<h1>foldByKey</h1>
+
+<hr />
+<h3>官方文档描述：</h3>
+
+<pre>
+<code>Merge the values for each key using an associative function and a neutral &quot;zero value&quot; which may be added to the result an arbitrary number of times, and must not change the result (e.g., Nil for list concatenation, 0 for addition, or 1 for multiplication.).
+</code></pre>
+
+<h3>函数原型：</h3>
+
+<pre>
+<code>def foldByKey(zeroValue: V, partitioner: Partitioner, func: JFunction2[V, V, V]): JavaPairRDD[K, V]
+
+def foldByKey(zeroValue: V, numPartitions: Int, func: JFunction2[V, V, V]): JavaPairRDD[K, V]
+
+def foldByKey(zeroValue: V, func: JFunction2[V, V, V]): JavaPairRDD[K, V]</code></pre>
+
+<p><strong>该函数用于将K对应V利用函数映射进行折叠、合并处理，其中参数zeroValue是对V进行初始化。</strong>&nbsp;<br />
+<strong>具体参数如下：</strong>&nbsp;<br />
+<strong>- zeroValue：初始值；</strong>&nbsp;<br />
+<strong>- numPartitions：分区数，默认的分区函数是HashPartitioner；</strong>&nbsp;<br />
+<strong>- partitioner：分区函数；</strong>&nbsp;<br />
+<strong>- func：映射函数，用户自定义函数。</strong></p>
+
+<h3>源码分析：</h3>
+
+<pre>
+<code>def foldByKey( zeroValue: V,  partitioner: Partitioner)(func: (V, V) =&gt; V): RDD[(K, V)] = self.withScope {  
+    // Serialize the zero value to a byte array so that we can get a new clone of it on each key  
+    val zeroBuffer = SparkEnv.get.serializer.newInstance().serialize(zeroValue)  
+    val zeroArray = new Array[Byte](zeroBuffer.limit)  
+    zeroBuffer.get(zeroArray)  
+    // When deserializing, use a lazy val to create just one instance of the serializer per task  
+    lazy val cachedSerializer = SparkEnv.get.serializer.newInstance()  
+    val createZero = () =&gt; cachedSerializer.deserialize[V](ByteBuffer.wrap(zeroArray))  
+    val cleanedFunc = self.context.clean(func)  
+    combineByKey[V]((v: V) =&gt; cleanedFunc(createZero(), v), cleanedFunc, cleanedFunc, partitioner)
+}</code></pre>
+
+<p><strong>从foldByKey()实现可以看出，该函数是基于<a href="http://www.jianshu.com/p/03f63af51afe" rel="nofollow">combineByKey()</a>实现的，其中createCombiner只是利用zeroValue对V进行初始化，而mergeValue和mergeCombiners相同，都是利用用户自定义函数。在这里需要注意如果实现K的V聚合操作，初始设置需要特别注意，不要改变聚合的结果。</strong></p>
+
+<h3>实例：</h3>
+
+<pre>
+<code>List&lt;Integer&gt; data = Arrays.asList(1, 2, 4, 3, 5, 6, 7, 1, 2);
+JavaRDD&lt;Integer&gt; javaRDD = javaSparkContext.parallelize(data);
+final Random rand = new Random(10);
+JavaPairRDD&lt;Integer,String&gt; javaPairRDD = javaRDD.mapToPair(new PairFunction&lt;Integer, Integer, String&gt;() {    
+    @Override    
+    public Tuple2&lt;Integer, String&gt; call(Integer integer) throws Exception {  
+      return new Tuple2&lt;Integer, String&gt;(integer,Integer.toString(rand.nextInt(10)));    
+  }
+});
+
+JavaPairRDD&lt;Integer,String&gt; foldByKeyRDD = javaPairRDD.foldByKey(&quot;X&quot;, new Function2&lt;String, String, String&gt;() {    
+    @Override    
+    public String call(String v1, String v2) throws Exception {        
+      return v1 + &quot;:&quot; + v2;    
+  }
+});
+System.out.println(&quot;~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~&quot; + foldByKeyRDD.collect());
+
+JavaPairRDD&lt;Integer,String&gt; foldByKeyRDD1 = javaPairRDD.foldByKey(&quot;X&quot;, 2, new Function2&lt;String, String, String&gt;() {    
+    @Override    
+    public String call(String v1, String v2) throws Exception {        
+      return v1 + &quot;:&quot; + v2;    
+    }
+});
+System.out.println(&quot;~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~&quot; + foldByKeyRDD1.collect());
+
+JavaPairRDD&lt;Integer,String&gt; foldByKeyRDD2 = javaPairRDD.foldByKey(&quot;X&quot;, new Partitioner() {    
+    @Override    
+    public int numPartitions() {        return 3;    }    
+    @Override    
+    public int getPartition(Object key) {        
+      return key.toString().hashCode()%numPartitions();    
+  }
+}, new Function2&lt;String, String, String&gt;() {    
+    @Override    
+    public String call(String v1, String v2) throws Exception {        
+      return v1 + &quot;:&quot; + v2;    
+  }
+});
+System.out.println(&quot;~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~&quot; + foldByKeyRDD2.collect());</code>
+</pre>
+
+<h1>【Spark Java API】Transformation(12)&mdash;zipPartitions、zip</h1>
+
+<p>2016年08月20日 11:34:37&nbsp;<a href="https://me.csdn.net/a6210575" target="_blank">小飞_侠</a>&nbsp;阅读数 428</p>
+
+<h1>zipPartitions</h1>
+
+<hr />
+<h3>官方文档描述：</h3>
+
+<pre>
+<code>Zip this RDD&#39;s partitions with one (or more) RDD(s) and return a new RDD by applying a function to the zipped partitions. Assumes that all the RDDs have the same number of partitions, but does not require them to have the same number of elements in each partition.
+</code></pre>
+
+<h3>函数原型：</h3>
+
+<pre>
+<code>def zipPartitions[U, V](    
+    other: JavaRDDLike[U, _], 
+    f: FlatMapFunction2[java.util.Iterator[T], java.util.Iterator[U], V]): JavaRDD[V]</code></pre>
+
+<p><strong>该函数将两个分区RDD按照partition进行合并，形成一个新的RDD。</strong></p>
+
+<h3>源码分析：</h3>
+
+<pre>
+<code>def zipPartitions[B: ClassTag, V: ClassTag]    
+      (rdd2: RDD[B], preservesPartitioning: Boolean)    
+      (f: (Iterator[T], Iterator[B]) =&gt; Iterator[V]): RDD[V] = withScope {  
+    new ZippedPartitionsRDD2(sc, sc.clean(f), this, rdd2, preservesPartitioning)
+}
+
+private[spark] class ZippedPartitionsRDD2[A: ClassTag, B: ClassTag, V: ClassTag](    
+    sc: SparkContext,    
+    var f: (Iterator[A], Iterator[B]) =&gt; Iterator[V],    
+    var rdd1: RDD[A],    
+    var rdd2: RDD[B],    
+    preservesPartitioning: Boolean = false)  
+  extends ZippedPartitionsBaseRDD[V](sc, List(rdd1, rdd2), preservesPartitioning) {  
+
+  override def compute(s: Partition, context: TaskContext): Iterator[V] = {    
+      val partitions = s.asInstanceOf[ZippedPartitionsPartition].partitions    
+      f(rdd1.iterator(partitions(0), context), rdd2.iterator(partitions(1), context))  
+  }  
+
+  override def clearDependencies() {    
+      super.clearDependencies()    
+      rdd1 = null    
+      rdd2 = null    
+      f = null  
+  }
+}</code></pre>
+
+<p><strong>从源码中可以看出，zipPartitions函数生成ZippedPartitionsRDD2，该RDD继承ZippedPartitionsBaseRDD，在ZippedPartitionsBaseRDD中的getPartitions方法中判断需要组合的RDD是否具有相同的分区数，但是该RDD实现中并没有要求每个partitioner内的元素数量相同。</strong></p>
+
+<h3>实例：</h3>
+
+<pre>
+<code>List&lt;Integer&gt; data = Arrays.asList(5, 1, 1, 4, 4, 2, 2);
+JavaRDD&lt;Integer&gt; javaRDD = javaSparkContext.parallelize(data,3);
+List&lt;Integer&gt; data1 = Arrays.asList(3, 2, 12, 5, 6, 1);
+JavaRDD&lt;Integer&gt; javaRDD1 = javaSparkContext.parallelize(data1,3);
+JavaRDD&lt;String&gt; zipPartitionsRDD = javaRDD.zipPartitions(javaRDD1, new FlatMapFunction2&lt;Iterator&lt;Integer&gt;, Iterator&lt;Integer&gt;, String&gt;() {    
+    @Override    
+    public Iterable&lt;String&gt; call(Iterator&lt;Integer&gt; integerIterator, Iterator&lt;Integer&gt; integerIterator2) throws Exception {        
+        LinkedList&lt;String&gt; linkedList = new LinkedList&lt;String&gt;();        
+        while(integerIterator.hasNext() &amp;&amp; integerIterator2.hasNext())            
+            linkedList.add(integerIterator.next().toString() + &quot;_&quot; + integerIterator2.next().toString());        
+        return linkedList;    
+  }
+});
+System.out.println(&quot;~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~&quot; + zipPartitionsRDD.collect());</code></pre>
+
+<h1>zip</h1>
+
+<hr />
+<h3>官方文档描述：</h3>
+
+<pre>
+<code>Zips this RDD with another one, returning key-value pairs with the first element in each RDD,second element in each RDD, etc. Assumes that the two RDDs have the same number of partitions and the same number of elements in each partition (e.g. one was made through a map on the other).
+</code></pre>
+
+<h3>函数原型：</h3>
+
+<pre>
+<code>def zip[U](other: JavaRDDLike[U, _]): JavaPairRDD[T, U]</code></pre>
+
+<ul>
+	<li>1</li>
+</ul>
+
+<p><strong>该函数用于将两个RDD进行组合，组合成一个key/value形式的RDD。</strong></p>
+
+<h3>源码分析：</h3>
+
+<pre>
+<code>def zip[U: ClassTag](other: RDD[U]): RDD[(T, U)] = withScope {  
+  zipPartitions(other, preservesPartitioning = false) { (thisIter, otherIter) =&gt;    
+    new Iterator[(T, U)] {      
+      def hasNext: Boolean = (thisIter.hasNext, otherIter.hasNext) match {        
+        case (true, true) =&gt; true        
+        case (false, false) =&gt; false        
+        case _ =&gt; throw new SparkException(&quot;Can only zip RDDs with &quot; +          &quot;same number of elements in each partition&quot;)      
+      }      
+      def next(): (T, U) = (thisIter.next(), otherIter.next())    
+    }  
+  }
+}</code></pre>
+
+<p><strong>从源码中可以看出，zip函数是基于zipPartitions实现的，其中preservesPartitioning为false，preservesPartitioning表示是否保留父RDD的partitioner分区；另外，两个RDD的partition数量及元数的数量都是相同的，否则会抛出异常。</strong></p>
+
+<h3>实例：</h3>
+
+<pre>
+<code>List&lt;Integer&gt; data = Arrays.asList(5, 1, 1, 4, 4, 2, 2);
+JavaRDD&lt;Integer&gt; javaRDD = javaSparkContext.parallelize(data,3);
+List&lt;Integer&gt; data1 = Arrays.asList(3,2,12,5,6,1,7);
+JavaRDD&lt;Integer&gt; javaRDD1 = javaSparkContext.parallelize(data1);
+JavaPairRDD&lt;Integer,Integer&gt; zipRDD = javaRDD.zip(javaRDD1);
+System.out.println(&quot;~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~&quot; + zipRDD.collect());</code></pre>
+
+<p>&nbsp;</p>
+
+<h1>【Spark Java API】Transformation(13)&mdash;zipWithIndex、zipWithUniqueId</h1>
+
+<h1>zipWithIndex</h1>
+
+<hr />
+<h3>官方文档描述：</h3>
+
+<pre>
+<code>Zips this RDD with its element indices. The ordering is first based on the partition index and then the ordering of items within each partition. So the first item in the first partition gets index 0, and the last item in the last partition receives the largest index. This is similar to Scala&#39;s zipWithIndex but it uses Long instead of Int as the index type.This method needs to trigger a spark job when this RDD contains more than one partitions.
+</code></pre>
+
+<h3>函数原型：</h3>
+
+<pre>
+<code>def zipWithIndex(): JavaPairRDD[T, JLong]</code></pre>
+
+<p><strong>该函数将RDD中的元素和这个元素在RDD中的indices组合起来，形成键/值对的RDD。</strong></p>
+
+<h3>源码分析：</h3>
+
+<pre>
+<code>def zipWithIndex(): RDD[(T, Long)] = withScope {  
+    new ZippedWithIndexRDD(this)
+}
+
+/** The start index of each partition. */
+@transient private val startIndices: Array[Long] = {  
+    val n = prev.partitions.length  
+    if (n == 0) {    
+      Array[Long]()  
+    } else if (n == 1) {   
+       Array(0L)  
+    } else {    
+       prev.context.runJob(      
+          prev,      
+          Utils.getIteratorSize _,      
+          0 until n - 1, // do not need to count the last partition      
+          allowLocal = false    
+      ).scanLeft(0L)(_ + _)  
+  }
+}
+
+override def compute(splitIn: Partition, context: TaskContext): Iterator[(T, Long)] = {  
+    val split = splitIn.asInstanceOf[ZippedWithIndexRDDPartition]      
+    firstParent[T].iterator(split.prev, context).zipWithIndex.map { x =&gt;    
+        (x._1, split.startIndex + x._2)  
+  }
+}</code></pre>
+
+<p><strong>从源码中可以看出，该函数返回ZippedWithIndexRDD，在ZippedWithIndexRDD中通过计算startIndices获得index；然后在compute函数中利用scala的zipWithIndex计算index。</strong></p>
+
+<h3>实例：</h3>
+
+<pre>
+<code>List&lt;Integer&gt; data = Arrays.asList(5, 1, 1, 4, 4, 2, 2); 
+JavaRDD&lt;Integer&gt; javaRDD = javaSparkContext.parallelize(data,3); 
+List&lt;Integer&gt; data1 = Arrays.asList(3,2,12,5,6,1,7); 
+JavaRDD&lt;Integer&gt; javaRDD1 = javaSparkContext.parallelize(data1);
+JavaPairRDD&lt;Integer,Long&gt; zipWithIndexRDD = javaRDD.zipWithIndex(); 
+System.out.println(&quot;~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~&quot; + zipWithIndexRDD.collect());</code></pre>
+
+<h1>zipWithUniqueId</h1>
+
+<hr />
+<h3>官方文档描述：</h3>
+
+<pre>
+<code>Zips this RDD with generated unique Long ids. Items in the kth partition will get ids k, n+k,2*n+k, ..., where n is the number of partitions. So there may exist gaps, but this method won&#39;t trigger a spark job, which is different from [[org.apache.spark.rdd.RDD#zipWithIndex]].
+</code></pre>
+
+<h3>函数原型：</h3>
+
+<pre>
+<code>def zipWithUniqueId(): JavaPairRDD[T, JLong]</code></pre>
+
+<p><strong>该函数将RDD中的元素和一个对应的唯一ID组合成键值对，其中ID的生成算法是每个分区的第一元素的ID是该分区索引号，每个分区中的第N个元素的ID是（N * 该RDD总的分区数） + （该分区索引号）。</strong></p>
+
+<h3>源码分析：</h3>
+
+<pre>
+<code>def zipWithUniqueId(): RDD[(T, Long)] = withScope {  
+    val n = this.partitions.length.toLong    
+    this.mapPartitionsWithIndex { case (k, iter) =&gt;    
+        iter.zipWithIndex.map { case (item, i) =&gt;      
+            (item, i * n + k)    
+        }  
+  }
+}</code></pre>
+
+<p><strong>*从源码中可以看出，zipWithUniqueId()函数是利用mapPartitionsWithIndex()函数获得每个元素的分区索引号，同时利用（i*n + k）进行相应的计算。</strong></p>
+
+<h3>实例：</h3>
+
+<pre>
+<code>List&lt;Integer&gt; data = Arrays.asList(5, 1, 1, 4, 4, 2, 2);
+JavaRDD&lt;Integer&gt; javaRDD = javaSparkContext.parallelize(data,3);
+List&lt;Integer&gt; data1 = Arrays.asList(3,2,12,5,6,1,7);
+JavaRDD&lt;Integer&gt; javaRDD1 = javaSparkContext.parallelize(data1);
+JavaPairRDD&lt;Integer,Long&gt; zipWithIndexRDD = javaRDD.zipWithUniqueId();
+System.out.println(&quot;~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~&quot; + zipWithIndexRDD.collect());</code></pre>
+
+<p>&nbsp;</p>
+
+<p>&nbsp;</p>
+
+<p>&nbsp;</p>

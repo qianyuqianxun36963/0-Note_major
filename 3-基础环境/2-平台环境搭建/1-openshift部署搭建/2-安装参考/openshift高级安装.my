@@ -1,0 +1,452 @@
+<h1>OpenShift高级安装</h1>
+
+<p><strong>1.1 服务器基本信息</strong></p>
+
+<p>　　本次安装采用一个master、5个node、3个etcd，node节点两块硬盘，60G磁盘用于docker storage，xxx改为自己的域名或主机名。</p>
+
+<p>&nbsp;&nbsp; &nbsp; &nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp; &nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp; &nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp; &nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp; &nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp; &nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp; &nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp; &nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp; &nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp; &nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp; &nbsp;&nbsp; &nbsp;</p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>节点</td>
+			<td>功能</td>
+			<td>IP</td>
+			<td>内存</td>
+			<td>磁盘</td>
+			<td>CPU</td>
+		</tr>
+		<tr>
+			<td>master1.xxx.net</td>
+			<td>Master节点</td>
+			<td>192.168.10.110</td>
+			<td>16G</td>
+			<td>40G</td>
+			<td>8C</td>
+		</tr>
+		<tr>
+			<td>node1.xxx.net</td>
+			<td>Node节点</td>
+			<td>192.168.10.112</td>
+			<td>8G</td>
+			<td>40G/60G</td>
+			<td>4C</td>
+		</tr>
+		<tr>
+			<td>node2.xxx.net</td>
+			<td>Node节点</td>
+			<td>192.168.10.113</td>
+			<td>8G</td>
+			<td>40G/60G</td>
+			<td>4C</td>
+		</tr>
+		<tr>
+			<td>node3.xxx.net</td>
+			<td>Node节点</td>
+			<td>192.168.10.116</td>
+			<td>8G</td>
+			<td>40G/60G</td>
+			<td>4C</td>
+		</tr>
+		<tr>
+			<td>node4.xxx.net</td>
+			<td>Node节点</td>
+			<td>192.168.10.114</td>
+			<td>8G</td>
+			<td>40G/60G</td>
+			<td>4C</td>
+		</tr>
+		<tr>
+			<td>node5.xxx.net</td>
+			<td>Node节点</td>
+			<td>192.168.10.117</td>
+			<td>8G</td>
+			<td>40G/60G</td>
+			<td>4C</td>
+		</tr>
+		<tr>
+			<td>etcd1.xxx.net</td>
+			<td>etcd</td>
+			<td>192.168.10.109</td>
+			<td>4G</td>
+			<td>40G</td>
+			<td>2C</td>
+		</tr>
+		<tr>
+			<td>etcd2.xxx.net</td>
+			<td>etcd</td>
+			<td>192.168.10.111</td>
+			<td>4G</td>
+			<td>40G</td>
+			<td>2C</td>
+		</tr>
+		<tr>
+			<td>etcd3.xxx.net</td>
+			<td>etcd</td>
+			<td>192.168.10.115</td>
+			<td>4G</td>
+			<td>40G</td>
+			<td>2C</td>
+		</tr>
+	</tbody>
+</table>
+
+<p><strong>1.2 基本配置</strong></p>
+
+<p><strong>　　所有节点</strong>hosts文件配置</p>
+
+<p>　　<strong>[root@openshift-master1 ~]# cat /etc/hosts</strong></p>
+
+<p>　　192.168.10.110 master1.xxx.net</p>
+
+<p>　　192.168.10.112 node1.xxx.net</p>
+
+<p>　　192.168.10.113 node2.xxx.net</p>
+
+<p>　　192.168.10.116 node3.xxx.net</p>
+
+<p>　　192.168.10.114 node4.xxx.net</p>
+
+<p>　　192.168.10.117 node5.xxx.net</p>
+
+<p>　　192.168.10.109 etcd1.xxx.net</p>
+
+<p>　　192.168.10.111 etcd2.xxx.net</p>
+
+<p>　　192.168.10.115 etcd3.xxx.net</p>
+
+<p><strong>　　Master1节点</strong>SSH互信</p>
+
+<p>　　<strong>[root@master1 ~]# ssh-keygen -t rsa</strong></p>
+
+<p>　　Generating public/private rsa key pair.</p>
+
+<p>　　Enter file in which to save the key (/root/.ssh/id_rsa):</p>
+
+<p>　　Created directory &#39;/root/.ssh&#39;.</p>
+
+<p>　　Enter passphrase (empty for no passphrase):</p>
+
+<p>　　Enter same passphrase again:</p>
+
+<p>　　Your identification has been saved in /root/.ssh/id_rsa.</p>
+
+<p>　　Your public key has been saved in /root/.ssh/id_rsa.pub.</p>
+
+<p>　　The key fingerprint is:</p>
+
+<p>　　SHA256:yFOKV/QRdQoxQ12uW8v0UWmpLcrxDQo8VNyVEuRWHlE root@master1.xxx.net</p>
+
+<p>　　The key&#39;s randomart image is:</p>
+
+<p>　　+---[RSA 2048]----+</p>
+
+<p>　　|&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ..X*++==E|</p>
+
+<p>　　|&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; . ..*o*o.+|</p>
+
+<p>　　|&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; o.. .oo=.|</p>
+
+<p>　　|&nbsp;&nbsp;&nbsp;&nbsp; o =o&nbsp;&nbsp; ..+ .|</p>
+
+<p>　　|&nbsp;&nbsp;&nbsp; . * S+ ..+oo |</p>
+
+<p>　　|&nbsp;&nbsp;&nbsp;&nbsp; . .&nbsp; + ==+o.|</p>
+
+<p>　　|&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; +..o..|</p>
+
+<p>　　|&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; |</p>
+
+<p>　　|&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; |</p>
+
+<p>　　+----[SHA256]-----+</p>
+
+<p>　　<strong>for i in `cat /etc/hosts | grep -v openshift | grep xxx.net | awk &#39;{print $2}&#39;`;do ssh-copy-id -i .ssh/id_rsa.pub $i;done</strong></p>
+
+<p><strong>　　所有节点</strong>安装基本环境</p>
+
+<p><strong>　　yum install wget git net-tools bind-utils iptables-services bridge-utils bash-completion kexec-tools sos psacct vim ntpdate httpd-tools -y</strong></p>
+
+<p><strong>　　所有节点</strong>更改时区并同步时间</p>
+
+<p>　　<strong>ln -sf /usr/share/zoneinfo/Asia/Shanghai /etc/localtime</strong></p>
+
+<p><strong>　　ntpdate cn.ntp.org.cn</strong></p>
+
+<p>　　<strong>yum update</strong></p>
+
+<p><strong>　　reboot</strong></p>
+
+<p><strong>　　yum install docker-1.13.1 -y</strong></p>
+
+<p>　　备注：docker可安装docker-ce　</p>
+
+<p><strong>　　所有节点</strong>激活网络</p>
+
+<p>　　<strong>nmcli con show</strong></p>
+
+<p><strong>　　nmcli con up ens160</strong></p>
+
+<p><strong>　　nmcli con mod ens160 connection.autoconnect yes</strong></p>
+
+<p><strong>　　systemctl restart NetworkManager</strong></p>
+
+<p><strong>　　所有Node节点</strong>更改/etc/sysconfig/docker-storage-setup如下：</p>
+
+<p>　　DEVS=/dev/sdb</p>
+
+<p>　　VG=docker-vg</p>
+
+<p><strong>　　所有Node节点</strong>执行docker-storage-setup</p>
+
+<p>　　<strong>[root@openshift-node1 ~]# docker-storage-setup&nbsp;&nbsp;</strong></p>
+
+<p>　　&nbsp;WARNING: Device for PV 28oz2p-ZKrx-gSc2-k6Tg-E49Y-MK4A-YcQq7h not found or rejected by a filter.</p>
+
+<p>　　&nbsp;WARNING: Device for PV 28oz2p-ZKrx-gSc2-k6Tg-E49Y-MK4A-YcQq7h not found or rejected by a filter.</p>
+
+<p>　　INFO: Device node /dev/sdb1 exists.</p>
+
+<p>　　 WARNING: Device for PV 28oz2p-ZKrx-gSc2-k6Tg-E49Y-MK4A-YcQq7h not found or rejected by a filter.</p>
+
+<p>　　Physical volume &quot;/dev/sdb1&quot; successfully created.</p>
+
+<p>　　WARNING: Device for PV 28oz2p-ZKrx-gSc2-k6Tg-E49Y-MK4A-YcQq7h not found or rejected by a filter.</p>
+
+<p>　　Volume group &quot;docker-vg&quot; successfully created</p>
+
+<p>　　WARNING: Device for PV 28oz2p-ZKrx-gSc2-k6Tg-E49Y-MK4A-YcQq7h not found or rejected by a filter.</p>
+
+<p>　　Using default stripesize 64.00 KiB.</p>
+
+<p>　　Rounding up size to full physical extent 84.00 MiB</p>
+
+<p>　　Thin pool volume with chunk size 512.00 KiB can address at most 126.50 TiB of data.</p>
+
+<p>　　Logical volume &quot;docker-pool&quot; created.</p>
+
+<p>　　Logical volume docker-vg/docker-pool changed.</p>
+
+<p><strong>　　所有节点</strong>更改docker仓库地址</p>
+
+<p>　　<strong>cat /etc/sysconfig/docker</strong></p>
+
+<p>　　# /etc/sysconfig/docker</p>
+
+<p>　　# Modify these options if you want to change the way the docker daemon runs</p>
+
+<p>　　# OPTIONS=&#39;--selinux-enabled --log-driver=journald --signature-verification=false&#39;</p>
+
+<p>　　OPTIONS=&#39;--selinux-enabled --log-driver=journald --registry-mirror=https://docker.mirrors.ustc.edu.cn&#39;</p>
+
+<p><strong>　　Master节点</strong>更改epel源,并安装ansible</p>
+
+<p>　　<strong>yum -y install&nbsp;<a href="https://dl.fedoraproject.org/pub/epel/7/x86_64/Packages/e/epel-release-7-11.noarch.rpm" rel="external nofollow noreferrer">https://dl.fedoraproject.org/pub/epel/7/x86_64/Packages/e/epel-release-7-11.noarch.rpm</a></strong></p>
+
+<p><strong>　　sed -i -e &quot;s/^enabled=1/enabled=0/&quot; /etc/yum.repos.d/epel.repo</strong></p>
+
+<p><strong>　　yum -y --enablerepo=epel install ansible pyOpenSSL</strong></p>
+
+<p><strong>　　</strong></p>
+
+<p><strong>1.3 etcd集群安装</strong></p>
+
+<p>　　安装etcd集群（按需安装，不与openshift在同一集群）</p>
+
+<p><strong>　　所有节点</strong>关闭firewalld</p>
+
+<p>　　<strong>[root@etcd1 ~]# systemctl stop firewalld</strong></p>
+
+<p><strong>　　[root@etcd1 ~]# systemctl disable firewalld</strong></p>
+
+<p>　　Removed symlink /etc/systemd/system/multi-user.target.wants/firewalld.service.</p>
+
+<p>　　Removed symlink /etc/systemd/system/dbus-org.fedoraproject.FirewallD1.service.</p>
+
+<p><strong>所有etcd节点</strong>开启iptables</p>
+
+<p>　　<strong>[root@etcd1 ~]# systemctl start iptables</strong></p>
+
+<p><strong>　　[root@etcd1 ~]# systemctl enable iptables</strong></p>
+
+<p>　　Created symlink from /etc/systemd/system/basic.target.wants/iptables.service to /usr/lib/systemd/system/iptables.service</p>
+
+<p><strong>　　所有etcd节点</strong>安装etcd，OpenShift高级安装模式无需自行配置etcd</p>
+
+<p>　　<strong>yum install etcd -y</strong></p>
+
+<p><strong>1.4 OpenShift高级安装</strong></p>
+
+<p><strong>　　参考文档：</strong><a href="https://docs.openshift.org/latest/install_config/install/advanced_install.html" rel="external nofollow noreferrer">https://docs.openshift.org/latest/install_config/install/advanced_install.html</a>　</p>
+
+<p>　　在<strong>master1节点</strong>上</p>
+
+<p>　　<strong>[root@master1 ~]# cat /etc/ansible/hosts</strong></p>
+
+<p>　　# Create an OSEv3 group that contains the masters, nodes, and etcd groups</p>
+
+<p>　　[OSEv3:children]</p>
+
+<p>　　masters</p>
+
+<p>　　nodes</p>
+
+<p>　　etcd</p>
+
+<p>　　#lb</p>
+
+<p>　　# Set variables common for all OSEv3 hosts</p>
+
+<p>　　[OSEv3:vars]</p>
+
+<p>　　# SSH user, this user should allow ssh based auth without requiring a password</p>
+
+<p>　　ansible_ssh_user=root</p>
+
+<p>　　ansible_become=yes</p>
+
+<p>　　debug_level=2</p>
+
+<p>　　openshift_deployment_type=origin</p>
+
+<p>　　# If ansible_ssh_user is not root, ansible_become must be set to true</p>
+
+<p>　　#ansible_become=true</p>
+
+<p>　　openshift_repos_enable_testing=true</p>
+
+<p>　　openshift_enable_service_catalog=false</p>
+
+<p>　　template_service_broker_install=false</p>
+
+<p>　　# uncomment the following to enable htpasswd authentication; defaults to DenyAllPasswordIdentityProvider</p>
+
+<p>　　openshift_master_identity_providers=[{&#39;name&#39;: &#39;htpasswd_auth&#39;, &#39;login&#39;: &#39;true&#39;, &#39;challenge&#39;: &#39;true&#39;, &#39;kind&#39;: &#39;HTPasswdPasswordIdentityProvider&#39;, &#39;filename&#39;: &#39;/etc/origin/master/htpasswd&#39;}]</p>
+
+<p>　　openshift_disable_check=disk_availability,docker_storage,memory_availability,docker_image_availability</p>
+
+<p>　　# config for metrics</p>
+
+<p>　　openshift_release=3.6.1</p>
+
+<p>　　openshift_clock_enabled=true</p>
+
+<p>　　#openshift_master_cluster_method=native</p>
+
+<p>　　#openshift_master_cluster_hostname=openshift.xxx.net</p>
+
+<p>　　#openshift_master_cluster_public_hostname=openshift.xxx.net</p>
+
+<p>　　#openshift_node_kubelet_args={&#39;pods-per-core&#39;: [&#39;10&#39;], &#39;max-pods&#39;: [&#39;250&#39;], &#39;image-gc-high-threshold&#39;: [&#39;90&#39;], &#39;image-gc-low-threshold&#39;: [&#39;80&#39;]}</p>
+
+<p>　　# host group for masters</p>
+
+<p>　　[masters]</p>
+
+<p>　　master1.xxx.net</p>
+
+<p>　　#master2.xxx.net</p>
+
+<p>　　# host group for lb</p>
+
+<p>　　#[lb]</p>
+
+<p>　　#lb.xxx.net</p>
+
+<p>　　# host group for etcd</p>
+
+<p>　　[etcd]</p>
+
+<p>　　etcd3.xxx.net</p>
+
+<p>　　etcd5.xxx.net</p>
+
+<p>　　etcd4.xxx.net</p>
+
+<p>　　# host group for nodes, includes region info</p>
+
+<p>　　[nodes]</p>
+
+<p>　　master1.xxx.net</p>
+
+<p>　　#master2.xxx.net</p>
+
+<p>　　node1.xxx.net</p>
+
+<p>　　node2.xxx.net openshift_node_labels=&quot;{&#39;region&#39;: &#39;infra&#39;, &#39;zone&#39;: &#39;default&#39;}&quot;</p>
+
+<p>　　node3.xxx.net openshift_node_labels=&quot;{&#39;region&#39;: &#39;infra&#39;, &#39;zone&#39;: &#39;default&#39;}&quot;</p>
+
+<p>　　node4.xxx.net</p>
+
+<p>　　node5.xxx.net openshift_node_labels=&quot;{&#39;region&#39;: &#39;infra&#39;, &#39;zone&#39;: &#39;default&#39;}&quot;</p>
+
+<p>　　下载openshift-ansible：</p>
+
+<p>　　<strong>wget&nbsp;<a href="https://github.com/openshift/openshift-ansible/archive/openshift-ansible-3.6.173.0.104-1.tar.gz" rel="external nofollow noreferrer">https://github.com/openshift/openshift-ansible/archive/openshift-ansible-3.6.173.0.104-1.tar.gz</a></strong></p>
+
+<p>　　解压</p>
+
+<p>　　执行安装：</p>
+
+<p>　　<strong>ansible-playbook -i /etc/ansible/hosts openshift-ansible-openshift-ansible-3.6.173.0.104-1/playbooks/byo/config.yml</strong></p>
+
+<p><strong>　　安装成功如下：</strong></p>
+
+<p><strong>　　<img src="https://bbsmax.ikafan.com/static/L3Byb3h5L2h0dHBzL2ltYWdlczIwMTguY25ibG9ncy5jb20vYmxvZy8xMDk1Mzg3LzIwMTgwNC8xMDk1Mzg3LTIwMTgwNDAzMjI1NTM0MDczLTIyNDQyOTQ4Ny5wbmc=.jpg" /></strong></p>
+
+<p><strong>1.5 验证安装</strong>　</p>
+
+<p><strong>　　Master1节点</strong>上验证node</p>
+
+<p>　　[root@master1 ~]# oc get nodes</p>
+
+<p>　　NAME&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; STATUS&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; AGE&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; VERSION</p>
+
+<p>　　master1.xxx.net&nbsp;&nbsp; Ready,SchedulingDisabled&nbsp;&nbsp; 38m&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; v1.6.1+5115d708d7</p>
+
+<p>　　node1.xxx.net&nbsp;&nbsp;&nbsp;&nbsp; Ready&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 38m&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; v1.6.1+5115d708d7</p>
+
+<p>　　node2.xxx.net&nbsp;&nbsp;&nbsp;&nbsp; Ready&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 38m&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; v1.6.1+5115d708d7</p>
+
+<p>　　node3.xxx.net&nbsp;&nbsp;&nbsp;&nbsp; Ready&nbsp; &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;38m&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; v1.6.1+5115d708d7</p>
+
+<p>　　node4.xxx.net&nbsp;&nbsp;&nbsp;&nbsp; Ready&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 38m&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; v1.6.1+5115d708d7</p>
+
+<p>　　node5.xxx.net&nbsp;&nbsp;&nbsp;&nbsp; Ready&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 38m&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; v1.6.1+5115d708d7</p>
+
+<p>　　<strong>Master1节点上</strong>验证etcd</p>
+
+<p>　　<strong>[root@master1 ~]# yum install etcd -y</strong></p>
+
+<p>　<strong>　[root@master1 ~]# etcdctl -C&nbsp;&nbsp;&nbsp;&nbsp; https://etcd1.xxx.net:2379,https://etcd3.xxx.net:2379,https://etcd2.xxx.net:2379&nbsp;&nbsp;&nbsp;&nbsp; --ca-file=/etc/origin/master/master.etcd-ca.crt&nbsp;&nbsp;&nbsp;&nbsp; --cert-file=/etc/origin/master/master.etcd-client.crt&nbsp;&nbsp;&nbsp;&nbsp; --key-file=/etc/origin/master/master.etcd-client.key cluster-health</strong></p>
+
+<p>　　member 17c82e7e21b639e7 is healthy: got healthy result from https://192.168.10.109:2379</p>
+
+<p>　　member 3bd39337b17b1a4e is healthy: got healthy result from https://192.168.10.111:2379</p>
+
+<p>　　member 62cacf31d21cfcd4 is healthy: got healthy result from https://192.168.10.115:2379</p>
+
+<p>　　cluster is healthy</p>
+
+<p>　　<strong>[root@master1 ~]#</strong>&nbsp;<strong>etcdctl -C&nbsp;&nbsp;&nbsp;&nbsp; https://etcd1.xxx.net:2379,https://etcd3.xxx.net:2379,https://etcd2.xxx.net:2379&nbsp;&nbsp;&nbsp;&nbsp; --ca-file=/etc/origin/master/master.etcd-ca.crt&nbsp;&nbsp;&nbsp;&nbsp; --cert-file=/etc/origin/master/master.etcd-client.crt&nbsp;&nbsp;&nbsp;&nbsp; --key-　　file=/etc/origin/master/master.etcd-client.key member list</strong></p>
+
+<p>　　17c82e7e21b639e7: name=etcd1.xxx.net peerURLs=https://192.168.10.109:2380 clientURLs=https://192.168.10.109:2379 isLeader=false</p>
+
+<p>　　3bd39337b17b1a4e: name=etcd2.xxx.net peerURLs=https://192.168.10.111:2380 clientURLs=https://192.168.10.111:2379 isLeader=false</p>
+
+<p>　　62cacf31d21cfcd4: name=etcd3.xxx.net peerURLs=https://192.168.10.115:2380 clientURLs=https://192.168.10.115:2379 isLeader=true</p>
+
+<p><strong>1.6 访问控制台</strong></p>
+
+<p><strong>　　</strong>高级安装模式下会安装router(安装在infra节点上)、registry、console</p>
+
+<p>　　创建控制台账号<strong>Master</strong>节点</p>
+
+<p>　　<strong>htpasswd -b /etc/origin/master/htpasswd dev dev2018</strong></p>
+
+<p>　　登录控制台：<a href="https://master1.haixiangjinfu.net:8443/" rel="external nofollow noreferrer">https://master1.xxx.net:8443</a></p>
+
+<p>　　此地址需要解析到<strong>master</strong>主机上</p>
+
+<p>　　<img src="https://bbsmax.ikafan.com/static/L3Byb3h5L2h0dHBzL2ltYWdlczIwMTguY25ibG9ncy5jb20vYmxvZy8xMDk1Mzg3LzIwMTgwNC8xMDk1Mzg3LTIwMTgwNDAzMjI1OTQ4MjA0LTE1ODAyNTkxMzgucG5n.jpg" /></p>

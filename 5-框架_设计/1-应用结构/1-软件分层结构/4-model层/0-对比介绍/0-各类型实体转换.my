@@ -1,0 +1,153 @@
+<h1>Beanutils.copyProperties()用法</h1>
+
+<h2>一、简介：</h2>
+
+<p>&nbsp; &nbsp; BeanUtils提供对Java反射和自省API的包装。其主要目的是利用反射机制对JavaBean的属性进行处理。我们知道，一个JavaBean通常包含了大量的属性，很多情况下，对JavaBean的处理导致大量get/set代码堆积，增加了代码长度和阅读代码的难度。</p>
+
+<h2>二、用法：</h2>
+
+<p>&nbsp; &nbsp; 如果你有两个具有很多相同属性的JavaBean，一个很常见的情况就是Struts里的PO对象（持久对象）和对应的ActionForm。例如：一个用户注册页面，有一个User实体类和一个UserActionForm，我们一般会在Action里从ActionForm构造一个PO对象，传统的方式是使用类似下面的语句对属性逐个赋值：</p>
+
+<p>// 获取 ActionForm 表单数据 &nbsp;<br />
+&nbsp;&nbsp;<br />
+UserActionForm uForm = (UserActionForm) form; &nbsp;</p>
+
+<p>// 构造一个User对象 &nbsp;<br />
+&nbsp;&nbsp;<br />
+User user = new User(); &nbsp;</p>
+
+<p>// 逐一赋值 &nbsp;<br />
+user.setUsername(uForm.getUsername); &nbsp;<br />
+&nbsp;&nbsp;<br />
+user.setPassword(uForm.getPassword); &nbsp;<br />
+&nbsp;&nbsp;<br />
+user.setAge(uForm.getAge); &nbsp;<br />
+&nbsp;&nbsp;<br />
+........... &nbsp;</p>
+
+<p>........... &nbsp;</p>
+
+<p>// 然后调用JDBC、或操作Hibernate 持久化对象User到数据库 &nbsp;</p>
+
+<p>...</p>
+
+<p>通过这样的方法如果表单数据N多、100、1000（夸张点。哈哈）、、、、那我们不是要写100、、、1000行set、get了。谁都不愿意这样做。</p>
+
+<p>&nbsp;而我们使用 BeanUtils.copyProperties() 方法以后，代码量大大的减少，而且整体程序看着也简洁明朗，代码如下：</p>
+
+<p><br />
+// 获取 ActionForm 表单数据 &nbsp;<br />
+&nbsp;&nbsp;<br />
+UserActionForm uForm = (UserActionForm) form; &nbsp;<br />
+&nbsp;&nbsp;<br />
+&nbsp; &nbsp;<br />
+&nbsp;&nbsp;<br />
+// 构造一个User对象 &nbsp;<br />
+&nbsp;&nbsp;<br />
+User user = new User(); &nbsp;<br />
+&nbsp;&nbsp;<br />
+&nbsp;&nbsp;<br />
+// 赋值 &nbsp;<br />
+&nbsp;&nbsp;<br />
+BeanUtils.copyProperties(user, uForm); &nbsp;<br />
+&nbsp;&nbsp;<br />
+// 然后调用JDBC、或操作Hibernate 持久化对象User到数据库 &nbsp;<br />
+&nbsp;&nbsp;<br />
+....... &nbsp;</p>
+
+<p>注：如果User和UserActionForm 间存在名称不相同的属性，则BeanUtils不对这些属性进行处理，需要手动处理。例如：</p>
+
+<p>User类里面有个createDate 创建时间字段，而UserActionForm里面无此字段。BeanUtils.copyProperties()不会对此字段做任何处理。必须要自己手动处理。</p>
+
+<p><br />
+用法总结如下：</p>
+
+<p><br />
+BeanUtils.copyProperties(&quot;转换后的类&quot;, &quot;要转换的类&quot;); &nbsp;</p>
+
+<p>PropertyUtils.copyProperties(&quot;转换后的类&quot;, &quot;要转换的类&quot;); &nbsp;<br />
+用法其实很简单，第一个参数是转换后的类，第二个参数是待转换的类</p>
+
+<h2>&nbsp;<br />
+三、重写：</h2>
+
+<p>&nbsp;<br />
+ReflectASM，高性能的反射：</p>
+
+<p>什么是ReflectASM &nbsp; &nbsp;ReflectASM是一个很小的java类库，主要是通过asm生产类来实现java反射，执行速度非常快，看了网上很多和反射的对比，觉得ReflectASM比较神奇，很想知道其原理，下面介绍下如何使用及原理；</p>
+
+<p>public static void main(String[] args) { &nbsp; &nbsp;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; User user = new User(); &nbsp; &nbsp;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; //使用reflectasm生产User访问类 &nbsp; &nbsp;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; MethodAccess access = MethodAccess.get(User.class); &nbsp; &nbsp;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; //invoke setName方法name值 &nbsp; &nbsp;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; access.invoke(user, &quot;setName&quot;, &quot;张三&quot;); &nbsp; &nbsp;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; //invoke getName方法 获得值 &nbsp; &nbsp;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; String name = (String)access.invoke(user, &quot;getName&quot;, null); &nbsp; &nbsp;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; System.out.println(name); &nbsp; &nbsp;<br />
+&nbsp; &nbsp; } &nbsp; &nbsp;<br />
+原理&nbsp;<br />
+&nbsp; &nbsp;上面代码的确实现反射的功能，代码主要的核心是 MethodAccess.get(User.class);&nbsp;<br />
+看了下源码，这段代码主要是通过asm生产一个User的处理类 UserMethodAccess（这个类主要是实现了invoke方法）的ByteCode，然后获得该对象，通过上面的invoke操作user类。&nbsp;</p>
+
+<p><br />
+ASM反射转换：</p>
+
+<p>private static Map&lt;Class, MethodAccess&gt; methodMap = new HashMap&lt;Class, MethodAccess&gt;(); &nbsp;<br />
+&nbsp;&nbsp;<br />
+&nbsp; &nbsp; private static Map&lt;String, Integer&gt; methodIndexMap = new HashMap&lt;String, Integer&gt;(); &nbsp;<br />
+&nbsp;&nbsp;<br />
+&nbsp; &nbsp; private static Map&lt;Class, List&lt;String&gt;&gt; fieldMap = new HashMap&lt;Class, List&lt;String&gt;&gt;(); &nbsp;<br />
+&nbsp;&nbsp;<br />
+&nbsp; &nbsp; public static void copyProperties(Object desc, Object orgi) { &nbsp;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; MethodAccess descMethodAccess = methodMap.get(desc.getClass()); &nbsp;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; if (descMethodAccess == null) { &nbsp;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; descMethodAccess = cache(desc); &nbsp;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; } &nbsp;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; MethodAccess orgiMethodAccess = methodMap.get(orgi.getClass()); &nbsp;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; if (orgiMethodAccess == null) { &nbsp;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; orgiMethodAccess = cache(orgi); &nbsp;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; } &nbsp;<br />
+&nbsp;&nbsp;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; List&lt;String&gt; fieldList = fieldMap.get(orgi.getClass()); &nbsp;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; for (String field : fieldList) { &nbsp;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; String getKey = orgi.getClass().getName() + &quot;.&quot; + &quot;get&quot; + field; &nbsp;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; String setkey = desc.getClass().getName() + &quot;.&quot; + &quot;set&quot; + field; &nbsp;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; Integer setIndex = methodIndexMap.get(setkey); &nbsp;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; if (setIndex != null) { &nbsp;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; int getIndex = methodIndexMap.get(getKey); &nbsp;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; // 参数一需要反射的对象 &nbsp;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; // 参数二class.getDeclaredMethods 对应方法的index &nbsp;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; // 参数对三象集合 &nbsp;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; descMethodAccess.invoke(desc, setIndex.intValue(), &nbsp;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; orgiMethodAccess.invoke(orgi, getIndex)); &nbsp;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; } &nbsp;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; } &nbsp;<br />
+&nbsp; &nbsp; } &nbsp;<br />
+&nbsp;&nbsp;<br />
+&nbsp; &nbsp; // 单例模式 &nbsp;<br />
+&nbsp; &nbsp; private static MethodAccess cache(Object orgi) { &nbsp;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; synchronized (orgi.getClass()) { &nbsp;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; MethodAccess methodAccess = MethodAccess.get(orgi.getClass()); &nbsp;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; Field[] fields = orgi.getClass().getDeclaredFields(); &nbsp;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; List&lt;String&gt; fieldList = new ArrayList&lt;String&gt;(fields.length); &nbsp;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; for (Field field : fields) { &nbsp;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; if (Modifier.isPrivate(field.getModifiers()) &nbsp;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &amp;&amp; !Modifier.isStatic(field.getModifiers())) { // 是否是私有的，是否是静态的 &nbsp;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; // 非公共私有变量 &nbsp;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; String fieldName = StringUtils.capitalize(field.getName()); // 获取属性名称 &nbsp;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; int getIndex = methodAccess.getIndex(&quot;get&quot; + fieldName); // 获取get方法的下标 &nbsp;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; int setIndex = methodAccess.getIndex(&quot;set&quot; + fieldName); // 获取set方法的下标 &nbsp;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; methodIndexMap.put(orgi.getClass().getName() + &quot;.&quot; + &quot;get&quot; &nbsp;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; + fieldName, getIndex); // 将类名get方法名，方法下标注册到map中 &nbsp;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; methodIndexMap.put(orgi.getClass().getName() + &quot;.&quot; + &quot;set&quot; &nbsp;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; + fieldName, setIndex); // 将类名set方法名，方法下标注册到map中 &nbsp;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; fieldList.add(fieldName); // 将属性名称放入集合里 &nbsp;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; } &nbsp;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; } &nbsp;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; fieldMap.put(orgi.getClass(), fieldList); // 将类名，属性名称注册到map中 &nbsp;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; methodMap.put(orgi.getClass(), methodAccess); &nbsp;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; return methodAccess; &nbsp;<br />
+&nbsp; &nbsp; &nbsp; &nbsp; } &nbsp;<br />
+&nbsp; &nbsp; } &nbsp;<br />
+执行1000000条效率80几毫秒，效率已经没问题了；</p>

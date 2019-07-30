@@ -1,0 +1,6789 @@
+<h1>OpenShift 3.9 多节点集群（Ansible）安装</h1>
+
+<p>2018年05月24日 21:19:16&nbsp;<a href="https://me.csdn.net/sun_qiangwei" target="_blank">sun_qiangwei</a>&nbsp;阅读数：4871</p>
+
+<p>&nbsp;版权声明：本文为博主原创文章，未经博主允许不得转载。 https://blog.csdn.net/sun_qiangwei/article/details/80443943</p>
+
+<p>OpenShift集群的部署可以分为以下几个阶段：</p>
+
+<p><strong>1、主机环境准备</strong>：准备OpenShift集群需要的主机，并进行集群环境准备。</p>
+
+<p><strong>2、安装依赖包</strong>：提前安装使用Ansible安装OpenShift集群所依赖的第三方包。</p>
+
+<p><strong>3、Ansible执行安装</strong>：使用Ansible Playbook进行自动化安装。</p>
+
+<p><strong>4、OpenShift系统配置</strong>：在使用Ansible执行安装完成之后的系统配置。</p>
+
+<p><strong>5、测试问题处理</strong></p>
+
+<p>&nbsp;</p>
+
+<hr />
+<p><strong>一、主机环境准备</strong></p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>类型</p>
+			</td>
+			<td>
+			<p>主机名（域名）</p>
+			</td>
+			<td>
+			<p>IP</p>
+			</td>
+			<td>
+			<p>操作系统</p>
+			</td>
+			<td>
+			<p>内存</p>
+			</td>
+			<td>
+			<p>磁盘</p>
+			</td>
+		</tr>
+		<tr>
+			<td>
+			<p>Master</p>
+			</td>
+			<td>
+			<p>master.192.168.40.161.nip.io</p>
+			</td>
+			<td>
+			<p>192.168.40.161</p>
+			</td>
+			<td>
+			<p>CentOS7.5</p>
+			</td>
+			<td>
+			<p>2G</p>
+			</td>
+			<td>
+			<p>sda：10G for OS</p>
+
+			<p>sdb：20G for docker</p>
+			</td>
+		</tr>
+		<tr>
+			<td>
+			<p>Node</p>
+			</td>
+			<td>
+			<p>node1.192.168.40.162.nip.io</p>
+			</td>
+			<td>
+			<p>192.168.40.162</p>
+			</td>
+			<td>
+			<p>CentOS7.5</p>
+			</td>
+			<td>
+			<p>2G</p>
+			</td>
+			<td>
+			<p>sda：10G for OS</p>
+
+			<p>sdb：20G for docker</p>
+			</td>
+		</tr>
+		<tr>
+			<td>
+			<p>Node</p>
+			</td>
+			<td>
+			<p>node2.192.168.40.163.nip.io</p>
+			</td>
+			<td>
+			<p>192.168.40.163</p>
+			</td>
+			<td>
+			<p>CentOS7.5</p>
+			</td>
+			<td>
+			<p>2G</p>
+			</td>
+			<td>
+			<p>sda：10G for OS</p>
+
+			<p>sdb：20G for docker</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>&nbsp;</p>
+
+<p><em>说明：在安装的过程中，使用了nip.io结尾的域名，关于nip.io的问题，请查阅&nbsp;</em><a href="http://nip.io/" rel="nofollow" target="_blank"><em>nip.io</em></a><em>&nbsp;网站 。</em></p>
+
+<p>&nbsp;</p>
+
+<p><strong>1、检查主机与Internet的状态</strong></p>
+
+<p>由于在安装的过程中需要通过Internet下载相关依赖，因此需要检查三台主机与Internet的状态。</p>
+
+<p>&nbsp;</p>
+
+<p><strong>2、检查主机名</strong></p>
+
+<p>按照上面表格中所列的主机名进行主机名检查。如果不一致，可以通过下面的命令进行配置，如下：</p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>hostnamectl set-hostname master.192.168.40.161.nip.io</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>&nbsp;</p>
+
+<p><strong>3、检查主机名（域名）的解析是否正常</strong></p>
+
+<p>可以通过 ping $(hostname)来验证主机名到主机IP的解析情况。</p>
+
+<p>如果出现不能ping通的情况，可以直接修改各个节点的 /etc/hosts 文件，加上静态的域名解析。</p>
+
+<p>&nbsp;</p>
+
+<p>此外由于使用的是nip.io的域名，正常的DNS都能够解析到正确的IP地址；但是在输入命令的过程中使用全域名会很麻烦，因此在hosts中添加了主机名的缩写配置，如下：</p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>192.168.40.161 master</p>
+
+			<p>192.168.40.162 node1</p>
+
+			<p>192.168.40.163 node2</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>&nbsp;</p>
+
+<p><strong>4、检查SELINUX是否开启</strong></p>
+
+<p>官方文档推荐开启SELINUX，否则会导致安装失败。</p>
+
+<p>修改方式如下：</p>
+
+<p>/etc/selinux/config</p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>SELINUX=enforcing</p>
+
+			<p>SELINUXTYPE=targeted</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>&nbsp;</p>
+
+<p><strong>5、配置三台主机ssh免密访问</strong></p>
+
+<p>5.1）在所有节点上以root账号登陆，并进入到/root的主目录</p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>[root@master ~]$ pwd</p>
+
+			<p>/root</p>
+
+			<p>[root@master ~]$</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>&nbsp;</p>
+
+<p>5.2）在所有节点上生成密钥对。</p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>[root@master ~]$ ssh-keygen -t rsa</p>
+
+			<p>Generating public/private rsa key pair.</p>
+
+			<p>Enter file in which to save the key (/home/.ssh/id_rsa):</p>
+
+			<p>Created directory &#39;/home/.ssh&#39;.</p>
+
+			<p>Enter passphrase (empty for no passphrase):</p>
+
+			<p>Enter same passphrase again:</p>
+
+			<p>Your identification has been saved in /home/.ssh/id_rsa.</p>
+
+			<p>Your public key has been saved in /home/.ssh/id_rsa.pub.</p>
+
+			<p>The key fingerprint is:</p>
+
+			<p>29:1c:df:59:0d:5f:ee:28:07:c0:57:21:15:af:a3:88 root@master</p>
+
+			<p>The key&#39;s randomart image is:</p>
+
+			<p>+--[ RSA 2048]----+</p>
+
+			<p>| .. oo=o.|</p>
+
+			<p>| ...= + |</p>
+
+			<p>| . .o o o|</p>
+
+			<p>| . o o o . + |</p>
+
+			<p>| o S o . = .|</p>
+
+			<p>| . . . + . |</p>
+
+			<p>| E . . |</p>
+
+			<p>| |</p>
+
+			<p>| |</p>
+
+			<p>+-----------------+</p>
+
+			<p>[root@master ~]$</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>&nbsp;</p>
+
+<p>5.3）然后进入.ssh目录，把公钥复制到authorized_keys</p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>[root@master ~]$ cd .ssh</p>
+
+			<p>[root@master .ssh]$ ls</p>
+
+			<p>id_rsa id_rsa.pub</p>
+
+			<p>[root@master .ssh]$ cp id_rsa.pub authorized_keys</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>&nbsp;</p>
+
+<p>5.4）分发ssh公钥到各个节点</p>
+
+<p>先将node1和node2的公钥添加到master节点的authorized_keys文件中。</p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>[root@node1 .ssh]$ ssh-copy-id master</p>
+
+			<p>[root<a href="http://hdfs-yarn-1/" rel="nofollow" target="_blank">@</a>node2 .ssh]$ ssh-copy-id master</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>最后再使用scp将master中的authorized_keys文件传送到各个节点。</p>
+
+<p>&nbsp;</p>
+
+<p>此处，需要注意.ssh(755)及.ssh/authorized_keys(644)的权限。&nbsp;</p>
+
+<p>&nbsp;</p>
+
+<p>&nbsp;</p>
+
+<hr />
+<p><strong>二、安装依赖包</strong></p>
+
+<p><strong>1、所有主机上执行以下命令进行系统更新</strong></p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>yum install -y update</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>安装完成之后，重新系统生效。</p>
+
+<p>&nbsp;</p>
+
+<p><strong>2、所有的主机下执行以下命令安装OpenShift依赖的软件包。</strong></p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>yum install wget git net-tools bind-utils iptables-services bridge-utils bash-completion kexec-tools sos psacct bash-completion.noarch bash-completion-extras.noarch python-passlib NetworkManager -y</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>&nbsp;</p>
+
+<p><strong>3、所有的主机安装docker</strong></p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>yum install docker-1.13.1 -y</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>&nbsp;</p>
+
+<p><strong>4、配置docker使用的存储</strong></p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>echo DEVS=/dev/sdb &gt; /etc/sysconfig/docker-storage-setup</p>
+
+			<p>echo VG=DOCKER &gt;&gt; /etc/sysconfig/docker-storage-setup</p>
+
+			<p>echo SETUP_LVM_THIN_POOL=yes &gt;&gt; /etc/sysconfig/docker-storage-setup</p>
+
+			<p>echo DATA_SIZE=&quot;100%FREE&quot;&gt;&gt; /etc/sysconfig/docker-storage-setup</p>
+
+			<p>&nbsp;</p>
+
+			<p>rm -rf /var/lib/docker</p>
+
+			<p>&nbsp;</p>
+
+			<p>wipefs --all /dev/sdb</p>
+
+			<p>docker-storage-setup</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>&nbsp;</p>
+
+<p><strong>5、配置docker镜像加速</strong></p>
+
+<p>选择阿里云的镜像服务器进行加速，修改 /etc/docker/daemon.json 文件，如下所示：</p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>[root@master ~]# more /etc/docker/daemon.json</p>
+
+			<p>{</p>
+
+			<p>&quot;registry-mirrors&quot;: [&quot;https://换成自己的地址.mirror.aliyuncs.com&quot;]</p>
+
+			<p>}</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>配置完成之后，所有主机启动docker，命令如下：</p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>systemctl enable docker</p>
+
+			<p>systemctl start docker</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>&nbsp;</p>
+
+<hr />
+<p><strong>三、在Master主机上执行Ansible集群安装</strong></p>
+
+<p><strong>1、启用EPEL仓库以安装Ansible</strong></p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>#install epel</p>
+
+			<p>yum -y install epel-release</p>
+
+			<p>&nbsp;</p>
+
+			<p># Disable the EPEL repository globally so that is not accidentally used during later steps of the installation</p>
+
+			<p>sed -i -e &quot;s/^enabled=1/enabled=0/&quot; /etc/yum.repos.d/epel.repo</p>
+
+			<p>&nbsp;</p>
+
+			<p>yum -y --enablerepo=epel install ansible pyOpenSSL #3.9必须2.5版本</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p><strong>2、从 github 上clone openshift-ansible 3.9版本</strong></p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>git clone -b release-3.9 https://github.com/openshift/openshift-ansible</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>说明：最近通过本blog重新安装openshift集群时，发现总是出现各种各样的问题，如 /etc/dnsmasq.d/origin-upstream-dns.conf 、/etc/origin/node/resolv.conf 等文件缺失，因此将原来从github上clone源代码，修改为下载已经release的版本。</p>
+
+<p>&nbsp;</p>
+
+<p><strong>2、从github上下载openshift-ansible已经release的版本</strong></p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>wget https://github.com/openshift/openshift-ansible/archive/openshift-ansible-3.9.32-1.zip</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p><strong>下载完成之后，进行解压并重命为 openshift-ansible。</strong></p>
+
+<p>&nbsp;</p>
+
+<p><strong>3、修改软件源</strong></p>
+
+<p>由于目前OpenShift-ansible还没有添加3.9的源，所以需要自行修改下，方法如下：</p>
+
+<ul>
+	<li>进行openshift-ansible/roles/openshift_repos/templates/ 复制一份 CentOS-OpenShift-Origin37.repo.j2 为 CentOS-OpenShift-Origin39.repo.j2。</li>
+	<li>修改CentOS-OpenShift-Origin39.repo.j2中的源修改为国内的，比如阿里云。</li>
+</ul>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>[centos-openshift-origin39]</p>
+
+			<p>name=CentOS OpenShift Origin</p>
+
+			<p>baseurl=http://mirrors.aliyun.com/centos/7/paas/x86_64/openshift-origin39/</p>
+
+			<p>enabled=1</p>
+
+			<p>gpgcheck=1</p>
+
+			<p>gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-CentOS-SIG-PaaS</p>
+
+			<p>&nbsp;</p>
+
+			<p>[centos-openshift-origin39-testing]</p>
+
+			<p>name=CentOS OpenShift Origin Testing</p>
+
+			<p>baseurl=http://buildlogs.centos.org/centos/7/paas/x86_64/openshift-origin39/</p>
+
+			<p>enabled={{ 1 if openshift_repos_enable_testing else 0 }}</p>
+
+			<p>gpgcheck=0</p>
+
+			<p>gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-CentOS-SIG-PaaS</p>
+
+			<p>&nbsp;</p>
+
+			<p>[centos-openshift-origin39-debuginfo]</p>
+
+			<p>name=CentOS OpenShift Origin DebugInfo</p>
+
+			<p>baseurl=http://debuginfo.centos.org/centos/7/paas/x86_64/</p>
+
+			<p>enabled=0</p>
+
+			<p>gpgcheck=1</p>
+
+			<p>gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-CentOS-SIG-PaaS</p>
+
+			<p>&nbsp;</p>
+
+			<p>[centos-openshift-origin39-source]</p>
+
+			<p>name=CentOS OpenShift Origin Source</p>
+
+			<p>baseurl=http://vault.centos.org/centos/7/paas/Source/openshift-origin39/</p>
+
+			<p>enabled=0</p>
+
+			<p>gpgcheck=1</p>
+
+			<p>gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-CentOS-SIG-PaaS</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>&nbsp;</p>
+
+<p><strong>4、配置 ansible inventory 文件，保存到 /etc/ansible/inventory.ini文件中。</strong></p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p># Create an OSEv3 group that contains the masters and nodes groups</p>
+
+			<p>[OSEv3:children]</p>
+
+			<p>#目前配置标准的三个角色</p>
+
+			<p>masters</p>
+
+			<p>nodes</p>
+
+			<p>etcd</p>
+
+			<p>&nbsp;</p>
+
+			<p># Set variables common for all OSEv3 hosts</p>
+
+			<p>[OSEv3:vars]</p>
+
+			<p># SSH user, this user should allow ssh based auth without requiring a password</p>
+
+			<p>ansible_ssh_user=root</p>
+
+			<p>#使用origin社区版</p>
+
+			<p>openshift_deployment_type=origin</p>
+
+			<p>#指定安装版本</p>
+
+			<p>openshift_release=3.9</p>
+
+			<p>&nbsp;</p>
+
+			<p>#指定默认域名，访问的时候需要使用该域名，没有dns服务器，需要手动添加本地hosts文件</p>
+
+			<p>openshift_master_default_subdomain=apps.192.168.40.161.nip.io</p>
+
+			<p>&nbsp;</p>
+
+			<p>#禁止磁盘、内存和镜像检查</p>
+
+			<p>openshift_disable_check=disk_availability,docker_storage,memory_availability,docker_image_availability</p>
+
+			<p>&nbsp;</p>
+
+			<p>#disk_availability：报错信息是推荐的master磁盘空间剩余量大于40GB。测试环境无法满足，跳过检测。</p>
+
+			<p>#memory_availability：报错信息是推荐的master内存为16GB，node内存为8GB，测试环境无法满足，跳过检测。</p>
+
+			<p>#docker_image_availability：报错信息是需要的几个镜像未找到，选择跳过，装完集群后，在使用的时候再自行下载。</p>
+
+			<p>#docker_storage：报错信息是推荐选择一块磁盘空间存储镜像，这里选择跳过。采用docker默认的方式存储镜像。</p>
+
+			<p>&nbsp;</p>
+
+			<p>&nbsp;</p>
+
+			<p># uncomment the following to enable htpasswd authentication; defaults to DenyAllPasswordIdentityProvider</p>
+
+			<p>openshift_master_identity_providers=[{&#39;name&#39;:&#39;htpasswd_auth&#39;,&#39;login&#39;:&#39;true&#39;,&#39;challenge&#39;:&#39;true&#39;,&#39;kind&#39;:&#39;HTPasswdPasswordIdentityProvider&#39;,&#39;filename&#39;:&#39;/etc/origin/master/htpasswd&#39;}]</p>
+
+			<p>&nbsp;</p>
+
+			<p>#ntp时间同步</p>
+
+			<p>openshift_clock_enabled=true</p>
+
+			<p>&nbsp;</p>
+
+			<p>#节点配额</p>
+
+			<p>openshift_node_kubelet_args={&#39;pods-per-core&#39;: [&#39;10&#39;]}</p>
+
+			<p>&nbsp;</p>
+
+			<p># host group for masters</p>
+
+			<p>[masters]</p>
+
+			<p>master openshift_schedulable=True</p>
+
+			<p>&nbsp;</p>
+
+			<p># host group for nodes, includes region info</p>
+
+			<p>[nodes]</p>
+
+			<p>master openshift_node_labels=&quot;{&#39;region&#39;: &#39;infra&#39;}&quot;</p>
+
+			<p>node1 openshift_node_labels=&quot;{&#39;region&#39;: &#39;infra&#39;, &#39;zone&#39;: &#39;default&#39;}&quot;</p>
+
+			<p>node2 openshift_node_labels=&quot;{&#39;region&#39;: &#39;infra&#39;, &#39;zone&#39;: &#39;default&#39;}&quot;</p>
+
+			<p>&nbsp;</p>
+
+			<p>[etcd]</p>
+
+			<p>master</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p><strong>5、修改脚本问题</strong></p>
+
+<p>openshift-ansible/roles/lib_utils/filter_plugins/openshift_master.py 的第487行</p>
+
+<p><img alt="" src="https://img-blog.csdn.net/20180725212702868?watermark/2/text/aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L3N1bl9xaWFuZ3dlaQ==/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70" /></p>
+
+<p>注释掉图片中框出来的两行。</p>
+
+<p>&nbsp;</p>
+
+<p>&nbsp;</p>
+
+<p><strong>6、开始安装</strong></p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>ansible-playbook -i /etc/ansible/inventory.ini openshift-ansible/playbooks/prerequisites.yml</p>
+
+			<p>ansible-playbook -i /etc/ansible/inventory.ini openshift-ansible/playbooks/deploy_cluster.yml</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>安装过程是完全自动化的，无需手动干预。在绝大多数情况下，Ansible的脚本Playbook是可以反复执行的。</p>
+
+<p>第一条语句的运行结果：</p>
+
+<p><img alt="" src="https://img-blog.csdn.net/20180524211635122" /></p>
+
+<p>第二条语句的运行结果：</p>
+
+<p><img alt="" src="https://img-blog.csdn.net/20180524211645787" /></p>
+
+<p>&nbsp;</p>
+
+<p><strong>7、检查</strong></p>
+
+<p>安装完成后，执行oc get nodes 检查当前集群的成员列表以及它们的状态。</p>
+
+<p><img alt="" src="https://img-blog.csdn.net/20180524211701487" /></p>
+
+<p>其实在安装完成之后 第二个节点和第三个节点的roles类型为空，需要将其打上compute标签，命令如下：</p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>oc label node node1.192.168.40.162.nip.io node-role.kubernetes.io/compute=true</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>&nbsp;</p>
+
+<p>&nbsp;</p>
+
+<hr />
+<p><strong>四、OpenShift系统配置</strong></p>
+
+<p><strong>1、创建用户</strong></p>
+
+<p>安装的时候，在Ansible的hosts文件中定义了HTPasswd文件作为后端的用户身份信息库。</p>
+
+<p>&nbsp;</p>
+
+<p>安装程序自动生成了数据文件/etc/origin/master/htpasswd。但是此时该文件还是一个空文件，并没有任何用户信息。</p>
+
+<p>&nbsp;</p>
+
+<p>需要通过htpasswd命令来创建用户。创建账号为dev密码为dev的用户。</p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>[root@master ~]# htpasswd -b /etc/origin/master/htpasswd dev dev</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>&nbsp;</p>
+
+<p><strong>2、给dev添加集群管理员权限</strong></p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>oc adm policy add-cluster-role-to-user cluster-admin dev</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>&nbsp;</p>
+
+<p><strong>4、重启服务</strong></p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>systemctl restart origin-master-api</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>&nbsp;</p>
+
+<p><strong>5、访问页面</strong>，https://master.192.168.40.161.nip.io:8443</p>
+
+<p><img alt="" src="https://img-blog.csdn.net/20180524211711174" /></p>
+
+<p>&nbsp;</p>
+
+<p>&nbsp;</p>
+
+<hr />
+<p><strong>五、测试过程中的问题处理</strong></p>
+
+<p><strong>1、无法通过github下载源代码</strong></p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>Cloning &quot;<a href="https://github.com/gshipley/simplephp.git" rel="nofollow" target="_blank">https://github.com/gshipley/simplephp.git&nbsp;</a>&quot; ...</p>
+
+			<p>error: fatal: unable to access &#39;<a href="https://github.com/gshipley/simplephp.git/'%20rel=">https://github.com/gshipley/simplephp.git/&#39;:&nbsp;</a>Peer&#39;s certificate issuer has been marked as not trusted by the user.</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>解决方法：</p>
+
+<p>原因是在 /etc/resolv.conf 中多了search *** （专业术语：FQDN）,将其注释掉即可，但是当NetworkManager服务重新启动之后，之前的配置又会被覆盖，方法如下：</p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>chattr +i /etc/resolv.conf</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>&nbsp;</p>
+
+<p>2、无法进行docker的注册</p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>error: build error: Failed to push image: After retrying 6 times, Push image still failed due to error: Get https://docker-registry.default.svc:5000/v1/_ping: dial tcp 192.168.40.163:5000: getsockopt: connection refused</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>解决方法：</p>
+
+<p>通过观察docker-registry的pod界面可知</p>
+
+<p><img alt="" src="https://img-blog.csdn.net/20180524211740710" /></p>
+
+<p>&nbsp;</p>
+
+<p>，其绑定的IP地址为 172.30.135.115，因此在 /etc/hosts 中添加了</p>
+
+<p><img alt="" src="https://img-blog.csdn.net/20180524211800237" /></p>
+
+<h1>OpenShift 3.9 多节点集群（Ansible）安装</h1>
+
+<p>2018年05月24日 21:19:16&nbsp;<a href="https://me.csdn.net/sun_qiangwei" target="_blank">sun_qiangwei</a>&nbsp;阅读数：4871</p>
+
+<p>&nbsp;版权声明：本文为博主原创文章，未经博主允许不得转载。 https://blog.csdn.net/sun_qiangwei/article/details/80443943</p>
+
+<p>OpenShift集群的部署可以分为以下几个阶段：</p>
+
+<p><strong>1、主机环境准备</strong>：准备OpenShift集群需要的主机，并进行集群环境准备。</p>
+
+<p><strong>2、安装依赖包</strong>：提前安装使用Ansible安装OpenShift集群所依赖的第三方包。</p>
+
+<p><strong>3、Ansible执行安装</strong>：使用Ansible Playbook进行自动化安装。</p>
+
+<p><strong>4、OpenShift系统配置</strong>：在使用Ansible执行安装完成之后的系统配置。</p>
+
+<p><strong>5、测试问题处理</strong></p>
+
+<p>&nbsp;</p>
+
+<hr />
+<p><strong>一、主机环境准备</strong></p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>类型</p>
+			</td>
+			<td>
+			<p>主机名（域名）</p>
+			</td>
+			<td>
+			<p>IP</p>
+			</td>
+			<td>
+			<p>操作系统</p>
+			</td>
+			<td>
+			<p>内存</p>
+			</td>
+			<td>
+			<p>磁盘</p>
+			</td>
+		</tr>
+		<tr>
+			<td>
+			<p>Master</p>
+			</td>
+			<td>
+			<p>master.192.168.40.161.nip.io</p>
+			</td>
+			<td>
+			<p>192.168.40.161</p>
+			</td>
+			<td>
+			<p>CentOS7.5</p>
+			</td>
+			<td>
+			<p>2G</p>
+			</td>
+			<td>
+			<p>sda：10G for OS</p>
+
+			<p>sdb：20G for docker</p>
+			</td>
+		</tr>
+		<tr>
+			<td>
+			<p>Node</p>
+			</td>
+			<td>
+			<p>node1.192.168.40.162.nip.io</p>
+			</td>
+			<td>
+			<p>192.168.40.162</p>
+			</td>
+			<td>
+			<p>CentOS7.5</p>
+			</td>
+			<td>
+			<p>2G</p>
+			</td>
+			<td>
+			<p>sda：10G for OS</p>
+
+			<p>sdb：20G for docker</p>
+			</td>
+		</tr>
+		<tr>
+			<td>
+			<p>Node</p>
+			</td>
+			<td>
+			<p>node2.192.168.40.163.nip.io</p>
+			</td>
+			<td>
+			<p>192.168.40.163</p>
+			</td>
+			<td>
+			<p>CentOS7.5</p>
+			</td>
+			<td>
+			<p>2G</p>
+			</td>
+			<td>
+			<p>sda：10G for OS</p>
+
+			<p>sdb：20G for docker</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>&nbsp;</p>
+
+<p><em>说明：在安装的过程中，使用了nip.io结尾的域名，关于nip.io的问题，请查阅&nbsp;</em><a href="http://nip.io/" rel="nofollow" target="_blank"><em>nip.io</em></a><em>&nbsp;网站 。</em></p>
+
+<p>&nbsp;</p>
+
+<p><strong>1、检查主机与Internet的状态</strong></p>
+
+<p>由于在安装的过程中需要通过Internet下载相关依赖，因此需要检查三台主机与Internet的状态。</p>
+
+<p>&nbsp;</p>
+
+<p><strong>2、检查主机名</strong></p>
+
+<p>按照上面表格中所列的主机名进行主机名检查。如果不一致，可以通过下面的命令进行配置，如下：</p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>hostnamectl set-hostname master.192.168.40.161.nip.io</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>&nbsp;</p>
+
+<p><strong>3、检查主机名（域名）的解析是否正常</strong></p>
+
+<p>可以通过 ping $(hostname)来验证主机名到主机IP的解析情况。</p>
+
+<p>如果出现不能ping通的情况，可以直接修改各个节点的 /etc/hosts 文件，加上静态的域名解析。</p>
+
+<p>&nbsp;</p>
+
+<p>此外由于使用的是nip.io的域名，正常的DNS都能够解析到正确的IP地址；但是在输入命令的过程中使用全域名会很麻烦，因此在hosts中添加了主机名的缩写配置，如下：</p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>192.168.40.161 master</p>
+
+			<p>192.168.40.162 node1</p>
+
+			<p>192.168.40.163 node2</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>&nbsp;</p>
+
+<p><strong>4、检查SELINUX是否开启</strong></p>
+
+<p>官方文档推荐开启SELINUX，否则会导致安装失败。</p>
+
+<p>修改方式如下：</p>
+
+<p>/etc/selinux/config</p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>SELINUX=enforcing</p>
+
+			<p>SELINUXTYPE=targeted</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>&nbsp;</p>
+
+<p><strong>5、配置三台主机ssh免密访问</strong></p>
+
+<p>5.1）在所有节点上以root账号登陆，并进入到/root的主目录</p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>[root@master ~]$ pwd</p>
+
+			<p>/root</p>
+
+			<p>[root@master ~]$</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>&nbsp;</p>
+
+<p>5.2）在所有节点上生成密钥对。</p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>[root@master ~]$ ssh-keygen -t rsa</p>
+
+			<p>Generating public/private rsa key pair.</p>
+
+			<p>Enter file in which to save the key (/home/.ssh/id_rsa):</p>
+
+			<p>Created directory &#39;/home/.ssh&#39;.</p>
+
+			<p>Enter passphrase (empty for no passphrase):</p>
+
+			<p>Enter same passphrase again:</p>
+
+			<p>Your identification has been saved in /home/.ssh/id_rsa.</p>
+
+			<p>Your public key has been saved in /home/.ssh/id_rsa.pub.</p>
+
+			<p>The key fingerprint is:</p>
+
+			<p>29:1c:df:59:0d:5f:ee:28:07:c0:57:21:15:af:a3:88 root@master</p>
+
+			<p>The key&#39;s randomart image is:</p>
+
+			<p>+--[ RSA 2048]----+</p>
+
+			<p>| .. oo=o.|</p>
+
+			<p>| ...= + |</p>
+
+			<p>| . .o o o|</p>
+
+			<p>| . o o o . + |</p>
+
+			<p>| o S o . = .|</p>
+
+			<p>| . . . + . |</p>
+
+			<p>| E . . |</p>
+
+			<p>| |</p>
+
+			<p>| |</p>
+
+			<p>+-----------------+</p>
+
+			<p>[root@master ~]$</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>&nbsp;</p>
+
+<p>5.3）然后进入.ssh目录，把公钥复制到authorized_keys</p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>[root@master ~]$ cd .ssh</p>
+
+			<p>[root@master .ssh]$ ls</p>
+
+			<p>id_rsa id_rsa.pub</p>
+
+			<p>[root@master .ssh]$ cp id_rsa.pub authorized_keys</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>&nbsp;</p>
+
+<p>5.4）分发ssh公钥到各个节点</p>
+
+<p>先将node1和node2的公钥添加到master节点的authorized_keys文件中。</p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>[root@node1 .ssh]$ ssh-copy-id master</p>
+
+			<p>[root<a href="http://hdfs-yarn-1/" rel="nofollow" target="_blank">@</a>node2 .ssh]$ ssh-copy-id master</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>最后再使用scp将master中的authorized_keys文件传送到各个节点。</p>
+
+<p>&nbsp;</p>
+
+<p>此处，需要注意.ssh(755)及.ssh/authorized_keys(644)的权限。&nbsp;</p>
+
+<p>&nbsp;</p>
+
+<p>&nbsp;</p>
+
+<hr />
+<p><strong>二、安装依赖包</strong></p>
+
+<p><strong>1、所有主机上执行以下命令进行系统更新</strong></p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>yum install -y update</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>安装完成之后，重新系统生效。</p>
+
+<p>&nbsp;</p>
+
+<p><strong>2、所有的主机下执行以下命令安装OpenShift依赖的软件包。</strong></p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>yum install wget git net-tools bind-utils iptables-services bridge-utils bash-completion kexec-tools sos psacct bash-completion.noarch bash-completion-extras.noarch python-passlib NetworkManager -y</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>&nbsp;</p>
+
+<p><strong>3、所有的主机安装docker</strong></p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>yum install docker-1.13.1 -y</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>&nbsp;</p>
+
+<p><strong>4、配置docker使用的存储</strong></p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>echo DEVS=/dev/sdb &gt; /etc/sysconfig/docker-storage-setup</p>
+
+			<p>echo VG=DOCKER &gt;&gt; /etc/sysconfig/docker-storage-setup</p>
+
+			<p>echo SETUP_LVM_THIN_POOL=yes &gt;&gt; /etc/sysconfig/docker-storage-setup</p>
+
+			<p>echo DATA_SIZE=&quot;100%FREE&quot;&gt;&gt; /etc/sysconfig/docker-storage-setup</p>
+
+			<p>&nbsp;</p>
+
+			<p>rm -rf /var/lib/docker</p>
+
+			<p>&nbsp;</p>
+
+			<p>wipefs --all /dev/sdb</p>
+
+			<p>docker-storage-setup</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>&nbsp;</p>
+
+<p><strong>5、配置docker镜像加速</strong></p>
+
+<p>选择阿里云的镜像服务器进行加速，修改 /etc/docker/daemon.json 文件，如下所示：</p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>[root@master ~]# more /etc/docker/daemon.json</p>
+
+			<p>{</p>
+
+			<p>&quot;registry-mirrors&quot;: [&quot;https://换成自己的地址.mirror.aliyuncs.com&quot;]</p>
+
+			<p>}</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>配置完成之后，所有主机启动docker，命令如下：</p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>systemctl enable docker</p>
+
+			<p>systemctl start docker</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>&nbsp;</p>
+
+<hr />
+<p><strong>三、在Master主机上执行Ansible集群安装</strong></p>
+
+<p><strong>1、启用EPEL仓库以安装Ansible</strong></p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>#install epel</p>
+
+			<p>yum -y install epel-release</p>
+
+			<p>&nbsp;</p>
+
+			<p># Disable the EPEL repository globally so that is not accidentally used during later steps of the installation</p>
+
+			<p>sed -i -e &quot;s/^enabled=1/enabled=0/&quot; /etc/yum.repos.d/epel.repo</p>
+
+			<p>&nbsp;</p>
+
+			<p>yum -y --enablerepo=epel install ansible pyOpenSSL #3.9必须2.5版本</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p><strong>2、从 github 上clone openshift-ansible 3.9版本</strong></p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>git clone -b release-3.9 https://github.com/openshift/openshift-ansible</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>说明：最近通过本blog重新安装openshift集群时，发现总是出现各种各样的问题，如 /etc/dnsmasq.d/origin-upstream-dns.conf 、/etc/origin/node/resolv.conf 等文件缺失，因此将原来从github上clone源代码，修改为下载已经release的版本。</p>
+
+<p>&nbsp;</p>
+
+<p><strong>2、从github上下载openshift-ansible已经release的版本</strong></p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>wget https://github.com/openshift/openshift-ansible/archive/openshift-ansible-3.9.32-1.zip</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p><strong>下载完成之后，进行解压并重命为 openshift-ansible。</strong></p>
+
+<p>&nbsp;</p>
+
+<p><strong>3、修改软件源</strong></p>
+
+<p>由于目前OpenShift-ansible还没有添加3.9的源，所以需要自行修改下，方法如下：</p>
+
+<ul>
+	<li>进行openshift-ansible/roles/openshift_repos/templates/ 复制一份 CentOS-OpenShift-Origin37.repo.j2 为 CentOS-OpenShift-Origin39.repo.j2。</li>
+	<li>修改CentOS-OpenShift-Origin39.repo.j2中的源修改为国内的，比如阿里云。</li>
+</ul>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>[centos-openshift-origin39]</p>
+
+			<p>name=CentOS OpenShift Origin</p>
+
+			<p>baseurl=http://mirrors.aliyun.com/centos/7/paas/x86_64/openshift-origin39/</p>
+
+			<p>enabled=1</p>
+
+			<p>gpgcheck=1</p>
+
+			<p>gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-CentOS-SIG-PaaS</p>
+
+			<p>&nbsp;</p>
+
+			<p>[centos-openshift-origin39-testing]</p>
+
+			<p>name=CentOS OpenShift Origin Testing</p>
+
+			<p>baseurl=http://buildlogs.centos.org/centos/7/paas/x86_64/openshift-origin39/</p>
+
+			<p>enabled={{ 1 if openshift_repos_enable_testing else 0 }}</p>
+
+			<p>gpgcheck=0</p>
+
+			<p>gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-CentOS-SIG-PaaS</p>
+
+			<p>&nbsp;</p>
+
+			<p>[centos-openshift-origin39-debuginfo]</p>
+
+			<p>name=CentOS OpenShift Origin DebugInfo</p>
+
+			<p>baseurl=http://debuginfo.centos.org/centos/7/paas/x86_64/</p>
+
+			<p>enabled=0</p>
+
+			<p>gpgcheck=1</p>
+
+			<p>gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-CentOS-SIG-PaaS</p>
+
+			<p>&nbsp;</p>
+
+			<p>[centos-openshift-origin39-source]</p>
+
+			<p>name=CentOS OpenShift Origin Source</p>
+
+			<p>baseurl=http://vault.centos.org/centos/7/paas/Source/openshift-origin39/</p>
+
+			<p>enabled=0</p>
+
+			<p>gpgcheck=1</p>
+
+			<p>gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-CentOS-SIG-PaaS</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>&nbsp;</p>
+
+<p><strong>4、配置 ansible inventory 文件，保存到 /etc/ansible/inventory.ini文件中。</strong></p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p># Create an OSEv3 group that contains the masters and nodes groups</p>
+
+			<p>[OSEv3:children]</p>
+
+			<p>#目前配置标准的三个角色</p>
+
+			<p>masters</p>
+
+			<p>nodes</p>
+
+			<p>etcd</p>
+
+			<p>&nbsp;</p>
+
+			<p># Set variables common for all OSEv3 hosts</p>
+
+			<p>[OSEv3:vars]</p>
+
+			<p># SSH user, this user should allow ssh based auth without requiring a password</p>
+
+			<p>ansible_ssh_user=root</p>
+
+			<p>#使用origin社区版</p>
+
+			<p>openshift_deployment_type=origin</p>
+
+			<p>#指定安装版本</p>
+
+			<p>openshift_release=3.9</p>
+
+			<p>&nbsp;</p>
+
+			<p>#指定默认域名，访问的时候需要使用该域名，没有dns服务器，需要手动添加本地hosts文件</p>
+
+			<p>openshift_master_default_subdomain=apps.192.168.40.161.nip.io</p>
+
+			<p>&nbsp;</p>
+
+			<p>#禁止磁盘、内存和镜像检查</p>
+
+			<p>openshift_disable_check=disk_availability,docker_storage,memory_availability,docker_image_availability</p>
+
+			<p>&nbsp;</p>
+
+			<p>#disk_availability：报错信息是推荐的master磁盘空间剩余量大于40GB。测试环境无法满足，跳过检测。</p>
+
+			<p>#memory_availability：报错信息是推荐的master内存为16GB，node内存为8GB，测试环境无法满足，跳过检测。</p>
+
+			<p>#docker_image_availability：报错信息是需要的几个镜像未找到，选择跳过，装完集群后，在使用的时候再自行下载。</p>
+
+			<p>#docker_storage：报错信息是推荐选择一块磁盘空间存储镜像，这里选择跳过。采用docker默认的方式存储镜像。</p>
+
+			<p>&nbsp;</p>
+
+			<p>&nbsp;</p>
+
+			<p># uncomment the following to enable htpasswd authentication; defaults to DenyAllPasswordIdentityProvider</p>
+
+			<p>openshift_master_identity_providers=[{&#39;name&#39;:&#39;htpasswd_auth&#39;,&#39;login&#39;:&#39;true&#39;,&#39;challenge&#39;:&#39;true&#39;,&#39;kind&#39;:&#39;HTPasswdPasswordIdentityProvider&#39;,&#39;filename&#39;:&#39;/etc/origin/master/htpasswd&#39;}]</p>
+
+			<p>&nbsp;</p>
+
+			<p>#ntp时间同步</p>
+
+			<p>openshift_clock_enabled=true</p>
+
+			<p>&nbsp;</p>
+
+			<p>#节点配额</p>
+
+			<p>openshift_node_kubelet_args={&#39;pods-per-core&#39;: [&#39;10&#39;]}</p>
+
+			<p>&nbsp;</p>
+
+			<p># host group for masters</p>
+
+			<p>[masters]</p>
+
+			<p>master openshift_schedulable=True</p>
+
+			<p>&nbsp;</p>
+
+			<p># host group for nodes, includes region info</p>
+
+			<p>[nodes]</p>
+
+			<p>master openshift_node_labels=&quot;{&#39;region&#39;: &#39;infra&#39;}&quot;</p>
+
+			<p>node1 openshift_node_labels=&quot;{&#39;region&#39;: &#39;infra&#39;, &#39;zone&#39;: &#39;default&#39;}&quot;</p>
+
+			<p>node2 openshift_node_labels=&quot;{&#39;region&#39;: &#39;infra&#39;, &#39;zone&#39;: &#39;default&#39;}&quot;</p>
+
+			<p>&nbsp;</p>
+
+			<p>[etcd]</p>
+
+			<p>master</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p><strong>5、修改脚本问题</strong></p>
+
+<p>openshift-ansible/roles/lib_utils/filter_plugins/openshift_master.py 的第487行</p>
+
+<p><img alt="" src="https://img-blog.csdn.net/20180725212702868?watermark/2/text/aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L3N1bl9xaWFuZ3dlaQ==/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70" /></p>
+
+<p>注释掉图片中框出来的两行。</p>
+
+<p>&nbsp;</p>
+
+<p>&nbsp;</p>
+
+<p><strong>6、开始安装</strong></p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>ansible-playbook -i /etc/ansible/inventory.ini openshift-ansible/playbooks/prerequisites.yml</p>
+
+			<p>ansible-playbook -i /etc/ansible/inventory.ini openshift-ansible/playbooks/deploy_cluster.yml</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>安装过程是完全自动化的，无需手动干预。在绝大多数情况下，Ansible的脚本Playbook是可以反复执行的。</p>
+
+<p>第一条语句的运行结果：</p>
+
+<p><img alt="" src="https://img-blog.csdn.net/20180524211635122" /></p>
+
+<p>第二条语句的运行结果：</p>
+
+<p><img alt="" src="https://img-blog.csdn.net/20180524211645787" /></p>
+
+<p>&nbsp;</p>
+
+<p><strong>7、检查</strong></p>
+
+<p>安装完成后，执行oc get nodes 检查当前集群的成员列表以及它们的状态。</p>
+
+<p><img alt="" src="https://img-blog.csdn.net/20180524211701487" /></p>
+
+<p>其实在安装完成之后 第二个节点和第三个节点的roles类型为空，需要将其打上compute标签，命令如下：</p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>oc label node node1.192.168.40.162.nip.io node-role.kubernetes.io/compute=true</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>&nbsp;</p>
+
+<p>&nbsp;</p>
+
+<hr />
+<p><strong>四、OpenShift系统配置</strong></p>
+
+<p><strong>1、创建用户</strong></p>
+
+<p>安装的时候，在Ansible的hosts文件中定义了HTPasswd文件作为后端的用户身份信息库。</p>
+
+<p>&nbsp;</p>
+
+<p>安装程序自动生成了数据文件/etc/origin/master/htpasswd。但是此时该文件还是一个空文件，并没有任何用户信息。</p>
+
+<p>&nbsp;</p>
+
+<p>需要通过htpasswd命令来创建用户。创建账号为dev密码为dev的用户。</p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>[root@master ~]# htpasswd -b /etc/origin/master/htpasswd dev dev</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>&nbsp;</p>
+
+<p><strong>2、给dev添加集群管理员权限</strong></p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>oc adm policy add-cluster-role-to-user cluster-admin dev</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>&nbsp;</p>
+
+<p><strong>4、重启服务</strong></p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>systemctl restart origin-master-api</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>&nbsp;</p>
+
+<p><strong>5、访问页面</strong>，https://master.192.168.40.161.nip.io:8443</p>
+
+<p><img alt="" src="https://img-blog.csdn.net/20180524211711174" /></p>
+
+<p>&nbsp;</p>
+
+<p>&nbsp;</p>
+
+<hr />
+<p><strong>五、测试过程中的问题处理</strong></p>
+
+<p><strong>1、无法通过github下载源代码</strong></p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>Cloning &quot;<a href="https://github.com/gshipley/simplephp.git" rel="nofollow" target="_blank">https://github.com/gshipley/simplephp.git&nbsp;</a>&quot; ...</p>
+
+			<p>error: fatal: unable to access &#39;<a href="https://github.com/gshipley/simplephp.git/'%20rel=">https://github.com/gshipley/simplephp.git/&#39;:&nbsp;</a>Peer&#39;s certificate issuer has been marked as not trusted by the user.</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>解决方法：</p>
+
+<p>原因是在 /etc/resolv.conf 中多了search *** （专业术语：FQDN）,将其注释掉即可，但是当NetworkManager服务重新启动之后，之前的配置又会被覆盖，方法如下：</p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>chattr +i /etc/resolv.conf</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>&nbsp;</p>
+
+<p>2、无法进行docker的注册</p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>error: build error: Failed to push image: After retrying 6 times, Push image still failed due to error: Get https://docker-registry.default.svc:5000/v1/_ping: dial tcp 192.168.40.163:5000: getsockopt: connection refused</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>解决方法：</p>
+
+<p>通过观察docker-registry的pod界面可知</p>
+
+<p><img alt="" src="https://img-blog.csdn.net/20180524211740710" /></p>
+
+<p>&nbsp;</p>
+
+<p>，其绑定的IP地址为 172.30.135.115，因此在 /etc/hosts 中添加了</p>
+
+<p><img alt="" src="https://img-blog.csdn.net/20180524211800237" /></p>
+
+<h1>OpenShift 3.9 多节点集群（Ansible）安装</h1>
+
+<p>2018年05月24日 21:19:16&nbsp;<a href="https://me.csdn.net/sun_qiangwei" target="_blank">sun_qiangwei</a>&nbsp;阅读数：4871</p>
+
+<p>&nbsp;版权声明：本文为博主原创文章，未经博主允许不得转载。 https://blog.csdn.net/sun_qiangwei/article/details/80443943</p>
+
+<p>OpenShift集群的部署可以分为以下几个阶段：</p>
+
+<p><strong>1、主机环境准备</strong>：准备OpenShift集群需要的主机，并进行集群环境准备。</p>
+
+<p><strong>2、安装依赖包</strong>：提前安装使用Ansible安装OpenShift集群所依赖的第三方包。</p>
+
+<p><strong>3、Ansible执行安装</strong>：使用Ansible Playbook进行自动化安装。</p>
+
+<p><strong>4、OpenShift系统配置</strong>：在使用Ansible执行安装完成之后的系统配置。</p>
+
+<p><strong>5、测试问题处理</strong></p>
+
+<p>&nbsp;</p>
+
+<hr />
+<p><strong>一、主机环境准备</strong></p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>类型</p>
+			</td>
+			<td>
+			<p>主机名（域名）</p>
+			</td>
+			<td>
+			<p>IP</p>
+			</td>
+			<td>
+			<p>操作系统</p>
+			</td>
+			<td>
+			<p>内存</p>
+			</td>
+			<td>
+			<p>磁盘</p>
+			</td>
+		</tr>
+		<tr>
+			<td>
+			<p>Master</p>
+			</td>
+			<td>
+			<p>master.192.168.40.161.nip.io</p>
+			</td>
+			<td>
+			<p>192.168.40.161</p>
+			</td>
+			<td>
+			<p>CentOS7.5</p>
+			</td>
+			<td>
+			<p>2G</p>
+			</td>
+			<td>
+			<p>sda：10G for OS</p>
+
+			<p>sdb：20G for docker</p>
+			</td>
+		</tr>
+		<tr>
+			<td>
+			<p>Node</p>
+			</td>
+			<td>
+			<p>node1.192.168.40.162.nip.io</p>
+			</td>
+			<td>
+			<p>192.168.40.162</p>
+			</td>
+			<td>
+			<p>CentOS7.5</p>
+			</td>
+			<td>
+			<p>2G</p>
+			</td>
+			<td>
+			<p>sda：10G for OS</p>
+
+			<p>sdb：20G for docker</p>
+			</td>
+		</tr>
+		<tr>
+			<td>
+			<p>Node</p>
+			</td>
+			<td>
+			<p>node2.192.168.40.163.nip.io</p>
+			</td>
+			<td>
+			<p>192.168.40.163</p>
+			</td>
+			<td>
+			<p>CentOS7.5</p>
+			</td>
+			<td>
+			<p>2G</p>
+			</td>
+			<td>
+			<p>sda：10G for OS</p>
+
+			<p>sdb：20G for docker</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>&nbsp;</p>
+
+<p><em>说明：在安装的过程中，使用了nip.io结尾的域名，关于nip.io的问题，请查阅&nbsp;</em><a href="http://nip.io/" rel="nofollow" target="_blank"><em>nip.io</em></a><em>&nbsp;网站 。</em></p>
+
+<p>&nbsp;</p>
+
+<p><strong>1、检查主机与Internet的状态</strong></p>
+
+<p>由于在安装的过程中需要通过Internet下载相关依赖，因此需要检查三台主机与Internet的状态。</p>
+
+<p>&nbsp;</p>
+
+<p><strong>2、检查主机名</strong></p>
+
+<p>按照上面表格中所列的主机名进行主机名检查。如果不一致，可以通过下面的命令进行配置，如下：</p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>hostnamectl set-hostname master.192.168.40.161.nip.io</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>&nbsp;</p>
+
+<p><strong>3、检查主机名（域名）的解析是否正常</strong></p>
+
+<p>可以通过 ping $(hostname)来验证主机名到主机IP的解析情况。</p>
+
+<p>如果出现不能ping通的情况，可以直接修改各个节点的 /etc/hosts 文件，加上静态的域名解析。</p>
+
+<p>&nbsp;</p>
+
+<p>此外由于使用的是nip.io的域名，正常的DNS都能够解析到正确的IP地址；但是在输入命令的过程中使用全域名会很麻烦，因此在hosts中添加了主机名的缩写配置，如下：</p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>192.168.40.161 master</p>
+
+			<p>192.168.40.162 node1</p>
+
+			<p>192.168.40.163 node2</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>&nbsp;</p>
+
+<p><strong>4、检查SELINUX是否开启</strong></p>
+
+<p>官方文档推荐开启SELINUX，否则会导致安装失败。</p>
+
+<p>修改方式如下：</p>
+
+<p>/etc/selinux/config</p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>SELINUX=enforcing</p>
+
+			<p>SELINUXTYPE=targeted</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>&nbsp;</p>
+
+<p><strong>5、配置三台主机ssh免密访问</strong></p>
+
+<p>5.1）在所有节点上以root账号登陆，并进入到/root的主目录</p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>[root@master ~]$ pwd</p>
+
+			<p>/root</p>
+
+			<p>[root@master ~]$</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>&nbsp;</p>
+
+<p>5.2）在所有节点上生成密钥对。</p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>[root@master ~]$ ssh-keygen -t rsa</p>
+
+			<p>Generating public/private rsa key pair.</p>
+
+			<p>Enter file in which to save the key (/home/.ssh/id_rsa):</p>
+
+			<p>Created directory &#39;/home/.ssh&#39;.</p>
+
+			<p>Enter passphrase (empty for no passphrase):</p>
+
+			<p>Enter same passphrase again:</p>
+
+			<p>Your identification has been saved in /home/.ssh/id_rsa.</p>
+
+			<p>Your public key has been saved in /home/.ssh/id_rsa.pub.</p>
+
+			<p>The key fingerprint is:</p>
+
+			<p>29:1c:df:59:0d:5f:ee:28:07:c0:57:21:15:af:a3:88 root@master</p>
+
+			<p>The key&#39;s randomart image is:</p>
+
+			<p>+--[ RSA 2048]----+</p>
+
+			<p>| .. oo=o.|</p>
+
+			<p>| ...= + |</p>
+
+			<p>| . .o o o|</p>
+
+			<p>| . o o o . + |</p>
+
+			<p>| o S o . = .|</p>
+
+			<p>| . . . + . |</p>
+
+			<p>| E . . |</p>
+
+			<p>| |</p>
+
+			<p>| |</p>
+
+			<p>+-----------------+</p>
+
+			<p>[root@master ~]$</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>&nbsp;</p>
+
+<p>5.3）然后进入.ssh目录，把公钥复制到authorized_keys</p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>[root@master ~]$ cd .ssh</p>
+
+			<p>[root@master .ssh]$ ls</p>
+
+			<p>id_rsa id_rsa.pub</p>
+
+			<p>[root@master .ssh]$ cp id_rsa.pub authorized_keys</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>&nbsp;</p>
+
+<p>5.4）分发ssh公钥到各个节点</p>
+
+<p>先将node1和node2的公钥添加到master节点的authorized_keys文件中。</p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>[root@node1 .ssh]$ ssh-copy-id master</p>
+
+			<p>[root<a href="http://hdfs-yarn-1/" rel="nofollow" target="_blank">@</a>node2 .ssh]$ ssh-copy-id master</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>最后再使用scp将master中的authorized_keys文件传送到各个节点。</p>
+
+<p>&nbsp;</p>
+
+<p>此处，需要注意.ssh(755)及.ssh/authorized_keys(644)的权限。&nbsp;</p>
+
+<p>&nbsp;</p>
+
+<p>&nbsp;</p>
+
+<hr />
+<p><strong>二、安装依赖包</strong></p>
+
+<p><strong>1、所有主机上执行以下命令进行系统更新</strong></p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>yum install -y update</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>安装完成之后，重新系统生效。</p>
+
+<p>&nbsp;</p>
+
+<p><strong>2、所有的主机下执行以下命令安装OpenShift依赖的软件包。</strong></p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>yum install wget git net-tools bind-utils iptables-services bridge-utils bash-completion kexec-tools sos psacct bash-completion.noarch bash-completion-extras.noarch python-passlib NetworkManager -y</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>&nbsp;</p>
+
+<p><strong>3、所有的主机安装docker</strong></p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>yum install docker-1.13.1 -y</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>&nbsp;</p>
+
+<p><strong>4、配置docker使用的存储</strong></p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>echo DEVS=/dev/sdb &gt; /etc/sysconfig/docker-storage-setup</p>
+
+			<p>echo VG=DOCKER &gt;&gt; /etc/sysconfig/docker-storage-setup</p>
+
+			<p>echo SETUP_LVM_THIN_POOL=yes &gt;&gt; /etc/sysconfig/docker-storage-setup</p>
+
+			<p>echo DATA_SIZE=&quot;100%FREE&quot;&gt;&gt; /etc/sysconfig/docker-storage-setup</p>
+
+			<p>&nbsp;</p>
+
+			<p>rm -rf /var/lib/docker</p>
+
+			<p>&nbsp;</p>
+
+			<p>wipefs --all /dev/sdb</p>
+
+			<p>docker-storage-setup</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>&nbsp;</p>
+
+<p><strong>5、配置docker镜像加速</strong></p>
+
+<p>选择阿里云的镜像服务器进行加速，修改 /etc/docker/daemon.json 文件，如下所示：</p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>[root@master ~]# more /etc/docker/daemon.json</p>
+
+			<p>{</p>
+
+			<p>&quot;registry-mirrors&quot;: [&quot;https://换成自己的地址.mirror.aliyuncs.com&quot;]</p>
+
+			<p>}</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>配置完成之后，所有主机启动docker，命令如下：</p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>systemctl enable docker</p>
+
+			<p>systemctl start docker</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>&nbsp;</p>
+
+<hr />
+<p><strong>三、在Master主机上执行Ansible集群安装</strong></p>
+
+<p><strong>1、启用EPEL仓库以安装Ansible</strong></p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>#install epel</p>
+
+			<p>yum -y install epel-release</p>
+
+			<p>&nbsp;</p>
+
+			<p># Disable the EPEL repository globally so that is not accidentally used during later steps of the installation</p>
+
+			<p>sed -i -e &quot;s/^enabled=1/enabled=0/&quot; /etc/yum.repos.d/epel.repo</p>
+
+			<p>&nbsp;</p>
+
+			<p>yum -y --enablerepo=epel install ansible pyOpenSSL #3.9必须2.5版本</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p><strong>2、从 github 上clone openshift-ansible 3.9版本</strong></p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>git clone -b release-3.9 https://github.com/openshift/openshift-ansible</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>说明：最近通过本blog重新安装openshift集群时，发现总是出现各种各样的问题，如 /etc/dnsmasq.d/origin-upstream-dns.conf 、/etc/origin/node/resolv.conf 等文件缺失，因此将原来从github上clone源代码，修改为下载已经release的版本。</p>
+
+<p>&nbsp;</p>
+
+<p><strong>2、从github上下载openshift-ansible已经release的版本</strong></p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>wget https://github.com/openshift/openshift-ansible/archive/openshift-ansible-3.9.32-1.zip</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p><strong>下载完成之后，进行解压并重命为 openshift-ansible。</strong></p>
+
+<p>&nbsp;</p>
+
+<p><strong>3、修改软件源</strong></p>
+
+<p>由于目前OpenShift-ansible还没有添加3.9的源，所以需要自行修改下，方法如下：</p>
+
+<ul>
+	<li>进行openshift-ansible/roles/openshift_repos/templates/ 复制一份 CentOS-OpenShift-Origin37.repo.j2 为 CentOS-OpenShift-Origin39.repo.j2。</li>
+	<li>修改CentOS-OpenShift-Origin39.repo.j2中的源修改为国内的，比如阿里云。</li>
+</ul>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>[centos-openshift-origin39]</p>
+
+			<p>name=CentOS OpenShift Origin</p>
+
+			<p>baseurl=http://mirrors.aliyun.com/centos/7/paas/x86_64/openshift-origin39/</p>
+
+			<p>enabled=1</p>
+
+			<p>gpgcheck=1</p>
+
+			<p>gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-CentOS-SIG-PaaS</p>
+
+			<p>&nbsp;</p>
+
+			<p>[centos-openshift-origin39-testing]</p>
+
+			<p>name=CentOS OpenShift Origin Testing</p>
+
+			<p>baseurl=http://buildlogs.centos.org/centos/7/paas/x86_64/openshift-origin39/</p>
+
+			<p>enabled={{ 1 if openshift_repos_enable_testing else 0 }}</p>
+
+			<p>gpgcheck=0</p>
+
+			<p>gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-CentOS-SIG-PaaS</p>
+
+			<p>&nbsp;</p>
+
+			<p>[centos-openshift-origin39-debuginfo]</p>
+
+			<p>name=CentOS OpenShift Origin DebugInfo</p>
+
+			<p>baseurl=http://debuginfo.centos.org/centos/7/paas/x86_64/</p>
+
+			<p>enabled=0</p>
+
+			<p>gpgcheck=1</p>
+
+			<p>gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-CentOS-SIG-PaaS</p>
+
+			<p>&nbsp;</p>
+
+			<p>[centos-openshift-origin39-source]</p>
+
+			<p>name=CentOS OpenShift Origin Source</p>
+
+			<p>baseurl=http://vault.centos.org/centos/7/paas/Source/openshift-origin39/</p>
+
+			<p>enabled=0</p>
+
+			<p>gpgcheck=1</p>
+
+			<p>gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-CentOS-SIG-PaaS</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>&nbsp;</p>
+
+<p><strong>4、配置 ansible inventory 文件，保存到 /etc/ansible/inventory.ini文件中。</strong></p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p># Create an OSEv3 group that contains the masters and nodes groups</p>
+
+			<p>[OSEv3:children]</p>
+
+			<p>#目前配置标准的三个角色</p>
+
+			<p>masters</p>
+
+			<p>nodes</p>
+
+			<p>etcd</p>
+
+			<p>&nbsp;</p>
+
+			<p># Set variables common for all OSEv3 hosts</p>
+
+			<p>[OSEv3:vars]</p>
+
+			<p># SSH user, this user should allow ssh based auth without requiring a password</p>
+
+			<p>ansible_ssh_user=root</p>
+
+			<p>#使用origin社区版</p>
+
+			<p>openshift_deployment_type=origin</p>
+
+			<p>#指定安装版本</p>
+
+			<p>openshift_release=3.9</p>
+
+			<p>&nbsp;</p>
+
+			<p>#指定默认域名，访问的时候需要使用该域名，没有dns服务器，需要手动添加本地hosts文件</p>
+
+			<p>openshift_master_default_subdomain=apps.192.168.40.161.nip.io</p>
+
+			<p>&nbsp;</p>
+
+			<p>#禁止磁盘、内存和镜像检查</p>
+
+			<p>openshift_disable_check=disk_availability,docker_storage,memory_availability,docker_image_availability</p>
+
+			<p>&nbsp;</p>
+
+			<p>#disk_availability：报错信息是推荐的master磁盘空间剩余量大于40GB。测试环境无法满足，跳过检测。</p>
+
+			<p>#memory_availability：报错信息是推荐的master内存为16GB，node内存为8GB，测试环境无法满足，跳过检测。</p>
+
+			<p>#docker_image_availability：报错信息是需要的几个镜像未找到，选择跳过，装完集群后，在使用的时候再自行下载。</p>
+
+			<p>#docker_storage：报错信息是推荐选择一块磁盘空间存储镜像，这里选择跳过。采用docker默认的方式存储镜像。</p>
+
+			<p>&nbsp;</p>
+
+			<p>&nbsp;</p>
+
+			<p># uncomment the following to enable htpasswd authentication; defaults to DenyAllPasswordIdentityProvider</p>
+
+			<p>openshift_master_identity_providers=[{&#39;name&#39;:&#39;htpasswd_auth&#39;,&#39;login&#39;:&#39;true&#39;,&#39;challenge&#39;:&#39;true&#39;,&#39;kind&#39;:&#39;HTPasswdPasswordIdentityProvider&#39;,&#39;filename&#39;:&#39;/etc/origin/master/htpasswd&#39;}]</p>
+
+			<p>&nbsp;</p>
+
+			<p>#ntp时间同步</p>
+
+			<p>openshift_clock_enabled=true</p>
+
+			<p>&nbsp;</p>
+
+			<p>#节点配额</p>
+
+			<p>openshift_node_kubelet_args={&#39;pods-per-core&#39;: [&#39;10&#39;]}</p>
+
+			<p>&nbsp;</p>
+
+			<p># host group for masters</p>
+
+			<p>[masters]</p>
+
+			<p>master openshift_schedulable=True</p>
+
+			<p>&nbsp;</p>
+
+			<p># host group for nodes, includes region info</p>
+
+			<p>[nodes]</p>
+
+			<p>master openshift_node_labels=&quot;{&#39;region&#39;: &#39;infra&#39;}&quot;</p>
+
+			<p>node1 openshift_node_labels=&quot;{&#39;region&#39;: &#39;infra&#39;, &#39;zone&#39;: &#39;default&#39;}&quot;</p>
+
+			<p>node2 openshift_node_labels=&quot;{&#39;region&#39;: &#39;infra&#39;, &#39;zone&#39;: &#39;default&#39;}&quot;</p>
+
+			<p>&nbsp;</p>
+
+			<p>[etcd]</p>
+
+			<p>master</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p><strong>5、修改脚本问题</strong></p>
+
+<p>openshift-ansible/roles/lib_utils/filter_plugins/openshift_master.py 的第487行</p>
+
+<p><img alt="" src="https://img-blog.csdn.net/20180725212702868?watermark/2/text/aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L3N1bl9xaWFuZ3dlaQ==/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70" /></p>
+
+<p>注释掉图片中框出来的两行。</p>
+
+<p>&nbsp;</p>
+
+<p>&nbsp;</p>
+
+<p><strong>6、开始安装</strong></p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>ansible-playbook -i /etc/ansible/inventory.ini openshift-ansible/playbooks/prerequisites.yml</p>
+
+			<p>ansible-playbook -i /etc/ansible/inventory.ini openshift-ansible/playbooks/deploy_cluster.yml</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>安装过程是完全自动化的，无需手动干预。在绝大多数情况下，Ansible的脚本Playbook是可以反复执行的。</p>
+
+<p>第一条语句的运行结果：</p>
+
+<p><img alt="" src="https://img-blog.csdn.net/20180524211635122" /></p>
+
+<p>第二条语句的运行结果：</p>
+
+<p><img alt="" src="https://img-blog.csdn.net/20180524211645787" /></p>
+
+<p>&nbsp;</p>
+
+<p><strong>7、检查</strong></p>
+
+<p>安装完成后，执行oc get nodes 检查当前集群的成员列表以及它们的状态。</p>
+
+<p><img alt="" src="https://img-blog.csdn.net/20180524211701487" /></p>
+
+<p>其实在安装完成之后 第二个节点和第三个节点的roles类型为空，需要将其打上compute标签，命令如下：</p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>oc label node node1.192.168.40.162.nip.io node-role.kubernetes.io/compute=true</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>&nbsp;</p>
+
+<p>&nbsp;</p>
+
+<hr />
+<p><strong>四、OpenShift系统配置</strong></p>
+
+<p><strong>1、创建用户</strong></p>
+
+<p>安装的时候，在Ansible的hosts文件中定义了HTPasswd文件作为后端的用户身份信息库。</p>
+
+<p>&nbsp;</p>
+
+<p>安装程序自动生成了数据文件/etc/origin/master/htpasswd。但是此时该文件还是一个空文件，并没有任何用户信息。</p>
+
+<p>&nbsp;</p>
+
+<p>需要通过htpasswd命令来创建用户。创建账号为dev密码为dev的用户。</p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>[root@master ~]# htpasswd -b /etc/origin/master/htpasswd dev dev</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>&nbsp;</p>
+
+<p><strong>2、给dev添加集群管理员权限</strong></p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>oc adm policy add-cluster-role-to-user cluster-admin dev</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>&nbsp;</p>
+
+<p><strong>4、重启服务</strong></p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>systemctl restart origin-master-api</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>&nbsp;</p>
+
+<p><strong>5、访问页面</strong>，https://master.192.168.40.161.nip.io:8443</p>
+
+<p><img alt="" src="https://img-blog.csdn.net/20180524211711174" /></p>
+
+<p>&nbsp;</p>
+
+<p>&nbsp;</p>
+
+<hr />
+<p><strong>五、测试过程中的问题处理</strong></p>
+
+<p><strong>1、无法通过github下载源代码</strong></p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>Cloning &quot;<a href="https://github.com/gshipley/simplephp.git" rel="nofollow" target="_blank">https://github.com/gshipley/simplephp.git&nbsp;</a>&quot; ...</p>
+
+			<p>error: fatal: unable to access &#39;<a href="https://github.com/gshipley/simplephp.git/'%20rel=">https://github.com/gshipley/simplephp.git/&#39;:&nbsp;</a>Peer&#39;s certificate issuer has been marked as not trusted by the user.</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>解决方法：</p>
+
+<p>原因是在 /etc/resolv.conf 中多了search *** （专业术语：FQDN）,将其注释掉即可，但是当NetworkManager服务重新启动之后，之前的配置又会被覆盖，方法如下：</p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>chattr +i /etc/resolv.conf</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>&nbsp;</p>
+
+<p>2、无法进行docker的注册</p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>error: build error: Failed to push image: After retrying 6 times, Push image still failed due to error: Get https://docker-registry.default.svc:5000/v1/_ping: dial tcp 192.168.40.163:5000: getsockopt: connection refused</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>解决方法：</p>
+
+<p>通过观察docker-registry的pod界面可知</p>
+
+<p><img alt="" src="https://img-blog.csdn.net/20180524211740710" /></p>
+
+<p>&nbsp;</p>
+
+<p>，其绑定的IP地址为 172.30.135.115，因此在 /etc/hosts 中添加了</p>
+
+<p><img alt="" src="https://img-blog.csdn.net/20180524211800237" /></p>
+
+<h1>OpenShift 3.9 多节点集群（Ansible）安装</h1>
+
+<p>2018年05月24日 21:19:16&nbsp;<a href="https://me.csdn.net/sun_qiangwei" target="_blank">sun_qiangwei</a>&nbsp;阅读数：4871</p>
+
+<p>&nbsp;版权声明：本文为博主原创文章，未经博主允许不得转载。 https://blog.csdn.net/sun_qiangwei/article/details/80443943</p>
+
+<p>OpenShift集群的部署可以分为以下几个阶段：</p>
+
+<p><strong>1、主机环境准备</strong>：准备OpenShift集群需要的主机，并进行集群环境准备。</p>
+
+<p><strong>2、安装依赖包</strong>：提前安装使用Ansible安装OpenShift集群所依赖的第三方包。</p>
+
+<p><strong>3、Ansible执行安装</strong>：使用Ansible Playbook进行自动化安装。</p>
+
+<p><strong>4、OpenShift系统配置</strong>：在使用Ansible执行安装完成之后的系统配置。</p>
+
+<p><strong>5、测试问题处理</strong></p>
+
+<p>&nbsp;</p>
+
+<hr />
+<p><strong>一、主机环境准备</strong></p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>类型</p>
+			</td>
+			<td>
+			<p>主机名（域名）</p>
+			</td>
+			<td>
+			<p>IP</p>
+			</td>
+			<td>
+			<p>操作系统</p>
+			</td>
+			<td>
+			<p>内存</p>
+			</td>
+			<td>
+			<p>磁盘</p>
+			</td>
+		</tr>
+		<tr>
+			<td>
+			<p>Master</p>
+			</td>
+			<td>
+			<p>master.192.168.40.161.nip.io</p>
+			</td>
+			<td>
+			<p>192.168.40.161</p>
+			</td>
+			<td>
+			<p>CentOS7.5</p>
+			</td>
+			<td>
+			<p>2G</p>
+			</td>
+			<td>
+			<p>sda：10G for OS</p>
+
+			<p>sdb：20G for docker</p>
+			</td>
+		</tr>
+		<tr>
+			<td>
+			<p>Node</p>
+			</td>
+			<td>
+			<p>node1.192.168.40.162.nip.io</p>
+			</td>
+			<td>
+			<p>192.168.40.162</p>
+			</td>
+			<td>
+			<p>CentOS7.5</p>
+			</td>
+			<td>
+			<p>2G</p>
+			</td>
+			<td>
+			<p>sda：10G for OS</p>
+
+			<p>sdb：20G for docker</p>
+			</td>
+		</tr>
+		<tr>
+			<td>
+			<p>Node</p>
+			</td>
+			<td>
+			<p>node2.192.168.40.163.nip.io</p>
+			</td>
+			<td>
+			<p>192.168.40.163</p>
+			</td>
+			<td>
+			<p>CentOS7.5</p>
+			</td>
+			<td>
+			<p>2G</p>
+			</td>
+			<td>
+			<p>sda：10G for OS</p>
+
+			<p>sdb：20G for docker</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>&nbsp;</p>
+
+<p><em>说明：在安装的过程中，使用了nip.io结尾的域名，关于nip.io的问题，请查阅&nbsp;</em><a href="http://nip.io/" rel="nofollow" target="_blank"><em>nip.io</em></a><em>&nbsp;网站 。</em></p>
+
+<p>&nbsp;</p>
+
+<p><strong>1、检查主机与Internet的状态</strong></p>
+
+<p>由于在安装的过程中需要通过Internet下载相关依赖，因此需要检查三台主机与Internet的状态。</p>
+
+<p>&nbsp;</p>
+
+<p><strong>2、检查主机名</strong></p>
+
+<p>按照上面表格中所列的主机名进行主机名检查。如果不一致，可以通过下面的命令进行配置，如下：</p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>hostnamectl set-hostname master.192.168.40.161.nip.io</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>&nbsp;</p>
+
+<p><strong>3、检查主机名（域名）的解析是否正常</strong></p>
+
+<p>可以通过 ping $(hostname)来验证主机名到主机IP的解析情况。</p>
+
+<p>如果出现不能ping通的情况，可以直接修改各个节点的 /etc/hosts 文件，加上静态的域名解析。</p>
+
+<p>&nbsp;</p>
+
+<p>此外由于使用的是nip.io的域名，正常的DNS都能够解析到正确的IP地址；但是在输入命令的过程中使用全域名会很麻烦，因此在hosts中添加了主机名的缩写配置，如下：</p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>192.168.40.161 master</p>
+
+			<p>192.168.40.162 node1</p>
+
+			<p>192.168.40.163 node2</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>&nbsp;</p>
+
+<p><strong>4、检查SELINUX是否开启</strong></p>
+
+<p>官方文档推荐开启SELINUX，否则会导致安装失败。</p>
+
+<p>修改方式如下：</p>
+
+<p>/etc/selinux/config</p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>SELINUX=enforcing</p>
+
+			<p>SELINUXTYPE=targeted</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>&nbsp;</p>
+
+<p><strong>5、配置三台主机ssh免密访问</strong></p>
+
+<p>5.1）在所有节点上以root账号登陆，并进入到/root的主目录</p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>[root@master ~]$ pwd</p>
+
+			<p>/root</p>
+
+			<p>[root@master ~]$</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>&nbsp;</p>
+
+<p>5.2）在所有节点上生成密钥对。</p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>[root@master ~]$ ssh-keygen -t rsa</p>
+
+			<p>Generating public/private rsa key pair.</p>
+
+			<p>Enter file in which to save the key (/home/.ssh/id_rsa):</p>
+
+			<p>Created directory &#39;/home/.ssh&#39;.</p>
+
+			<p>Enter passphrase (empty for no passphrase):</p>
+
+			<p>Enter same passphrase again:</p>
+
+			<p>Your identification has been saved in /home/.ssh/id_rsa.</p>
+
+			<p>Your public key has been saved in /home/.ssh/id_rsa.pub.</p>
+
+			<p>The key fingerprint is:</p>
+
+			<p>29:1c:df:59:0d:5f:ee:28:07:c0:57:21:15:af:a3:88 root@master</p>
+
+			<p>The key&#39;s randomart image is:</p>
+
+			<p>+--[ RSA 2048]----+</p>
+
+			<p>| .. oo=o.|</p>
+
+			<p>| ...= + |</p>
+
+			<p>| . .o o o|</p>
+
+			<p>| . o o o . + |</p>
+
+			<p>| o S o . = .|</p>
+
+			<p>| . . . + . |</p>
+
+			<p>| E . . |</p>
+
+			<p>| |</p>
+
+			<p>| |</p>
+
+			<p>+-----------------+</p>
+
+			<p>[root@master ~]$</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>&nbsp;</p>
+
+<p>5.3）然后进入.ssh目录，把公钥复制到authorized_keys</p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>[root@master ~]$ cd .ssh</p>
+
+			<p>[root@master .ssh]$ ls</p>
+
+			<p>id_rsa id_rsa.pub</p>
+
+			<p>[root@master .ssh]$ cp id_rsa.pub authorized_keys</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>&nbsp;</p>
+
+<p>5.4）分发ssh公钥到各个节点</p>
+
+<p>先将node1和node2的公钥添加到master节点的authorized_keys文件中。</p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>[root@node1 .ssh]$ ssh-copy-id master</p>
+
+			<p>[root<a href="http://hdfs-yarn-1/" rel="nofollow" target="_blank">@</a>node2 .ssh]$ ssh-copy-id master</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>最后再使用scp将master中的authorized_keys文件传送到各个节点。</p>
+
+<p>&nbsp;</p>
+
+<p>此处，需要注意.ssh(755)及.ssh/authorized_keys(644)的权限。&nbsp;</p>
+
+<p>&nbsp;</p>
+
+<p>&nbsp;</p>
+
+<hr />
+<p><strong>二、安装依赖包</strong></p>
+
+<p><strong>1、所有主机上执行以下命令进行系统更新</strong></p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>yum install -y update</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>安装完成之后，重新系统生效。</p>
+
+<p>&nbsp;</p>
+
+<p><strong>2、所有的主机下执行以下命令安装OpenShift依赖的软件包。</strong></p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>yum install wget git net-tools bind-utils iptables-services bridge-utils bash-completion kexec-tools sos psacct bash-completion.noarch bash-completion-extras.noarch python-passlib NetworkManager -y</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>&nbsp;</p>
+
+<p><strong>3、所有的主机安装docker</strong></p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>yum install docker-1.13.1 -y</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>&nbsp;</p>
+
+<p><strong>4、配置docker使用的存储</strong></p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>echo DEVS=/dev/sdb &gt; /etc/sysconfig/docker-storage-setup</p>
+
+			<p>echo VG=DOCKER &gt;&gt; /etc/sysconfig/docker-storage-setup</p>
+
+			<p>echo SETUP_LVM_THIN_POOL=yes &gt;&gt; /etc/sysconfig/docker-storage-setup</p>
+
+			<p>echo DATA_SIZE=&quot;100%FREE&quot;&gt;&gt; /etc/sysconfig/docker-storage-setup</p>
+
+			<p>&nbsp;</p>
+
+			<p>rm -rf /var/lib/docker</p>
+
+			<p>&nbsp;</p>
+
+			<p>wipefs --all /dev/sdb</p>
+
+			<p>docker-storage-setup</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>&nbsp;</p>
+
+<p><strong>5、配置docker镜像加速</strong></p>
+
+<p>选择阿里云的镜像服务器进行加速，修改 /etc/docker/daemon.json 文件，如下所示：</p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>[root@master ~]# more /etc/docker/daemon.json</p>
+
+			<p>{</p>
+
+			<p>&quot;registry-mirrors&quot;: [&quot;https://换成自己的地址.mirror.aliyuncs.com&quot;]</p>
+
+			<p>}</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>配置完成之后，所有主机启动docker，命令如下：</p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>systemctl enable docker</p>
+
+			<p>systemctl start docker</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>&nbsp;</p>
+
+<hr />
+<p><strong>三、在Master主机上执行Ansible集群安装</strong></p>
+
+<p><strong>1、启用EPEL仓库以安装Ansible</strong></p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>#install epel</p>
+
+			<p>yum -y install epel-release</p>
+
+			<p>&nbsp;</p>
+
+			<p># Disable the EPEL repository globally so that is not accidentally used during later steps of the installation</p>
+
+			<p>sed -i -e &quot;s/^enabled=1/enabled=0/&quot; /etc/yum.repos.d/epel.repo</p>
+
+			<p>&nbsp;</p>
+
+			<p>yum -y --enablerepo=epel install ansible pyOpenSSL #3.9必须2.5版本</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p><strong>2、从 github 上clone openshift-ansible 3.9版本</strong></p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>git clone -b release-3.9 https://github.com/openshift/openshift-ansible</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>说明：最近通过本blog重新安装openshift集群时，发现总是出现各种各样的问题，如 /etc/dnsmasq.d/origin-upstream-dns.conf 、/etc/origin/node/resolv.conf 等文件缺失，因此将原来从github上clone源代码，修改为下载已经release的版本。</p>
+
+<p>&nbsp;</p>
+
+<p><strong>2、从github上下载openshift-ansible已经release的版本</strong></p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>wget https://github.com/openshift/openshift-ansible/archive/openshift-ansible-3.9.32-1.zip</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p><strong>下载完成之后，进行解压并重命为 openshift-ansible。</strong></p>
+
+<p>&nbsp;</p>
+
+<p><strong>3、修改软件源</strong></p>
+
+<p>由于目前OpenShift-ansible还没有添加3.9的源，所以需要自行修改下，方法如下：</p>
+
+<ul>
+	<li>进行openshift-ansible/roles/openshift_repos/templates/ 复制一份 CentOS-OpenShift-Origin37.repo.j2 为 CentOS-OpenShift-Origin39.repo.j2。</li>
+	<li>修改CentOS-OpenShift-Origin39.repo.j2中的源修改为国内的，比如阿里云。</li>
+</ul>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>[centos-openshift-origin39]</p>
+
+			<p>name=CentOS OpenShift Origin</p>
+
+			<p>baseurl=http://mirrors.aliyun.com/centos/7/paas/x86_64/openshift-origin39/</p>
+
+			<p>enabled=1</p>
+
+			<p>gpgcheck=1</p>
+
+			<p>gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-CentOS-SIG-PaaS</p>
+
+			<p>&nbsp;</p>
+
+			<p>[centos-openshift-origin39-testing]</p>
+
+			<p>name=CentOS OpenShift Origin Testing</p>
+
+			<p>baseurl=http://buildlogs.centos.org/centos/7/paas/x86_64/openshift-origin39/</p>
+
+			<p>enabled={{ 1 if openshift_repos_enable_testing else 0 }}</p>
+
+			<p>gpgcheck=0</p>
+
+			<p>gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-CentOS-SIG-PaaS</p>
+
+			<p>&nbsp;</p>
+
+			<p>[centos-openshift-origin39-debuginfo]</p>
+
+			<p>name=CentOS OpenShift Origin DebugInfo</p>
+
+			<p>baseurl=http://debuginfo.centos.org/centos/7/paas/x86_64/</p>
+
+			<p>enabled=0</p>
+
+			<p>gpgcheck=1</p>
+
+			<p>gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-CentOS-SIG-PaaS</p>
+
+			<p>&nbsp;</p>
+
+			<p>[centos-openshift-origin39-source]</p>
+
+			<p>name=CentOS OpenShift Origin Source</p>
+
+			<p>baseurl=http://vault.centos.org/centos/7/paas/Source/openshift-origin39/</p>
+
+			<p>enabled=0</p>
+
+			<p>gpgcheck=1</p>
+
+			<p>gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-CentOS-SIG-PaaS</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>&nbsp;</p>
+
+<p><strong>4、配置 ansible inventory 文件，保存到 /etc/ansible/inventory.ini文件中。</strong></p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p># Create an OSEv3 group that contains the masters and nodes groups</p>
+
+			<p>[OSEv3:children]</p>
+
+			<p>#目前配置标准的三个角色</p>
+
+			<p>masters</p>
+
+			<p>nodes</p>
+
+			<p>etcd</p>
+
+			<p>&nbsp;</p>
+
+			<p># Set variables common for all OSEv3 hosts</p>
+
+			<p>[OSEv3:vars]</p>
+
+			<p># SSH user, this user should allow ssh based auth without requiring a password</p>
+
+			<p>ansible_ssh_user=root</p>
+
+			<p>#使用origin社区版</p>
+
+			<p>openshift_deployment_type=origin</p>
+
+			<p>#指定安装版本</p>
+
+			<p>openshift_release=3.9</p>
+
+			<p>&nbsp;</p>
+
+			<p>#指定默认域名，访问的时候需要使用该域名，没有dns服务器，需要手动添加本地hosts文件</p>
+
+			<p>openshift_master_default_subdomain=apps.192.168.40.161.nip.io</p>
+
+			<p>&nbsp;</p>
+
+			<p>#禁止磁盘、内存和镜像检查</p>
+
+			<p>openshift_disable_check=disk_availability,docker_storage,memory_availability,docker_image_availability</p>
+
+			<p>&nbsp;</p>
+
+			<p>#disk_availability：报错信息是推荐的master磁盘空间剩余量大于40GB。测试环境无法满足，跳过检测。</p>
+
+			<p>#memory_availability：报错信息是推荐的master内存为16GB，node内存为8GB，测试环境无法满足，跳过检测。</p>
+
+			<p>#docker_image_availability：报错信息是需要的几个镜像未找到，选择跳过，装完集群后，在使用的时候再自行下载。</p>
+
+			<p>#docker_storage：报错信息是推荐选择一块磁盘空间存储镜像，这里选择跳过。采用docker默认的方式存储镜像。</p>
+
+			<p>&nbsp;</p>
+
+			<p>&nbsp;</p>
+
+			<p># uncomment the following to enable htpasswd authentication; defaults to DenyAllPasswordIdentityProvider</p>
+
+			<p>openshift_master_identity_providers=[{&#39;name&#39;:&#39;htpasswd_auth&#39;,&#39;login&#39;:&#39;true&#39;,&#39;challenge&#39;:&#39;true&#39;,&#39;kind&#39;:&#39;HTPasswdPasswordIdentityProvider&#39;,&#39;filename&#39;:&#39;/etc/origin/master/htpasswd&#39;}]</p>
+
+			<p>&nbsp;</p>
+
+			<p>#ntp时间同步</p>
+
+			<p>openshift_clock_enabled=true</p>
+
+			<p>&nbsp;</p>
+
+			<p>#节点配额</p>
+
+			<p>openshift_node_kubelet_args={&#39;pods-per-core&#39;: [&#39;10&#39;]}</p>
+
+			<p>&nbsp;</p>
+
+			<p># host group for masters</p>
+
+			<p>[masters]</p>
+
+			<p>master openshift_schedulable=True</p>
+
+			<p>&nbsp;</p>
+
+			<p># host group for nodes, includes region info</p>
+
+			<p>[nodes]</p>
+
+			<p>master openshift_node_labels=&quot;{&#39;region&#39;: &#39;infra&#39;}&quot;</p>
+
+			<p>node1 openshift_node_labels=&quot;{&#39;region&#39;: &#39;infra&#39;, &#39;zone&#39;: &#39;default&#39;}&quot;</p>
+
+			<p>node2 openshift_node_labels=&quot;{&#39;region&#39;: &#39;infra&#39;, &#39;zone&#39;: &#39;default&#39;}&quot;</p>
+
+			<p>&nbsp;</p>
+
+			<p>[etcd]</p>
+
+			<p>master</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p><strong>5、修改脚本问题</strong></p>
+
+<p>openshift-ansible/roles/lib_utils/filter_plugins/openshift_master.py 的第487行</p>
+
+<p><img alt="" src="https://img-blog.csdn.net/20180725212702868?watermark/2/text/aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L3N1bl9xaWFuZ3dlaQ==/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70" /></p>
+
+<p>注释掉图片中框出来的两行。</p>
+
+<p>&nbsp;</p>
+
+<p>&nbsp;</p>
+
+<p><strong>6、开始安装</strong></p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>ansible-playbook -i /etc/ansible/inventory.ini openshift-ansible/playbooks/prerequisites.yml</p>
+
+			<p>ansible-playbook -i /etc/ansible/inventory.ini openshift-ansible/playbooks/deploy_cluster.yml</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>安装过程是完全自动化的，无需手动干预。在绝大多数情况下，Ansible的脚本Playbook是可以反复执行的。</p>
+
+<p>第一条语句的运行结果：</p>
+
+<p><img alt="" src="https://img-blog.csdn.net/20180524211635122" /></p>
+
+<p>第二条语句的运行结果：</p>
+
+<p><img alt="" src="https://img-blog.csdn.net/20180524211645787" /></p>
+
+<p>&nbsp;</p>
+
+<p><strong>7、检查</strong></p>
+
+<p>安装完成后，执行oc get nodes 检查当前集群的成员列表以及它们的状态。</p>
+
+<p><img alt="" src="https://img-blog.csdn.net/20180524211701487" /></p>
+
+<p>其实在安装完成之后 第二个节点和第三个节点的roles类型为空，需要将其打上compute标签，命令如下：</p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>oc label node node1.192.168.40.162.nip.io node-role.kubernetes.io/compute=true</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>&nbsp;</p>
+
+<p>&nbsp;</p>
+
+<hr />
+<p><strong>四、OpenShift系统配置</strong></p>
+
+<p><strong>1、创建用户</strong></p>
+
+<p>安装的时候，在Ansible的hosts文件中定义了HTPasswd文件作为后端的用户身份信息库。</p>
+
+<p>&nbsp;</p>
+
+<p>安装程序自动生成了数据文件/etc/origin/master/htpasswd。但是此时该文件还是一个空文件，并没有任何用户信息。</p>
+
+<p>&nbsp;</p>
+
+<p>需要通过htpasswd命令来创建用户。创建账号为dev密码为dev的用户。</p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>[root@master ~]# htpasswd -b /etc/origin/master/htpasswd dev dev</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>&nbsp;</p>
+
+<p><strong>2、给dev添加集群管理员权限</strong></p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>oc adm policy add-cluster-role-to-user cluster-admin dev</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>&nbsp;</p>
+
+<p><strong>4、重启服务</strong></p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>systemctl restart origin-master-api</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>&nbsp;</p>
+
+<p><strong>5、访问页面</strong>，https://master.192.168.40.161.nip.io:8443</p>
+
+<p><img alt="" src="https://img-blog.csdn.net/20180524211711174" /></p>
+
+<p>&nbsp;</p>
+
+<p>&nbsp;</p>
+
+<hr />
+<p><strong>五、测试过程中的问题处理</strong></p>
+
+<p><strong>1、无法通过github下载源代码</strong></p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>Cloning &quot;<a href="https://github.com/gshipley/simplephp.git" rel="nofollow" target="_blank">https://github.com/gshipley/simplephp.git&nbsp;</a>&quot; ...</p>
+
+			<p>error: fatal: unable to access &#39;<a href="https://github.com/gshipley/simplephp.git/'%20rel=">https://github.com/gshipley/simplephp.git/&#39;:&nbsp;</a>Peer&#39;s certificate issuer has been marked as not trusted by the user.</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>解决方法：</p>
+
+<p>原因是在 /etc/resolv.conf 中多了search *** （专业术语：FQDN）,将其注释掉即可，但是当NetworkManager服务重新启动之后，之前的配置又会被覆盖，方法如下：</p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>chattr +i /etc/resolv.conf</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>&nbsp;</p>
+
+<p>2、无法进行docker的注册</p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>error: build error: Failed to push image: After retrying 6 times, Push image still failed due to error: Get https://docker-registry.default.svc:5000/v1/_ping: dial tcp 192.168.40.163:5000: getsockopt: connection refused</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>解决方法：</p>
+
+<p>通过观察docker-registry的pod界面可知</p>
+
+<p><img alt="" src="https://img-blog.csdn.net/20180524211740710" /></p>
+
+<p>&nbsp;</p>
+
+<p>，其绑定的IP地址为 172.30.135.115，因此在 /etc/hosts 中添加了</p>
+
+<p><img alt="" src="https://img-blog.csdn.net/20180524211800237" /></p>
+
+<h1>OpenShift 3.9 多节点集群（Ansible）安装</h1>
+
+<p>2018年05月24日 21:19:16&nbsp;<a href="https://me.csdn.net/sun_qiangwei" target="_blank">sun_qiangwei</a>&nbsp;阅读数：4871</p>
+
+<p>&nbsp;版权声明：本文为博主原创文章，未经博主允许不得转载。 https://blog.csdn.net/sun_qiangwei/article/details/80443943</p>
+
+<p>OpenShift集群的部署可以分为以下几个阶段：</p>
+
+<p><strong>1、主机环境准备</strong>：准备OpenShift集群需要的主机，并进行集群环境准备。</p>
+
+<p><strong>2、安装依赖包</strong>：提前安装使用Ansible安装OpenShift集群所依赖的第三方包。</p>
+
+<p><strong>3、Ansible执行安装</strong>：使用Ansible Playbook进行自动化安装。</p>
+
+<p><strong>4、OpenShift系统配置</strong>：在使用Ansible执行安装完成之后的系统配置。</p>
+
+<p><strong>5、测试问题处理</strong></p>
+
+<p>&nbsp;</p>
+
+<hr />
+<p><strong>一、主机环境准备</strong></p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>类型</p>
+			</td>
+			<td>
+			<p>主机名（域名）</p>
+			</td>
+			<td>
+			<p>IP</p>
+			</td>
+			<td>
+			<p>操作系统</p>
+			</td>
+			<td>
+			<p>内存</p>
+			</td>
+			<td>
+			<p>磁盘</p>
+			</td>
+		</tr>
+		<tr>
+			<td>
+			<p>Master</p>
+			</td>
+			<td>
+			<p>master.192.168.40.161.nip.io</p>
+			</td>
+			<td>
+			<p>192.168.40.161</p>
+			</td>
+			<td>
+			<p>CentOS7.5</p>
+			</td>
+			<td>
+			<p>2G</p>
+			</td>
+			<td>
+			<p>sda：10G for OS</p>
+
+			<p>sdb：20G for docker</p>
+			</td>
+		</tr>
+		<tr>
+			<td>
+			<p>Node</p>
+			</td>
+			<td>
+			<p>node1.192.168.40.162.nip.io</p>
+			</td>
+			<td>
+			<p>192.168.40.162</p>
+			</td>
+			<td>
+			<p>CentOS7.5</p>
+			</td>
+			<td>
+			<p>2G</p>
+			</td>
+			<td>
+			<p>sda：10G for OS</p>
+
+			<p>sdb：20G for docker</p>
+			</td>
+		</tr>
+		<tr>
+			<td>
+			<p>Node</p>
+			</td>
+			<td>
+			<p>node2.192.168.40.163.nip.io</p>
+			</td>
+			<td>
+			<p>192.168.40.163</p>
+			</td>
+			<td>
+			<p>CentOS7.5</p>
+			</td>
+			<td>
+			<p>2G</p>
+			</td>
+			<td>
+			<p>sda：10G for OS</p>
+
+			<p>sdb：20G for docker</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>&nbsp;</p>
+
+<p><em>说明：在安装的过程中，使用了nip.io结尾的域名，关于nip.io的问题，请查阅&nbsp;</em><a href="http://nip.io/" rel="nofollow" target="_blank"><em>nip.io</em></a><em>&nbsp;网站 。</em></p>
+
+<p>&nbsp;</p>
+
+<p><strong>1、检查主机与Internet的状态</strong></p>
+
+<p>由于在安装的过程中需要通过Internet下载相关依赖，因此需要检查三台主机与Internet的状态。</p>
+
+<p>&nbsp;</p>
+
+<p><strong>2、检查主机名</strong></p>
+
+<p>按照上面表格中所列的主机名进行主机名检查。如果不一致，可以通过下面的命令进行配置，如下：</p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>hostnamectl set-hostname master.192.168.40.161.nip.io</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>&nbsp;</p>
+
+<p><strong>3、检查主机名（域名）的解析是否正常</strong></p>
+
+<p>可以通过 ping $(hostname)来验证主机名到主机IP的解析情况。</p>
+
+<p>如果出现不能ping通的情况，可以直接修改各个节点的 /etc/hosts 文件，加上静态的域名解析。</p>
+
+<p>&nbsp;</p>
+
+<p>此外由于使用的是nip.io的域名，正常的DNS都能够解析到正确的IP地址；但是在输入命令的过程中使用全域名会很麻烦，因此在hosts中添加了主机名的缩写配置，如下：</p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>192.168.40.161 master</p>
+
+			<p>192.168.40.162 node1</p>
+
+			<p>192.168.40.163 node2</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>&nbsp;</p>
+
+<p><strong>4、检查SELINUX是否开启</strong></p>
+
+<p>官方文档推荐开启SELINUX，否则会导致安装失败。</p>
+
+<p>修改方式如下：</p>
+
+<p>/etc/selinux/config</p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>SELINUX=enforcing</p>
+
+			<p>SELINUXTYPE=targeted</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>&nbsp;</p>
+
+<p><strong>5、配置三台主机ssh免密访问</strong></p>
+
+<p>5.1）在所有节点上以root账号登陆，并进入到/root的主目录</p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>[root@master ~]$ pwd</p>
+
+			<p>/root</p>
+
+			<p>[root@master ~]$</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>&nbsp;</p>
+
+<p>5.2）在所有节点上生成密钥对。</p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>[root@master ~]$ ssh-keygen -t rsa</p>
+
+			<p>Generating public/private rsa key pair.</p>
+
+			<p>Enter file in which to save the key (/home/.ssh/id_rsa):</p>
+
+			<p>Created directory &#39;/home/.ssh&#39;.</p>
+
+			<p>Enter passphrase (empty for no passphrase):</p>
+
+			<p>Enter same passphrase again:</p>
+
+			<p>Your identification has been saved in /home/.ssh/id_rsa.</p>
+
+			<p>Your public key has been saved in /home/.ssh/id_rsa.pub.</p>
+
+			<p>The key fingerprint is:</p>
+
+			<p>29:1c:df:59:0d:5f:ee:28:07:c0:57:21:15:af:a3:88 root@master</p>
+
+			<p>The key&#39;s randomart image is:</p>
+
+			<p>+--[ RSA 2048]----+</p>
+
+			<p>| .. oo=o.|</p>
+
+			<p>| ...= + |</p>
+
+			<p>| . .o o o|</p>
+
+			<p>| . o o o . + |</p>
+
+			<p>| o S o . = .|</p>
+
+			<p>| . . . + . |</p>
+
+			<p>| E . . |</p>
+
+			<p>| |</p>
+
+			<p>| |</p>
+
+			<p>+-----------------+</p>
+
+			<p>[root@master ~]$</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>&nbsp;</p>
+
+<p>5.3）然后进入.ssh目录，把公钥复制到authorized_keys</p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>[root@master ~]$ cd .ssh</p>
+
+			<p>[root@master .ssh]$ ls</p>
+
+			<p>id_rsa id_rsa.pub</p>
+
+			<p>[root@master .ssh]$ cp id_rsa.pub authorized_keys</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>&nbsp;</p>
+
+<p>5.4）分发ssh公钥到各个节点</p>
+
+<p>先将node1和node2的公钥添加到master节点的authorized_keys文件中。</p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>[root@node1 .ssh]$ ssh-copy-id master</p>
+
+			<p>[root<a href="http://hdfs-yarn-1/" rel="nofollow" target="_blank">@</a>node2 .ssh]$ ssh-copy-id master</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>最后再使用scp将master中的authorized_keys文件传送到各个节点。</p>
+
+<p>&nbsp;</p>
+
+<p>此处，需要注意.ssh(755)及.ssh/authorized_keys(644)的权限。&nbsp;</p>
+
+<p>&nbsp;</p>
+
+<p>&nbsp;</p>
+
+<hr />
+<p><strong>二、安装依赖包</strong></p>
+
+<p><strong>1、所有主机上执行以下命令进行系统更新</strong></p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>yum install -y update</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>安装完成之后，重新系统生效。</p>
+
+<p>&nbsp;</p>
+
+<p><strong>2、所有的主机下执行以下命令安装OpenShift依赖的软件包。</strong></p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>yum install wget git net-tools bind-utils iptables-services bridge-utils bash-completion kexec-tools sos psacct bash-completion.noarch bash-completion-extras.noarch python-passlib NetworkManager -y</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>&nbsp;</p>
+
+<p><strong>3、所有的主机安装docker</strong></p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>yum install docker-1.13.1 -y</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>&nbsp;</p>
+
+<p><strong>4、配置docker使用的存储</strong></p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>echo DEVS=/dev/sdb &gt; /etc/sysconfig/docker-storage-setup</p>
+
+			<p>echo VG=DOCKER &gt;&gt; /etc/sysconfig/docker-storage-setup</p>
+
+			<p>echo SETUP_LVM_THIN_POOL=yes &gt;&gt; /etc/sysconfig/docker-storage-setup</p>
+
+			<p>echo DATA_SIZE=&quot;100%FREE&quot;&gt;&gt; /etc/sysconfig/docker-storage-setup</p>
+
+			<p>&nbsp;</p>
+
+			<p>rm -rf /var/lib/docker</p>
+
+			<p>&nbsp;</p>
+
+			<p>wipefs --all /dev/sdb</p>
+
+			<p>docker-storage-setup</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>&nbsp;</p>
+
+<p><strong>5、配置docker镜像加速</strong></p>
+
+<p>选择阿里云的镜像服务器进行加速，修改 /etc/docker/daemon.json 文件，如下所示：</p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>[root@master ~]# more /etc/docker/daemon.json</p>
+
+			<p>{</p>
+
+			<p>&quot;registry-mirrors&quot;: [&quot;https://换成自己的地址.mirror.aliyuncs.com&quot;]</p>
+
+			<p>}</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>配置完成之后，所有主机启动docker，命令如下：</p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>systemctl enable docker</p>
+
+			<p>systemctl start docker</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>&nbsp;</p>
+
+<hr />
+<p><strong>三、在Master主机上执行Ansible集群安装</strong></p>
+
+<p><strong>1、启用EPEL仓库以安装Ansible</strong></p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>#install epel</p>
+
+			<p>yum -y install epel-release</p>
+
+			<p>&nbsp;</p>
+
+			<p># Disable the EPEL repository globally so that is not accidentally used during later steps of the installation</p>
+
+			<p>sed -i -e &quot;s/^enabled=1/enabled=0/&quot; /etc/yum.repos.d/epel.repo</p>
+
+			<p>&nbsp;</p>
+
+			<p>yum -y --enablerepo=epel install ansible pyOpenSSL #3.9必须2.5版本</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p><strong>2、从 github 上clone openshift-ansible 3.9版本</strong></p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>git clone -b release-3.9 https://github.com/openshift/openshift-ansible</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>说明：最近通过本blog重新安装openshift集群时，发现总是出现各种各样的问题，如 /etc/dnsmasq.d/origin-upstream-dns.conf 、/etc/origin/node/resolv.conf 等文件缺失，因此将原来从github上clone源代码，修改为下载已经release的版本。</p>
+
+<p>&nbsp;</p>
+
+<p><strong>2、从github上下载openshift-ansible已经release的版本</strong></p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>wget https://github.com/openshift/openshift-ansible/archive/openshift-ansible-3.9.32-1.zip</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p><strong>下载完成之后，进行解压并重命为 openshift-ansible。</strong></p>
+
+<p>&nbsp;</p>
+
+<p><strong>3、修改软件源</strong></p>
+
+<p>由于目前OpenShift-ansible还没有添加3.9的源，所以需要自行修改下，方法如下：</p>
+
+<ul>
+	<li>进行openshift-ansible/roles/openshift_repos/templates/ 复制一份 CentOS-OpenShift-Origin37.repo.j2 为 CentOS-OpenShift-Origin39.repo.j2。</li>
+	<li>修改CentOS-OpenShift-Origin39.repo.j2中的源修改为国内的，比如阿里云。</li>
+</ul>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>[centos-openshift-origin39]</p>
+
+			<p>name=CentOS OpenShift Origin</p>
+
+			<p>baseurl=http://mirrors.aliyun.com/centos/7/paas/x86_64/openshift-origin39/</p>
+
+			<p>enabled=1</p>
+
+			<p>gpgcheck=1</p>
+
+			<p>gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-CentOS-SIG-PaaS</p>
+
+			<p>&nbsp;</p>
+
+			<p>[centos-openshift-origin39-testing]</p>
+
+			<p>name=CentOS OpenShift Origin Testing</p>
+
+			<p>baseurl=http://buildlogs.centos.org/centos/7/paas/x86_64/openshift-origin39/</p>
+
+			<p>enabled={{ 1 if openshift_repos_enable_testing else 0 }}</p>
+
+			<p>gpgcheck=0</p>
+
+			<p>gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-CentOS-SIG-PaaS</p>
+
+			<p>&nbsp;</p>
+
+			<p>[centos-openshift-origin39-debuginfo]</p>
+
+			<p>name=CentOS OpenShift Origin DebugInfo</p>
+
+			<p>baseurl=http://debuginfo.centos.org/centos/7/paas/x86_64/</p>
+
+			<p>enabled=0</p>
+
+			<p>gpgcheck=1</p>
+
+			<p>gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-CentOS-SIG-PaaS</p>
+
+			<p>&nbsp;</p>
+
+			<p>[centos-openshift-origin39-source]</p>
+
+			<p>name=CentOS OpenShift Origin Source</p>
+
+			<p>baseurl=http://vault.centos.org/centos/7/paas/Source/openshift-origin39/</p>
+
+			<p>enabled=0</p>
+
+			<p>gpgcheck=1</p>
+
+			<p>gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-CentOS-SIG-PaaS</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>&nbsp;</p>
+
+<p><strong>4、配置 ansible inventory 文件，保存到 /etc/ansible/inventory.ini文件中。</strong></p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p># Create an OSEv3 group that contains the masters and nodes groups</p>
+
+			<p>[OSEv3:children]</p>
+
+			<p>#目前配置标准的三个角色</p>
+
+			<p>masters</p>
+
+			<p>nodes</p>
+
+			<p>etcd</p>
+
+			<p>&nbsp;</p>
+
+			<p># Set variables common for all OSEv3 hosts</p>
+
+			<p>[OSEv3:vars]</p>
+
+			<p># SSH user, this user should allow ssh based auth without requiring a password</p>
+
+			<p>ansible_ssh_user=root</p>
+
+			<p>#使用origin社区版</p>
+
+			<p>openshift_deployment_type=origin</p>
+
+			<p>#指定安装版本</p>
+
+			<p>openshift_release=3.9</p>
+
+			<p>&nbsp;</p>
+
+			<p>#指定默认域名，访问的时候需要使用该域名，没有dns服务器，需要手动添加本地hosts文件</p>
+
+			<p>openshift_master_default_subdomain=apps.192.168.40.161.nip.io</p>
+
+			<p>&nbsp;</p>
+
+			<p>#禁止磁盘、内存和镜像检查</p>
+
+			<p>openshift_disable_check=disk_availability,docker_storage,memory_availability,docker_image_availability</p>
+
+			<p>&nbsp;</p>
+
+			<p>#disk_availability：报错信息是推荐的master磁盘空间剩余量大于40GB。测试环境无法满足，跳过检测。</p>
+
+			<p>#memory_availability：报错信息是推荐的master内存为16GB，node内存为8GB，测试环境无法满足，跳过检测。</p>
+
+			<p>#docker_image_availability：报错信息是需要的几个镜像未找到，选择跳过，装完集群后，在使用的时候再自行下载。</p>
+
+			<p>#docker_storage：报错信息是推荐选择一块磁盘空间存储镜像，这里选择跳过。采用docker默认的方式存储镜像。</p>
+
+			<p>&nbsp;</p>
+
+			<p>&nbsp;</p>
+
+			<p># uncomment the following to enable htpasswd authentication; defaults to DenyAllPasswordIdentityProvider</p>
+
+			<p>openshift_master_identity_providers=[{&#39;name&#39;:&#39;htpasswd_auth&#39;,&#39;login&#39;:&#39;true&#39;,&#39;challenge&#39;:&#39;true&#39;,&#39;kind&#39;:&#39;HTPasswdPasswordIdentityProvider&#39;,&#39;filename&#39;:&#39;/etc/origin/master/htpasswd&#39;}]</p>
+
+			<p>&nbsp;</p>
+
+			<p>#ntp时间同步</p>
+
+			<p>openshift_clock_enabled=true</p>
+
+			<p>&nbsp;</p>
+
+			<p>#节点配额</p>
+
+			<p>openshift_node_kubelet_args={&#39;pods-per-core&#39;: [&#39;10&#39;]}</p>
+
+			<p>&nbsp;</p>
+
+			<p># host group for masters</p>
+
+			<p>[masters]</p>
+
+			<p>master openshift_schedulable=True</p>
+
+			<p>&nbsp;</p>
+
+			<p># host group for nodes, includes region info</p>
+
+			<p>[nodes]</p>
+
+			<p>master openshift_node_labels=&quot;{&#39;region&#39;: &#39;infra&#39;}&quot;</p>
+
+			<p>node1 openshift_node_labels=&quot;{&#39;region&#39;: &#39;infra&#39;, &#39;zone&#39;: &#39;default&#39;}&quot;</p>
+
+			<p>node2 openshift_node_labels=&quot;{&#39;region&#39;: &#39;infra&#39;, &#39;zone&#39;: &#39;default&#39;}&quot;</p>
+
+			<p>&nbsp;</p>
+
+			<p>[etcd]</p>
+
+			<p>master</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p><strong>5、修改脚本问题</strong></p>
+
+<p>openshift-ansible/roles/lib_utils/filter_plugins/openshift_master.py 的第487行</p>
+
+<p><img alt="" src="https://img-blog.csdn.net/20180725212702868?watermark/2/text/aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L3N1bl9xaWFuZ3dlaQ==/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70" /></p>
+
+<p>注释掉图片中框出来的两行。</p>
+
+<p>&nbsp;</p>
+
+<p>&nbsp;</p>
+
+<p><strong>6、开始安装</strong></p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>ansible-playbook -i /etc/ansible/inventory.ini openshift-ansible/playbooks/prerequisites.yml</p>
+
+			<p>ansible-playbook -i /etc/ansible/inventory.ini openshift-ansible/playbooks/deploy_cluster.yml</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>安装过程是完全自动化的，无需手动干预。在绝大多数情况下，Ansible的脚本Playbook是可以反复执行的。</p>
+
+<p>第一条语句的运行结果：</p>
+
+<p><img alt="" src="https://img-blog.csdn.net/20180524211635122" /></p>
+
+<p>第二条语句的运行结果：</p>
+
+<p><img alt="" src="https://img-blog.csdn.net/20180524211645787" /></p>
+
+<p>&nbsp;</p>
+
+<p><strong>7、检查</strong></p>
+
+<p>安装完成后，执行oc get nodes 检查当前集群的成员列表以及它们的状态。</p>
+
+<p><img alt="" src="https://img-blog.csdn.net/20180524211701487" /></p>
+
+<p>其实在安装完成之后 第二个节点和第三个节点的roles类型为空，需要将其打上compute标签，命令如下：</p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>oc label node node1.192.168.40.162.nip.io node-role.kubernetes.io/compute=true</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>&nbsp;</p>
+
+<p>&nbsp;</p>
+
+<hr />
+<p><strong>四、OpenShift系统配置</strong></p>
+
+<p><strong>1、创建用户</strong></p>
+
+<p>安装的时候，在Ansible的hosts文件中定义了HTPasswd文件作为后端的用户身份信息库。</p>
+
+<p>&nbsp;</p>
+
+<p>安装程序自动生成了数据文件/etc/origin/master/htpasswd。但是此时该文件还是一个空文件，并没有任何用户信息。</p>
+
+<p>&nbsp;</p>
+
+<p>需要通过htpasswd命令来创建用户。创建账号为dev密码为dev的用户。</p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>[root@master ~]# htpasswd -b /etc/origin/master/htpasswd dev dev</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>&nbsp;</p>
+
+<p><strong>2、给dev添加集群管理员权限</strong></p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>oc adm policy add-cluster-role-to-user cluster-admin dev</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>&nbsp;</p>
+
+<p><strong>4、重启服务</strong></p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>systemctl restart origin-master-api</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>&nbsp;</p>
+
+<p><strong>5、访问页面</strong>，https://master.192.168.40.161.nip.io:8443</p>
+
+<p><img alt="" src="https://img-blog.csdn.net/20180524211711174" /></p>
+
+<p>&nbsp;</p>
+
+<p>&nbsp;</p>
+
+<hr />
+<p><strong>五、测试过程中的问题处理</strong></p>
+
+<p><strong>1、无法通过github下载源代码</strong></p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>Cloning &quot;<a href="https://github.com/gshipley/simplephp.git" rel="nofollow" target="_blank">https://github.com/gshipley/simplephp.git&nbsp;</a>&quot; ...</p>
+
+			<p>error: fatal: unable to access &#39;<a href="https://github.com/gshipley/simplephp.git/'%20rel=">https://github.com/gshipley/simplephp.git/&#39;:&nbsp;</a>Peer&#39;s certificate issuer has been marked as not trusted by the user.</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>解决方法：</p>
+
+<p>原因是在 /etc/resolv.conf 中多了search *** （专业术语：FQDN）,将其注释掉即可，但是当NetworkManager服务重新启动之后，之前的配置又会被覆盖，方法如下：</p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>chattr +i /etc/resolv.conf</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>&nbsp;</p>
+
+<p>2、无法进行docker的注册</p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>error: build error: Failed to push image: After retrying 6 times, Push image still failed due to error: Get https://docker-registry.default.svc:5000/v1/_ping: dial tcp 192.168.40.163:5000: getsockopt: connection refused</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>解决方法：</p>
+
+<p>通过观察docker-registry的pod界面可知</p>
+
+<p><img alt="" src="https://img-blog.csdn.net/20180524211740710" /></p>
+
+<p>&nbsp;</p>
+
+<p>，其绑定的IP地址为 172.30.135.115，因此在 /etc/hosts 中添加了</p>
+
+<p><img alt="" src="https://img-blog.csdn.net/20180524211800237" /></p>
+
+<h1>OpenShift 3.9 多节点集群（Ansible）安装</h1>
+
+<p>2018年05月24日 21:19:16&nbsp;<a href="https://me.csdn.net/sun_qiangwei" target="_blank">sun_qiangwei</a>&nbsp;阅读数：4871</p>
+
+<p>&nbsp;版权声明：本文为博主原创文章，未经博主允许不得转载。 https://blog.csdn.net/sun_qiangwei/article/details/80443943</p>
+
+<p>OpenShift集群的部署可以分为以下几个阶段：</p>
+
+<p><strong>1、主机环境准备</strong>：准备OpenShift集群需要的主机，并进行集群环境准备。</p>
+
+<p><strong>2、安装依赖包</strong>：提前安装使用Ansible安装OpenShift集群所依赖的第三方包。</p>
+
+<p><strong>3、Ansible执行安装</strong>：使用Ansible Playbook进行自动化安装。</p>
+
+<p><strong>4、OpenShift系统配置</strong>：在使用Ansible执行安装完成之后的系统配置。</p>
+
+<p><strong>5、测试问题处理</strong></p>
+
+<p>&nbsp;</p>
+
+<hr />
+<p><strong>一、主机环境准备</strong></p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>类型</p>
+			</td>
+			<td>
+			<p>主机名（域名）</p>
+			</td>
+			<td>
+			<p>IP</p>
+			</td>
+			<td>
+			<p>操作系统</p>
+			</td>
+			<td>
+			<p>内存</p>
+			</td>
+			<td>
+			<p>磁盘</p>
+			</td>
+		</tr>
+		<tr>
+			<td>
+			<p>Master</p>
+			</td>
+			<td>
+			<p>master.192.168.40.161.nip.io</p>
+			</td>
+			<td>
+			<p>192.168.40.161</p>
+			</td>
+			<td>
+			<p>CentOS7.5</p>
+			</td>
+			<td>
+			<p>2G</p>
+			</td>
+			<td>
+			<p>sda：10G for OS</p>
+
+			<p>sdb：20G for docker</p>
+			</td>
+		</tr>
+		<tr>
+			<td>
+			<p>Node</p>
+			</td>
+			<td>
+			<p>node1.192.168.40.162.nip.io</p>
+			</td>
+			<td>
+			<p>192.168.40.162</p>
+			</td>
+			<td>
+			<p>CentOS7.5</p>
+			</td>
+			<td>
+			<p>2G</p>
+			</td>
+			<td>
+			<p>sda：10G for OS</p>
+
+			<p>sdb：20G for docker</p>
+			</td>
+		</tr>
+		<tr>
+			<td>
+			<p>Node</p>
+			</td>
+			<td>
+			<p>node2.192.168.40.163.nip.io</p>
+			</td>
+			<td>
+			<p>192.168.40.163</p>
+			</td>
+			<td>
+			<p>CentOS7.5</p>
+			</td>
+			<td>
+			<p>2G</p>
+			</td>
+			<td>
+			<p>sda：10G for OS</p>
+
+			<p>sdb：20G for docker</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>&nbsp;</p>
+
+<p><em>说明：在安装的过程中，使用了nip.io结尾的域名，关于nip.io的问题，请查阅&nbsp;</em><a href="http://nip.io/" rel="nofollow" target="_blank"><em>nip.io</em></a><em>&nbsp;网站 。</em></p>
+
+<p>&nbsp;</p>
+
+<p><strong>1、检查主机与Internet的状态</strong></p>
+
+<p>由于在安装的过程中需要通过Internet下载相关依赖，因此需要检查三台主机与Internet的状态。</p>
+
+<p>&nbsp;</p>
+
+<p><strong>2、检查主机名</strong></p>
+
+<p>按照上面表格中所列的主机名进行主机名检查。如果不一致，可以通过下面的命令进行配置，如下：</p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>hostnamectl set-hostname master.192.168.40.161.nip.io</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>&nbsp;</p>
+
+<p><strong>3、检查主机名（域名）的解析是否正常</strong></p>
+
+<p>可以通过 ping $(hostname)来验证主机名到主机IP的解析情况。</p>
+
+<p>如果出现不能ping通的情况，可以直接修改各个节点的 /etc/hosts 文件，加上静态的域名解析。</p>
+
+<p>&nbsp;</p>
+
+<p>此外由于使用的是nip.io的域名，正常的DNS都能够解析到正确的IP地址；但是在输入命令的过程中使用全域名会很麻烦，因此在hosts中添加了主机名的缩写配置，如下：</p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>192.168.40.161 master</p>
+
+			<p>192.168.40.162 node1</p>
+
+			<p>192.168.40.163 node2</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>&nbsp;</p>
+
+<p><strong>4、检查SELINUX是否开启</strong></p>
+
+<p>官方文档推荐开启SELINUX，否则会导致安装失败。</p>
+
+<p>修改方式如下：</p>
+
+<p>/etc/selinux/config</p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>SELINUX=enforcing</p>
+
+			<p>SELINUXTYPE=targeted</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>&nbsp;</p>
+
+<p><strong>5、配置三台主机ssh免密访问</strong></p>
+
+<p>5.1）在所有节点上以root账号登陆，并进入到/root的主目录</p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>[root@master ~]$ pwd</p>
+
+			<p>/root</p>
+
+			<p>[root@master ~]$</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>&nbsp;</p>
+
+<p>5.2）在所有节点上生成密钥对。</p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>[root@master ~]$ ssh-keygen -t rsa</p>
+
+			<p>Generating public/private rsa key pair.</p>
+
+			<p>Enter file in which to save the key (/home/.ssh/id_rsa):</p>
+
+			<p>Created directory &#39;/home/.ssh&#39;.</p>
+
+			<p>Enter passphrase (empty for no passphrase):</p>
+
+			<p>Enter same passphrase again:</p>
+
+			<p>Your identification has been saved in /home/.ssh/id_rsa.</p>
+
+			<p>Your public key has been saved in /home/.ssh/id_rsa.pub.</p>
+
+			<p>The key fingerprint is:</p>
+
+			<p>29:1c:df:59:0d:5f:ee:28:07:c0:57:21:15:af:a3:88 root@master</p>
+
+			<p>The key&#39;s randomart image is:</p>
+
+			<p>+--[ RSA 2048]----+</p>
+
+			<p>| .. oo=o.|</p>
+
+			<p>| ...= + |</p>
+
+			<p>| . .o o o|</p>
+
+			<p>| . o o o . + |</p>
+
+			<p>| o S o . = .|</p>
+
+			<p>| . . . + . |</p>
+
+			<p>| E . . |</p>
+
+			<p>| |</p>
+
+			<p>| |</p>
+
+			<p>+-----------------+</p>
+
+			<p>[root@master ~]$</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>&nbsp;</p>
+
+<p>5.3）然后进入.ssh目录，把公钥复制到authorized_keys</p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>[root@master ~]$ cd .ssh</p>
+
+			<p>[root@master .ssh]$ ls</p>
+
+			<p>id_rsa id_rsa.pub</p>
+
+			<p>[root@master .ssh]$ cp id_rsa.pub authorized_keys</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>&nbsp;</p>
+
+<p>5.4）分发ssh公钥到各个节点</p>
+
+<p>先将node1和node2的公钥添加到master节点的authorized_keys文件中。</p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>[root@node1 .ssh]$ ssh-copy-id master</p>
+
+			<p>[root<a href="http://hdfs-yarn-1/" rel="nofollow" target="_blank">@</a>node2 .ssh]$ ssh-copy-id master</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>最后再使用scp将master中的authorized_keys文件传送到各个节点。</p>
+
+<p>&nbsp;</p>
+
+<p>此处，需要注意.ssh(755)及.ssh/authorized_keys(644)的权限。&nbsp;</p>
+
+<p>&nbsp;</p>
+
+<p>&nbsp;</p>
+
+<hr />
+<p><strong>二、安装依赖包</strong></p>
+
+<p><strong>1、所有主机上执行以下命令进行系统更新</strong></p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>yum install -y update</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>安装完成之后，重新系统生效。</p>
+
+<p>&nbsp;</p>
+
+<p><strong>2、所有的主机下执行以下命令安装OpenShift依赖的软件包。</strong></p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>yum install wget git net-tools bind-utils iptables-services bridge-utils bash-completion kexec-tools sos psacct bash-completion.noarch bash-completion-extras.noarch python-passlib NetworkManager -y</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>&nbsp;</p>
+
+<p><strong>3、所有的主机安装docker</strong></p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>yum install docker-1.13.1 -y</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>&nbsp;</p>
+
+<p><strong>4、配置docker使用的存储</strong></p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>echo DEVS=/dev/sdb &gt; /etc/sysconfig/docker-storage-setup</p>
+
+			<p>echo VG=DOCKER &gt;&gt; /etc/sysconfig/docker-storage-setup</p>
+
+			<p>echo SETUP_LVM_THIN_POOL=yes &gt;&gt; /etc/sysconfig/docker-storage-setup</p>
+
+			<p>echo DATA_SIZE=&quot;100%FREE&quot;&gt;&gt; /etc/sysconfig/docker-storage-setup</p>
+
+			<p>&nbsp;</p>
+
+			<p>rm -rf /var/lib/docker</p>
+
+			<p>&nbsp;</p>
+
+			<p>wipefs --all /dev/sdb</p>
+
+			<p>docker-storage-setup</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>&nbsp;</p>
+
+<p><strong>5、配置docker镜像加速</strong></p>
+
+<p>选择阿里云的镜像服务器进行加速，修改 /etc/docker/daemon.json 文件，如下所示：</p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>[root@master ~]# more /etc/docker/daemon.json</p>
+
+			<p>{</p>
+
+			<p>&quot;registry-mirrors&quot;: [&quot;https://换成自己的地址.mirror.aliyuncs.com&quot;]</p>
+
+			<p>}</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>配置完成之后，所有主机启动docker，命令如下：</p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>systemctl enable docker</p>
+
+			<p>systemctl start docker</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>&nbsp;</p>
+
+<hr />
+<p><strong>三、在Master主机上执行Ansible集群安装</strong></p>
+
+<p><strong>1、启用EPEL仓库以安装Ansible</strong></p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>#install epel</p>
+
+			<p>yum -y install epel-release</p>
+
+			<p>&nbsp;</p>
+
+			<p># Disable the EPEL repository globally so that is not accidentally used during later steps of the installation</p>
+
+			<p>sed -i -e &quot;s/^enabled=1/enabled=0/&quot; /etc/yum.repos.d/epel.repo</p>
+
+			<p>&nbsp;</p>
+
+			<p>yum -y --enablerepo=epel install ansible pyOpenSSL #3.9必须2.5版本</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p><strong>2、从 github 上clone openshift-ansible 3.9版本</strong></p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>git clone -b release-3.9 https://github.com/openshift/openshift-ansible</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>说明：最近通过本blog重新安装openshift集群时，发现总是出现各种各样的问题，如 /etc/dnsmasq.d/origin-upstream-dns.conf 、/etc/origin/node/resolv.conf 等文件缺失，因此将原来从github上clone源代码，修改为下载已经release的版本。</p>
+
+<p>&nbsp;</p>
+
+<p><strong>2、从github上下载openshift-ansible已经release的版本</strong></p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>wget https://github.com/openshift/openshift-ansible/archive/openshift-ansible-3.9.32-1.zip</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p><strong>下载完成之后，进行解压并重命为 openshift-ansible。</strong></p>
+
+<p>&nbsp;</p>
+
+<p><strong>3、修改软件源</strong></p>
+
+<p>由于目前OpenShift-ansible还没有添加3.9的源，所以需要自行修改下，方法如下：</p>
+
+<ul>
+	<li>进行openshift-ansible/roles/openshift_repos/templates/ 复制一份 CentOS-OpenShift-Origin37.repo.j2 为 CentOS-OpenShift-Origin39.repo.j2。</li>
+	<li>修改CentOS-OpenShift-Origin39.repo.j2中的源修改为国内的，比如阿里云。</li>
+</ul>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>[centos-openshift-origin39]</p>
+
+			<p>name=CentOS OpenShift Origin</p>
+
+			<p>baseurl=http://mirrors.aliyun.com/centos/7/paas/x86_64/openshift-origin39/</p>
+
+			<p>enabled=1</p>
+
+			<p>gpgcheck=1</p>
+
+			<p>gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-CentOS-SIG-PaaS</p>
+
+			<p>&nbsp;</p>
+
+			<p>[centos-openshift-origin39-testing]</p>
+
+			<p>name=CentOS OpenShift Origin Testing</p>
+
+			<p>baseurl=http://buildlogs.centos.org/centos/7/paas/x86_64/openshift-origin39/</p>
+
+			<p>enabled={{ 1 if openshift_repos_enable_testing else 0 }}</p>
+
+			<p>gpgcheck=0</p>
+
+			<p>gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-CentOS-SIG-PaaS</p>
+
+			<p>&nbsp;</p>
+
+			<p>[centos-openshift-origin39-debuginfo]</p>
+
+			<p>name=CentOS OpenShift Origin DebugInfo</p>
+
+			<p>baseurl=http://debuginfo.centos.org/centos/7/paas/x86_64/</p>
+
+			<p>enabled=0</p>
+
+			<p>gpgcheck=1</p>
+
+			<p>gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-CentOS-SIG-PaaS</p>
+
+			<p>&nbsp;</p>
+
+			<p>[centos-openshift-origin39-source]</p>
+
+			<p>name=CentOS OpenShift Origin Source</p>
+
+			<p>baseurl=http://vault.centos.org/centos/7/paas/Source/openshift-origin39/</p>
+
+			<p>enabled=0</p>
+
+			<p>gpgcheck=1</p>
+
+			<p>gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-CentOS-SIG-PaaS</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>&nbsp;</p>
+
+<p><strong>4、配置 ansible inventory 文件，保存到 /etc/ansible/inventory.ini文件中。</strong></p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p># Create an OSEv3 group that contains the masters and nodes groups</p>
+
+			<p>[OSEv3:children]</p>
+
+			<p>#目前配置标准的三个角色</p>
+
+			<p>masters</p>
+
+			<p>nodes</p>
+
+			<p>etcd</p>
+
+			<p>&nbsp;</p>
+
+			<p># Set variables common for all OSEv3 hosts</p>
+
+			<p>[OSEv3:vars]</p>
+
+			<p># SSH user, this user should allow ssh based auth without requiring a password</p>
+
+			<p>ansible_ssh_user=root</p>
+
+			<p>#使用origin社区版</p>
+
+			<p>openshift_deployment_type=origin</p>
+
+			<p>#指定安装版本</p>
+
+			<p>openshift_release=3.9</p>
+
+			<p>&nbsp;</p>
+
+			<p>#指定默认域名，访问的时候需要使用该域名，没有dns服务器，需要手动添加本地hosts文件</p>
+
+			<p>openshift_master_default_subdomain=apps.192.168.40.161.nip.io</p>
+
+			<p>&nbsp;</p>
+
+			<p>#禁止磁盘、内存和镜像检查</p>
+
+			<p>openshift_disable_check=disk_availability,docker_storage,memory_availability,docker_image_availability</p>
+
+			<p>&nbsp;</p>
+
+			<p>#disk_availability：报错信息是推荐的master磁盘空间剩余量大于40GB。测试环境无法满足，跳过检测。</p>
+
+			<p>#memory_availability：报错信息是推荐的master内存为16GB，node内存为8GB，测试环境无法满足，跳过检测。</p>
+
+			<p>#docker_image_availability：报错信息是需要的几个镜像未找到，选择跳过，装完集群后，在使用的时候再自行下载。</p>
+
+			<p>#docker_storage：报错信息是推荐选择一块磁盘空间存储镜像，这里选择跳过。采用docker默认的方式存储镜像。</p>
+
+			<p>&nbsp;</p>
+
+			<p>&nbsp;</p>
+
+			<p># uncomment the following to enable htpasswd authentication; defaults to DenyAllPasswordIdentityProvider</p>
+
+			<p>openshift_master_identity_providers=[{&#39;name&#39;:&#39;htpasswd_auth&#39;,&#39;login&#39;:&#39;true&#39;,&#39;challenge&#39;:&#39;true&#39;,&#39;kind&#39;:&#39;HTPasswdPasswordIdentityProvider&#39;,&#39;filename&#39;:&#39;/etc/origin/master/htpasswd&#39;}]</p>
+
+			<p>&nbsp;</p>
+
+			<p>#ntp时间同步</p>
+
+			<p>openshift_clock_enabled=true</p>
+
+			<p>&nbsp;</p>
+
+			<p>#节点配额</p>
+
+			<p>openshift_node_kubelet_args={&#39;pods-per-core&#39;: [&#39;10&#39;]}</p>
+
+			<p>&nbsp;</p>
+
+			<p># host group for masters</p>
+
+			<p>[masters]</p>
+
+			<p>master openshift_schedulable=True</p>
+
+			<p>&nbsp;</p>
+
+			<p># host group for nodes, includes region info</p>
+
+			<p>[nodes]</p>
+
+			<p>master openshift_node_labels=&quot;{&#39;region&#39;: &#39;infra&#39;}&quot;</p>
+
+			<p>node1 openshift_node_labels=&quot;{&#39;region&#39;: &#39;infra&#39;, &#39;zone&#39;: &#39;default&#39;}&quot;</p>
+
+			<p>node2 openshift_node_labels=&quot;{&#39;region&#39;: &#39;infra&#39;, &#39;zone&#39;: &#39;default&#39;}&quot;</p>
+
+			<p>&nbsp;</p>
+
+			<p>[etcd]</p>
+
+			<p>master</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p><strong>5、修改脚本问题</strong></p>
+
+<p>openshift-ansible/roles/lib_utils/filter_plugins/openshift_master.py 的第487行</p>
+
+<p><img alt="" src="https://img-blog.csdn.net/20180725212702868?watermark/2/text/aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L3N1bl9xaWFuZ3dlaQ==/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70" /></p>
+
+<p>注释掉图片中框出来的两行。</p>
+
+<p>&nbsp;</p>
+
+<p>&nbsp;</p>
+
+<p><strong>6、开始安装</strong></p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>ansible-playbook -i /etc/ansible/inventory.ini openshift-ansible/playbooks/prerequisites.yml</p>
+
+			<p>ansible-playbook -i /etc/ansible/inventory.ini openshift-ansible/playbooks/deploy_cluster.yml</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>安装过程是完全自动化的，无需手动干预。在绝大多数情况下，Ansible的脚本Playbook是可以反复执行的。</p>
+
+<p>第一条语句的运行结果：</p>
+
+<p><img alt="" src="https://img-blog.csdn.net/20180524211635122" /></p>
+
+<p>第二条语句的运行结果：</p>
+
+<p><img alt="" src="https://img-blog.csdn.net/20180524211645787" /></p>
+
+<p>&nbsp;</p>
+
+<p><strong>7、检查</strong></p>
+
+<p>安装完成后，执行oc get nodes 检查当前集群的成员列表以及它们的状态。</p>
+
+<p><img alt="" src="https://img-blog.csdn.net/20180524211701487" /></p>
+
+<p>其实在安装完成之后 第二个节点和第三个节点的roles类型为空，需要将其打上compute标签，命令如下：</p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>oc label node node1.192.168.40.162.nip.io node-role.kubernetes.io/compute=true</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>&nbsp;</p>
+
+<p>&nbsp;</p>
+
+<hr />
+<p><strong>四、OpenShift系统配置</strong></p>
+
+<p><strong>1、创建用户</strong></p>
+
+<p>安装的时候，在Ansible的hosts文件中定义了HTPasswd文件作为后端的用户身份信息库。</p>
+
+<p>&nbsp;</p>
+
+<p>安装程序自动生成了数据文件/etc/origin/master/htpasswd。但是此时该文件还是一个空文件，并没有任何用户信息。</p>
+
+<p>&nbsp;</p>
+
+<p>需要通过htpasswd命令来创建用户。创建账号为dev密码为dev的用户。</p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>[root@master ~]# htpasswd -b /etc/origin/master/htpasswd dev dev</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>&nbsp;</p>
+
+<p><strong>2、给dev添加集群管理员权限</strong></p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>oc adm policy add-cluster-role-to-user cluster-admin dev</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>&nbsp;</p>
+
+<p><strong>4、重启服务</strong></p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>systemctl restart origin-master-api</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>&nbsp;</p>
+
+<p><strong>5、访问页面</strong>，https://master.192.168.40.161.nip.io:8443</p>
+
+<p><img alt="" src="https://img-blog.csdn.net/20180524211711174" /></p>
+
+<p>&nbsp;</p>
+
+<p>&nbsp;</p>
+
+<hr />
+<p><strong>五、测试过程中的问题处理</strong></p>
+
+<p><strong>1、无法通过github下载源代码</strong></p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>Cloning &quot;<a href="https://github.com/gshipley/simplephp.git" rel="nofollow" target="_blank">https://github.com/gshipley/simplephp.git&nbsp;</a>&quot; ...</p>
+
+			<p>error: fatal: unable to access &#39;<a href="https://github.com/gshipley/simplephp.git/'%20rel=">https://github.com/gshipley/simplephp.git/&#39;:&nbsp;</a>Peer&#39;s certificate issuer has been marked as not trusted by the user.</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>解决方法：</p>
+
+<p>原因是在 /etc/resolv.conf 中多了search *** （专业术语：FQDN）,将其注释掉即可，但是当NetworkManager服务重新启动之后，之前的配置又会被覆盖，方法如下：</p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>chattr +i /etc/resolv.conf</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>&nbsp;</p>
+
+<p>2、无法进行docker的注册</p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>error: build error: Failed to push image: After retrying 6 times, Push image still failed due to error: Get https://docker-registry.default.svc:5000/v1/_ping: dial tcp 192.168.40.163:5000: getsockopt: connection refused</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>解决方法：</p>
+
+<p>通过观察docker-registry的pod界面可知</p>
+
+<p><img alt="" src="https://img-blog.csdn.net/20180524211740710" /></p>
+
+<p>&nbsp;</p>
+
+<p>，其绑定的IP地址为 172.30.135.115，因此在 /etc/hosts 中添加了</p>
+
+<p><img alt="" src="https://img-blog.csdn.net/20180524211800237" /></p>
+
+<h1>OpenShift 3.9 多节点集群（Ansible）安装</h1>
+
+<p>2018年05月24日 21:19:16&nbsp;<a href="https://me.csdn.net/sun_qiangwei" target="_blank">sun_qiangwei</a>&nbsp;阅读数：4871</p>
+
+<p>&nbsp;版权声明：本文为博主原创文章，未经博主允许不得转载。 https://blog.csdn.net/sun_qiangwei/article/details/80443943</p>
+
+<p>OpenShift集群的部署可以分为以下几个阶段：</p>
+
+<p><strong>1、主机环境准备</strong>：准备OpenShift集群需要的主机，并进行集群环境准备。</p>
+
+<p><strong>2、安装依赖包</strong>：提前安装使用Ansible安装OpenShift集群所依赖的第三方包。</p>
+
+<p><strong>3、Ansible执行安装</strong>：使用Ansible Playbook进行自动化安装。</p>
+
+<p><strong>4、OpenShift系统配置</strong>：在使用Ansible执行安装完成之后的系统配置。</p>
+
+<p><strong>5、测试问题处理</strong></p>
+
+<p>&nbsp;</p>
+
+<hr />
+<p><strong>一、主机环境准备</strong></p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>类型</p>
+			</td>
+			<td>
+			<p>主机名（域名）</p>
+			</td>
+			<td>
+			<p>IP</p>
+			</td>
+			<td>
+			<p>操作系统</p>
+			</td>
+			<td>
+			<p>内存</p>
+			</td>
+			<td>
+			<p>磁盘</p>
+			</td>
+		</tr>
+		<tr>
+			<td>
+			<p>Master</p>
+			</td>
+			<td>
+			<p>master.192.168.40.161.nip.io</p>
+			</td>
+			<td>
+			<p>192.168.40.161</p>
+			</td>
+			<td>
+			<p>CentOS7.5</p>
+			</td>
+			<td>
+			<p>2G</p>
+			</td>
+			<td>
+			<p>sda：10G for OS</p>
+
+			<p>sdb：20G for docker</p>
+			</td>
+		</tr>
+		<tr>
+			<td>
+			<p>Node</p>
+			</td>
+			<td>
+			<p>node1.192.168.40.162.nip.io</p>
+			</td>
+			<td>
+			<p>192.168.40.162</p>
+			</td>
+			<td>
+			<p>CentOS7.5</p>
+			</td>
+			<td>
+			<p>2G</p>
+			</td>
+			<td>
+			<p>sda：10G for OS</p>
+
+			<p>sdb：20G for docker</p>
+			</td>
+		</tr>
+		<tr>
+			<td>
+			<p>Node</p>
+			</td>
+			<td>
+			<p>node2.192.168.40.163.nip.io</p>
+			</td>
+			<td>
+			<p>192.168.40.163</p>
+			</td>
+			<td>
+			<p>CentOS7.5</p>
+			</td>
+			<td>
+			<p>2G</p>
+			</td>
+			<td>
+			<p>sda：10G for OS</p>
+
+			<p>sdb：20G for docker</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>&nbsp;</p>
+
+<p><em>说明：在安装的过程中，使用了nip.io结尾的域名，关于nip.io的问题，请查阅&nbsp;</em><a href="http://nip.io/" rel="nofollow" target="_blank"><em>nip.io</em></a><em>&nbsp;网站 。</em></p>
+
+<p>&nbsp;</p>
+
+<p><strong>1、检查主机与Internet的状态</strong></p>
+
+<p>由于在安装的过程中需要通过Internet下载相关依赖，因此需要检查三台主机与Internet的状态。</p>
+
+<p>&nbsp;</p>
+
+<p><strong>2、检查主机名</strong></p>
+
+<p>按照上面表格中所列的主机名进行主机名检查。如果不一致，可以通过下面的命令进行配置，如下：</p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>hostnamectl set-hostname master.192.168.40.161.nip.io</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>&nbsp;</p>
+
+<p><strong>3、检查主机名（域名）的解析是否正常</strong></p>
+
+<p>可以通过 ping $(hostname)来验证主机名到主机IP的解析情况。</p>
+
+<p>如果出现不能ping通的情况，可以直接修改各个节点的 /etc/hosts 文件，加上静态的域名解析。</p>
+
+<p>&nbsp;</p>
+
+<p>此外由于使用的是nip.io的域名，正常的DNS都能够解析到正确的IP地址；但是在输入命令的过程中使用全域名会很麻烦，因此在hosts中添加了主机名的缩写配置，如下：</p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>192.168.40.161 master</p>
+
+			<p>192.168.40.162 node1</p>
+
+			<p>192.168.40.163 node2</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>&nbsp;</p>
+
+<p><strong>4、检查SELINUX是否开启</strong></p>
+
+<p>官方文档推荐开启SELINUX，否则会导致安装失败。</p>
+
+<p>修改方式如下：</p>
+
+<p>/etc/selinux/config</p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>SELINUX=enforcing</p>
+
+			<p>SELINUXTYPE=targeted</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>&nbsp;</p>
+
+<p><strong>5、配置三台主机ssh免密访问</strong></p>
+
+<p>5.1）在所有节点上以root账号登陆，并进入到/root的主目录</p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>[root@master ~]$ pwd</p>
+
+			<p>/root</p>
+
+			<p>[root@master ~]$</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>&nbsp;</p>
+
+<p>5.2）在所有节点上生成密钥对。</p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>[root@master ~]$ ssh-keygen -t rsa</p>
+
+			<p>Generating public/private rsa key pair.</p>
+
+			<p>Enter file in which to save the key (/home/.ssh/id_rsa):</p>
+
+			<p>Created directory &#39;/home/.ssh&#39;.</p>
+
+			<p>Enter passphrase (empty for no passphrase):</p>
+
+			<p>Enter same passphrase again:</p>
+
+			<p>Your identification has been saved in /home/.ssh/id_rsa.</p>
+
+			<p>Your public key has been saved in /home/.ssh/id_rsa.pub.</p>
+
+			<p>The key fingerprint is:</p>
+
+			<p>29:1c:df:59:0d:5f:ee:28:07:c0:57:21:15:af:a3:88 root@master</p>
+
+			<p>The key&#39;s randomart image is:</p>
+
+			<p>+--[ RSA 2048]----+</p>
+
+			<p>| .. oo=o.|</p>
+
+			<p>| ...= + |</p>
+
+			<p>| . .o o o|</p>
+
+			<p>| . o o o . + |</p>
+
+			<p>| o S o . = .|</p>
+
+			<p>| . . . + . |</p>
+
+			<p>| E . . |</p>
+
+			<p>| |</p>
+
+			<p>| |</p>
+
+			<p>+-----------------+</p>
+
+			<p>[root@master ~]$</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>&nbsp;</p>
+
+<p>5.3）然后进入.ssh目录，把公钥复制到authorized_keys</p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>[root@master ~]$ cd .ssh</p>
+
+			<p>[root@master .ssh]$ ls</p>
+
+			<p>id_rsa id_rsa.pub</p>
+
+			<p>[root@master .ssh]$ cp id_rsa.pub authorized_keys</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>&nbsp;</p>
+
+<p>5.4）分发ssh公钥到各个节点</p>
+
+<p>先将node1和node2的公钥添加到master节点的authorized_keys文件中。</p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>[root@node1 .ssh]$ ssh-copy-id master</p>
+
+			<p>[root<a href="http://hdfs-yarn-1/" rel="nofollow" target="_blank">@</a>node2 .ssh]$ ssh-copy-id master</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>最后再使用scp将master中的authorized_keys文件传送到各个节点。</p>
+
+<p>&nbsp;</p>
+
+<p>此处，需要注意.ssh(755)及.ssh/authorized_keys(644)的权限。&nbsp;</p>
+
+<p>&nbsp;</p>
+
+<p>&nbsp;</p>
+
+<hr />
+<p><strong>二、安装依赖包</strong></p>
+
+<p><strong>1、所有主机上执行以下命令进行系统更新</strong></p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>yum install -y update</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>安装完成之后，重新系统生效。</p>
+
+<p>&nbsp;</p>
+
+<p><strong>2、所有的主机下执行以下命令安装OpenShift依赖的软件包。</strong></p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>yum install wget git net-tools bind-utils iptables-services bridge-utils bash-completion kexec-tools sos psacct bash-completion.noarch bash-completion-extras.noarch python-passlib NetworkManager -y</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>&nbsp;</p>
+
+<p><strong>3、所有的主机安装docker</strong></p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>yum install docker-1.13.1 -y</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>&nbsp;</p>
+
+<p><strong>4、配置docker使用的存储</strong></p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>echo DEVS=/dev/sdb &gt; /etc/sysconfig/docker-storage-setup</p>
+
+			<p>echo VG=DOCKER &gt;&gt; /etc/sysconfig/docker-storage-setup</p>
+
+			<p>echo SETUP_LVM_THIN_POOL=yes &gt;&gt; /etc/sysconfig/docker-storage-setup</p>
+
+			<p>echo DATA_SIZE=&quot;100%FREE&quot;&gt;&gt; /etc/sysconfig/docker-storage-setup</p>
+
+			<p>&nbsp;</p>
+
+			<p>rm -rf /var/lib/docker</p>
+
+			<p>&nbsp;</p>
+
+			<p>wipefs --all /dev/sdb</p>
+
+			<p>docker-storage-setup</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>&nbsp;</p>
+
+<p><strong>5、配置docker镜像加速</strong></p>
+
+<p>选择阿里云的镜像服务器进行加速，修改 /etc/docker/daemon.json 文件，如下所示：</p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>[root@master ~]# more /etc/docker/daemon.json</p>
+
+			<p>{</p>
+
+			<p>&quot;registry-mirrors&quot;: [&quot;https://换成自己的地址.mirror.aliyuncs.com&quot;]</p>
+
+			<p>}</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>配置完成之后，所有主机启动docker，命令如下：</p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>systemctl enable docker</p>
+
+			<p>systemctl start docker</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>&nbsp;</p>
+
+<hr />
+<p><strong>三、在Master主机上执行Ansible集群安装</strong></p>
+
+<p><strong>1、启用EPEL仓库以安装Ansible</strong></p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>#install epel</p>
+
+			<p>yum -y install epel-release</p>
+
+			<p>&nbsp;</p>
+
+			<p># Disable the EPEL repository globally so that is not accidentally used during later steps of the installation</p>
+
+			<p>sed -i -e &quot;s/^enabled=1/enabled=0/&quot; /etc/yum.repos.d/epel.repo</p>
+
+			<p>&nbsp;</p>
+
+			<p>yum -y --enablerepo=epel install ansible pyOpenSSL #3.9必须2.5版本</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p><strong>2、从 github 上clone openshift-ansible 3.9版本</strong></p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>git clone -b release-3.9 https://github.com/openshift/openshift-ansible</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>说明：最近通过本blog重新安装openshift集群时，发现总是出现各种各样的问题，如 /etc/dnsmasq.d/origin-upstream-dns.conf 、/etc/origin/node/resolv.conf 等文件缺失，因此将原来从github上clone源代码，修改为下载已经release的版本。</p>
+
+<p>&nbsp;</p>
+
+<p><strong>2、从github上下载openshift-ansible已经release的版本</strong></p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>wget https://github.com/openshift/openshift-ansible/archive/openshift-ansible-3.9.32-1.zip</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p><strong>下载完成之后，进行解压并重命为 openshift-ansible。</strong></p>
+
+<p>&nbsp;</p>
+
+<p><strong>3、修改软件源</strong></p>
+
+<p>由于目前OpenShift-ansible还没有添加3.9的源，所以需要自行修改下，方法如下：</p>
+
+<ul>
+	<li>进行openshift-ansible/roles/openshift_repos/templates/ 复制一份 CentOS-OpenShift-Origin37.repo.j2 为 CentOS-OpenShift-Origin39.repo.j2。</li>
+	<li>修改CentOS-OpenShift-Origin39.repo.j2中的源修改为国内的，比如阿里云。</li>
+</ul>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>[centos-openshift-origin39]</p>
+
+			<p>name=CentOS OpenShift Origin</p>
+
+			<p>baseurl=http://mirrors.aliyun.com/centos/7/paas/x86_64/openshift-origin39/</p>
+
+			<p>enabled=1</p>
+
+			<p>gpgcheck=1</p>
+
+			<p>gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-CentOS-SIG-PaaS</p>
+
+			<p>&nbsp;</p>
+
+			<p>[centos-openshift-origin39-testing]</p>
+
+			<p>name=CentOS OpenShift Origin Testing</p>
+
+			<p>baseurl=http://buildlogs.centos.org/centos/7/paas/x86_64/openshift-origin39/</p>
+
+			<p>enabled={{ 1 if openshift_repos_enable_testing else 0 }}</p>
+
+			<p>gpgcheck=0</p>
+
+			<p>gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-CentOS-SIG-PaaS</p>
+
+			<p>&nbsp;</p>
+
+			<p>[centos-openshift-origin39-debuginfo]</p>
+
+			<p>name=CentOS OpenShift Origin DebugInfo</p>
+
+			<p>baseurl=http://debuginfo.centos.org/centos/7/paas/x86_64/</p>
+
+			<p>enabled=0</p>
+
+			<p>gpgcheck=1</p>
+
+			<p>gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-CentOS-SIG-PaaS</p>
+
+			<p>&nbsp;</p>
+
+			<p>[centos-openshift-origin39-source]</p>
+
+			<p>name=CentOS OpenShift Origin Source</p>
+
+			<p>baseurl=http://vault.centos.org/centos/7/paas/Source/openshift-origin39/</p>
+
+			<p>enabled=0</p>
+
+			<p>gpgcheck=1</p>
+
+			<p>gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-CentOS-SIG-PaaS</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>&nbsp;</p>
+
+<p><strong>4、配置 ansible inventory 文件，保存到 /etc/ansible/inventory.ini文件中。</strong></p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p># Create an OSEv3 group that contains the masters and nodes groups</p>
+
+			<p>[OSEv3:children]</p>
+
+			<p>#目前配置标准的三个角色</p>
+
+			<p>masters</p>
+
+			<p>nodes</p>
+
+			<p>etcd</p>
+
+			<p>&nbsp;</p>
+
+			<p># Set variables common for all OSEv3 hosts</p>
+
+			<p>[OSEv3:vars]</p>
+
+			<p># SSH user, this user should allow ssh based auth without requiring a password</p>
+
+			<p>ansible_ssh_user=root</p>
+
+			<p>#使用origin社区版</p>
+
+			<p>openshift_deployment_type=origin</p>
+
+			<p>#指定安装版本</p>
+
+			<p>openshift_release=3.9</p>
+
+			<p>&nbsp;</p>
+
+			<p>#指定默认域名，访问的时候需要使用该域名，没有dns服务器，需要手动添加本地hosts文件</p>
+
+			<p>openshift_master_default_subdomain=apps.192.168.40.161.nip.io</p>
+
+			<p>&nbsp;</p>
+
+			<p>#禁止磁盘、内存和镜像检查</p>
+
+			<p>openshift_disable_check=disk_availability,docker_storage,memory_availability,docker_image_availability</p>
+
+			<p>&nbsp;</p>
+
+			<p>#disk_availability：报错信息是推荐的master磁盘空间剩余量大于40GB。测试环境无法满足，跳过检测。</p>
+
+			<p>#memory_availability：报错信息是推荐的master内存为16GB，node内存为8GB，测试环境无法满足，跳过检测。</p>
+
+			<p>#docker_image_availability：报错信息是需要的几个镜像未找到，选择跳过，装完集群后，在使用的时候再自行下载。</p>
+
+			<p>#docker_storage：报错信息是推荐选择一块磁盘空间存储镜像，这里选择跳过。采用docker默认的方式存储镜像。</p>
+
+			<p>&nbsp;</p>
+
+			<p>&nbsp;</p>
+
+			<p># uncomment the following to enable htpasswd authentication; defaults to DenyAllPasswordIdentityProvider</p>
+
+			<p>openshift_master_identity_providers=[{&#39;name&#39;:&#39;htpasswd_auth&#39;,&#39;login&#39;:&#39;true&#39;,&#39;challenge&#39;:&#39;true&#39;,&#39;kind&#39;:&#39;HTPasswdPasswordIdentityProvider&#39;,&#39;filename&#39;:&#39;/etc/origin/master/htpasswd&#39;}]</p>
+
+			<p>&nbsp;</p>
+
+			<p>#ntp时间同步</p>
+
+			<p>openshift_clock_enabled=true</p>
+
+			<p>&nbsp;</p>
+
+			<p>#节点配额</p>
+
+			<p>openshift_node_kubelet_args={&#39;pods-per-core&#39;: [&#39;10&#39;]}</p>
+
+			<p>&nbsp;</p>
+
+			<p># host group for masters</p>
+
+			<p>[masters]</p>
+
+			<p>master openshift_schedulable=True</p>
+
+			<p>&nbsp;</p>
+
+			<p># host group for nodes, includes region info</p>
+
+			<p>[nodes]</p>
+
+			<p>master openshift_node_labels=&quot;{&#39;region&#39;: &#39;infra&#39;}&quot;</p>
+
+			<p>node1 openshift_node_labels=&quot;{&#39;region&#39;: &#39;infra&#39;, &#39;zone&#39;: &#39;default&#39;}&quot;</p>
+
+			<p>node2 openshift_node_labels=&quot;{&#39;region&#39;: &#39;infra&#39;, &#39;zone&#39;: &#39;default&#39;}&quot;</p>
+
+			<p>&nbsp;</p>
+
+			<p>[etcd]</p>
+
+			<p>master</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p><strong>5、修改脚本问题</strong></p>
+
+<p>openshift-ansible/roles/lib_utils/filter_plugins/openshift_master.py 的第487行</p>
+
+<p><img alt="" src="https://img-blog.csdn.net/20180725212702868?watermark/2/text/aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L3N1bl9xaWFuZ3dlaQ==/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70" /></p>
+
+<p>注释掉图片中框出来的两行。</p>
+
+<p>&nbsp;</p>
+
+<p>&nbsp;</p>
+
+<p><strong>6、开始安装</strong></p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>ansible-playbook -i /etc/ansible/inventory.ini openshift-ansible/playbooks/prerequisites.yml</p>
+
+			<p>ansible-playbook -i /etc/ansible/inventory.ini openshift-ansible/playbooks/deploy_cluster.yml</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>安装过程是完全自动化的，无需手动干预。在绝大多数情况下，Ansible的脚本Playbook是可以反复执行的。</p>
+
+<p>第一条语句的运行结果：</p>
+
+<p><img alt="" src="https://img-blog.csdn.net/20180524211635122" /></p>
+
+<p>第二条语句的运行结果：</p>
+
+<p><img alt="" src="https://img-blog.csdn.net/20180524211645787" /></p>
+
+<p>&nbsp;</p>
+
+<p><strong>7、检查</strong></p>
+
+<p>安装完成后，执行oc get nodes 检查当前集群的成员列表以及它们的状态。</p>
+
+<p><img alt="" src="https://img-blog.csdn.net/20180524211701487" /></p>
+
+<p>其实在安装完成之后 第二个节点和第三个节点的roles类型为空，需要将其打上compute标签，命令如下：</p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>oc label node node1.192.168.40.162.nip.io node-role.kubernetes.io/compute=true</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>&nbsp;</p>
+
+<p>&nbsp;</p>
+
+<hr />
+<p><strong>四、OpenShift系统配置</strong></p>
+
+<p><strong>1、创建用户</strong></p>
+
+<p>安装的时候，在Ansible的hosts文件中定义了HTPasswd文件作为后端的用户身份信息库。</p>
+
+<p>&nbsp;</p>
+
+<p>安装程序自动生成了数据文件/etc/origin/master/htpasswd。但是此时该文件还是一个空文件，并没有任何用户信息。</p>
+
+<p>&nbsp;</p>
+
+<p>需要通过htpasswd命令来创建用户。创建账号为dev密码为dev的用户。</p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>[root@master ~]# htpasswd -b /etc/origin/master/htpasswd dev dev</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>&nbsp;</p>
+
+<p><strong>2、给dev添加集群管理员权限</strong></p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>oc adm policy add-cluster-role-to-user cluster-admin dev</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>&nbsp;</p>
+
+<p><strong>4、重启服务</strong></p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>systemctl restart origin-master-api</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>&nbsp;</p>
+
+<p><strong>5、访问页面</strong>，https://master.192.168.40.161.nip.io:8443</p>
+
+<p><img alt="" src="https://img-blog.csdn.net/20180524211711174" /></p>
+
+<p>&nbsp;</p>
+
+<p>&nbsp;</p>
+
+<hr />
+<p><strong>五、测试过程中的问题处理</strong></p>
+
+<p><strong>1、无法通过github下载源代码</strong></p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>Cloning &quot;<a href="https://github.com/gshipley/simplephp.git" rel="nofollow" target="_blank">https://github.com/gshipley/simplephp.git&nbsp;</a>&quot; ...</p>
+
+			<p>error: fatal: unable to access &#39;<a href="https://github.com/gshipley/simplephp.git/'%20rel=">https://github.com/gshipley/simplephp.git/&#39;:&nbsp;</a>Peer&#39;s certificate issuer has been marked as not trusted by the user.</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>解决方法：</p>
+
+<p>原因是在 /etc/resolv.conf 中多了search *** （专业术语：FQDN）,将其注释掉即可，但是当NetworkManager服务重新启动之后，之前的配置又会被覆盖，方法如下：</p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>chattr +i /etc/resolv.conf</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>&nbsp;</p>
+
+<p>2、无法进行docker的注册</p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>error: build error: Failed to push image: After retrying 6 times, Push image still failed due to error: Get https://docker-registry.default.svc:5000/v1/_ping: dial tcp 192.168.40.163:5000: getsockopt: connection refused</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>解决方法：</p>
+
+<p>通过观察docker-registry的pod界面可知</p>
+
+<p><img alt="" src="https://img-blog.csdn.net/20180524211740710" /></p>
+
+<p>&nbsp;</p>
+
+<p>，其绑定的IP地址为 172.30.135.115，因此在 /etc/hosts 中添加了</p>
+
+<p><img alt="" src="https://img-blog.csdn.net/20180524211800237" /></p>
+
+<h1>OpenShift 3.9 多节点集群（Ansible）安装</h1>
+
+<p>2018年05月24日 21:19:16&nbsp;<a href="https://me.csdn.net/sun_qiangwei" target="_blank">sun_qiangwei</a>&nbsp;阅读数：4871</p>
+
+<p>&nbsp;版权声明：本文为博主原创文章，未经博主允许不得转载。 https://blog.csdn.net/sun_qiangwei/article/details/80443943</p>
+
+<p>OpenShift集群的部署可以分为以下几个阶段：</p>
+
+<p><strong>1、主机环境准备</strong>：准备OpenShift集群需要的主机，并进行集群环境准备。</p>
+
+<p><strong>2、安装依赖包</strong>：提前安装使用Ansible安装OpenShift集群所依赖的第三方包。</p>
+
+<p><strong>3、Ansible执行安装</strong>：使用Ansible Playbook进行自动化安装。</p>
+
+<p><strong>4、OpenShift系统配置</strong>：在使用Ansible执行安装完成之后的系统配置。</p>
+
+<p><strong>5、测试问题处理</strong></p>
+
+<p>&nbsp;</p>
+
+<hr />
+<p><strong>一、主机环境准备</strong></p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>类型</p>
+			</td>
+			<td>
+			<p>主机名（域名）</p>
+			</td>
+			<td>
+			<p>IP</p>
+			</td>
+			<td>
+			<p>操作系统</p>
+			</td>
+			<td>
+			<p>内存</p>
+			</td>
+			<td>
+			<p>磁盘</p>
+			</td>
+		</tr>
+		<tr>
+			<td>
+			<p>Master</p>
+			</td>
+			<td>
+			<p>master.192.168.40.161.nip.io</p>
+			</td>
+			<td>
+			<p>192.168.40.161</p>
+			</td>
+			<td>
+			<p>CentOS7.5</p>
+			</td>
+			<td>
+			<p>2G</p>
+			</td>
+			<td>
+			<p>sda：10G for OS</p>
+
+			<p>sdb：20G for docker</p>
+			</td>
+		</tr>
+		<tr>
+			<td>
+			<p>Node</p>
+			</td>
+			<td>
+			<p>node1.192.168.40.162.nip.io</p>
+			</td>
+			<td>
+			<p>192.168.40.162</p>
+			</td>
+			<td>
+			<p>CentOS7.5</p>
+			</td>
+			<td>
+			<p>2G</p>
+			</td>
+			<td>
+			<p>sda：10G for OS</p>
+
+			<p>sdb：20G for docker</p>
+			</td>
+		</tr>
+		<tr>
+			<td>
+			<p>Node</p>
+			</td>
+			<td>
+			<p>node2.192.168.40.163.nip.io</p>
+			</td>
+			<td>
+			<p>192.168.40.163</p>
+			</td>
+			<td>
+			<p>CentOS7.5</p>
+			</td>
+			<td>
+			<p>2G</p>
+			</td>
+			<td>
+			<p>sda：10G for OS</p>
+
+			<p>sdb：20G for docker</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>&nbsp;</p>
+
+<p><em>说明：在安装的过程中，使用了nip.io结尾的域名，关于nip.io的问题，请查阅&nbsp;</em><a href="http://nip.io/" rel="nofollow" target="_blank"><em>nip.io</em></a><em>&nbsp;网站 。</em></p>
+
+<p>&nbsp;</p>
+
+<p><strong>1、检查主机与Internet的状态</strong></p>
+
+<p>由于在安装的过程中需要通过Internet下载相关依赖，因此需要检查三台主机与Internet的状态。</p>
+
+<p>&nbsp;</p>
+
+<p><strong>2、检查主机名</strong></p>
+
+<p>按照上面表格中所列的主机名进行主机名检查。如果不一致，可以通过下面的命令进行配置，如下：</p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>hostnamectl set-hostname master.192.168.40.161.nip.io</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>&nbsp;</p>
+
+<p><strong>3、检查主机名（域名）的解析是否正常</strong></p>
+
+<p>可以通过 ping $(hostname)来验证主机名到主机IP的解析情况。</p>
+
+<p>如果出现不能ping通的情况，可以直接修改各个节点的 /etc/hosts 文件，加上静态的域名解析。</p>
+
+<p>&nbsp;</p>
+
+<p>此外由于使用的是nip.io的域名，正常的DNS都能够解析到正确的IP地址；但是在输入命令的过程中使用全域名会很麻烦，因此在hosts中添加了主机名的缩写配置，如下：</p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>192.168.40.161 master</p>
+
+			<p>192.168.40.162 node1</p>
+
+			<p>192.168.40.163 node2</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>&nbsp;</p>
+
+<p><strong>4、检查SELINUX是否开启</strong></p>
+
+<p>官方文档推荐开启SELINUX，否则会导致安装失败。</p>
+
+<p>修改方式如下：</p>
+
+<p>/etc/selinux/config</p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>SELINUX=enforcing</p>
+
+			<p>SELINUXTYPE=targeted</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>&nbsp;</p>
+
+<p><strong>5、配置三台主机ssh免密访问</strong></p>
+
+<p>5.1）在所有节点上以root账号登陆，并进入到/root的主目录</p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>[root@master ~]$ pwd</p>
+
+			<p>/root</p>
+
+			<p>[root@master ~]$</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>&nbsp;</p>
+
+<p>5.2）在所有节点上生成密钥对。</p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>[root@master ~]$ ssh-keygen -t rsa</p>
+
+			<p>Generating public/private rsa key pair.</p>
+
+			<p>Enter file in which to save the key (/home/.ssh/id_rsa):</p>
+
+			<p>Created directory &#39;/home/.ssh&#39;.</p>
+
+			<p>Enter passphrase (empty for no passphrase):</p>
+
+			<p>Enter same passphrase again:</p>
+
+			<p>Your identification has been saved in /home/.ssh/id_rsa.</p>
+
+			<p>Your public key has been saved in /home/.ssh/id_rsa.pub.</p>
+
+			<p>The key fingerprint is:</p>
+
+			<p>29:1c:df:59:0d:5f:ee:28:07:c0:57:21:15:af:a3:88 root@master</p>
+
+			<p>The key&#39;s randomart image is:</p>
+
+			<p>+--[ RSA 2048]----+</p>
+
+			<p>| .. oo=o.|</p>
+
+			<p>| ...= + |</p>
+
+			<p>| . .o o o|</p>
+
+			<p>| . o o o . + |</p>
+
+			<p>| o S o . = .|</p>
+
+			<p>| . . . + . |</p>
+
+			<p>| E . . |</p>
+
+			<p>| |</p>
+
+			<p>| |</p>
+
+			<p>+-----------------+</p>
+
+			<p>[root@master ~]$</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>&nbsp;</p>
+
+<p>5.3）然后进入.ssh目录，把公钥复制到authorized_keys</p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>[root@master ~]$ cd .ssh</p>
+
+			<p>[root@master .ssh]$ ls</p>
+
+			<p>id_rsa id_rsa.pub</p>
+
+			<p>[root@master .ssh]$ cp id_rsa.pub authorized_keys</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>&nbsp;</p>
+
+<p>5.4）分发ssh公钥到各个节点</p>
+
+<p>先将node1和node2的公钥添加到master节点的authorized_keys文件中。</p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>[root@node1 .ssh]$ ssh-copy-id master</p>
+
+			<p>[root<a href="http://hdfs-yarn-1/" rel="nofollow" target="_blank">@</a>node2 .ssh]$ ssh-copy-id master</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>最后再使用scp将master中的authorized_keys文件传送到各个节点。</p>
+
+<p>&nbsp;</p>
+
+<p>此处，需要注意.ssh(755)及.ssh/authorized_keys(644)的权限。&nbsp;</p>
+
+<p>&nbsp;</p>
+
+<p>&nbsp;</p>
+
+<hr />
+<p><strong>二、安装依赖包</strong></p>
+
+<p><strong>1、所有主机上执行以下命令进行系统更新</strong></p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>yum install -y update</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>安装完成之后，重新系统生效。</p>
+
+<p>&nbsp;</p>
+
+<p><strong>2、所有的主机下执行以下命令安装OpenShift依赖的软件包。</strong></p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>yum install wget git net-tools bind-utils iptables-services bridge-utils bash-completion kexec-tools sos psacct bash-completion.noarch bash-completion-extras.noarch python-passlib NetworkManager -y</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>&nbsp;</p>
+
+<p><strong>3、所有的主机安装docker</strong></p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>yum install docker-1.13.1 -y</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>&nbsp;</p>
+
+<p><strong>4、配置docker使用的存储</strong></p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>echo DEVS=/dev/sdb &gt; /etc/sysconfig/docker-storage-setup</p>
+
+			<p>echo VG=DOCKER &gt;&gt; /etc/sysconfig/docker-storage-setup</p>
+
+			<p>echo SETUP_LVM_THIN_POOL=yes &gt;&gt; /etc/sysconfig/docker-storage-setup</p>
+
+			<p>echo DATA_SIZE=&quot;100%FREE&quot;&gt;&gt; /etc/sysconfig/docker-storage-setup</p>
+
+			<p>&nbsp;</p>
+
+			<p>rm -rf /var/lib/docker</p>
+
+			<p>&nbsp;</p>
+
+			<p>wipefs --all /dev/sdb</p>
+
+			<p>docker-storage-setup</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>&nbsp;</p>
+
+<p><strong>5、配置docker镜像加速</strong></p>
+
+<p>选择阿里云的镜像服务器进行加速，修改 /etc/docker/daemon.json 文件，如下所示：</p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>[root@master ~]# more /etc/docker/daemon.json</p>
+
+			<p>{</p>
+
+			<p>&quot;registry-mirrors&quot;: [&quot;https://换成自己的地址.mirror.aliyuncs.com&quot;]</p>
+
+			<p>}</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>配置完成之后，所有主机启动docker，命令如下：</p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>systemctl enable docker</p>
+
+			<p>systemctl start docker</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>&nbsp;</p>
+
+<hr />
+<p><strong>三、在Master主机上执行Ansible集群安装</strong></p>
+
+<p><strong>1、启用EPEL仓库以安装Ansible</strong></p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>#install epel</p>
+
+			<p>yum -y install epel-release</p>
+
+			<p>&nbsp;</p>
+
+			<p># Disable the EPEL repository globally so that is not accidentally used during later steps of the installation</p>
+
+			<p>sed -i -e &quot;s/^enabled=1/enabled=0/&quot; /etc/yum.repos.d/epel.repo</p>
+
+			<p>&nbsp;</p>
+
+			<p>yum -y --enablerepo=epel install ansible pyOpenSSL #3.9必须2.5版本</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p><strong>2、从 github 上clone openshift-ansible 3.9版本</strong></p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>git clone -b release-3.9 https://github.com/openshift/openshift-ansible</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>说明：最近通过本blog重新安装openshift集群时，发现总是出现各种各样的问题，如 /etc/dnsmasq.d/origin-upstream-dns.conf 、/etc/origin/node/resolv.conf 等文件缺失，因此将原来从github上clone源代码，修改为下载已经release的版本。</p>
+
+<p>&nbsp;</p>
+
+<p><strong>2、从github上下载openshift-ansible已经release的版本</strong></p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>wget https://github.com/openshift/openshift-ansible/archive/openshift-ansible-3.9.32-1.zip</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p><strong>下载完成之后，进行解压并重命为 openshift-ansible。</strong></p>
+
+<p>&nbsp;</p>
+
+<p><strong>3、修改软件源</strong></p>
+
+<p>由于目前OpenShift-ansible还没有添加3.9的源，所以需要自行修改下，方法如下：</p>
+
+<ul>
+	<li>进行openshift-ansible/roles/openshift_repos/templates/ 复制一份 CentOS-OpenShift-Origin37.repo.j2 为 CentOS-OpenShift-Origin39.repo.j2。</li>
+	<li>修改CentOS-OpenShift-Origin39.repo.j2中的源修改为国内的，比如阿里云。</li>
+</ul>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>[centos-openshift-origin39]</p>
+
+			<p>name=CentOS OpenShift Origin</p>
+
+			<p>baseurl=http://mirrors.aliyun.com/centos/7/paas/x86_64/openshift-origin39/</p>
+
+			<p>enabled=1</p>
+
+			<p>gpgcheck=1</p>
+
+			<p>gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-CentOS-SIG-PaaS</p>
+
+			<p>&nbsp;</p>
+
+			<p>[centos-openshift-origin39-testing]</p>
+
+			<p>name=CentOS OpenShift Origin Testing</p>
+
+			<p>baseurl=http://buildlogs.centos.org/centos/7/paas/x86_64/openshift-origin39/</p>
+
+			<p>enabled={{ 1 if openshift_repos_enable_testing else 0 }}</p>
+
+			<p>gpgcheck=0</p>
+
+			<p>gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-CentOS-SIG-PaaS</p>
+
+			<p>&nbsp;</p>
+
+			<p>[centos-openshift-origin39-debuginfo]</p>
+
+			<p>name=CentOS OpenShift Origin DebugInfo</p>
+
+			<p>baseurl=http://debuginfo.centos.org/centos/7/paas/x86_64/</p>
+
+			<p>enabled=0</p>
+
+			<p>gpgcheck=1</p>
+
+			<p>gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-CentOS-SIG-PaaS</p>
+
+			<p>&nbsp;</p>
+
+			<p>[centos-openshift-origin39-source]</p>
+
+			<p>name=CentOS OpenShift Origin Source</p>
+
+			<p>baseurl=http://vault.centos.org/centos/7/paas/Source/openshift-origin39/</p>
+
+			<p>enabled=0</p>
+
+			<p>gpgcheck=1</p>
+
+			<p>gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-CentOS-SIG-PaaS</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>&nbsp;</p>
+
+<p><strong>4、配置 ansible inventory 文件，保存到 /etc/ansible/inventory.ini文件中。</strong></p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p># Create an OSEv3 group that contains the masters and nodes groups</p>
+
+			<p>[OSEv3:children]</p>
+
+			<p>#目前配置标准的三个角色</p>
+
+			<p>masters</p>
+
+			<p>nodes</p>
+
+			<p>etcd</p>
+
+			<p>&nbsp;</p>
+
+			<p># Set variables common for all OSEv3 hosts</p>
+
+			<p>[OSEv3:vars]</p>
+
+			<p># SSH user, this user should allow ssh based auth without requiring a password</p>
+
+			<p>ansible_ssh_user=root</p>
+
+			<p>#使用origin社区版</p>
+
+			<p>openshift_deployment_type=origin</p>
+
+			<p>#指定安装版本</p>
+
+			<p>openshift_release=3.9</p>
+
+			<p>&nbsp;</p>
+
+			<p>#指定默认域名，访问的时候需要使用该域名，没有dns服务器，需要手动添加本地hosts文件</p>
+
+			<p>openshift_master_default_subdomain=apps.192.168.40.161.nip.io</p>
+
+			<p>&nbsp;</p>
+
+			<p>#禁止磁盘、内存和镜像检查</p>
+
+			<p>openshift_disable_check=disk_availability,docker_storage,memory_availability,docker_image_availability</p>
+
+			<p>&nbsp;</p>
+
+			<p>#disk_availability：报错信息是推荐的master磁盘空间剩余量大于40GB。测试环境无法满足，跳过检测。</p>
+
+			<p>#memory_availability：报错信息是推荐的master内存为16GB，node内存为8GB，测试环境无法满足，跳过检测。</p>
+
+			<p>#docker_image_availability：报错信息是需要的几个镜像未找到，选择跳过，装完集群后，在使用的时候再自行下载。</p>
+
+			<p>#docker_storage：报错信息是推荐选择一块磁盘空间存储镜像，这里选择跳过。采用docker默认的方式存储镜像。</p>
+
+			<p>&nbsp;</p>
+
+			<p>&nbsp;</p>
+
+			<p># uncomment the following to enable htpasswd authentication; defaults to DenyAllPasswordIdentityProvider</p>
+
+			<p>openshift_master_identity_providers=[{&#39;name&#39;:&#39;htpasswd_auth&#39;,&#39;login&#39;:&#39;true&#39;,&#39;challenge&#39;:&#39;true&#39;,&#39;kind&#39;:&#39;HTPasswdPasswordIdentityProvider&#39;,&#39;filename&#39;:&#39;/etc/origin/master/htpasswd&#39;}]</p>
+
+			<p>&nbsp;</p>
+
+			<p>#ntp时间同步</p>
+
+			<p>openshift_clock_enabled=true</p>
+
+			<p>&nbsp;</p>
+
+			<p>#节点配额</p>
+
+			<p>openshift_node_kubelet_args={&#39;pods-per-core&#39;: [&#39;10&#39;]}</p>
+
+			<p>&nbsp;</p>
+
+			<p># host group for masters</p>
+
+			<p>[masters]</p>
+
+			<p>master openshift_schedulable=True</p>
+
+			<p>&nbsp;</p>
+
+			<p># host group for nodes, includes region info</p>
+
+			<p>[nodes]</p>
+
+			<p>master openshift_node_labels=&quot;{&#39;region&#39;: &#39;infra&#39;}&quot;</p>
+
+			<p>node1 openshift_node_labels=&quot;{&#39;region&#39;: &#39;infra&#39;, &#39;zone&#39;: &#39;default&#39;}&quot;</p>
+
+			<p>node2 openshift_node_labels=&quot;{&#39;region&#39;: &#39;infra&#39;, &#39;zone&#39;: &#39;default&#39;}&quot;</p>
+
+			<p>&nbsp;</p>
+
+			<p>[etcd]</p>
+
+			<p>master</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p><strong>5、修改脚本问题</strong></p>
+
+<p>openshift-ansible/roles/lib_utils/filter_plugins/openshift_master.py 的第487行</p>
+
+<p><img alt="" src="https://img-blog.csdn.net/20180725212702868?watermark/2/text/aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L3N1bl9xaWFuZ3dlaQ==/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70" /></p>
+
+<p>注释掉图片中框出来的两行。</p>
+
+<p>&nbsp;</p>
+
+<p>&nbsp;</p>
+
+<p><strong>6、开始安装</strong></p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>ansible-playbook -i /etc/ansible/inventory.ini openshift-ansible/playbooks/prerequisites.yml</p>
+
+			<p>ansible-playbook -i /etc/ansible/inventory.ini openshift-ansible/playbooks/deploy_cluster.yml</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>安装过程是完全自动化的，无需手动干预。在绝大多数情况下，Ansible的脚本Playbook是可以反复执行的。</p>
+
+<p>第一条语句的运行结果：</p>
+
+<p><img alt="" src="https://img-blog.csdn.net/20180524211635122" /></p>
+
+<p>第二条语句的运行结果：</p>
+
+<p><img alt="" src="https://img-blog.csdn.net/20180524211645787" /></p>
+
+<p>&nbsp;</p>
+
+<p><strong>7、检查</strong></p>
+
+<p>安装完成后，执行oc get nodes 检查当前集群的成员列表以及它们的状态。</p>
+
+<p><img alt="" src="https://img-blog.csdn.net/20180524211701487" /></p>
+
+<p>其实在安装完成之后 第二个节点和第三个节点的roles类型为空，需要将其打上compute标签，命令如下：</p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>oc label node node1.192.168.40.162.nip.io node-role.kubernetes.io/compute=true</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>&nbsp;</p>
+
+<p>&nbsp;</p>
+
+<hr />
+<p><strong>四、OpenShift系统配置</strong></p>
+
+<p><strong>1、创建用户</strong></p>
+
+<p>安装的时候，在Ansible的hosts文件中定义了HTPasswd文件作为后端的用户身份信息库。</p>
+
+<p>&nbsp;</p>
+
+<p>安装程序自动生成了数据文件/etc/origin/master/htpasswd。但是此时该文件还是一个空文件，并没有任何用户信息。</p>
+
+<p>&nbsp;</p>
+
+<p>需要通过htpasswd命令来创建用户。创建账号为dev密码为dev的用户。</p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>[root@master ~]# htpasswd -b /etc/origin/master/htpasswd dev dev</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>&nbsp;</p>
+
+<p><strong>2、给dev添加集群管理员权限</strong></p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>oc adm policy add-cluster-role-to-user cluster-admin dev</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>&nbsp;</p>
+
+<p><strong>4、重启服务</strong></p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>systemctl restart origin-master-api</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>&nbsp;</p>
+
+<p><strong>5、访问页面</strong>，https://master.192.168.40.161.nip.io:8443</p>
+
+<p><img alt="" src="https://img-blog.csdn.net/20180524211711174" /></p>
+
+<p>&nbsp;</p>
+
+<p>&nbsp;</p>
+
+<hr />
+<p><strong>五、测试过程中的问题处理</strong></p>
+
+<p><strong>1、无法通过github下载源代码</strong></p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>Cloning &quot;<a href="https://github.com/gshipley/simplephp.git" rel="nofollow" target="_blank">https://github.com/gshipley/simplephp.git&nbsp;</a>&quot; ...</p>
+
+			<p>error: fatal: unable to access &#39;<a href="https://github.com/gshipley/simplephp.git/'%20rel=">https://github.com/gshipley/simplephp.git/&#39;:&nbsp;</a>Peer&#39;s certificate issuer has been marked as not trusted by the user.</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>解决方法：</p>
+
+<p>原因是在 /etc/resolv.conf 中多了search *** （专业术语：FQDN）,将其注释掉即可，但是当NetworkManager服务重新启动之后，之前的配置又会被覆盖，方法如下：</p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>chattr +i /etc/resolv.conf</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>&nbsp;</p>
+
+<p>2、无法进行docker的注册</p>
+
+<table>
+	<tbody>
+		<tr>
+			<td>
+			<p>error: build error: Failed to push image: After retrying 6 times, Push image still failed due to error: Get https://docker-registry.default.svc:5000/v1/_ping: dial tcp 192.168.40.163:5000: getsockopt: connection refused</p>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+<p>解决方法：</p>
+
+<p>通过观察docker-registry的pod界面可知</p>
+
+<p><img alt="" src="https://img-blog.csdn.net/20180524211740710" /></p>
+
+<p>&nbsp;</p>
+
+<p>，其绑定的IP地址为 172.30.135.115，因此在 /etc/hosts 中添加了</p>
+
+<p><img alt="" src="https://img-blog.csdn.net/20180524211800237" /></p>
+
+<p>&nbsp;</p>
+
+<p>&nbsp;</p>
+
+<p>&nbsp;</p>
+
+<p>&nbsp;</p>
+
+<p>&nbsp;</p>
+
+<p>&nbsp;</p>
+
+<p>&nbsp;</p>
