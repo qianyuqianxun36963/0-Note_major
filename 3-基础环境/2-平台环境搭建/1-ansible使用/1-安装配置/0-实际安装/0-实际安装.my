@@ -4,11 +4,13 @@
 
 <p>参考ubuntu14下环境安装/配置软件源source.list</p>
 
-<h2>2、执行ansible安装命令</h2>
+<h2>2、主从节点安装</h2>
+
+<h3>在 Control Machine 上安装 Ansible</h3>
 
 <p>参考 <a href="https://www.w3cschool.cn/automate_with_ansible/automate_with_ansible-1khc27p1.html">w3c安装教程 有其他版本linux安装方法哦</a></p>
 
-<h3>Ubuntu (Apt)</h3>
+<h4>Ubuntu (Apt)</h4>
 
 <ol>
 	<li>
@@ -33,56 +35,38 @@
 	</li>
 </ol>
 
-<h3>Python (Pip)</h3>
+<h3>在 Managed Node 安装 OpenSSH server 和 Python</h3>
 
-<p>Ansible 近来的释出速度很快，若想追求较新的版本可改用&nbsp;<strong>Pip</strong>&nbsp;的方式进行安装，较不建议初学者使用。</p>
+<p>正常在 Managed Node 我们都会安装 OpenSSH server 和开通连线权限以便于远端管理，OpenSSH 这边冻仁就不多加赘述了。</p>
 
-<ol>
+<p>Python 的部份呢？虽说现代的 GNU/Linux 大多都早已内建了，可 Ansible 预设使用的 Python 是 2.x 的版本，这在 Ubuntu 16.04 预载 Python 3.4 的环境上需做些调整，详情请参阅&nbsp;<a href="https://docs.ansible.com/ansible/python_3_support.html" target="_blank">Python 3 Support | Ansible Documentation</a>&nbsp;一文。<sup><a href="https://chusiang.gitbooks.io/automate-with-ansible/content/03.how-to-deploy-the-ansible.html#fn_2" target="_blank">2</a></sup></p>
+
+<ul>
 	<li>
-	<p>需请先安装&nbsp;<a href="https://pypi.python.org/pypi/pip" target="_blank">pip</a>，已安装者请略过。</p>
+	<p>Ubuntu.</p>
 
 	<pre>
-<code># Debian, Ubuntu
-$ sudo apt-get install -y python-pip
-
-# CentOS
-$ sudo yum install -y python-pip
-
-# macOS
-$ sudo easy_install pip
-</code></pre>
+<code>$ sudo apt-get install -y openssh-server python2.7</code></pre>
 	</li>
-</ol>
+</ul>
 
-<ol>
-	<li>
-	<p>升级 pip。</p>
-
-	<pre>
-<code>$ sudo pip install -U pip
-</code></pre>
-	</li>
-	<li>
-	<p>安装 Ansible。</p>
-
-	<pre>
-<code>$ sudo pip install ansible</code></pre>
-	</li>
-</ol>
-
-<h2>3、安装ssh和python环境</h2>
-
-<p>虽说现代的 GNU/Linux 大多都早已内建了，可 Ansible 预设使用的 Python 是 2.x 的版本，这在 Ubuntu 16.04 预载 Python 3.4 的环境上需做些调整，详情请参阅&nbsp;<a href="https://docs.ansible.com/ansible/python_3_support.html" target="_blank">Python 3 Support | Ansible Documentation</a>&nbsp;一文。</p>
-
-<p>我的电脑的话，直接执行下面这句就好</p>
-
-<p>apt-get install -y openssh-server python2.7</p>
-
-<h2>4、怎么设定 Ansible？</h2>
+<h2>2、怎么设定 Ansible？</h2>
 
 <p>我们可以借由&nbsp;<code>ansible.cfg</code>&nbsp;来设定预设的&nbsp;<strong>inventory 档案的路径</strong>、<strong>远端使用者名称</strong>和&nbsp;<strong>SSH 金钥路径</strong>等相关设定。</p>
 
-<p><img alt="automate_with_ansible_basic-14.jpg" src="https://chusiang.gitbooks.io/automate-with-ansible/content/imgs/automate_with_ansible_basic-14.jpg" style="height:375px; width:500px" /></p>
+<pre>
+&nbsp; vim ansible.cfg
+&nbsp; [defaults]
+&nbsp; # 指定 inventory 档案路径
+&nbsp; invertory = hosts
+&nbsp; 
+&nbsp; # 远端使用者名称
+&nbsp; remote_user = vagrant
+&nbsp; #private_key_file = ~/.ssh/id_rsa
+&nbsp; 
+&nbsp; # host_key_checking: 不询问加入 ssh  与否
+&nbsp; host_key_checking = false
+</pre>
 
 <ol>
 	<li>安装好 Ansible 后，我们可以在&nbsp;<code>/etc/ansible/</code>&nbsp;的目录底下找到 Ansible 的设定档。</li>
@@ -93,7 +77,23 @@ $ sudo easy_install pip
 
 <p><code>inventory</code>&nbsp;就单字本身有<strong>详细目录</strong>、<strong>清单</strong>和<strong>列表</strong>的意思。在这里我们可以把它当成是一份主机列表，我们可通过它对定义每个 Managed Node 的代号、IP 位址、连线相关资讯和群组。</p>
 
-<p><img alt="automate_with_ansible_basic-15.jpg" src="https://chusiang.gitbooks.io/automate-with-ansible/content/imgs/automate_with_ansible_basic-15.jpg" style="height:375px; width:500px" /></p>
+<pre>
+&nbsp; vim hosts
+&nbsp; # ansible_ssh_host: 远端 SSH主机地址
+&nbsp; # ansible_ssh_port: 远端 SSH主机端口
+&nbsp; # ansible_ssh_user: 远端 SSH主机用户
+&nbsp; # ansible_ssh_pass: 远端 SSH主机密码
+&nbsp; # ansible_ssh_private_key_file: 本机 SSH 私钥路径
+
+&nbsp; [dev]
+&nbsp; ansible-demo.local ansible_ssh_host = 127.0.0.1 ansible_ssh_port=2222
+
+&nbsp; [test]
+&nbsp; ansible-demo.local ansible_ssh_host = 10.10.0.1 ansible_ssh_user=ansible
+
+&nbsp; [prod]
+&nbsp; ansible-demo.local ansible_ssh_host = demo.drx.tw ansible_ssh_port=22
+</pre>
 
 <ol>
 	<li>

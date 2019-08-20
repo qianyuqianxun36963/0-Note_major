@@ -1,0 +1,189 @@
+<h1>Ansible 如何操作</h1>
+
+<p>相信大家手边都有可以练习 Ansible 的环境了，这次冻仁就来谈谈怎么操作 Ansible！</p>
+
+<p>一般来说，我们可以用 Ad-Hoc command 和 Playbook 两种方式来操作 Ansible。</p>
+
+<p>前者是透过一次次简短的指令来操作 Ansible，而后者则是先把任务写好，然后再一次执行。两者的关系就好比我们在 Linux Shell 里打指令和先写个 Shell Script 再执行一样。</p>
+
+<h2>Ad-Hoc Commands 是什么？</h2>
+
+<p><strong>Ad hoc</strong>&nbsp;这个单字是来自拉丁文常用短语中的一个短语，通常用来形容为一个特定的问题或任务而专门设定的解决方案&nbsp;<sup><a href="https://www.w3cschool.cn/automate_with_ansible/automate_with_ansible-qzva27p4.html#fn_1">1</a></sup>。<strong>Ad-Hoc Commands</strong>&nbsp;可以翻译为<strong>简短地指令</strong>，在这里冻仁会用<strong>指令操作模式</strong>来形容它，以常见的&nbsp;<code>ping</code>&nbsp;和&nbsp;<code>echo</code>&nbsp;操作为例。</p>
+
+<ul>
+	<li>
+	<p>ping.</p>
+
+	<pre>
+<code>$ ansible all -m ping
+server1 | SUCCESS =&gt; {
+    &quot;changed&quot;: false,
+    &quot;ping&quot;: &quot;pong&quot;
+}
+</code></pre>
+	</li>
+	<li>
+	<p>echo.</p>
+
+	<pre>
+<code>$ ansible all -m command -a &quot;echo Hello World&quot;
+server1 | SUCCESS | rc=0 &gt;&gt;
+Hello World
+</code></pre>
+	</li>
+</ul>
+
+<p>从以上的例子中可以看到 Ad-Hoc commands 一次只能处理一件事情，这即是它与 Playbooks 最大的差异。</p>
+
+<blockquote>
+<p>详情请参考官方的&nbsp;<a href="http://docs.ansible.com/ansible/intro_adhoc.html" target="_blank">Introduction To Ad-Hoc Commands | Ansible Documentation</a>&nbsp;文件。</p>
+</blockquote>
+
+<h2>Playbooks 是什么？</h2>
+
+<p><strong>Playbook</strong>&nbsp;就字面上的意思为<strong>剧本</strong>。我们可以通过事先写好的<strong>剧本 (Playbooks)</strong>&nbsp;来让各个 Managed Node 进行指定的<strong>动作 (Plays)</strong>&nbsp;和<strong>任务 (Tasks)</strong>。&nbsp;<sup><a href="https://www.w3cschool.cn/automate_with_ansible/automate_with_ansible-qzva27p4.html#fn_2">2</a></sup></p>
+
+<p>简而言之，Playbooks 是 Ansible 的脚本 (Script)，而且还是个比传统 Shell Script 还强大数百倍的脚本！如果今天只能记住一件事，请记住 Ansible 最好用、最厉害的就是它的 Playbook！</p>
+
+<p>Playbooks&nbsp;是什么</p>
+
+<p>1、一键部署的强大武器，比shell&nbsp;script&nbsp;更具结构化的脚本语言。</p>
+
+<p>2、使用YAML格式，写code就如同写文件，简单易读。</p>
+
+<p>3、可使用&nbsp;jinja2（template系统）表达式，并支持变数、判断式、递归等语法。</p>
+
+<ul>
+	<li><strong>Play</strong>：通常为某个特定的目的，例如：
+
+	<ul>
+		<li><code>Setup a official website with Drupal</code>&nbsp;(借由 Drupal 建置官网)</li>
+		<li><code>Restart the API service</code>&nbsp;(重开 API 服务)</li>
+	</ul>
+	</li>
+	<li><strong>Task</strong>：是要实行 Play 这个目地所需做的每个步骤，例如：
+	<ul>
+		<li><code>Install the Nginx</code>&nbsp;(安裝 Nginx)</li>
+		<li><code>Kill the djnago process</code>&nbsp;(强制停止 django 的行程)</li>
+	</ul>
+	</li>
+	<li><strong>Module</strong>：Ansible 所提供的各种操作方法，例如：
+	<ul>
+		<li><code>apt: name=vim state=present</code>&nbsp;(使用 apt 套件安装 vim)</li>
+		<li><code>command: /sbin/shutdown -r now</code>&nbsp;(使用 shutdown 的指令重新开机)</li>
+	</ul>
+	</li>
+</ul>
+
+<p><img alt="automate_with_ansible_basic-19.gif" src="https://chusiang.gitbooks.io/automate-with-ansible/content/imgs/automate_with_ansible_basic-19.gif" /></p>
+
+<h3><code>Hello World</code>&nbsp;Playbook</h3>
+
+<ul>
+	<li>
+	<p>来写一下我们的第一个 playbook！请建立一个&nbsp;<code>hello_world.yml</code>&nbsp;的档案，并将&nbsp;<code>---</code>&nbsp;开始的内容都写进去。</p>
+
+	<pre>
+<code>$ vi hello_world.yml
+---
+
+- name: say &#39;hello world&#39;
+  hosts: all
+  tasks:
+
+    - name: echo &#39;hello world&#39;
+      command: echo &#39;hello world&#39;
+      register: result
+
+    - name: print stdout
+      debug:
+        msg: &quot;&quot;
+</code></pre>
+	</li>
+	<li>
+	<p>执行 playbook：在这个范例中，我们执行了 1 个 Play、3 个 Task 和 2 个 Module。</p>
+
+	<pre>
+<code>$ ansible-playbook hello_world.yml
+
+PLAY [say &#39;hello world&#39;] *******************************************************
+
+TASK [setup] *******************************************************************
+ok: [server1]
+
+TASK [echo &#39;hello world&#39;] ******************************************************
+changed: [server1]
+
+TASK [print stdout] ************************************************************
+ok: [server1] =&gt; {
+    &quot;msg&quot;: &quot;hello world&quot;
+}
+
+PLAY RECAP *********************************************************************
+server1                    : ok=3    changed=1    unreachable=0    failed=0
+</code></pre>
+	</li>
+</ul>
+
+<h2>没有 Ansible 时，我们是怎么操作的？</h2>
+
+<p>冻仁在此附上 Linux Shell&nbsp;<sup><a href="https://www.w3cschool.cn/automate_with_ansible/automate_with_ansible-qzva27p4.html#fn_3">3</a></sup>&nbsp;上的传统作法，来比对两者的操作。</p>
+
+<h3>Shell (command line, cli, console)</h3>
+
+<ul>
+	<li>
+	<p>ping.</p>
+
+	<pre>
+<code>$ ping -c 1 8.8.8.8
+PING 8.8.8.8 (8.8.8.8): 56 data bytes
+64 bytes from 8.8.8.8: icmp_seq=0 ttl=44 time=10.022 ms
+
+--- 8.8.8.8 ping statistics ---
+1 packets transmitted, 1 packets received, 0.0% packet loss
+round-trip min/avg/max/stddev = 10.022/10.022/10.022/0.000 ms
+</code></pre>
+	</li>
+	<li>
+	<p>echo.</p>
+
+	<pre>
+<code>$ echo Hello World
+Hello World
+</code></pre>
+	</li>
+</ul>
+
+<h3>Shell Script</h3>
+
+<ul>
+	<li>
+	<p>建立&nbsp;<code>hello_world.sh</code>&nbsp;档案。</p>
+
+	<pre>
+<code>#!/bin/bash
+echo &#39;Hello World&#39;
+</code></pre>
+	</li>
+	<li>
+	<p>执行。</p>
+
+	<pre>
+<code>$ bash hello_world.sh
+Hello World
+</code></pre>
+	</li>
+</ul>
+
+<h2>后话</h2>
+
+<p>大家或许会问，会写 script 就够用了，为什么还要会写 playbook 呢？冻仁在此列了几个理由给大家参考：</p>
+
+<ol>
+	<li>若有现成的 script，我们可以用&nbsp;<code>shell</code>&nbsp;module 来执行它，这部份虽不冲突，但使用&nbsp;<code>shell</code>&nbsp;module 会造成每次跑 playbook 都会重复执行，不像其它 module 执行过就不会再执行了。</li>
+	<li>用 Ansible 的 module 可以把很多杂乱的指令给标准化，例如不同的 Linux 发行版本在安装套件时需代各种不同的参数。</li>
+	<li>在现有的 cloud native 的架构下，传统的 Shell Script 已不符使用，一般而言 Shell Script 只能对一台机器 (instance) 进行操作。</li>
+</ol>
+
+<p>相信大家都知道要怎么操作 Ansible 了，好好享受 Ansible 带给我们的乐趣吧！</p>
